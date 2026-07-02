@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "postgres-sb": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://med:med123456@localhost:5432/sb"
+      ],
+      "env": {}
+    }
+  }
+}

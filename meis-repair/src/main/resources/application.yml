@@ -1,0 +1,25 @@
+server:
+  port: 8086
+spring:
+  application:
+    name: meis-repair
+  flyway:
+    enabled: false
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:meis}
+    username: ${POSTGRES_USER:med}
+    password: ${POSTGRES_PASSWORD:med123456}
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER:localhost:8848}
+meis:
+  jwt:
+    secret: meis-saas-jwt-secret-change-in-production-256bits
+    issuer: meis-saas
+    expiration-ms: 86400000
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

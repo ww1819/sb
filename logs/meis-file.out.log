@@ -1,0 +1,28 @@
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.5)
+
+2026-07-02T10:36:28.053+08:00  INFO 26480 --- [meis-file] [           main] com.meis.saas.boot.MeisFileApplication   : Starting MeisFileApplication using Java 17.0.12 with PID 26480 (E:\workspace\sb\meis-file\target\meis-file-1.0.0-SNAPSHOT.jar started by Administrator in E:\workspace\sb)
+2026-07-02T10:36:28.058+08:00  INFO 26480 --- [meis-file] [           main] com.meis.saas.boot.MeisFileApplication   : The following 1 profile is active: "dev"
+2026-07-02T10:36:30.439+08:00  INFO 26480 --- [meis-file] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-07-02T10:36:30.442+08:00  INFO 26480 --- [meis-file] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-07-02T10:36:30.466+08:00  INFO 26480 --- [meis-file] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 6 ms. Found 0 Redis repository interfaces.
+2026-07-02T10:36:30.665+08:00  WARN 26480 --- [meis-file] [           main] o.m.s.mapper.ClassPathMapperScanner      : No MyBatis mapper was found in '[com.meis.saas.boot]' package. Please check your configuration.
+2026-07-02T10:36:30.781+08:00  INFO 26480 --- [meis-file] [           main] o.s.cloud.context.scope.GenericScope     : BeanFactory id=b0acd586-800d-3be4-ac5a-5ef5a6e7fc21
+2026-07-02T10:36:34.258+08:00  INFO 26480 --- [meis-file] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8092 (http)
+2026-07-02T10:36:34.353+08:00  INFO 26480 --- [meis-file] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-07-02T10:36:34.360+08:00  INFO 26480 --- [meis-file] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.20]
+2026-07-02T10:36:34.510+08:00  INFO 26480 --- [meis-file] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-07-02T10:36:34.512+08:00  INFO 26480 --- [meis-file] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 6228 ms
+ _ _   |_  _ _|_. ___ _ |    _ 
+| | |\/|_)(_| | |_\  |_)||_|_\ 
+     /               |         
+                        3.5.5 
+2026-07-02T10:36:44.264+08:00  INFO 26480 --- [meis-file] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
+2026-07-02T10:36:44.479+08:00  INFO 26480 --- [meis-file] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8092 (http) with context path ''
+2026-07-02T10:36:44.647+08:00  INFO 26480 --- [meis-file] [           main] com.meis.saas.boot.MeisFileApplication   : Started MeisFileApplication in 18.097 seconds (process running for 20.328)

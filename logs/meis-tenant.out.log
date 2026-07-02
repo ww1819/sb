@@ -1,0 +1,43 @@
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.5)
+
+2026-07-02T10:36:11.939+08:00  INFO 28072 --- [meis-tenant] [           main] c.meis.saas.boot.MeisTenantApplication   : Starting MeisTenantApplication using Java 17.0.12 with PID 28072 (E:\workspace\sb\meis-tenant\target\meis-tenant-1.0.0-SNAPSHOT.jar started by Administrator in E:\workspace\sb)
+2026-07-02T10:36:11.941+08:00  INFO 28072 --- [meis-tenant] [           main] c.meis.saas.boot.MeisTenantApplication   : The following 1 profile is active: "dev"
+2026-07-02T10:36:12.740+08:00  INFO 28072 --- [meis-tenant] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-07-02T10:36:12.741+08:00  INFO 28072 --- [meis-tenant] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-07-02T10:36:12.759+08:00  INFO 28072 --- [meis-tenant] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 8 ms. Found 0 Redis repository interfaces.
+2026-07-02T10:36:12.853+08:00  WARN 28072 --- [meis-tenant] [           main] o.m.s.mapper.ClassPathMapperScanner      : No MyBatis mapper was found in '[com.meis.saas.boot]' package. Please check your configuration.
+2026-07-02T10:36:12.906+08:00  INFO 28072 --- [meis-tenant] [           main] o.s.cloud.context.scope.GenericScope     : BeanFactory id=f3e0cda5-2d6b-3b67-ae29-1129729c4061
+2026-07-02T10:36:13.565+08:00  INFO 28072 --- [meis-tenant] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8082 (http)
+2026-07-02T10:36:13.580+08:00  INFO 28072 --- [meis-tenant] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-07-02T10:36:13.581+08:00  INFO 28072 --- [meis-tenant] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.20]
+2026-07-02T10:36:13.635+08:00  INFO 28072 --- [meis-tenant] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-07-02T10:36:13.636+08:00  INFO 28072 --- [meis-tenant] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1634 ms
+ _ _   |_  _ _|_. ___ _ |    _ 
+| | |\/|_)(_| | |_\  |_)||_|_\ 
+     /               |         
+                        3.5.5 
+2026-07-02T10:36:15.845+08:00  INFO 28072 --- [meis-tenant] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
+2026-07-02T10:36:16.048+08:00  INFO 28072 --- [meis-tenant] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8082 (http) with context path ''
+2026-07-02T10:36:16.139+08:00  INFO 28072 --- [meis-tenant] [           main] c.meis.saas.boot.MeisTenantApplication   : Started MeisTenantApplication in 4.616 seconds (process running for 4.935)
+2026-07-02T10:36:16.457+08:00  INFO 28072 --- [meis-tenant] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-07-02T10:36:17.255+08:00  INFO 28072 --- [meis-tenant] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@43b74979
+2026-07-02T10:36:17.259+08:00  INFO 28072 --- [meis-tenant] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-07-02T10:36:17.314+08:00  INFO 28072 --- [meis-tenant] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:postgresql://localhost:5432/meis (PostgreSQL 15.18)
+2026-07-02T10:36:17.513+08:00  INFO 28072 --- [meis-tenant] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 3 migrations (execution time 00:00.149s)
+2026-07-02T10:36:18.071+08:00  INFO 28072 --- [meis-tenant] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema "public": 3
+2026-07-02T10:36:18.073+08:00  INFO 28072 --- [meis-tenant] [           main] o.f.core.internal.command.DbMigrate      : Schema "public" is up to date. No migration necessary.
+2026-07-02T10:36:18.092+08:00  INFO 28072 --- [meis-tenant] [           main] c.m.s.common.flyway.TenantFlywayService  : Migrated schema public
+2026-07-02T10:36:18.093+08:00  INFO 28072 --- [meis-tenant] [           main] c.m.s.tenant.config.TenantStartupRunner  : Public schema migrated
+2026-07-02T10:36:18.243+08:00  INFO 28072 --- [meis-tenant] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:postgresql://localhost:5432/meis (PostgreSQL 15.18)
+2026-07-02T10:36:18.269+08:00  INFO 28072 --- [meis-tenant] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 6 migrations (execution time 00:00.020s)
+2026-07-02T10:36:18.280+08:00  INFO 28072 --- [meis-tenant] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema "tenant_demo": 6
+2026-07-02T10:36:18.281+08:00  INFO 28072 --- [meis-tenant] [           main] o.f.core.internal.command.DbMigrate      : Schema "tenant_demo" is up to date. No migration necessary.
+2026-07-02T10:36:18.285+08:00  INFO 28072 --- [meis-tenant] [           main] c.m.s.common.flyway.TenantFlywayService  : Migrated schema tenant_demo
+2026-07-02T10:36:18.384+08:00  INFO 28072 --- [meis-tenant] [           main] c.m.s.tenant.config.TenantStartupRunner  : Tenant schema ready: demo (tenant_demo)

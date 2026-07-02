@@ -1,0 +1,28 @@
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.5)
+
+2026-07-02T10:36:24.907+08:00  INFO 5056 --- [meis-special] [           main] c.meis.saas.boot.MeisSpecialApplication  : Starting MeisSpecialApplication using Java 17.0.12 with PID 5056 (E:\workspace\sb\meis-special\target\meis-special-1.0.0-SNAPSHOT.jar started by Administrator in E:\workspace\sb)
+2026-07-02T10:36:24.910+08:00  INFO 5056 --- [meis-special] [           main] c.meis.saas.boot.MeisSpecialApplication  : The following 1 profile is active: "dev"
+2026-07-02T10:36:28.732+08:00  INFO 5056 --- [meis-special] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-07-02T10:36:28.744+08:00  INFO 5056 --- [meis-special] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-07-02T10:36:28.787+08:00  INFO 5056 --- [meis-special] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 21 ms. Found 0 Redis repository interfaces.
+2026-07-02T10:36:31.166+08:00  WARN 5056 --- [meis-special] [           main] o.m.s.mapper.ClassPathMapperScanner      : No MyBatis mapper was found in '[com.meis.saas.boot]' package. Please check your configuration.
+2026-07-02T10:36:31.687+08:00  INFO 5056 --- [meis-special] [           main] o.s.cloud.context.scope.GenericScope     : BeanFactory id=8050766e-5199-38f8-b0fe-dd2b73401007
+2026-07-02T10:36:35.090+08:00  INFO 5056 --- [meis-special] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8090 (http)
+2026-07-02T10:36:35.110+08:00  INFO 5056 --- [meis-special] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-07-02T10:36:35.110+08:00  INFO 5056 --- [meis-special] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.20]
+2026-07-02T10:36:35.188+08:00  INFO 5056 --- [meis-special] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-07-02T10:36:35.189+08:00  INFO 5056 --- [meis-special] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 10200 ms
+ _ _   |_  _ _|_. ___ _ |    _ 
+| | |\/|_)(_| | |_\  |_)||_|_\ 
+     /               |         
+                        3.5.5 
+2026-07-02T10:36:45.110+08:00  INFO 5056 --- [meis-special] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
+2026-07-02T10:36:45.162+08:00  INFO 5056 --- [meis-special] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8090 (http) with context path ''
+2026-07-02T10:36:45.192+08:00  INFO 5056 --- [meis-special] [           main] c.meis.saas.boot.MeisSpecialApplication  : Started MeisSpecialApplication in 22.249 seconds (process running for 23.535)

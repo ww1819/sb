@@ -1,0 +1,28 @@
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.5)
+
+2026-07-02T10:36:30.725+08:00  INFO 5400 --- [meis-integration] [           main] c.m.s.boot.MeisIntegrationApplication    : Starting MeisIntegrationApplication using Java 17.0.12 with PID 5400 (E:\workspace\sb\meis-integration\target\meis-integration-1.0.0-SNAPSHOT.jar started by Administrator in E:\workspace\sb)
+2026-07-02T10:36:30.731+08:00  INFO 5400 --- [meis-integration] [           main] c.m.s.boot.MeisIntegrationApplication    : The following 1 profile is active: "dev"
+2026-07-02T10:36:32.656+08:00  INFO 5400 --- [meis-integration] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-07-02T10:36:32.659+08:00  INFO 5400 --- [meis-integration] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-07-02T10:36:32.676+08:00  INFO 5400 --- [meis-integration] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 3 ms. Found 0 Redis repository interfaces.
+2026-07-02T10:36:32.876+08:00  WARN 5400 --- [meis-integration] [           main] o.m.s.mapper.ClassPathMapperScanner      : No MyBatis mapper was found in '[com.meis.saas.boot]' package. Please check your configuration.
+2026-07-02T10:36:32.991+08:00  INFO 5400 --- [meis-integration] [           main] o.s.cloud.context.scope.GenericScope     : BeanFactory id=68111374-abb0-3791-9ef6-2a3b5e9c8553
+2026-07-02T10:36:34.389+08:00  INFO 5400 --- [meis-integration] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8094 (http)
+2026-07-02T10:36:34.415+08:00  INFO 5400 --- [meis-integration] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-07-02T10:36:34.416+08:00  INFO 5400 --- [meis-integration] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.20]
+2026-07-02T10:36:34.491+08:00  INFO 5400 --- [meis-integration] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-07-02T10:36:34.493+08:00  INFO 5400 --- [meis-integration] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 3612 ms
+ _ _   |_  _ _|_. ___ _ |    _ 
+| | |\/|_)(_| | |_\  |_)||_|_\ 
+     /               |         
+                        3.5.5 
+2026-07-02T10:36:41.737+08:00  INFO 5400 --- [meis-integration] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
+2026-07-02T10:36:42.435+08:00  INFO 5400 --- [meis-integration] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8094 (http) with context path ''
+2026-07-02T10:36:44.051+08:00  INFO 5400 --- [meis-integration] [           main] c.m.s.boot.MeisIntegrationApplication    : Started MeisIntegrationApplication in 15.029 seconds (process running for 17.123)

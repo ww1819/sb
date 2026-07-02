@@ -1,0 +1,49 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+  cloud:
+    gateway:
+      routes:
+        - id: meis-auth
+          uri: http://localhost:8081
+          predicates: [Path=/api/auth/**]
+        - id: meis-tenant
+          uri: http://localhost:8082
+          predicates: [Path=/api/tenant/**]
+        - id: meis-system
+          uri: http://localhost:8083
+          predicates: [Path=/api/system/**]
+        - id: meis-purchase
+          uri: http://localhost:8084
+          predicates: [Path=/api/purchase/**]
+        - id: meis-asset
+          uri: http://localhost:8085
+          predicates: [Path=/api/asset/**]
+        - id: meis-repair
+          uri: http://localhost:8086
+          predicates: [Path=/api/repair/**]
+        - id: meis-maintain
+          uri: http://localhost:8087
+          predicates: [Path=/api/maintain/**]
+        - id: meis-qc
+          uri: http://localhost:8088
+          predicates: [Path=/api/qc/**]
+        - id: meis-maintenance-contract
+          uri: http://localhost:8089
+          predicates: [Path=/api/maintenance-contract/**]
+        - id: meis-special
+          uri: http://localhost:8090
+          predicates: [Path=/api/special/**]
+        - id: meis-analytics
+          uri: http://localhost:8091
+          predicates: [Path=/api/analytics/**]
+        - id: meis-file
+          uri: http://localhost:8092
+          predicates: [Path=/api/file/**]
+        - id: meis-notification
+          uri: http://localhost:8093
+          predicates: [Path=/api/notification/**]
+        - id: meis-integration
+          uri: http://localhost:8094
+          predicates: [Path=/api/integration/**]

@@ -1,0 +1,20 @@
+pipeline {
+    agent any
+    stages {
+        stage('Build') {
+            steps {
+                sh 'mvn -B package -DskipTests'
+            }
+        }
+        stage('Docker') {
+            steps {
+                sh 'docker build -t meis/gateway:1.0.0 meis-gateway'
+            }
+        }
+        stage('Deploy') {
+            steps {
+                sh 'kubectl apply -f deploy/k8s/'
+            }
+        }
+    }
+}

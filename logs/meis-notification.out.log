@@ -1,0 +1,34 @@
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.5)
+
+2026-07-02T10:36:29.398+08:00  INFO 32428 --- [meis-notification] [           main] c.m.s.boot.MeisNotificationApplication   : Starting MeisNotificationApplication using Java 17.0.12 with PID 32428 (E:\workspace\sb\meis-notification\target\meis-notification-1.0.0-SNAPSHOT.jar started by Administrator in E:\workspace\sb)
+2026-07-02T10:36:29.402+08:00  INFO 32428 --- [meis-notification] [           main] c.m.s.boot.MeisNotificationApplication   : The following 1 profile is active: "dev"
+2026-07-02T10:36:32.584+08:00  INFO 32428 --- [meis-notification] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-07-02T10:36:32.593+08:00  INFO 32428 --- [meis-notification] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-07-02T10:36:32.615+08:00  INFO 32428 --- [meis-notification] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 7 ms. Found 0 Redis repository interfaces.
+2026-07-02T10:36:32.823+08:00  WARN 32428 --- [meis-notification] [           main] o.m.s.mapper.ClassPathMapperScanner      : No MyBatis mapper was found in '[com.meis.saas.boot]' package. Please check your configuration.
+2026-07-02T10:36:32.988+08:00  INFO 32428 --- [meis-notification] [           main] o.s.cloud.context.scope.GenericScope     : BeanFactory id=888b7a23-abb2-3144-b395-bb5977876c0f
+2026-07-02T10:36:35.388+08:00  INFO 32428 --- [meis-notification] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8093 (http)
+2026-07-02T10:36:35.424+08:00  INFO 32428 --- [meis-notification] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-07-02T10:36:35.429+08:00  INFO 32428 --- [meis-notification] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.20]
+2026-07-02T10:36:35.515+08:00  INFO 32428 --- [meis-notification] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-07-02T10:36:35.520+08:00  INFO 32428 --- [meis-notification] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 5908 ms
+ _ _   |_  _ _|_. ___ _ |    _ 
+| | |\/|_)(_| | |_\  |_)||_|_\ 
+     /               |         
+                        3.5.5 
+2026-07-02T10:36:44.231+08:00  INFO 32428 --- [meis-notification] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
+2026-07-02T10:36:44.434+08:00  INFO 32428 --- [meis-notification] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8093 (http) with context path ''
+2026-07-02T10:36:44.550+08:00  INFO 32428 --- [meis-notification] [           main] c.m.s.boot.MeisNotificationApplication   : Started MeisNotificationApplication in 16.579 seconds (process running for 18.517)
+2026-07-02T10:38:33.395+08:00  INFO 32428 --- [meis-notification] [nio-8093-exec-2] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-07-02T10:38:33.396+08:00  INFO 32428 --- [meis-notification] [nio-8093-exec-2] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-07-02T10:38:33.398+08:00  INFO 32428 --- [meis-notification] [nio-8093-exec-2] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+2026-07-02T10:38:33.461+08:00  INFO 32428 --- [meis-notification] [nio-8093-exec-2] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-07-02T10:38:33.624+08:00  INFO 32428 --- [meis-notification] [nio-8093-exec-2] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@4373f93c
+2026-07-02T10:38:33.627+08:00  INFO 32428 --- [meis-notification] [nio-8093-exec-2] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.

@@ -1,0 +1,36 @@
+openapi: 3.0.3
+info:
+  title: MEIS Integration API
+  version: 2.0.0
+  description: HIS/PACS/LIS/HRP/企业微信集成契约
+paths:
+  /api/integration/HIS/sync:
+    post:
+      summary: HIS 数据同步
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                taskType:
+                  type: string
+                patientVisits:
+                  type: array
+                  items:
+                    type: object
+  /api/integration/PACS/sync:
+    post:
+      summary: PACS 影像检查同步
+  /api/integration/LIS/sync:
+    post:
+      summary: LIS 检验数据同步
+  /api/integration/HRP/sync:
+    post:
+      summary: HRP 资产折旧同步
+  /api/integration/WECHAT_WORK/sync:
+    post:
+      summary: 企业微信消息推送
+  /api/integration/tasks:
+    get:
+      summary: 同步任务列表
