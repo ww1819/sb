@@ -1,0 +1,33 @@
+:root {
+  --meis-header-height: 56px;
+  --meis-tabbar-height: 40px;
+  --meis-page-bg: #f0f2f5;
+  --meis-card-radius: 8px;
+  --meis-card-shadow: 0 1px 4px rgba(0, 21, 41, 0.06);
+  --meis-header-gradient-start: #001529;
+  --meis-header-gradient-end: #003a70;
+  --meis-text-primary: #303133;
+  --meis-text-secondary: #909399;
+  --meis-border-light: #ebeef5;
+
+  --meis-space-sm: 8px;
+  --meis-space-md: 16px;
+  --meis-space-lg: 24px;
+  --meis-surface-muted: #fafbfc;
+  --meis-surface-header: #fafafa;
+  --meis-shadow-dropdown: 0 6px 16px rgba(0, 21, 41, 0.08);
+  --meis-status-success: #52c41a;
+  --meis-status-disabled: #c0c4cc;
+  --meis-avatar-size: 36px;
+  --meis-table-row-height: 52px;
+  --meis-table-hover: #f5f9ff;
+
+  --el-color-primary: #1677ff;
+  --el-color-primary-light-3: #4096ff;
+  --el-color-primary-light-5: #69b1ff;
+  --el-color-primary-light-7: #91caff;
+  --el-color-primary-light-8: #bae0ff;
+  --el-color-primary-light-9: #e6f4ff;
+  --el-color-primary-dark-2: #0958d9;
+  --el-border-radius-base: 6px;
+}
