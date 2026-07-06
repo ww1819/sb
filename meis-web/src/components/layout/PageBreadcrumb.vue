@@ -21,7 +21,7 @@ defineProps<{
   align-items: center;
   flex-wrap: wrap;
   gap: 4px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   font-size: var(--meis-font-subtitle);
   color: var(--meis-text-secondary);
 }

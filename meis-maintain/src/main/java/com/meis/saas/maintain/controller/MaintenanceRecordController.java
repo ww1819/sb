@@ -1,6 +1,7 @@
 package com.meis.saas.maintain.controller;
 
 import com.meis.saas.common.audit.OperationLog;
+import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.result.Result;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,13 @@ import java.util.*;
 public class MaintenanceRecordController {
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper = new ObjectMapper();
+
+    @GetMapping("/{id}")
+    public Result<Map<String, Object>> get(@PathVariable UUID id) {
+        var rows = jdbc.queryForList("SELECT * FROM maintenance_record WHERE id = ?::uuid", id);
+        if (rows.isEmpty()) throw new BizException(404, "not found");
+        return Result.ok(rows.get(0));
+    }
 
     @PostMapping
     @OperationLog(module = "maintain", description = "提交保养记录")
@@ -35,6 +43,10 @@ public class MaintenanceRecordController {
         } else {
             jdbc.update("UPDATE maintenance_record SET items_result=?::jsonb, overall_result=?, signature_url=?, status=?, updated_at=NOW() WHERE id=?::uuid",
                     itemsJson, body.get("overall_result"), body.get("signature_url"), body.get("status"), id);
+        }
+        if (body.get("plan_id") != null && "submitted".equals(body.get("status"))) {
+            jdbc.update("UPDATE maintenance_plan SET last_maintained_at = CURRENT_DATE, status = 'active', updated_at = NOW() WHERE id = ?::uuid",
+                    body.get("plan_id"));
         }
         return Result.ok(jdbc.queryForList("SELECT * FROM maintenance_record WHERE id = ?::uuid", id).get(0));
     }

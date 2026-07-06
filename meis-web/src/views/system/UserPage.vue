@@ -227,11 +227,10 @@
       </template>
     </el-dialog>
 
-    <el-drawer
+    <AppModal
       v-model="permVisible"
-      :title="'调整权限'"
-      size="640px"
-      destroy-on-close
+      title="调整权限"
+      size="lg"
     >
       <div v-if="currentUser" class="drawer-user-bar">
         <div class="user-avatar" :style="avatarStyle(currentUser.real_name || currentUser.username)">
@@ -256,12 +255,10 @@
       </div>
       <PermissionEditor ref="permEditorRef" :value="permValue" />
       <template #footer>
-        <div class="drawer-footer">
-          <el-button @click="permVisible = false">取消</el-button>
-          <el-button type="primary" :loading="savingPerm" @click="savePerm">保存权限</el-button>
-        </div>
+        <el-button @click="permVisible = false">取消</el-button>
+        <el-button type="primary" :loading="savingPerm" @click="savePerm">保存权限</el-button>
       </template>
-    </el-drawer>
+    </AppModal>
   </SystemPageCard>
 </template>
 
@@ -274,10 +271,10 @@ import SystemPageCard from '@/components/system/SystemPageCard.vue'
 import PageFilterBar from '@/components/system/PageFilterBar.vue'
 import { fetchPage, usePagedList } from '@/composables/usePagedList'
 import PermissionEditor, { type PermissionModel } from '@/components/PermissionEditor.vue'
+import AppModal from '@/components/AppModal.vue'
+import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
 
-const tableHeight = computed(
-  () => 'calc(100vh - var(--meis-header-height) - var(--meis-tabbar-height) - 300px)'
-)
+const tableHeight = useSystemTableHeight()
 
 const filterActive = ref<boolean | ''>('')
 const roleOptions = ref<any[]>([])

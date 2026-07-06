@@ -10,7 +10,7 @@ export interface PageResult<T> {
 }
 
 export function usePagedList<T = Record<string, unknown>>(loader: (params: URLSearchParams) => Promise<{ code: number; data?: PageResult<T>; message?: string }>) {
-  const rows = ref<T[]>([]) as { value: T[] }
+  const rows = ref<T[]>([])
   const total = ref(0)
   const page = ref(1)
   const size = ref(20)

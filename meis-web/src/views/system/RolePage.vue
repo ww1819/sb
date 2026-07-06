@@ -3,7 +3,7 @@
     <template #actions>
       <el-button type="primary" @click="openCreate">新建角色</el-button>
     </template>
-    <el-table :data="filteredRoles" border stripe class="system-table">
+    <el-table :data="filteredRoles" border stripe class="system-table" :height="tableHeight">
       <el-table-column prop="role_code" label="角色编码" width="140" />
       <el-table-column prop="role_name" label="角色名称" width="160" />
       <el-table-column prop="description" label="描述" show-overflow-tooltip />
@@ -49,18 +49,20 @@
       </template>
     </el-dialog>
 
-    <el-drawer v-model="permVisible" :title="'权限授权 - ' + (currentRole?.role_name || '')" size="640px" destroy-on-close>
+    <AppModal
+      v-model="permVisible"
+      :title="'权限授权 - ' + (currentRole?.role_name || '')"
+      size="lg"
+    >
       <PermissionEditor ref="permEditorRef" :value="permValue" />
       <template #footer>
-        <div class="drawer-footer">
-          <el-button @click="permVisible = false">取消</el-button>
-          <el-button type="primary" @click="savePerm">保存权限</el-button>
-          <el-button type="warning" @click="syncCurrent">
-            <el-icon><Refresh /></el-icon>同步到用户
-          </el-button>
-        </div>
+        <el-button @click="permVisible = false">取消</el-button>
+        <el-button type="primary" @click="savePerm">保存权限</el-button>
+        <el-button type="warning" @click="syncCurrent">
+          <el-icon><Refresh /></el-icon>同步到用户
+        </el-button>
       </template>
-    </el-drawer>
+    </AppModal>
   </SystemPageCard>
 </template>
 
@@ -70,7 +72,11 @@ import { Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
+import AppModal from '@/components/AppModal.vue'
 import PermissionEditor, { type PermissionModel } from '@/components/PermissionEditor.vue'
+import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
+
+const tableHeight = useSystemTableHeight()
 
 const roles = ref<any[]>([])
 const keyword = ref('')

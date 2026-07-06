@@ -25,5 +25,6 @@ defineEmits<{ 'add-item': [] }>()
 
 <style scoped>
 .master-detail { display: flex; flex-direction: column; gap: 16px; }
+.master-detail :deep(.el-table) { max-height: 360px; }
 .add-btn { margin-top: 8px; }
 </style>

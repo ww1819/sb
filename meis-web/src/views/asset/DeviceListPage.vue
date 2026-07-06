@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="device-list-page">
     <CrudPage v-if="!selectedDevice" :config="config" @detail="openDevice" />
     <template v-else>
       <el-button @click="selectedDevice = null">返回列表</el-button>
@@ -23,3 +23,11 @@ async function openDevice(row: Record<string, unknown>) {
   selectedDevice.value = data.data
 }
 </script>
+
+<style scoped>
+.device-list-page {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+</style>

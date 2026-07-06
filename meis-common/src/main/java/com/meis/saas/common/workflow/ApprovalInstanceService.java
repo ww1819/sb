@@ -98,12 +98,48 @@ public class ApprovalInstanceService {
             case "purchase_contract" -> jdbc.update("UPDATE purchase_contract SET approval_status = ? WHERE id = ?::uuid", status, businessId);
             case "device_scrap" -> {
                 jdbc.update("UPDATE device_scrap SET approval_status = ?, status = ? WHERE id = ?::uuid", status, status, businessId);
+                if ("approved".equals(status)) autoDisposeScrap(businessId);
             }
             case "asset_transfer" -> {
                 jdbc.update("UPDATE asset_transfer SET approval_status = ?, status = ? WHERE id = ?::uuid", status, status, businessId);
+                if ("approved".equals(status)) autoExecuteTransfer(businessId);
             }
-            case "device_outbound" -> jdbc.update("UPDATE device_outbound SET doc_status = ? WHERE id = ?::uuid", status, businessId);
+            case "device_outbound" -> {
+                jdbc.update("UPDATE device_outbound SET doc_status = ? WHERE id = ?::uuid", status, businessId);
+                if ("approved".equals(status)) autoIssueOutbound(businessId);
+            }
             default -> {}
+        }
+    }
+
+    private void autoExecuteTransfer(UUID id) {
+        var row = jdbc.queryForList("SELECT * FROM asset_transfer WHERE id = ?::uuid", id);
+        if (row.isEmpty()) return;
+        Map<String, Object> t = row.get(0);
+        if (t.get("to_dept_id") != null && t.get("device_id") != null) {
+            jdbc.update("UPDATE medical_device SET dept_id = ?::uuid, updated_at = NOW() WHERE id = ?::uuid",
+                    t.get("to_dept_id"), t.get("device_id"));
+        }
+        jdbc.update("UPDATE asset_transfer SET status = 'completed', updated_at = NOW() WHERE id = ?::uuid", id);
+    }
+
+    private void autoIssueOutbound(UUID id) {
+        var items = jdbc.queryForList("SELECT device_id FROM device_outbound_item WHERE outbound_id = ?::uuid", id);
+        for (Map<String, Object> item : items) {
+            if (item.get("device_id") != null) {
+                jdbc.update("UPDATE medical_device SET device_status = 'in_use', updated_at = NOW() WHERE id = ?::uuid",
+                        item.get("device_id"));
+            }
+        }
+        jdbc.update("UPDATE device_outbound SET status = 'issued', doc_status = 'approved', updated_at = NOW() WHERE id = ?::uuid", id);
+    }
+
+    private void autoDisposeScrap(UUID id) {
+        var row = jdbc.queryForList("SELECT device_id FROM device_scrap WHERE id = ?::uuid", id);
+        if (!row.isEmpty() && row.get(0).get("device_id") != null) {
+            jdbc.update("UPDATE medical_device SET device_status = 'scrap', updated_at = NOW() WHERE id = ?::uuid",
+                    row.get(0).get("device_id"));
+            jdbc.update("UPDATE device_scrap SET status = 'approved', updated_at = NOW() WHERE id = ?::uuid", id);
         }
     }
 

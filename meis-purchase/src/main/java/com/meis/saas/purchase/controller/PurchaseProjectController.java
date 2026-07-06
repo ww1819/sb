@@ -32,12 +32,22 @@ public class PurchaseProjectController {
         UUID id = body.containsKey("id") ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
         boolean exists = !jdbc.queryForList("SELECT 1 FROM purchase_project WHERE id = ?::uuid", id).isEmpty();
         if (exists) {
-            jdbc.update("UPDATE purchase_project SET project_name=?, plan_id=?::uuid, purchase_method=?, status=?, updated_at=NOW() WHERE id=?::uuid",
-                    body.get("project_name"), body.get("plan_id"), body.get("purchase_method"), body.getOrDefault("status", "draft"), id);
+            jdbc.update("""
+                UPDATE purchase_project SET project_name=?, plan_id=?::uuid, purchase_method=?, supplier_id=?::uuid,
+                total_amount=?, bid_open_date=?, award_date=?, bid_sections=?, bid_evaluation=?, status=?, updated_at=NOW()
+                WHERE id=?::uuid
+                """,
+                    body.get("project_name"), body.get("plan_id"), body.get("purchase_method"), body.get("supplier_id"),
+                    body.get("total_amount"), body.get("bid_open_date"), body.get("award_date"),
+                    body.get("bid_sections"), body.get("bid_evaluation"), body.getOrDefault("status", "draft"), id);
         } else {
-            jdbc.update("INSERT INTO purchase_project (id, project_code, project_name, plan_id, purchase_method, status) VALUES (?::uuid,?,?,?::uuid,?,?)",
+            jdbc.update("""
+                INSERT INTO purchase_project (id, project_code, project_name, plan_id, purchase_method, supplier_id, total_amount, status)
+                VALUES (?::uuid,?,?,?::uuid,?,?::uuid,?,?)
+                """,
                     id, body.getOrDefault("project_code", "PJ" + System.currentTimeMillis()),
-                    body.get("project_name"), body.get("plan_id"), body.get("purchase_method"), "draft");
+                    body.get("project_name"), body.get("plan_id"), body.get("purchase_method"),
+                    body.get("supplier_id"), body.get("total_amount"), "draft");
         }
         return get(id);
     }

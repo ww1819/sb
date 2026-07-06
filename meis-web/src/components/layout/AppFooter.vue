@@ -21,8 +21,8 @@ import { APP_COPYRIGHT, APP_NAME, APP_SUPPORT, APP_VERSION } from '@/config/app'
   justify-content: center;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 16px;
-  padding: 12px 0 4px;
+  margin-top: 8px;
+  padding: 8px 0 4px;
   border-top: 1px solid var(--meis-border-light);
   font-size: 12px;
   color: var(--meis-text-secondary);

@@ -1,6 +1,6 @@
 <template>
   <SystemPageCard title="套餐管理" subtitle="查看平台套餐与包含菜单">
-    <el-table :data="packages" border stripe class="system-table" v-loading="loading">
+    <el-table :data="packages" border stripe class="system-table" :height="tableHeight" v-loading="loading">
       <el-table-column prop="package_code" label="套餐编码" width="140" />
       <el-table-column prop="package_name" label="名称" min-width="160" />
       <el-table-column prop="max_users" label="用户数上限" width="120" />
@@ -23,6 +23,9 @@
 import { onMounted, ref } from 'vue'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
+import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
+
+const tableHeight = useSystemTableHeight()
 
 const packages = ref<Record<string, unknown>[]>([])
 const packageMenus = ref<string[]>([])

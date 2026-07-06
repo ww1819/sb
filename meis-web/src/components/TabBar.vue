@@ -79,7 +79,7 @@ onUnmounted(() => document.removeEventListener('click', hideContextMenu))
   display: flex;
   align-items: flex-end;
   gap: 4px;
-  padding: 6px 16px 0;
+  padding: 4px 16px 0;
   background: #e8ecf1;
   border-bottom: 1px solid var(--meis-border-light);
   overflow-x: auto;

@@ -53,22 +53,20 @@
         </template>
       </el-table-column>
       <template #empty>
-        <PageEmpty description="暂无数据，点击下方按钮新建" action-text="新增" @action="openForm()" />
+        <PageEmpty description="暂无数据" />
       </template>
     </el-table>
 
-    <FormDrawer v-model="formVisible" :title="formTitle" @save="save">
+    <FormDrawer v-model="formVisible" :title="formTitle" size="lg" @save="save">
       <el-form label-width="120px">
-        <el-form-item v-for="f in formFields" :key="f.prop" :label="f.label" :required="f.required">
-          <FieldRenderer v-model="form[f.prop]" :field="f" />
-        </el-form-item>
+        <GroupedFormFields :table="config.table" :model="form" :fields="formFields" />
       </el-form>
     </FormDrawer>
   </SystemPageCard>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onActivated, onMounted, ref, watch } from 'vue'
 import http from '@/api/http'
 import FormDrawer from './FormDrawer.vue'
 import FieldRenderer from './FieldRenderer.vue'
@@ -77,8 +75,10 @@ import PageFilterBar from './system/PageFilterBar.vue'
 import TableCellValue from './table/TableCellValue.vue'
 import PageEmpty from './table/PageEmpty.vue'
 import type { PageConfig } from '@/config/pageRegistry'
-import { getSchema } from '@/config/pageSchemas'
+import { getListFields, getSchema } from '@/config/pageSchemas'
+import GroupedFormFields from './form/GroupedFormFields.vue'
 import { columnAlign } from '@/utils/tableCell'
+import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
 
 const props = defineProps<{ config: PageConfig }>()
 const emit = defineEmits<{ detail: [row: Record<string, unknown>] }>()
@@ -93,13 +93,11 @@ const formVisible = ref(false)
 const form = ref<Record<string, unknown>>({})
 const formTitle = ref('新增')
 
-const tableHeight = computed(
-  () => 'calc(100vh - var(--meis-header-height) - var(--meis-tabbar-height) - 300px)'
-)
+const tableHeight = useSystemTableHeight()
 
 const schema = computed(() => getSchema(props.config.table))
 const listFields = computed(() => {
-  const s = schema.value.filter((f) => f.list)
+  const s = getListFields(props.config.table)
   if (s.length) return s
   const first = rows.value[0]
   if (!first) return [{ prop: 'id', label: 'id' }]
@@ -166,5 +164,15 @@ function onRowDblClick(row: Record<string, unknown>) {
 }
 
 watch(() => props.config, load, { deep: true })
-onMounted(load)
+
+let initialized = false
+onMounted(async () => {
+  await load()
+  initialized = true
+})
+onActivated(() => {
+  if (initialized) load()
+})
+
+defineExpose({ load })
 </script>

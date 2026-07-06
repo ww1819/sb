@@ -51,15 +51,34 @@ public class PurchasePlanController {
         }
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> items = (List<Map<String, Object>>) body.getOrDefault("items", List.of());
+        double totalBudget = 0;
+        for (Map<String, Object> item : items) {
+            Number qty = item.get("quantity") instanceof Number n ? n : 1;
+            Number price = item.get("estimated_price") instanceof Number n ? n : 0;
+            double lineTotal = qty.doubleValue() * price.doubleValue();
+            item.put("total_price", lineTotal);
+            totalBudget += lineTotal;
+        }
+        if (body.get("plan_year") != null) {
+            int year = ((Number) body.get("plan_year")).intValue();
+            var dup = jdbc.queryForList(
+                    "SELECT id FROM purchase_plan WHERE plan_year = ? AND id != ?::uuid AND is_active = true LIMIT 1",
+                    year, id);
+            if (!dup.isEmpty() && !exists) {
+                throw new BizException(400, "该年度已有采购计划");
+            }
+        }
         jdbc.update("DELETE FROM purchase_plan_item WHERE plan_id = ?::uuid", id);
         for (Map<String, Object> item : items) {
             jdbc.update("""
-                INSERT INTO purchase_plan_item (id, plan_id, device_name, quantity, estimated_price, total_price, specification, justification)
-                VALUES (?::uuid,?::uuid,?,?,?,?,?,?)
+                INSERT INTO purchase_plan_item (id, plan_id, device_name, category_id, quantity, estimated_price, total_price, specification, priority, justification)
+                VALUES (?::uuid,?::uuid,?,?::uuid,?,?,?,?,?,?)
                 """,
-                    UUID.randomUUID(), id, item.get("device_name"), item.get("quantity"),
-                    item.get("estimated_price"), item.get("total_price"), item.get("specification"), item.get("justification"));
+                    UUID.randomUUID(), id, item.get("device_name"), item.get("category_id"), item.get("quantity"),
+                    item.get("estimated_price"), item.get("total_price"), item.get("specification"),
+                    item.getOrDefault("priority", 1), item.get("justification"));
         }
+        jdbc.update("UPDATE purchase_plan SET total_budget = ?, updated_at = NOW() WHERE id = ?::uuid", totalBudget, id);
         return get(id);
     }
 

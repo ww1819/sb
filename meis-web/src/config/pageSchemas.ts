@@ -1,46 +1,35 @@
+import { businessSchemas } from './businessSchemas'
+
+export type FieldGroup =
+  | 'basic'
+  | 'finance'
+  | 'location'
+  | 'approval'
+  | 'attachment'
+  | 'remark'
+  | 'detail'
+  | 'workflow'
+  | 'time'
+  | 'status'
+  | 'other'
+
 export interface FieldSchema {
   prop: string
   label: string
-  type?: 'text' | 'number' | 'date' | 'select' | 'textarea'
+  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'textarea' | 'boolean' | 'json'
   dictType?: string
+  linkTable?: string
+  group?: FieldGroup
   required?: boolean
   readonly?: boolean
   list?: boolean
+  detail?: boolean
+  width?: number
+  span?: number
 }
 
 export const tableSchemas: Record<string, FieldSchema[]> = {
-  purchase_plan: [
-    { prop: 'plan_code', label: '计划编号', list: true },
-    { prop: 'plan_year', label: '年度', type: 'number', list: true },
-    { prop: 'total_budget', label: '预算总额', type: 'number', list: true },
-    { prop: 'approval_status', label: '审批状态', dictType: 'approval_status', list: true, readonly: true },
-    { prop: 'justification', label: '论证说明', type: 'textarea' }
-  ],
-  purchase_project: [
-    { prop: 'project_code', label: '项目编号', list: true },
-    { prop: 'project_name', label: '项目名称', list: true },
-    { prop: 'purchase_method', label: '采购方式', dictType: 'purchase_method', list: true },
-    { prop: 'status', label: '状态', list: true }
-  ],
-  purchase_contract: [
-    { prop: 'contract_code', label: '合同编号', list: true },
-    { prop: 'contract_name', label: '合同名称', list: true },
-    { prop: 'contract_amount', label: '合同金额', type: 'number', list: true },
-    { prop: 'approval_status', label: '审批状态', list: true }
-  ],
-  medical_device: [
-    { prop: 'device_code', label: '设备编码', list: true },
-    { prop: 'device_name', label: '设备名称', list: true },
-    { prop: 'brand', label: '品牌', list: true },
-    { prop: 'device_status', label: '状态', dictType: 'device_status', list: true }
-  ],
-  repair_workorder: [
-    { prop: 'wo_no', label: '工单号', list: true, readonly: true },
-    { prop: 'device_name', label: '设备', list: true },
-    { prop: 'fault_description', label: '故障描述', type: 'textarea', list: true },
-    { prop: 'urgency_level', label: '紧急度', dictType: 'urgency', list: true },
-    { prop: 'status', label: '状态', list: true, readonly: true }
-  ],
+  ...businessSchemas,
   sys_user: [
     { prop: 'username', label: '用户名', list: true },
     { prop: 'real_name', label: '姓名', list: true },
@@ -88,4 +77,46 @@ export const tableSchemas: Record<string, FieldSchema[]> = {
 
 export function getSchema(table: string): FieldSchema[] {
   return tableSchemas[table] ?? []
+}
+
+export function getListFields(table: string): FieldSchema[] {
+  const schema = getSchema(table)
+  const listed = schema.filter((f) => f.list)
+  return listed.length ? listed : schema.slice(0, 12)
+}
+
+export function getDetailFields(table: string): FieldSchema[] {
+  const schema = getSchema(table)
+  const detail = schema.filter((f) => f.detail)
+  return detail.length ? detail : schema.filter((f) => !f.readonly).slice(0, 10)
+}
+
+export function getGroupedFields(table: string): { group: FieldGroup; fields: FieldSchema[] }[] {
+  const schema = getSchema(table)
+  const groups = new Map<FieldGroup, FieldSchema[]>()
+  for (const f of schema) {
+    const g = f.group ?? 'other'
+    if (!groups.has(g)) groups.set(g, [])
+    groups.get(g)!.push(f)
+  }
+  const order: FieldGroup[] = ['basic', 'finance', 'location', 'time', 'status', 'workflow', 'approval', 'attachment', 'remark', 'other']
+  return order.filter((g) => groups.has(g)).map((g) => ({ group: g, fields: groups.get(g)! }))
+}
+
+const groupTitleMap: Record<FieldGroup, string> = {
+  basic: '基本信息',
+  finance: '财务信息',
+  location: '位置信息',
+  time: '时间信息',
+  status: '状态信息',
+  workflow: '流程信息',
+  approval: '审批信息',
+  attachment: '附件',
+  remark: '备注',
+  detail: '明细',
+  other: '其他'
+}
+
+export function groupTitle(g: FieldGroup) {
+  return groupTitleMap[g] ?? g
 }

@@ -36,16 +36,23 @@ public class PurchaseContractController {
         if (exists) {
             jdbc.update("""
                 UPDATE purchase_contract SET contract_name=?, project_id=?::uuid, supplier_id=?::uuid,
-                contract_amount=?, sign_date=?, approval_status=?, updated_at=NOW() WHERE id=?::uuid
+                contract_amount=?, sign_date=?, start_date=?, end_date=?, warranty_period=?, payment_terms=?,
+                acceptance_status=?, invoice_summary=?, approval_status=?, status=?, remark=?, updated_at=NOW()
+                WHERE id=?::uuid
                 """, body.get("contract_name"), body.get("project_id"), body.get("supplier_id"),
-                    body.get("contract_amount"), body.get("sign_date"), body.getOrDefault("approval_status", "draft"), id);
+                    body.get("contract_amount"), body.get("sign_date"), body.get("start_date"), body.get("end_date"),
+                    body.get("warranty_period"), body.get("payment_terms"), body.get("acceptance_status"),
+                    body.get("invoice_summary"), body.getOrDefault("approval_status", "draft"),
+                    body.getOrDefault("status", "active"), body.get("remark"), id);
         } else {
             jdbc.update("""
-                INSERT INTO purchase_contract (id, contract_code, contract_name, project_id, supplier_id, contract_amount, sign_date, approval_status)
-                VALUES (?::uuid,?,?,?::uuid,?::uuid,?,?,?)
+                INSERT INTO purchase_contract (id, contract_code, contract_name, project_id, supplier_id, contract_amount,
+                sign_date, start_date, end_date, warranty_period, payment_terms, approval_status, status)
+                VALUES (?::uuid,?,?,?::uuid,?::uuid,?,?,?,?,?,?,?,?)
                 """, id, body.getOrDefault("contract_code", "CT" + System.currentTimeMillis()),
                     body.get("contract_name"), body.get("project_id"), body.get("supplier_id"),
-                    body.get("contract_amount"), body.get("sign_date"), "draft");
+                    body.get("contract_amount"), body.get("sign_date"), body.get("start_date"), body.get("end_date"),
+                    body.get("warranty_period"), body.get("payment_terms"), "draft", "active");
         }
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> payments = (List<Map<String, Object>>) body.getOrDefault("payments", List.of());

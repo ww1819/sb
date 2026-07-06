@@ -3,7 +3,7 @@
     <template #actions>
       <el-button type="primary" @click="openFlowForm()">新增流程</el-button>
     </template>
-    <el-table :data="flows" border stripe class="system-table">
+    <el-table :data="flows" border stripe class="system-table" :height="flowTableHeight">
       <el-table-column prop="flow_code" label="流程编码" width="160" />
       <el-table-column prop="flow_name" label="流程名称" />
       <el-table-column prop="business_type" label="业务类型" width="140" />
@@ -28,7 +28,7 @@
         <span class="approval-nodes-title">审批节点 — {{ currentFlow.flow_name }}</span>
         <el-button type="primary" size="small" @click="openNodeForm()">新增节点</el-button>
       </div>
-      <el-table :data="nodes" border stripe class="system-table">
+      <el-table :data="nodes" border stripe class="system-table" max-height="240">
         <el-table-column prop="node_order" label="顺序" width="80" />
         <el-table-column prop="node_name" label="节点名称" />
         <el-table-column prop="approver_role" label="审批角色" width="140" />
@@ -71,10 +71,17 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
+import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
+
+const tableHeight = useSystemTableHeight()
+const flowTableHeight = computed(() => {
+  const base = tableHeight.value
+  return currentFlow.value ? Math.max(180, base - 300) : base
+})
 
 const loading = ref(false)
 

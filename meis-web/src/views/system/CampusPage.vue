@@ -3,7 +3,7 @@
     <template #actions>
       <el-button type="primary" @click="openForm()">新增院区</el-button>
     </template>
-    <el-table :data="filteredList" border stripe class="system-table">
+    <el-table :data="filteredList" border stripe class="system-table" :height="tableHeight">
       <el-table-column prop="campus_code" label="院区编码" width="100" />
       <el-table-column prop="campus_name" label="院区名称" />
       <el-table-column prop="address" label="地址" show-overflow-tooltip />
@@ -43,6 +43,9 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
+import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
+
+const tableHeight = useSystemTableHeight()
 
 const list = ref<any[]>([])
 const keyword = ref('')

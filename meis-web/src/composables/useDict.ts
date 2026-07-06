@@ -10,11 +10,12 @@ export function useDict() {
     if (cache.has(type)) return cache.get(type)!
     loading.value = true
     try {
-      const { data } = await http.get('/system/sys_dict/list', { params: { limit: 500 } })
+      const { data } = await http.get(`/system/dict/type/${type}`)
       const rows = data.data ?? []
-      const items = rows
-        .filter((r: Record<string, string>) => r.dict_type === type)
-        .map((r: Record<string, string>) => ({ label: r.dict_label, value: r.dict_value ?? r.dict_code }))
+      const items = rows.map((r: Record<string, string>) => ({
+        label: r.dict_label,
+        value: r.dict_value ?? r.dict_code
+      }))
       cache.set(type, items)
       return items
     } finally {

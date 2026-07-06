@@ -3,7 +3,7 @@
     <template #actions>
       <el-button type="primary" @click="openForm()">新增科室</el-button>
     </template>
-    <el-table :data="filteredList" border stripe row-key="id" default-expand-all class="system-table dept-tree-table">
+    <el-table :data="filteredList" border stripe row-key="id" default-expand-all class="system-table dept-tree-table" :height="tableHeight">
       <el-table-column prop="dept_code" label="科室编码" width="100" />
       <el-table-column prop="dept_name" label="科室名称" />
       <el-table-column prop="campus_name" label="院区" width="120" />
@@ -55,6 +55,9 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
+import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
+
+const tableHeight = useSystemTableHeight()
 
 const list = ref<any[]>([])
 const keyword = ref('')

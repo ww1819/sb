@@ -24,6 +24,13 @@ public class RepairWorkorderController {
             "accepted", Set.of("closed")
     );
 
+    @GetMapping("/{id}")
+    public Result<Map<String, Object>> get(@PathVariable UUID id) {
+        List<Map<String, Object>> rows = jdbc.queryForList("SELECT * FROM repair_workorder WHERE id = ?::uuid", id);
+        if (rows.isEmpty()) throw new BizException(404, "workorder not found");
+        return Result.ok(rows.get(0));
+    }
+
     @PostMapping
     @OperationLog(module = "repair", description = "创建报修工单")
     public Result<Map<String, Object>> create(@RequestBody Map<String, Object> body) {

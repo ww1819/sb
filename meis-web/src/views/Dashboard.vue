@@ -1,5 +1,5 @@
 <template>
-  <div class="dashboard dashboard-stagger">
+  <div class="dashboard dashboard-stagger page-view--scroll">
     <div class="dashboard-hero">
       <div>
         <h2 class="hero-title">{{ profile.title }}</h2>
@@ -227,6 +227,12 @@ function numVal(v: unknown) {
 </script>
 
 <style scoped>
+.dashboard {
+  height: 100%;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
 .dashboard-hero {
   display: flex;
   align-items: center;

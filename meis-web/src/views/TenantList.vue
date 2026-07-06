@@ -4,7 +4,7 @@
       <el-button type="primary" @click="openCreate">开户</el-button>
     </template>
 
-    <el-table :data="list" border stripe class="system-table">
+    <el-table :data="list" border stripe class="system-table" :height="tableHeight">
       <el-table-column prop="tenant_code" label="编码" width="120" />
       <el-table-column prop="tenant_name" label="名称" min-width="160" />
       <el-table-column prop="schema_name" label="Schema" width="160" />
@@ -86,6 +86,9 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
+import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
+
+const tableHeight = useSystemTableHeight()
 
 const router = useRouter()
 const list = ref<any[]>([])
@@ -155,12 +158,14 @@ async function create() {
   }
   creating.value = true
   try {
-    const { data } = await http.post('/tenant/create', form)
+    const { data } = await http.post('/tenant/create', form, { timeout: 180000 })
     if (data.code === 0) {
       showCreate.value = false
       Object.assign(credentials, data.data)
       showCredentials.value = true
       load()
+    } else {
+      ElMessage.error(data.message || '创建失败')
     }
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.message || '创建失败')

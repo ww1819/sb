@@ -74,6 +74,54 @@ function Test-MeisPortListening {
     return [bool](netstat -ano | Select-String ":\s*$Port\s+.*LISTENING")
 }
 
+function Test-MeisRedisAvailable {
+    try {
+        $client = New-Object System.Net.Sockets.TcpClient
+        $client.ReceiveTimeout = 2000
+        $client.SendTimeout = 2000
+        $client.Connect('127.0.0.1', 6379)
+        $stream = $client.GetStream()
+        $ping = [System.Text.Encoding]::ASCII.GetBytes("*1`r`n`$4`r`nPING`r`n")
+        $stream.Write($ping, 0, $ping.Length)
+        $buf = New-Object byte[] 128
+        $read = $stream.Read($buf, 0, $buf.Length)
+        $client.Close()
+        if ($read -le 0) { return $false }
+        $resp = [System.Text.Encoding]::ASCII.GetString($buf, 0, $read)
+        return $resp -match 'PONG'
+    } catch {
+        return $false
+    }
+}
+
+function Ensure-MeisRedis {
+    if (Test-MeisRedisAvailable) {
+        Write-Host "  OK redis PING/PONG :6379" -ForegroundColor Green
+        return $true
+    }
+    Write-Host "  WARN redis not ready on :6379 - disabling cache for this session" -ForegroundColor Yellow
+    $compose = Join-Path $script:MeisRoot "deploy\docker-compose\docker-compose.yml"
+    if (Get-Command docker -ErrorAction SilentlyContinue) {
+        if (Test-Path $compose) {
+            Write-Host "  Trying docker compose redis ..."
+            try {
+                docker compose -f $compose up -d redis 2>&1 | Out-Null
+            } catch {
+                # docker may print warnings to stderr; ignore if container starts
+            }
+            for ($i = 0; $i -lt 15; $i++) {
+                if (Test-MeisRedisAvailable) {
+                    Write-Host "  OK redis PING/PONG (docker)" -ForegroundColor Green
+                    return $true
+                }
+                Start-Sleep -Seconds 1
+            }
+        }
+    }
+    Write-Host "  Tip: install/start Redis, or services run with --meis.cache.enabled=false" -ForegroundColor Yellow
+    return $false
+}
+
 function Start-MeisServices {
     param(
         [string]$Profile = "dev",
@@ -89,6 +137,7 @@ function Start-MeisServices {
     if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
 
     Write-Host "Starting MEIS services (profile: $Profile) ..."
+    $redisOk = Ensure-MeisRedis
     foreach ($s in $script:MeisServices) {
         $jar = Join-Path $root "$($s.name)\target\$($s.name)-1.0.0-SNAPSHOT.jar"
         if (-not (Test-Path $jar)) {
@@ -101,6 +150,9 @@ function Start-MeisServices {
             "--spring.profiles.active=$Profile",
             "--spring.cloud.nacos.discovery.enabled=false"
         )
+        if (-not $redisOk) {
+            $javaArgs += "--meis.cache.enabled=false"
+        }
         Start-Process -FilePath $javaExe -ArgumentList $javaArgs -WorkingDirectory $root `
             -WindowStyle Minimized -RedirectStandardOutput $stdout -RedirectStandardError $stderr | Out-Null
         Write-Host "  launch $($s.name) -> port $($s.port)"

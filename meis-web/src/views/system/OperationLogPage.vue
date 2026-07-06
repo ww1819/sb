@@ -8,7 +8,7 @@
       <el-button type="primary" @click="search">查询</el-button>
       <el-button @click="resetFilters">重置</el-button>
     </template>
-    <el-table :data="rows" border stripe class="system-table">
+    <el-table :data="rows" border stripe class="system-table" :height="tableHeight">
       <el-table-column prop="created_at" label="时间" width="170">
         <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
       </el-table-column>
@@ -23,16 +23,23 @@
         </template>
       </el-table-column>
     </el-table>
-    <el-drawer v-model="detailVisible" title="日志详情" size="480px">
+    <AppModal v-model="detailVisible" title="日志详情" size="md">
       <pre class="detail-json">{{ detailText }}</pre>
-    </el-drawer>
+      <template #footer>
+        <el-button @click="detailVisible = false">关闭</el-button>
+      </template>
+    </AppModal>
   </SystemPageCard>
 </template>
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
+import AppModal from '@/components/AppModal.vue'
 import { fetchPage, usePagedList } from '@/composables/usePagedList'
+import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
+
+const tableHeight = useSystemTableHeight()
 
 const filters = reactive({ module: '', userId: '', startDate: '', endDate: '' })
 const detailVisible = ref(false)

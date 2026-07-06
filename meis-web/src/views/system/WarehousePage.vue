@@ -3,7 +3,7 @@
     <template #actions>
       <el-button type="primary" @click="openForm()">新增库房</el-button>
     </template>
-    <el-table :data="filteredList" border stripe class="system-table">
+    <el-table :data="filteredList" border stripe class="system-table" :height="tableHeight">
       <el-table-column prop="warehouse_code" label="编码" width="100" />
       <el-table-column prop="warehouse_name" label="名称" />
       <el-table-column prop="campus_name" label="院区" width="120" />
@@ -54,6 +54,9 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
+import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
+
+const tableHeight = useSystemTableHeight()
 
 const list = ref<any[]>([])
 const keyword = ref('')

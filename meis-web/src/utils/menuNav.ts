@@ -1,3 +1,5 @@
+import { getPageConfig } from '@/config/pageRegistry'
+
 export interface NavMenuItem {
   id: string
   title: string
@@ -74,7 +76,7 @@ export function resolveBreadcrumb(
       }
     }
   }
-  const fallback = titleMap.get(activePath)
+  const fallback = titleMap.get(activePath) ?? getPageConfig(activePath)?.title
   if (fallback) return [{ label: fallback }]
   const seg = activePath.split('/').filter(Boolean).pop()
   return [{ label: seg ?? '当前页面' }]

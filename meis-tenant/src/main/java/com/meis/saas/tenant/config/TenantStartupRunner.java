@@ -38,7 +38,7 @@ public class TenantStartupRunner implements ApplicationRunner {
             try {
                 tenantFlyway.createSchema(schema);
                 tenantFlyway.migrate(schema);
-                ensureDemoAdmin(schema, code);
+                ensureTenantAdminPassword(schema, code);
                 log.info("Tenant schema ready: {} ({})", code, schema);
             } catch (Exception e) {
                 log.error("Tenant schema migration skipped for {} ({}): {}", code, schema, e.getMessage());
@@ -65,10 +65,15 @@ public class TenantStartupRunner implements ApplicationRunner {
         }
     }
 
-    private void ensureDemoAdmin(String schema, String code) {
-        if (!"demo".equals(code)) return;
+    private void ensureTenantAdminPassword(String schema, String code) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT password_hash FROM " + schema + ".sys_user WHERE username = 'admin'");
+        if (rows.isEmpty()) return;
         BCryptPasswordEncoder enc = new BCryptPasswordEncoder();
-        String hash = enc.encode("admin123");
-        jdbc.update("UPDATE " + schema + ".sys_user SET password_hash = ? WHERE username = 'admin'", hash);
+        String hash = rows.get(0).get("password_hash").toString();
+        if (!enc.matches("admin123", hash)) {
+            jdbc.update("UPDATE " + schema + ".sys_user SET password_hash = ? WHERE username = 'admin'", enc.encode("admin123"));
+            log.info("Tenant admin password reset to default for {} (admin / admin123)", code);
+        }
     }
 }

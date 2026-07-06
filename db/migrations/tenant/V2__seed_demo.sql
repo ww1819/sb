@@ -4,7 +4,7 @@ INSERT INTO department (dept_code, dept_name, is_clinical) VALUES ('001', '设�
 
 -- admin / admin123 (BCrypt)
 INSERT INTO sys_user (username, password_hash, real_name, is_active)
-SELECT 'admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '系统管理员', true
+SELECT 'admin', '$2a$10$CedZfmrp1GW/UsPu/jkLfOBO9GpJUMESw/pu4VsxCK9cR6gY9N0/C', '系统管理员', true
 WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE username = 'admin');
 
 INSERT INTO sys_role (role_code, role_name, permissions)
