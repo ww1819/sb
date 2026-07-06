@@ -1,0 +1,235 @@
+<template>
+  <aside class="app-sidebar" :class="{ collapsed }" :style="{ width: sidebarWidth }">
+    <div class="sidebar-brand" @click="emit('home')">
+      <span class="brand-logo">M</span>
+      <span v-show="!collapsed" class="brand-text">{{ brandTitle }}</span>
+    </div>
+
+    <el-scrollbar class="sidebar-scroll">
+      <NavMenuState
+        v-if="loading || error"
+        :loading="loading"
+        :error="error"
+        variant="side"
+        @retry="emit('retry')"
+      />
+
+      <el-menu
+        v-else
+        ref="menuRef"
+        :default-active="activePath"
+        :collapse="collapsed"
+        :collapse-transition="false"
+        class="sidebar-menu"
+        @select="onSelect"
+      >
+        <template v-for="mod in modules" :key="mod.id">
+          <el-menu-item v-if="mod.path && !mod.groups?.length" :index="mod.path">
+            <el-icon><component :is="moduleIcon(mod.id)" /></el-icon>
+            <template #title>{{ mod.title }}</template>
+          </el-menu-item>
+
+          <el-sub-menu v-else-if="mod.groups?.length" :index="mod.id">
+            <template #title>
+              <el-icon><component :is="moduleIcon(mod.id)" /></el-icon>
+              <span>{{ mod.title }}</span>
+            </template>
+            <template v-for="group in mod.groups" :key="`${mod.id}-${group.title || 'default'}`">
+              <el-menu-item-group v-if="group.title" :title="group.title">
+                <el-menu-item v-for="item in group.items" :key="item.path" :index="item.path">
+                  {{ item.title }}
+                </el-menu-item>
+              </el-menu-item-group>
+              <el-menu-item v-for="item in group.items" v-else :key="item.path" :index="item.path">
+                {{ item.title }}
+              </el-menu-item>
+            </template>
+          </el-sub-menu>
+        </template>
+      </el-menu>
+    </el-scrollbar>
+  </aside>
+</template>
+
+<script setup lang="ts">
+import { computed, ref, watch, type Component } from 'vue'
+import type { MenuInstance } from 'element-plus'
+import {
+  Box,
+  DataAnalysis,
+  Document,
+  Monitor,
+  Odometer,
+  OfficeBuilding,
+  Setting,
+  ShoppingCart,
+  Tools,
+  Warning
+} from '@element-plus/icons-vue'
+import NavMenuState from './NavMenuState.vue'
+
+interface MenuItem {
+  id: string
+  title: string
+  path: string
+}
+
+interface MenuGroup {
+  title: string
+  items: MenuItem[]
+}
+
+interface TopModule {
+  id: string
+  title: string
+  path?: string
+  groups: MenuGroup[]
+}
+
+const props = defineProps<{
+  modules: TopModule[]
+  activePath: string
+  collapsed: boolean
+  brandTitle: string
+  loading?: boolean
+  error?: string
+}>()
+
+const emit = defineEmits<{
+  select: [path: string]
+  home: []
+  retry: []
+}>()
+
+const menuRef = ref<MenuInstance>()
+
+watch(
+  () => props.activePath,
+  (path) => {
+    if (path) menuRef.value?.updateActiveIndex(path)
+  }
+)
+
+const sidebarWidth = computed(() =>
+  props.collapsed ? 'var(--meis-sidebar-collapsed-width)' : 'var(--meis-sidebar-width)'
+)
+
+function onSelect(path: string) {
+  emit('select', path)
+}
+
+function moduleIcon(id: string): Component {
+  const map: Record<string, Component> = {
+    dashboard: Odometer,
+    purchase: ShoppingCart,
+    asset: Box,
+    repair: Tools,
+    maintain: Setting,
+    qc: Monitor,
+    special: Warning,
+    analytics: DataAnalysis,
+    system: Setting,
+    tenant: OfficeBuilding,
+    platform: OfficeBuilding,
+    'maintenance-contract': Document
+  }
+  return map[id] ?? Document
+}
+</script>
+
+<style scoped>
+.app-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: linear-gradient(180deg, var(--meis-header-gradient-start) 0%, #002140 100%);
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08);
+  transition: width 0.2s ease;
+  flex-shrink: 0;
+  z-index: 210;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--meis-header-height);
+  padding: 0 16px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.brand-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--el-color-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.brand-text {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-scroll {
+  flex: 1;
+}
+
+.sidebar-menu {
+  border-right: none;
+  background: transparent;
+  padding: 8px 0 16px;
+}
+
+.sidebar-menu:not(.el-menu--collapse) {
+  width: 100%;
+}
+
+.sidebar-menu :deep(.el-menu-item),
+.sidebar-menu :deep(.el-sub-menu__title) {
+  color: rgba(255, 255, 255, 0.82);
+  height: 44px;
+  line-height: 44px;
+}
+
+.sidebar-menu :deep(.el-menu-item:hover),
+.sidebar-menu :deep(.el-sub-menu__title:hover) {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #fff;
+}
+
+.sidebar-menu :deep(.el-menu-item.is-active) {
+  background: var(--el-color-primary) !important;
+  color: #fff;
+}
+
+.sidebar-menu :deep(.el-menu-item-group__title) {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
+  padding-left: 20px !important;
+}
+
+.sidebar-menu :deep(.el-sub-menu .el-menu-item) {
+  min-width: auto;
+  background: transparent;
+}
+
+.sidebar-menu :deep(.el-sub-menu .el-menu) {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.collapsed .brand-text {
+  display: none;
+}
+</style>

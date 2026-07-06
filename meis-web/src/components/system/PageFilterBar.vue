@@ -3,7 +3,7 @@
     <div class="filter-fields">
       <el-input
         :model-value="keyword"
-        placeholder="用户名 / 姓名 / 工号 / 手机"
+        :placeholder="placeholder"
         clearable
         class="filter-keyword"
         :prefix-icon="Search"
@@ -21,9 +21,13 @@
 <script setup lang="ts">
 import { RefreshLeft, Search } from '@element-plus/icons-vue'
 
-defineProps<{
-  keyword?: string
-}>()
+withDefaults(
+  defineProps<{
+    keyword?: string
+    placeholder?: string
+  }>(),
+  { placeholder: '用户名 / 姓名 / 工号 / 手机' }
+)
 
 defineEmits<{
   search: []

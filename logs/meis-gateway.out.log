@@ -7,23 +7,23 @@
  =========|_|==============|___/=/_/_/_/
  :: Spring Boot ::                (v3.2.5)
 
-2026-07-02T10:36:30.919+08:00  INFO 34096 --- [meis-gateway] [           main] c.meis.saas.boot.MeisGatewayApplication  : Starting MeisGatewayApplication using Java 17.0.12 with PID 34096 (E:\workspace\sb\meis-gateway\target\meis-gateway-1.0.0-SNAPSHOT.jar started by Administrator in E:\workspace\sb)
-2026-07-02T10:36:30.922+08:00  INFO 34096 --- [meis-gateway] [           main] c.meis.saas.boot.MeisGatewayApplication  : The following 1 profile is active: "dev"
-2026-07-02T10:36:34.287+08:00  INFO 34096 --- [meis-gateway] [           main] o.s.cloud.context.scope.GenericScope     : BeanFactory id=6589ba71-a6da-3221-9fd1-814daa76e0b2
-2026-07-02T10:36:40.484+08:00  INFO 34096 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [After]
-2026-07-02T10:36:40.484+08:00  INFO 34096 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [Before]
-2026-07-02T10:36:40.485+08:00  INFO 34096 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [Between]
-2026-07-02T10:36:40.485+08:00  INFO 34096 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [Cookie]
-2026-07-02T10:36:40.485+08:00  INFO 34096 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [Header]
-2026-07-02T10:36:40.485+08:00  INFO 34096 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [Host]
-2026-07-02T10:36:40.485+08:00  INFO 34096 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [Method]
-2026-07-02T10:36:40.485+08:00  INFO 34096 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [Path]
-2026-07-02T10:36:40.486+08:00  INFO 34096 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [Query]
-2026-07-02T10:36:40.486+08:00  INFO 34096 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [ReadBody]
-2026-07-02T10:36:40.487+08:00  INFO 34096 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [RemoteAddr]
-2026-07-02T10:36:40.490+08:00  INFO 34096 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [XForwardedRemoteAddr]
-2026-07-02T10:36:40.490+08:00  INFO 34096 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [Weight]
-2026-07-02T10:36:40.490+08:00  INFO 34096 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [CloudFoundryRouteService]
-2026-07-02T10:36:42.065+08:00  INFO 34096 --- [meis-gateway] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
-2026-07-02T10:36:44.214+08:00  INFO 34096 --- [meis-gateway] [           main] o.s.b.web.embedded.netty.NettyWebServer  : Netty started on port 8080
-2026-07-02T10:36:44.737+08:00  INFO 34096 --- [meis-gateway] [           main] c.meis.saas.boot.MeisGatewayApplication  : Started MeisGatewayApplication in 15.335 seconds (process running for 17.121)
+2026-07-03T15:52:04.899+08:00  INFO 43492 --- [meis-gateway] [           main] c.meis.saas.boot.MeisGatewayApplication  : Starting MeisGatewayApplication using Java 17.0.18 with PID 43492 (E:\workspace\sb\meis-gateway\target\meis-gateway-1.0.0-SNAPSHOT.jar started by Administrator in E:\workspace\sb)
+2026-07-03T15:52:04.906+08:00  INFO 43492 --- [meis-gateway] [           main] c.meis.saas.boot.MeisGatewayApplication  : The following 1 profile is active: "dev"
+2026-07-03T15:52:22.846+08:00  INFO 43492 --- [meis-gateway] [           main] o.s.cloud.context.scope.GenericScope     : BeanFactory id=6589ba71-a6da-3221-9fd1-814daa76e0b2
+2026-07-03T15:52:34.773+08:00  INFO 43492 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [After]
+2026-07-03T15:52:34.774+08:00  INFO 43492 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [Before]
+2026-07-03T15:52:34.774+08:00  INFO 43492 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [Between]
+2026-07-03T15:52:34.774+08:00  INFO 43492 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [Cookie]
+2026-07-03T15:52:34.775+08:00  INFO 43492 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [Header]
+2026-07-03T15:52:34.775+08:00  INFO 43492 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [Host]
+2026-07-03T15:52:34.775+08:00  INFO 43492 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [Method]
+2026-07-03T15:52:34.775+08:00  INFO 43492 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [Path]
+2026-07-03T15:52:34.776+08:00  INFO 43492 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [Query]
+2026-07-03T15:52:34.776+08:00  INFO 43492 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [ReadBody]
+2026-07-03T15:52:34.776+08:00  INFO 43492 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [RemoteAddr]
+2026-07-03T15:52:34.776+08:00  INFO 43492 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [XForwardedRemoteAddr]
+2026-07-03T15:52:34.777+08:00  INFO 43492 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [Weight]
+2026-07-03T15:52:34.777+08:00  INFO 43492 --- [meis-gateway] [           main] o.s.c.g.r.RouteDefinitionRouteLocator    : Loaded RoutePredicateFactory [CloudFoundryRouteService]
+2026-07-03T15:52:36.808+08:00  INFO 43492 --- [meis-gateway] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
+2026-07-03T15:52:38.438+08:00  INFO 43492 --- [meis-gateway] [           main] o.s.b.web.embedded.netty.NettyWebServer  : Netty started on port 8080
+2026-07-03T15:52:38.810+08:00  INFO 43492 --- [meis-gateway] [           main] c.meis.saas.boot.MeisGatewayApplication  : Started MeisGatewayApplication in 40.964 seconds (process running for 48.512)

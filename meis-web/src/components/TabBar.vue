@@ -104,7 +104,7 @@ onUnmounted(() => document.removeEventListener('click', hideContextMenu))
   color: #606266;
   cursor: pointer;
   user-select: none;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
   flex-shrink: 0;
 }
 
@@ -121,6 +121,7 @@ onUnmounted(() => document.removeEventListener('click', hideContextMenu))
   margin-bottom: -1px;
   z-index: 1;
   border-color: var(--meis-border-light);
+  transform: translateY(-1px);
 }
 
 .tab-title {

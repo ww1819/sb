@@ -70,9 +70,12 @@ import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import { useTabsStore } from '@/stores/tabs'
+import { getHomePath } from '@/utils/home'
 
 const router = useRouter()
 const auth = useAuthStore()
+const tabs = useTabsStore()
 const loading = ref(false)
 const mode = ref<'tenant' | 'platform'>('tenant')
 const tenantForm = reactive({ tenantCode: 'demo', username: 'admin', password: 'admin123' })
@@ -82,8 +85,9 @@ async function onTenantSubmit() {
   loading.value = true
   try {
     await auth.login(tenantForm.tenantCode, tenantForm.username, tenantForm.password)
+    tabs.reset()
     ElMessage.success('登录成功')
-    router.push('/dashboard')
+    router.push(getHomePath())
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.message || e.message || '登录失败')
   } finally {
@@ -95,8 +99,9 @@ async function onPlatformSubmit() {
   loading.value = true
   try {
     await auth.platformLogin(platformForm.username, platformForm.password)
+    tabs.reset()
     ElMessage.success('平台管理员登录成功')
-    router.push('/tenant/list')
+    router.push(getHomePath())
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.message || e.message || '登录失败')
   } finally {

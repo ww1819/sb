@@ -7,28 +7,118 @@
  =========|_|==============|___/=/_/_/_/
  :: Spring Boot ::                (v3.2.5)
 
-2026-07-02T10:36:29.398+08:00  INFO 32428 --- [meis-notification] [           main] c.m.s.boot.MeisNotificationApplication   : Starting MeisNotificationApplication using Java 17.0.12 with PID 32428 (E:\workspace\sb\meis-notification\target\meis-notification-1.0.0-SNAPSHOT.jar started by Administrator in E:\workspace\sb)
-2026-07-02T10:36:29.402+08:00  INFO 32428 --- [meis-notification] [           main] c.m.s.boot.MeisNotificationApplication   : The following 1 profile is active: "dev"
-2026-07-02T10:36:32.584+08:00  INFO 32428 --- [meis-notification] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
-2026-07-02T10:36:32.593+08:00  INFO 32428 --- [meis-notification] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
-2026-07-02T10:36:32.615+08:00  INFO 32428 --- [meis-notification] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 7 ms. Found 0 Redis repository interfaces.
-2026-07-02T10:36:32.823+08:00  WARN 32428 --- [meis-notification] [           main] o.m.s.mapper.ClassPathMapperScanner      : No MyBatis mapper was found in '[com.meis.saas.boot]' package. Please check your configuration.
-2026-07-02T10:36:32.988+08:00  INFO 32428 --- [meis-notification] [           main] o.s.cloud.context.scope.GenericScope     : BeanFactory id=888b7a23-abb2-3144-b395-bb5977876c0f
-2026-07-02T10:36:35.388+08:00  INFO 32428 --- [meis-notification] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8093 (http)
-2026-07-02T10:36:35.424+08:00  INFO 32428 --- [meis-notification] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
-2026-07-02T10:36:35.429+08:00  INFO 32428 --- [meis-notification] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.20]
-2026-07-02T10:36:35.515+08:00  INFO 32428 --- [meis-notification] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
-2026-07-02T10:36:35.520+08:00  INFO 32428 --- [meis-notification] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 5908 ms
+2026-07-03T15:51:58.837+08:00  INFO 42280 --- [meis-notification] [           main] c.m.s.boot.MeisNotificationApplication   : Starting MeisNotificationApplication using Java 17.0.18 with PID 42280 (E:\workspace\sb\meis-notification\target\meis-notification-1.0.0-SNAPSHOT.jar started by Administrator in E:\workspace\sb)
+2026-07-03T15:51:58.878+08:00  INFO 42280 --- [meis-notification] [           main] c.m.s.boot.MeisNotificationApplication   : The following 1 profile is active: "dev"
+2026-07-03T15:52:12.616+08:00  INFO 42280 --- [meis-notification] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-07-03T15:52:12.633+08:00  INFO 42280 --- [meis-notification] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-07-03T15:52:12.731+08:00  INFO 42280 --- [meis-notification] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 60 ms. Found 0 Redis repository interfaces.
+2026-07-03T15:52:13.209+08:00  WARN 42280 --- [meis-notification] [           main] o.m.s.mapper.ClassPathMapperScanner      : No MyBatis mapper was found in '[com.meis.saas.boot]' package. Please check your configuration.
+2026-07-03T15:52:13.394+08:00  INFO 42280 --- [meis-notification] [           main] o.s.cloud.context.scope.GenericScope     : BeanFactory id=888b7a23-abb2-3144-b395-bb5977876c0f
+2026-07-03T15:52:17.233+08:00  INFO 42280 --- [meis-notification] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8093 (http)
+2026-07-03T15:52:17.269+08:00  INFO 42280 --- [meis-notification] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-07-03T15:52:17.271+08:00  INFO 42280 --- [meis-notification] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.20]
+2026-07-03T15:52:17.393+08:00  INFO 42280 --- [meis-notification] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-07-03T15:52:17.397+08:00  INFO 42280 --- [meis-notification] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 18091 ms
  _ _   |_  _ _|_. ___ _ |    _ 
 | | |\/|_)(_| | |_\  |_)||_|_\ 
      /               |         
                         3.5.5 
-2026-07-02T10:36:44.231+08:00  INFO 32428 --- [meis-notification] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
-2026-07-02T10:36:44.434+08:00  INFO 32428 --- [meis-notification] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8093 (http) with context path ''
-2026-07-02T10:36:44.550+08:00  INFO 32428 --- [meis-notification] [           main] c.m.s.boot.MeisNotificationApplication   : Started MeisNotificationApplication in 16.579 seconds (process running for 18.517)
-2026-07-02T10:38:33.395+08:00  INFO 32428 --- [meis-notification] [nio-8093-exec-2] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
-2026-07-02T10:38:33.396+08:00  INFO 32428 --- [meis-notification] [nio-8093-exec-2] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
-2026-07-02T10:38:33.398+08:00  INFO 32428 --- [meis-notification] [nio-8093-exec-2] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
-2026-07-02T10:38:33.461+08:00  INFO 32428 --- [meis-notification] [nio-8093-exec-2] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
-2026-07-02T10:38:33.624+08:00  INFO 32428 --- [meis-notification] [nio-8093-exec-2] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@4373f93c
-2026-07-02T10:38:33.627+08:00  INFO 32428 --- [meis-notification] [nio-8093-exec-2] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-07-03T15:52:35.344+08:00  INFO 42280 --- [meis-notification] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
+2026-07-03T15:52:35.717+08:00  INFO 42280 --- [meis-notification] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8093 (http) with context path ''
+2026-07-03T15:52:36.554+08:00  INFO 42280 --- [meis-notification] [           main] c.m.s.boot.MeisNotificationApplication   : Started MeisNotificationApplication in 44.78 seconds (process running for 48.199)
+2026-07-03T16:51:08.089+08:00  INFO 42280 --- [meis-notification] [nio-8093-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-07-03T16:51:08.092+08:00  INFO 42280 --- [meis-notification] [nio-8093-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-07-03T16:51:08.156+08:00  INFO 42280 --- [meis-notification] [nio-8093-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 62 ms
+2026-07-03T16:51:08.334+08:00  INFO 42280 --- [meis-notification] [nio-8093-exec-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-07-03T16:51:08.891+08:00  INFO 42280 --- [meis-notification] [nio-8093-exec-1] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@4ab86c84
+2026-07-03T16:51:08.915+08:00  INFO 42280 --- [meis-notification] [nio-8093-exec-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-07-04T07:59:56.716+08:00 ERROR 42280 --- [meis-notification] [   scheduling-1] o.s.s.s.TaskUtils$LoggingErrorHandler    : Unexpected error occurred in scheduled task
+
+org.springframework.jdbc.BadSqlGrammarException: StatementCallback; bad SQL grammar [SELECT device_code, device_name, warranty_end_date FROM medical_device WHERE warranty_end_date = CURRENT_DATE + 7 LIMIT 20]
+	at org.springframework.jdbc.support.SQLStateSQLExceptionTranslator.doTranslate(SQLStateSQLExceptionTranslator.java:112) ~[spring-jdbc-6.1.6.jar!/:6.1.6]
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:107) ~[spring-jdbc-6.1.6.jar!/:6.1.6]
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:116) ~[spring-jdbc-6.1.6.jar!/:6.1.6]
+	at org.springframework.jdbc.core.JdbcTemplate.translateException(JdbcTemplate.java:1548) ~[spring-jdbc-6.1.6.jar!/:6.1.6]
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:408) ~[spring-jdbc-6.1.6.jar!/:6.1.6]
+	at org.springframework.jdbc.core.JdbcTemplate.query(JdbcTemplate.java:476) ~[spring-jdbc-6.1.6.jar!/:6.1.6]
+	at org.springframework.jdbc.core.JdbcTemplate.query(JdbcTemplate.java:486) ~[spring-jdbc-6.1.6.jar!/:6.1.6]
+	at org.springframework.jdbc.core.JdbcTemplate.queryForList(JdbcTemplate.java:536) ~[spring-jdbc-6.1.6.jar!/:6.1.6]
+	at com.meis.saas.notification.controller.NotificationController.dailyExpiryScan(NotificationController.java:53) ~[!/:na]
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method) ~[na:na]
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77) ~[na:na]
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569) ~[na:na]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.runInternal(ScheduledMethodRunnable.java:130) ~[spring-context-6.1.6.jar!/:6.1.6]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.lambda$run$2(ScheduledMethodRunnable.java:124) ~[spring-context-6.1.6.jar!/:6.1.6]
+	at io.micrometer.observation.Observation.observe(Observation.java:499) ~[micrometer-observation-1.12.5.jar!/:1.12.5]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:124) ~[spring-context-6.1.6.jar!/:6.1.6]
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54) ~[spring-context-6.1.6.jar!/:6.1.6]
+	at org.springframework.scheduling.concurrent.ReschedulingRunnable.run(ReschedulingRunnable.java:96) ~[spring-context-6.1.6.jar!/:6.1.6]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:539) ~[na:na]
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:304) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:840) ~[na:na]
+Caused by: org.postgresql.util.PSQLException: 错误: 关系 "medical_device" 不存在
+  位置：57
+	at org.postgresql.core.v3.QueryExecutorImpl.receiveErrorResponse(QueryExecutorImpl.java:2725) ~[postgresql-42.7.3.jar!/:42.7.3]
+	at org.postgresql.core.v3.QueryExecutorImpl.processResults(QueryExecutorImpl.java:2412) ~[postgresql-42.7.3.jar!/:42.7.3]
+	at org.postgresql.core.v3.QueryExecutorImpl.execute(QueryExecutorImpl.java:371) ~[postgresql-42.7.3.jar!/:42.7.3]
+	at org.postgresql.jdbc.PgStatement.executeInternal(PgStatement.java:502) ~[postgresql-42.7.3.jar!/:42.7.3]
+	at org.postgresql.jdbc.PgStatement.execute(PgStatement.java:419) ~[postgresql-42.7.3.jar!/:42.7.3]
+	at org.postgresql.jdbc.PgStatement.executeWithFlags(PgStatement.java:341) ~[postgresql-42.7.3.jar!/:42.7.3]
+	at org.postgresql.jdbc.PgStatement.executeCachedSql(PgStatement.java:326) ~[postgresql-42.7.3.jar!/:42.7.3]
+	at org.postgresql.jdbc.PgStatement.executeWithFlags(PgStatement.java:302) ~[postgresql-42.7.3.jar!/:42.7.3]
+	at org.postgresql.jdbc.PgStatement.executeQuery(PgStatement.java:251) ~[postgresql-42.7.3.jar!/:42.7.3]
+	at com.zaxxer.hikari.pool.ProxyStatement.executeQuery(ProxyStatement.java:110) ~[HikariCP-5.0.1.jar!/:na]
+	at com.zaxxer.hikari.pool.HikariProxyStatement.executeQuery(HikariProxyStatement.java) ~[HikariCP-5.0.1.jar!/:na]
+	at org.springframework.jdbc.core.JdbcTemplate$1QueryStatementCallback.doInStatement(JdbcTemplate.java:463) ~[spring-jdbc-6.1.6.jar!/:6.1.6]
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:393) ~[spring-jdbc-6.1.6.jar!/:6.1.6]
+	... 20 common frames omitted
+
+2026-07-05T07:59:56.095+08:00 ERROR 42280 --- [meis-notification] [   scheduling-1] o.s.s.s.TaskUtils$LoggingErrorHandler    : Unexpected error occurred in scheduled task
+
+org.springframework.jdbc.BadSqlGrammarException: StatementCallback; bad SQL grammar [SELECT device_code, device_name, warranty_end_date FROM medical_device WHERE warranty_end_date = CURRENT_DATE + 7 LIMIT 20]
+	at org.springframework.jdbc.support.SQLStateSQLExceptionTranslator.doTranslate(SQLStateSQLExceptionTranslator.java:112) ~[spring-jdbc-6.1.6.jar!/:6.1.6]
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:107) ~[spring-jdbc-6.1.6.jar!/:6.1.6]
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:116) ~[spring-jdbc-6.1.6.jar!/:6.1.6]
+	at org.springframework.jdbc.core.JdbcTemplate.translateException(JdbcTemplate.java:1548) ~[spring-jdbc-6.1.6.jar!/:6.1.6]
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:408) ~[spring-jdbc-6.1.6.jar!/:6.1.6]
+	at org.springframework.jdbc.core.JdbcTemplate.query(JdbcTemplate.java:476) ~[spring-jdbc-6.1.6.jar!/:6.1.6]
+	at org.springframework.jdbc.core.JdbcTemplate.query(JdbcTemplate.java:486) ~[spring-jdbc-6.1.6.jar!/:6.1.6]
+	at org.springframework.jdbc.core.JdbcTemplate.queryForList(JdbcTemplate.java:536) ~[spring-jdbc-6.1.6.jar!/:6.1.6]
+	at com.meis.saas.notification.controller.NotificationController.dailyExpiryScan(NotificationController.java:53) ~[!/:na]
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method) ~[na:na]
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77) ~[na:na]
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569) ~[na:na]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.runInternal(ScheduledMethodRunnable.java:130) ~[spring-context-6.1.6.jar!/:6.1.6]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.lambda$run$2(ScheduledMethodRunnable.java:124) ~[spring-context-6.1.6.jar!/:6.1.6]
+	at io.micrometer.observation.Observation.observe(Observation.java:499) ~[micrometer-observation-1.12.5.jar!/:1.12.5]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:124) ~[spring-context-6.1.6.jar!/:6.1.6]
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54) ~[spring-context-6.1.6.jar!/:6.1.6]
+	at org.springframework.scheduling.concurrent.ReschedulingRunnable.run(ReschedulingRunnable.java:96) ~[spring-context-6.1.6.jar!/:6.1.6]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:539) ~[na:na]
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:304) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:840) ~[na:na]
+Caused by: org.postgresql.util.PSQLException: 错误: 关系 "medical_device" 不存在
+  位置：57
+	at org.postgresql.core.v3.QueryExecutorImpl.receiveErrorResponse(QueryExecutorImpl.java:2725) ~[postgresql-42.7.3.jar!/:42.7.3]
+	at org.postgresql.core.v3.QueryExecutorImpl.processResults(QueryExecutorImpl.java:2412) ~[postgresql-42.7.3.jar!/:42.7.3]
+	at org.postgresql.core.v3.QueryExecutorImpl.execute(QueryExecutorImpl.java:371) ~[postgresql-42.7.3.jar!/:42.7.3]
+	at org.postgresql.jdbc.PgStatement.executeInternal(PgStatement.java:502) ~[postgresql-42.7.3.jar!/:42.7.3]
+	at org.postgresql.jdbc.PgStatement.execute(PgStatement.java:419) ~[postgresql-42.7.3.jar!/:42.7.3]
+	at org.postgresql.jdbc.PgStatement.executeWithFlags(PgStatement.java:341) ~[postgresql-42.7.3.jar!/:42.7.3]
+	at org.postgresql.jdbc.PgStatement.executeCachedSql(PgStatement.java:326) ~[postgresql-42.7.3.jar!/:42.7.3]
+	at org.postgresql.jdbc.PgStatement.executeWithFlags(PgStatement.java:302) ~[postgresql-42.7.3.jar!/:42.7.3]
+	at org.postgresql.jdbc.PgStatement.executeQuery(PgStatement.java:251) ~[postgresql-42.7.3.jar!/:42.7.3]
+	at com.zaxxer.hikari.pool.ProxyStatement.executeQuery(ProxyStatement.java:110) ~[HikariCP-5.0.1.jar!/:na]
+	at com.zaxxer.hikari.pool.HikariProxyStatement.executeQuery(HikariProxyStatement.java) ~[HikariCP-5.0.1.jar!/:na]
+	at org.springframework.jdbc.core.JdbcTemplate$1QueryStatementCallback.doInStatement(JdbcTemplate.java:463) ~[spring-jdbc-6.1.6.jar!/:6.1.6]
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:393) ~[spring-jdbc-6.1.6.jar!/:6.1.6]
+	... 20 common frames omitted
+

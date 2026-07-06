@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import router from '@/router'
+import { createHomeTab, getHomePath, isHomePath } from '@/utils/home'
+import { clearPersistedTabs, loadPersistedTabs, savePersistedTabs } from '@/utils/tabStorage'
 
 export interface TabItem {
   path: string
@@ -7,30 +9,47 @@ export interface TabItem {
   closable: boolean
 }
 
+function createInitialState() {
+  const persisted = loadPersistedTabs()
+  if (persisted) {
+    return {
+      tabs: persisted.tabs,
+      activePath: persisted.activePath
+    }
+  }
+  const home = createHomeTab()
+  return {
+    tabs: [home] as TabItem[],
+    activePath: home.path
+  }
+}
+
 export const useTabsStore = defineStore('tabs', {
-  state: () => ({
-    tabs: [{ path: '/dashboard', title: '工作台', closable: false }] as TabItem[],
-    activePath: '/dashboard'
-  }),
+  state: () => createInitialState(),
   actions: {
+    persist() {
+      savePersistedTabs(this.tabs, this.activePath)
+    },
     open(path: string, title: string) {
       const exists = this.tabs.find((t) => t.path === path)
       if (!exists) {
         this.tabs.push({
           path,
           title,
-          closable: path !== '/dashboard'
+          closable: !isHomePath(path)
         })
       } else if (title && exists.title !== title) {
         exists.title = title
       }
       this.activePath = path
+      this.persist()
       if (router.currentRoute.value.path !== path) {
         router.push(path)
       }
     },
     switchTo(path: string) {
       this.activePath = path
+      this.persist()
       if (router.currentRoute.value.path !== path) {
         router.push(path)
       }
@@ -44,12 +63,16 @@ export const useTabsStore = defineStore('tabs', {
       if (this.activePath === path) {
         const next = this.tabs[idx] ?? this.tabs[idx - 1] ?? this.tabs[0]
         if (next) this.switchTo(next.path)
+      } else {
+        this.persist()
       }
     },
     closeOthers(keepPath: string) {
       this.tabs = this.tabs.filter((t) => !t.closable || t.path === keepPath)
       if (!this.tabs.find((t) => t.path === this.activePath)) {
         this.switchTo(keepPath)
+      } else {
+        this.persist()
       }
     },
     closeAll() {
@@ -60,8 +83,31 @@ export const useTabsStore = defineStore('tabs', {
       }
     },
     reset() {
-      this.tabs = [{ path: '/dashboard', title: '工作台', closable: false }]
-      this.activePath = '/dashboard'
+      clearPersistedTabs()
+      const home = createHomeTab()
+      this.tabs = [home]
+      this.activePath = home.path
+    },
+    ensureHomeTab() {
+      const homePath = getHomePath()
+      const home = this.tabs.find((t) => t.path === homePath)
+      if (!home) {
+        this.tabs.unshift(createHomeTab())
+      } else {
+        home.closable = false
+        home.title = createHomeTab().title
+      }
+      const staleHome = this.tabs.find(
+        (t) => !t.closable && t.path !== homePath
+      )
+      if (staleHome) {
+        const idx = this.tabs.indexOf(staleHome)
+        this.tabs.splice(idx, 1)
+      }
+      if (!this.tabs.some((t) => t.path === this.activePath)) {
+        this.activePath = homePath
+      }
+      this.persist()
     }
   }
 })
