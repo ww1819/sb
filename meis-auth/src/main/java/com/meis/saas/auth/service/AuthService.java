@@ -2,6 +2,8 @@ package com.meis.saas.auth.service;
 
 import com.meis.saas.api.dto.LoginRequest;
 import com.meis.saas.api.dto.LoginResponse;
+import com.meis.saas.common.cache.LoginRateLimitService;
+import com.meis.saas.common.cache.TokenBlacklistService;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.rbac.PermissionService;
 import com.meis.saas.common.security.JwtUtil;
@@ -19,12 +21,26 @@ public class AuthService {
     private final JdbcTemplate jdbc;
     private final JwtUtil jwtUtil;
     private final PermissionService permissionService;
+    private final LoginRateLimitService loginRateLimit;
+    private final TokenBlacklistService tokenBlacklist;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
     public LoginResponse login(LoginRequest req) {
         if (req.getTenantCode() == null || req.getUsername() == null || req.getPassword() == null) {
             throw new BizException(400, "tenantCode/username/password required");
         }
+        loginRateLimit.checkAllowed(req.getTenantCode(), req.getUsername());
+        try {
+            return doLogin(req);
+        } catch (BizException e) {
+            if (e.getCode() == 401) {
+                loginRateLimit.onFailure(req.getTenantCode(), req.getUsername());
+            }
+            throw e;
+        }
+    }
+
+    private LoginResponse doLogin(LoginRequest req) {
         List<Map<String, Object>> tenants = jdbc.queryForList(
                 "SELECT id, tenant_code, schema_name, status FROM sys_tenant WHERE tenant_code = ?",
                 req.getTenantCode());
@@ -44,13 +60,12 @@ public class AuthService {
         String hash = user.get("password_hash").toString();
         if (!encoder.matches(req.getPassword(), hash)) throw new BizException(401, "invalid credentials");
 
+        loginRateLimit.onSuccess(req.getTenantCode(), req.getUsername());
+
         String userId = user.get("id").toString();
         UUID[] roleIds = toRoleIds(user.get("role_ids"));
-        Map<String, Object> userPerms = permissionService.parsePermissions(user.get("permissions"));
-        if (user.get("permissions") == null || isEmptyPerms(userPerms)) {
-            userPerms = permissionService.loadRolePermissions(schema, roleIds);
-        }
-        Map<String, Object> permissions = permissionService.effectivePermissions(tenantId, userPerms);
+        Map<String, Object> permissions = permissionService.resolveUserEffectivePermissions(
+                tenantId, schema, userId, user.get("permissions"), roleIds);
         List<String> roles = loadRoleCodes(schema, roleIds);
 
         String token = jwtUtil.generate(userId, req.getUsername(), tenantId, req.getTenantCode(), schema, roles, permissions, "tenant");
@@ -74,6 +89,18 @@ public class AuthService {
         if (req.getUsername() == null || req.getPassword() == null) {
             throw new BizException(400, "username/password required");
         }
+        loginRateLimit.checkAllowed(null, req.getUsername());
+        try {
+            return doPlatformLogin(req);
+        } catch (BizException e) {
+            if (e.getCode() == 401) {
+                loginRateLimit.onFailure(null, req.getUsername());
+            }
+            throw e;
+        }
+    }
+
+    private LoginResponse doPlatformLogin(LoginRequest req) {
         List<Map<String, Object>> users = jdbc.queryForList(
                 "SELECT id, username, password_hash, real_name, is_active FROM platform_user WHERE username = ?",
                 req.getUsername());
@@ -83,6 +110,8 @@ public class AuthService {
 
         String hash = user.get("password_hash").toString();
         if (!encoder.matches(req.getPassword(), hash)) throw new BizException(401, "invalid credentials");
+
+        loginRateLimit.onSuccess(null, req.getUsername());
 
         String userId = user.get("id").toString();
         Map<String, Object> permissions = Map.of(
@@ -105,6 +134,15 @@ public class AuthService {
                 .permissions(permissions)
                 .userType("platform")
                 .build();
+    }
+
+    public void logout(String token) {
+        if (token != null && token.startsWith("Bearer ")) {
+            token = token.substring(7);
+        }
+        if (token != null && !token.isBlank()) {
+            tokenBlacklist.blacklist(token);
+        }
     }
 
     public Map<String, Object> permissions(String tenantId, String schema, UUID[] roleIds) {
@@ -133,11 +171,5 @@ public class AuthService {
             return Arrays.stream(objs).map(o -> UUID.fromString(o.toString())).toArray(UUID[]::new);
         }
         return new UUID[0];
-    }
-
-    @SuppressWarnings("unchecked")
-    private boolean isEmptyPerms(Map<String, Object> p) {
-        List<String> menus = (List<String>) p.getOrDefault("menus", List.of());
-        return menus.isEmpty();
     }
 }

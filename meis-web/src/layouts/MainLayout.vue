@@ -137,7 +137,7 @@ const avatarText = computed(() => {
 })
 
 function onUserCommand(cmd: string) {
-  if (cmd === 'logout') logout()
+  if (cmd === 'logout') void logout()
 }
 
 const openMod = computed(() => modules.value.find((m) => m.id === openId.value) ?? null)
@@ -236,9 +236,9 @@ function isModuleActive(mod: TopModule) {
   return mod.groups?.some((g) => g.items.some((i) => i.path === active))
 }
 
-function logout() {
+async function logout() {
   tabsStore.reset()
-  auth.logout()
+  await auth.logout()
   router.push('/login')
 }
 </script>

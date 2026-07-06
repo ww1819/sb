@@ -1,6 +1,7 @@
 package com.meis.saas.system.controller;
 
 import com.meis.saas.common.audit.OperationLog;
+import com.meis.saas.common.cache.MeisCacheEviction;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
@@ -23,6 +24,7 @@ public class UserController {
 
     private final JdbcTemplate jdbc;
     private final PermissionService permissionService;
+    private final MeisCacheEviction cacheEviction;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
     @GetMapping
@@ -123,6 +125,7 @@ public class UserController {
         if (Boolean.TRUE.equals(body.get("syncPermissions"))) {
             copyRolePermissions(id, roleId);
         }
+        evictUserPerm(id);
         return Result.ok();
     }
 
@@ -146,6 +149,7 @@ public class UserController {
         permissionService.validatePermissions(tenantId, TenantContext.getSchemaName(), permissions);
         jdbc.update("UPDATE sys_user SET permissions = ?::jsonb, permission_mode = 'custom', updated_at = NOW() WHERE id = ?::uuid",
                 permissionService.toJson(permissions), id);
+        evictUserPerm(id);
         return Result.ok();
     }
 
@@ -157,6 +161,7 @@ public class UserController {
         UUID[] roleIds = toRoleIds(users.get(0).get("role_ids"));
         if (roleIds.length == 0) throw new BizException(400, "user has no role");
         copyRolePermissions(id, roleIds[0]);
+        evictUserPerm(id);
         return Result.ok();
     }
 
@@ -174,6 +179,14 @@ public class UserController {
         String json = permissionService.toJson(permissionService.parsePermissions(roles.get(0).get("permissions")));
         jdbc.update("UPDATE sys_user SET permissions = ?::jsonb, permission_mode = 'synced', updated_at = NOW() WHERE id = ?::uuid",
                 json, userId);
+        evictUserPerm(userId);
+    }
+
+    private void evictUserPerm(UUID userId) {
+        String tenantId = TenantContext.getTenantId();
+        if (tenantId != null) {
+            cacheEviction.evictUserPermission(tenantId, userId.toString());
+        }
     }
 
     private void enrichRoleName(Map<String, Object> user) {

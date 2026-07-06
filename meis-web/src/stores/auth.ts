@@ -41,7 +41,12 @@ export const useAuthStore = defineStore('auth', {
       const raw = localStorage.getItem('meis_user')
       if (raw) this.user = JSON.parse(raw)
     },
-    logout() {
+    async logout() {
+      try {
+        await http.post('/auth/logout')
+      } catch {
+        /* 网络失败仍本地登出 */
+      }
       this.user = null
       localStorage.removeItem('meis_token')
       localStorage.removeItem('meis_user')

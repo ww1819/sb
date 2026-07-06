@@ -1,5 +1,6 @@
 package com.meis.saas.tenant.service;
 
+import com.meis.saas.common.cache.MeisCacheEviction;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -13,6 +14,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TenantMenuService {
     private final JdbcTemplate jdbc;
+    private final MeisCacheEviction cacheEviction;
 
     public List<String> getAuthorizedMenus(UUID tenantId) {
         return jdbc.queryForList(
@@ -27,6 +29,9 @@ public class TenantMenuService {
             jdbc.update("INSERT INTO sys_tenant_menu (tenant_id, menu_code) VALUES (?::uuid, ?)",
                     tenantId, code);
         }
+        String tid = tenantId.toString();
+        cacheEviction.evictTenantMenus(tid);
+        cacheEviction.evictTenantPermissions(tid);
     }
 
     public List<Map<String, Object>> listPackages() {

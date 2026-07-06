@@ -1,8 +1,13 @@
 package com.meis.saas.system.controller;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.meis.saas.common.audit.OperationLog;
-import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.cache.CacheKeys;
+import com.meis.saas.common.cache.MeisCacheEviction;
+import com.meis.saas.common.cache.MeisCacheProperties;
+import com.meis.saas.common.cache.RedisJsonCache;
 import com.meis.saas.common.result.Result;
+import com.meis.saas.common.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
@@ -14,18 +19,35 @@ import java.util.*;
 @RequiredArgsConstructor
 public class DepartmentController {
     private final JdbcTemplate jdbc;
+    private final RedisJsonCache cache;
+    private final MeisCacheProperties cacheProps;
+    private final MeisCacheEviction cacheEviction;
 
     @GetMapping
     public Result<List<Map<String, Object>>> list() {
-        return Result.ok(jdbc.queryForList(
-                "SELECT d.*, c.campus_name FROM department d LEFT JOIN campus c ON d.campus_id = c.id ORDER BY d.sort_order, d.dept_code"));
+        String schema = schema();
+        return Result.ok(cache.getOrLoad(
+                CacheKeys.deptList(schema),
+                cacheProps.getOrgTtl(),
+                new TypeReference<List<Map<String, Object>>>() {},
+                () -> jdbc.queryForList(
+                        "SELECT d.*, c.campus_name FROM department d LEFT JOIN campus c ON d.campus_id = c.id ORDER BY d.sort_order, d.dept_code")));
     }
 
     @GetMapping("/tree")
     public Result<List<Map<String, Object>>> tree() {
+        String schema = schema();
+        return Result.ok(cache.getOrLoad(
+                CacheKeys.deptTree(schema),
+                cacheProps.getOrgTtl(),
+                new TypeReference<List<Map<String, Object>>>() {},
+                this::loadDeptTree));
+    }
+
+    private List<Map<String, Object>> loadDeptTree() {
         List<Map<String, Object>> all = jdbc.queryForList(
                 "SELECT id, dept_code, dept_name, parent_id, campus_id, is_clinical, sort_order, is_active FROM department ORDER BY sort_order, dept_code");
-        return Result.ok(buildTree(all, null));
+        return buildTree(all, null);
     }
 
     @PostMapping
@@ -38,6 +60,7 @@ public class DepartmentController {
                 body.get("campus_id"), body.get("floor_number"), body.get("room_number"),
                 body.getOrDefault("is_clinical", false), body.getOrDefault("sort_order", 0),
                 body.getOrDefault("is_active", true));
+        cacheEviction.evictSchemaOrg(schema());
         return Result.ok(jdbc.queryForList("SELECT * FROM department WHERE id = ?::uuid", id).get(0));
     }
 
@@ -50,6 +73,7 @@ public class DepartmentController {
                 body.get("campus_id"), body.get("floor_number"), body.get("room_number"),
                 body.getOrDefault("is_clinical", false), body.getOrDefault("sort_order", 0),
                 body.getOrDefault("is_active", true), id);
+        cacheEviction.evictSchemaOrg(schema());
         return Result.ok(jdbc.queryForList("SELECT * FROM department WHERE id = ?::uuid", id).get(0));
     }
 
@@ -57,7 +81,13 @@ public class DepartmentController {
     @OperationLog(module = "system", description = "删除科室")
     public Result<Void> delete(@PathVariable UUID id) {
         jdbc.update("UPDATE department SET is_active = false, updated_at = NOW() WHERE id = ?::uuid", id);
+        cacheEviction.evictSchemaOrg(schema());
         return Result.ok();
+    }
+
+    private String schema() {
+        String s = TenantContext.getSchemaName();
+        return s == null || s.isBlank() ? "public" : s;
     }
 
     private List<Map<String, Object>> buildTree(List<Map<String, Object>> all, String parentId) {

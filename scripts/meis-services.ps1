@@ -66,7 +66,10 @@ function Test-MeisPortListening {
 }
 
 function Start-MeisServices {
-    param([string]$Profile = "dev")
+    param(
+        [string]$Profile = "dev",
+        [switch]$FollowLogs
+    )
 
     $env:JAVA_HOME = "C:\Program Files\Java\jdk-17"
     $env:Path = "$env:JAVA_HOME\bin;" + $env:Path
@@ -127,4 +130,21 @@ function Start-MeisServices {
         Write-Host 'All services are listening.' -ForegroundColor Green
     }
     Write-Host 'Gateway: http://localhost:8080'
+    Write-Host ''
+    Write-Host 'Note: Spring Boot logs are written to files (not this terminal):' -ForegroundColor Cyan
+    Write-Host "  $logDir\*.out.log"
+    Write-Host ''
+    Write-Host 'Commands:' -ForegroundColor Cyan
+    Write-Host '  powershell -File scripts\status.ps1'
+    Write-Host '  powershell -File scripts\logs.ps1 -Service gateway -Follow'
+    Write-Host '  powershell -File scripts\logs.ps1 -List'
+
+    if ($FollowLogs) {
+        $gwLog = Join-Path $logDir 'meis-gateway.out.log'
+        if (Test-Path $gwLog) {
+            Write-Host ''
+            Write-Host '=== meis-gateway (live) Ctrl+C to stop ===' -ForegroundColor Yellow
+            Get-Content $gwLog -Tail 40 -Wait
+        }
+    }
 }
