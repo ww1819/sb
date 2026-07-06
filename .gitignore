@@ -1,0 +1,3 @@
+# Runtime logs (MEIS start scripts write here)
+logs/
+*.log
