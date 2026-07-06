@@ -1,0 +1,5 @@
+export const APP_NAME = 'MEIS 医院设备管理系统'
+export const APP_SHORT_NAME = 'MEIS'
+export const APP_VERSION = '1.0.0'
+export const APP_COPYRIGHT = '© 2026 MEIS. All rights reserved.'
+export const APP_SUPPORT = '技术支持'

@@ -1,9 +1,12 @@
 :root {
   --meis-header-height: 56px;
   --meis-tabbar-height: 40px;
+  --meis-sidebar-width: 220px;
+  --meis-sidebar-collapsed-width: 64px;
   --meis-page-bg: #f0f2f5;
   --meis-card-radius: 8px;
-  --meis-card-shadow: 0 1px 4px rgba(0, 21, 41, 0.06);
+  --meis-radius-lg: 12px;
+  --meis-card-shadow: var(--meis-shadow-sm);
   --meis-header-gradient-start: #001529;
   --meis-header-gradient-end: #003a70;
   --meis-text-primary: #303133;
@@ -15,12 +18,25 @@
   --meis-space-lg: 24px;
   --meis-surface-muted: #fafbfc;
   --meis-surface-header: #fafafa;
+  --meis-shadow-sm: 0 1px 4px rgba(0, 21, 41, 0.06);
+  --meis-shadow-md: 0 4px 12px rgba(0, 21, 41, 0.08);
+  --meis-shadow-lg: 0 8px 24px rgba(0, 21, 41, 0.12);
   --meis-shadow-dropdown: 0 6px 16px rgba(0, 21, 41, 0.08);
+
+  --meis-font-title: 18px;
+  --meis-font-subtitle: 14px;
+  --meis-font-caption: 12px;
+
   --meis-status-success: #52c41a;
+  --meis-status-warning: #faad14;
+  --meis-status-danger: #ff4d4f;
+  --meis-status-info: #1677ff;
   --meis-status-disabled: #c0c4cc;
+
   --meis-avatar-size: 36px;
   --meis-table-row-height: 52px;
   --meis-table-hover: #f5f9ff;
+  --meis-table-hover-accent: var(--el-color-primary);
 
   --el-color-primary: #1677ff;
   --el-color-primary-light-3: #4096ff;

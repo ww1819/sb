@@ -1,39 +1,61 @@
 <template>
-  <div class="crud-page">
-    <div class="toolbar">
-      <el-input v-model="keyword" placeholder="搜索" clearable style="width: 220px" @keyup.enter="load" />
-      <el-button type="primary" @click="load">查询</el-button>
-      <el-button v-permission="'add'" type="success" @click="openForm()">新增</el-button>
+  <SystemPageCard
+    :title="config.title"
+    :loading="loading"
+    show-pager
+    v-model:page="page"
+    v-model:size="size"
+    :total="total"
+    @page-change="load"
+  >
+    <template #actions>
+      <el-button v-permission="'add'" type="primary" @click="openForm()">新增</el-button>
       <el-button @click="exportCsv">导出</el-button>
       <slot name="toolbar-extra" />
-    </div>
+    </template>
 
-    <el-table v-loading="loading" :data="rows" border stripe height="calc(100vh - 260px)" @row-dblclick="onRowDblClick">
+    <template #filterBar>
+      <PageFilterBar
+        v-model:keyword="keyword"
+        placeholder="关键词搜索"
+        @search="onSearch"
+        @reset="onReset"
+      />
+    </template>
+
+    <el-table
+      v-loading="loading"
+      :data="rows"
+      stripe
+      class="system-table"
+      :height="tableHeight"
+      @row-dblclick="onRowDblClick"
+    >
       <el-table-column
         v-for="f in listFields"
         :key="f.prop"
         :prop="f.prop"
         :label="f.label"
+        :align="columnAlign(f.prop, f.type)"
         min-width="120"
         show-overflow-tooltip
-      />
-      <el-table-column label="操作" width="160" fixed="right">
+      >
         <template #default="{ row }">
-          <el-button link type="primary" @click="openForm(row)">编辑</el-button>
-          <el-button link type="danger" @click="remove(row)">删除</el-button>
+          <TableCellValue :field="f" :value="row[f.prop]" />
         </template>
       </el-table-column>
+      <el-table-column label="操作" width="160" fixed="right">
+        <template #default="{ row }">
+          <div class="table-actions">
+            <el-button link type="primary" @click="openForm(row)">编辑</el-button>
+            <el-button link type="danger" @click="remove(row)">删除</el-button>
+          </div>
+        </template>
+      </el-table-column>
+      <template #empty>
+        <PageEmpty description="暂无数据，点击下方按钮新建" action-text="新增" @action="openForm()" />
+      </template>
     </el-table>
-
-    <el-pagination
-      v-model:current-page="page"
-      v-model:page-size="size"
-      :total="total"
-      layout="total, prev, pager, next, sizes"
-      :page-sizes="[10, 20, 50]"
-      class="pager"
-      @change="load"
-    />
 
     <FormDrawer v-model="formVisible" :title="formTitle" @save="save">
       <el-form label-width="120px">
@@ -42,7 +64,7 @@
         </el-form-item>
       </el-form>
     </FormDrawer>
-  </div>
+  </SystemPageCard>
 </template>
 
 <script setup lang="ts">
@@ -50,8 +72,13 @@ import { computed, onMounted, ref, watch } from 'vue'
 import http from '@/api/http'
 import FormDrawer from './FormDrawer.vue'
 import FieldRenderer from './FieldRenderer.vue'
+import SystemPageCard from './system/SystemPageCard.vue'
+import PageFilterBar from './system/PageFilterBar.vue'
+import TableCellValue from './table/TableCellValue.vue'
+import PageEmpty from './table/PageEmpty.vue'
 import type { PageConfig } from '@/config/pageRegistry'
 import { getSchema } from '@/config/pageSchemas'
+import { columnAlign } from '@/utils/tableCell'
 
 const props = defineProps<{ config: PageConfig }>()
 const emit = defineEmits<{ detail: [row: Record<string, unknown>] }>()
@@ -65,6 +92,10 @@ const keyword = ref('')
 const formVisible = ref(false)
 const form = ref<Record<string, unknown>>({})
 const formTitle = ref('新增')
+
+const tableHeight = computed(
+  () => 'calc(100vh - var(--meis-header-height) - var(--meis-tabbar-height) - 300px)'
+)
 
 const schema = computed(() => getSchema(props.config.table))
 const listFields = computed(() => {
@@ -91,6 +122,17 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+function onSearch() {
+  page.value = 1
+  load()
+}
+
+function onReset() {
+  keyword.value = ''
+  page.value = 1
+  load()
 }
 
 function openForm(row?: Record<string, unknown>) {
@@ -126,8 +168,3 @@ function onRowDblClick(row: Record<string, unknown>) {
 watch(() => props.config, load, { deep: true })
 onMounted(load)
 </script>
-
-<style scoped>
-.toolbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-.pager { margin-top: 12px; justify-content: flex-end; }
-</style>

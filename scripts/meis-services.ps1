@@ -1,6 +1,15 @@
 # MEIS service list (shared by start/stop/restart scripts)
 $script:MeisRoot = Split-Path $PSScriptRoot -Parent
 
+function Resolve-MeisJavaHome {
+    foreach ($jdkHome in @($env:MEIS_JAVA_HOME, 'E:\workspace\jdk-17', 'C:\Program Files\Java\jdk-17')) {
+        if (-not $jdkHome) { continue }
+        $java = Join-Path $jdkHome 'bin\java.exe'
+        if (Test-Path $java) { return $jdkHome }
+    }
+    throw 'JDK 17 not found. Install to E:\workspace\jdk-17 or set MEIS_JAVA_HOME.'
+}
+
 $script:MeisServicePorts = @(8082, 8081, 8083, 8084, 8085, 8086, 8087, 8088, 8089, 8090, 8091, 8092, 8093, 8094, 8080)
 
 $script:MeisServices = @(
@@ -71,8 +80,10 @@ function Start-MeisServices {
         [switch]$FollowLogs
     )
 
-    $env:JAVA_HOME = "C:\Program Files\Java\jdk-17"
+    $env:JAVA_HOME = Resolve-MeisJavaHome
+    $javaExe = Join-Path $env:JAVA_HOME 'bin\java.exe'
     $env:Path = "$env:JAVA_HOME\bin;" + $env:Path
+    Write-Host "Using JAVA_HOME: $env:JAVA_HOME"
     $root = $script:MeisRoot
     $logDir = Join-Path $root "logs"
     if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
@@ -90,7 +101,7 @@ function Start-MeisServices {
             "--spring.profiles.active=$Profile",
             "--spring.cloud.nacos.discovery.enabled=false"
         )
-        Start-Process -FilePath java -ArgumentList $javaArgs -WorkingDirectory $root `
+        Start-Process -FilePath $javaExe -ArgumentList $javaArgs -WorkingDirectory $root `
             -WindowStyle Minimized -RedirectStandardOutput $stdout -RedirectStandardError $stderr | Out-Null
         Write-Host "  launch $($s.name) -> port $($s.port)"
         Start-Sleep -Seconds 1
