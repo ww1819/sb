@@ -9,6 +9,10 @@ spring:
     url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:meis}
     username: ${POSTGRES_USER:med}
     password: ${POSTGRES_PASSWORD:med123456}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
   cloud:
     nacos:
       discovery:
@@ -18,6 +22,8 @@ meis:
     secret: meis-saas-jwt-secret-change-in-production-256bits
     issuer: meis-saas
     expiration-ms: 86400000
+  cache:
+    enabled: true
 management:
   endpoints:
     web:

@@ -1,6 +1,7 @@
 package com.meis.saas.system.controller;
 
 import com.meis.saas.common.audit.OperationLog;
+import com.meis.saas.common.cache.MeisCacheEviction;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.rbac.PermissionService;
 import com.meis.saas.common.result.Result;
@@ -17,6 +18,7 @@ import java.util.*;
 public class RoleController {
     private final JdbcTemplate jdbc;
     private final PermissionService permissionService;
+    private final MeisCacheEviction cacheEviction;
 
     @GetMapping
     public Result<List<Map<String, Object>>> list() {
@@ -73,12 +75,15 @@ public class RoleController {
         permissionService.validatePermissions(tenantId, TenantContext.getSchemaName(), permissions);
         jdbc.update("UPDATE sys_role SET permissions = ?::jsonb, updated_at = NOW() WHERE id = ?::uuid",
                 permissionService.toJson(permissions), id);
+        cacheEviction.evictTenantPermissions(tenantId);
         return Result.ok();
     }
 
     @PostMapping("/{id}/sync-permissions")
     @OperationLog(module = "system", description = "同步角色权限到用户")
-    public Result<Map<String, Object>> syncPermissions(@PathVariable UUID id) {
+    public Result<Map<String, Object>> syncPermissions(@PathVariable UUID id,
+                                                       @RequestHeader(value = "X-Tenant-Id", required = false) String tenantId) {
+        if (tenantId == null) tenantId = TenantContext.getTenantId();
         List<Map<String, Object>> roles = jdbc.queryForList("SELECT permissions FROM sys_role WHERE id = ?::uuid", id);
         if (roles.isEmpty()) throw new BizException(404, "role not found");
         String permsJson = permissionService.toJson(
@@ -86,6 +91,7 @@ public class RoleController {
         int updated = jdbc.update(
                 "UPDATE sys_user SET permissions = ?::jsonb, permission_mode = 'synced', updated_at = NOW() WHERE role_ids IS NOT NULL AND ?::uuid = ANY(role_ids)",
                 permsJson, id);
+        cacheEviction.evictTenantPermissions(tenantId);
         return Result.ok(Map.of("updatedCount", updated));
     }
 

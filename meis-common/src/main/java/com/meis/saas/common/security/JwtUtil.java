@@ -22,6 +22,7 @@ public class JwtUtil {
     public String generate(String userId, String username, String tenantId, String tenantCode,
                            String schemaName, List<String> roles, Map<String, Object> permissions,
                            String userType) {
+        String jti = UUID.randomUUID().toString();
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("username", username);
@@ -31,7 +32,9 @@ public class JwtUtil {
         claims.put("roles", roles);
         claims.put("permissions", permissions);
         claims.put("userType", userType != null ? userType : "tenant");
+        claims.put("jti", jti);
         return Jwts.builder()
+                .id(jti)
                 .claims(claims)
                 .subject(username)
                 .issuer(props.getIssuer())
@@ -39,6 +42,15 @@ public class JwtUtil {
                 .expiration(new Date(System.currentTimeMillis() + props.getExpirationMs()))
                 .signWith(key())
                 .compact();
+    }
+
+    public String getJti(Claims claims) {
+        String jti = claims.getId();
+        if (jti == null || jti.isBlank()) {
+            Object raw = claims.get("jti");
+            jti = raw == null ? null : raw.toString();
+        }
+        return jti;
     }
 
     public Claims parse(String token) {

@@ -2,6 +2,9 @@ package com.meis.saas.common.rbac;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.meis.saas.common.cache.CacheKeys;
+import com.meis.saas.common.cache.MeisCacheProperties;
+import com.meis.saas.common.cache.RedisJsonCache;
 import lombok.RequiredArgsConstructor;
 import org.postgresql.util.PGobject;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -14,12 +17,39 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PermissionService {
     private final JdbcTemplate jdbc;
+    private final RedisJsonCache cache;
+    private final MeisCacheProperties cacheProps;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public List<String> tenantAuthorizedMenus(String tenantId) {
-        return jdbc.queryForList(
-                "SELECT menu_code FROM sys_tenant_menu WHERE tenant_id = ?::uuid",
-                String.class, tenantId);
+        return cache.getOrLoad(
+                CacheKeys.tenantMenus(tenantId),
+                cacheProps.getTenantMenuTtl(),
+                new TypeReference<List<String>>() {},
+                () -> jdbc.queryForList(
+                        "SELECT menu_code FROM sys_tenant_menu WHERE tenant_id = ?::uuid",
+                        String.class, tenantId));
+    }
+
+    public Map<String, Object> resolveUserEffectivePermissions(String tenantId, String schema, String userId,
+                                                                Object permissionsRaw, UUID[] roleIds) {
+        return cache.getOrLoad(
+                CacheKeys.userPerms(tenantId, userId),
+                cacheProps.getUserPermTtl(),
+                new TypeReference<Map<String, Object>>() {},
+                () -> {
+                    Map<String, Object> userPerms = parsePermissions(permissionsRaw);
+                    if (permissionsRaw == null || isEmptyUserPerms(userPerms)) {
+                        userPerms = loadRolePermissions(schema, roleIds);
+                    }
+                    return effectivePermissions(tenantId, userPerms);
+                });
+    }
+
+    private boolean isEmptyUserPerms(Map<String, Object> perms) {
+        @SuppressWarnings("unchecked")
+        List<String> menus = (List<String>) perms.getOrDefault("menus", List.of());
+        return menus.isEmpty();
     }
 
     public Map<String, Object> loadRolePermissions(String schema, UUID[] roleIds) {

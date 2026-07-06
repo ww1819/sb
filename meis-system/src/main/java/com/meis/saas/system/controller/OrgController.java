@@ -1,8 +1,11 @@
 package com.meis.saas.system.controller;
 
-import com.meis.saas.common.audit.OperationLog;
-import com.meis.saas.common.exception.BizException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.meis.saas.common.cache.CacheKeys;
+import com.meis.saas.common.cache.MeisCacheProperties;
+import com.meis.saas.common.cache.RedisJsonCache;
 import com.meis.saas.common.result.Result;
+import com.meis.saas.common.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +17,8 @@ import java.util.*;
 @RequiredArgsConstructor
 public class OrgController {
     private final JdbcTemplate jdbc;
+    private final RedisJsonCache cache;
+    private final MeisCacheProperties cacheProps;
 
     @GetMapping("/tree")
     public Result<List<Map<String, Object>>> tree() {
@@ -28,9 +33,23 @@ public class OrgController {
 
     @GetMapping("/dept-tree")
     public Result<List<Map<String, Object>>> deptTree() {
+        String schema = schema();
+        return Result.ok(cache.getOrLoad(
+                CacheKeys.orgPermTree(schema),
+                cacheProps.getOrgTtl(),
+                new TypeReference<List<Map<String, Object>>>() {},
+                this::loadPermDeptTree));
+    }
+
+    private List<Map<String, Object>> loadPermDeptTree() {
         List<Map<String, Object>> all = jdbc.queryForList(
                 "SELECT id, dept_code, dept_name, parent_id, is_clinical FROM department WHERE is_active = true ORDER BY sort_order, dept_code");
-        return Result.ok(buildTree(all, null));
+        return buildTree(all, null);
+    }
+
+    private String schema() {
+        String s = TenantContext.getSchemaName();
+        return s == null || s.isBlank() ? "public" : s;
     }
 
     private List<Map<String, Object>> buildTree(List<Map<String, Object>> all, String parentId) {

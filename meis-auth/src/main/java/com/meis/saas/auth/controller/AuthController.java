@@ -23,6 +23,12 @@ public class AuthController {
         return Result.ok(authService.platformLogin(request));
     }
 
+    @PostMapping("/logout")
+    public Result<Void> logout(@RequestHeader(value = "Authorization", required = false) String authorization) {
+        authService.logout(authorization);
+        return Result.ok();
+    }
+
     @GetMapping("/health")
     public Result<String> health() {
         return Result.ok("ok");

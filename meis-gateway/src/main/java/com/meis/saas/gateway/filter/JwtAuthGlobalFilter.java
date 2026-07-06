@@ -1,5 +1,6 @@
 package com.meis.saas.gateway.filter;
 
+import com.meis.saas.common.cache.TokenBlacklistService;
 import com.meis.saas.common.security.JwtUtil;
 import com.meis.saas.common.tenant.TenantConstants;
 import io.jsonwebtoken.Claims;
@@ -21,6 +22,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class JwtAuthGlobalFilter implements GlobalFilter, Ordered {
     private final JwtUtil jwtUtil;
+    private final TokenBlacklistService tokenBlacklist;
     private final AntPathMatcher matcher = new AntPathMatcher();
     private static final List<String> WHITELIST = List.of(
             "/api/auth/login",
@@ -44,6 +46,10 @@ public class JwtAuthGlobalFilter implements GlobalFilter, Ordered {
         }
         String token = auth.substring(7);
         if (!jwtUtil.valid(token)) {
+            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+            return exchange.getResponse().setComplete();
+        }
+        if (tokenBlacklist.isBlacklisted(token)) {
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }

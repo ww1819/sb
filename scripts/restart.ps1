@@ -1,7 +1,8 @@
 # Restart MEIS backend: stop all -> optional build -> start
 param(
     [string]$Profile = "dev",
-    [switch]$Build
+    [switch]$Build,
+    [switch]$FollowLogs
 )
 
 $ErrorActionPreference = "Stop"
@@ -17,6 +18,6 @@ if ($Build) {
 }
 
 Write-Host "=== Starting MEIS backend ==="
-& "$PSScriptRoot\start.ps1" -Profile $Profile
+& "$PSScriptRoot\start.ps1" -Profile $Profile -FollowLogs:$FollowLogs
 
 Write-Host "=== Restart complete ==="

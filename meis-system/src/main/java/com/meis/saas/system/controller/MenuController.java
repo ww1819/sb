@@ -1,5 +1,9 @@
 package com.meis.saas.system.controller;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.meis.saas.common.cache.CacheKeys;
+import com.meis.saas.common.cache.MeisCacheProperties;
+import com.meis.saas.common.cache.RedisJsonCache;
 import com.meis.saas.common.rbac.PermissionService;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
@@ -19,6 +23,8 @@ public class MenuController {
     private final MenuService menuService;
     private final PermissionService permissionService;
     private final JdbcTemplate jdbc;
+    private final RedisJsonCache cache;
+    private final MeisCacheProperties cacheProps;
 
     @GetMapping("/menus")
     public Result<List<Map<String, Object>>> menusGet(@RequestHeader(value = "X-Tenant-Id", required = false) String tenantId) {
@@ -66,8 +72,15 @@ public class MenuController {
 
     @GetMapping("/permission/buttons")
     public Result<List<Map<String, Object>>> buttonPermissions() {
-        return Result.ok(jdbc.queryForList(
-                "SELECT dict_code as code, dict_label as label FROM sys_dict WHERE dict_type = 'button_perm' AND is_active = true ORDER BY sort_order"));
+        String schema = TenantContext.getSchemaName();
+        if (schema == null || schema.isBlank()) schema = "public";
+        String finalSchema = schema;
+        return Result.ok(cache.getOrLoad(
+                CacheKeys.buttonPerms(finalSchema),
+                cacheProps.getDictTtl(),
+                new TypeReference<List<Map<String, Object>>>() {},
+                () -> jdbc.queryForList(
+                        "SELECT dict_code as code, dict_label as label FROM sys_dict WHERE dict_type = 'button_perm' AND is_active = true ORDER BY sort_order")));
     }
 
     @GetMapping("/menus/platform-nav")

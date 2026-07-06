@@ -7,6 +7,7 @@
  =========|_|==============|___/=/_/_/_/
  :: Spring Boot ::                (v3.2.5)
 
+<<<<<<< HEAD
 2026-07-03T15:51:58.837+08:00  INFO 42280 --- [meis-notification] [           main] c.m.s.boot.MeisNotificationApplication   : Starting MeisNotificationApplication using Java 17.0.18 with PID 42280 (E:\workspace\sb\meis-notification\target\meis-notification-1.0.0-SNAPSHOT.jar started by Administrator in E:\workspace\sb)
 2026-07-03T15:51:58.878+08:00  INFO 42280 --- [meis-notification] [           main] c.m.s.boot.MeisNotificationApplication   : The following 1 profile is active: "dev"
 2026-07-03T15:52:12.616+08:00  INFO 42280 --- [meis-notification] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
@@ -19,10 +20,25 @@
 2026-07-03T15:52:17.271+08:00  INFO 42280 --- [meis-notification] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.20]
 2026-07-03T15:52:17.393+08:00  INFO 42280 --- [meis-notification] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
 2026-07-03T15:52:17.397+08:00  INFO 42280 --- [meis-notification] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 18091 ms
+=======
+2026-07-06T10:19:45.351+08:00  INFO 3468 --- [meis-notification] [           main] c.m.s.boot.MeisNotificationApplication   : Starting MeisNotificationApplication using Java 17.0.12 with PID 3468 (E:\workspace\sb\meis-notification\target\meis-notification-1.0.0-SNAPSHOT.jar started by Administrator in E:\workspace\sb)
+2026-07-06T10:19:45.355+08:00  INFO 3468 --- [meis-notification] [           main] c.m.s.boot.MeisNotificationApplication   : The following 1 profile is active: "dev"
+2026-07-06T10:19:47.892+08:00  INFO 3468 --- [meis-notification] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-07-06T10:19:47.894+08:00  INFO 3468 --- [meis-notification] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-07-06T10:19:48.048+08:00  INFO 3468 --- [meis-notification] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 135 ms. Found 0 Redis repository interfaces.
+2026-07-06T10:19:49.061+08:00  WARN 3468 --- [meis-notification] [           main] o.m.s.mapper.ClassPathMapperScanner      : No MyBatis mapper was found in '[com.meis.saas.boot]' package. Please check your configuration.
+2026-07-06T10:19:49.426+08:00  INFO 3468 --- [meis-notification] [           main] o.s.cloud.context.scope.GenericScope     : BeanFactory id=888b7a23-abb2-3144-b395-bb5977876c0f
+2026-07-06T10:19:52.559+08:00  INFO 3468 --- [meis-notification] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8093 (http)
+2026-07-06T10:19:52.574+08:00  INFO 3468 --- [meis-notification] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-07-06T10:19:52.574+08:00  INFO 3468 --- [meis-notification] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.20]
+2026-07-06T10:19:52.625+08:00  INFO 3468 --- [meis-notification] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-07-06T10:19:52.627+08:00  INFO 3468 --- [meis-notification] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 7206 ms
+>>>>>>> 475840a7cb337ab27739aa9936c88bb7ae3a7ae5
  _ _   |_  _ _|_. ___ _ |    _ 
 | | |\/|_)(_| | |_\  |_)||_|_\ 
      /               |         
                         3.5.5 
+<<<<<<< HEAD
 2026-07-03T15:52:35.344+08:00  INFO 42280 --- [meis-notification] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
 2026-07-03T15:52:35.717+08:00  INFO 42280 --- [meis-notification] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8093 (http) with context path ''
 2026-07-03T15:52:36.554+08:00  INFO 42280 --- [meis-notification] [           main] c.m.s.boot.MeisNotificationApplication   : Started MeisNotificationApplication in 44.78 seconds (process running for 48.199)
@@ -167,3 +183,8 @@ Caused by: org.postgresql.util.PSQLException: 错误: 关系 "medical_device" 不存在
 	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:393) ~[spring-jdbc-6.1.6.jar!/:6.1.6]
 	... 20 common frames omitted
 
+=======
+2026-07-06T10:19:58.500+08:00  INFO 3468 --- [meis-notification] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
+2026-07-06T10:19:58.611+08:00  INFO 3468 --- [meis-notification] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8093 (http) with context path ''
+2026-07-06T10:19:58.745+08:00  INFO 3468 --- [meis-notification] [           main] c.m.s.boot.MeisNotificationApplication   : Started MeisNotificationApplication in 16.194 seconds (process running for 19.026)
+>>>>>>> 475840a7cb337ab27739aa9936c88bb7ae3a7ae5

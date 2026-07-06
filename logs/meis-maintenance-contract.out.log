@@ -7,6 +7,7 @@
  =========|_|==============|___/=/_/_/_/
  :: Spring Boot ::                (v3.2.5)
 
+<<<<<<< HEAD
 2026-07-03T15:51:43.067+08:00  INFO 12444 --- [meis-maintenance-contract] [           main] m.s.b.MeisMaintenanceContractApplication : Starting MeisMaintenanceContractApplication using Java 17.0.18 with PID 12444 (E:\workspace\sb\meis-maintenance-contract\target\meis-maintenance-contract-1.0.0-SNAPSHOT.jar started by Administrator in E:\workspace\sb)
 2026-07-03T15:51:43.148+08:00  INFO 12444 --- [meis-maintenance-contract] [           main] m.s.b.MeisMaintenanceContractApplication : The following 1 profile is active: "dev"
 2026-07-03T15:51:48.488+08:00  INFO 12444 --- [meis-maintenance-contract] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
@@ -19,10 +20,30 @@
 2026-07-03T15:51:53.731+08:00  INFO 12444 --- [meis-maintenance-contract] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.20]
 2026-07-03T15:51:53.903+08:00  INFO 12444 --- [meis-maintenance-contract] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
 2026-07-03T15:51:53.907+08:00  INFO 12444 --- [meis-maintenance-contract] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 10163 ms
+=======
+2026-07-06T10:19:36.808+08:00  INFO 26148 --- [meis-maintenance-contract] [           main] m.s.b.MeisMaintenanceContractApplication : Starting MeisMaintenanceContractApplication using Java 17.0.12 with PID 26148 (E:\workspace\sb\meis-maintenance-contract\target\meis-maintenance-contract-1.0.0-SNAPSHOT.jar started by Administrator in E:\workspace\sb)
+2026-07-06T10:19:36.843+08:00  INFO 26148 --- [meis-maintenance-contract] [           main] m.s.b.MeisMaintenanceContractApplication : The following 1 profile is active: "dev"
+2026-07-06T10:19:40.291+08:00  INFO 26148 --- [meis-maintenance-contract] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-07-06T10:19:40.293+08:00  INFO 26148 --- [meis-maintenance-contract] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-07-06T10:19:40.316+08:00  INFO 26148 --- [meis-maintenance-contract] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 12 ms. Found 0 Redis repository interfaces.
+2026-07-06T10:19:40.501+08:00  WARN 26148 --- [meis-maintenance-contract] [           main] o.m.s.mapper.ClassPathMapperScanner      : No MyBatis mapper was found in '[com.meis.saas.boot]' package. Please check your configuration.
+2026-07-06T10:19:40.598+08:00  INFO 26148 --- [meis-maintenance-contract] [           main] o.s.cloud.context.scope.GenericScope     : BeanFactory id=5562498a-3a5a-30a4-8b94-cb0542f1990a
+2026-07-06T10:19:44.160+08:00  INFO 26148 --- [meis-maintenance-contract] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8089 (http)
+2026-07-06T10:19:44.179+08:00  INFO 26148 --- [meis-maintenance-contract] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-07-06T10:19:44.180+08:00  INFO 26148 --- [meis-maintenance-contract] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.20]
+2026-07-06T10:19:44.238+08:00  INFO 26148 --- [meis-maintenance-contract] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-07-06T10:19:44.240+08:00  INFO 26148 --- [meis-maintenance-contract] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 7224 ms
+>>>>>>> 475840a7cb337ab27739aa9936c88bb7ae3a7ae5
  _ _   |_  _ _|_. ___ _ |    _ 
 | | |\/|_)(_| | |_\  |_)||_|_\ 
      /               |         
                         3.5.5 
+<<<<<<< HEAD
 2026-07-03T15:52:04.868+08:00  INFO 12444 --- [meis-maintenance-contract] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
 2026-07-03T15:52:05.204+08:00  INFO 12444 --- [meis-maintenance-contract] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8089 (http) with context path ''
 2026-07-03T15:52:08.205+08:00  INFO 12444 --- [meis-maintenance-contract] [           main] m.s.b.MeisMaintenanceContractApplication : Started MeisMaintenanceContractApplication in 29.559 seconds (process running for 30.924)
+=======
+2026-07-06T10:19:53.258+08:00  INFO 26148 --- [meis-maintenance-contract] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
+2026-07-06T10:19:53.359+08:00  INFO 26148 --- [meis-maintenance-contract] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8089 (http) with context path ''
+2026-07-06T10:19:53.879+08:00  INFO 26148 --- [meis-maintenance-contract] [           main] m.s.b.MeisMaintenanceContractApplication : Started MeisMaintenanceContractApplication in 19.041 seconds (process running for 20.454)
+>>>>>>> 475840a7cb337ab27739aa9936c88bb7ae3a7ae5

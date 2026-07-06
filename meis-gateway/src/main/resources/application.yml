@@ -5,6 +5,10 @@ spring:
     name: meis-gateway
   profiles:
     active: dev
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
   autoconfigure:
     exclude:
       - com.meis.saas.common.config.CommonAutoConfiguration
@@ -23,6 +27,8 @@ meis:
     secret: meis-saas-jwt-secret-change-in-production-256bits
     issuer: meis-saas
     expiration-ms: 86400000
+  cache:
+    enabled: true
 management:
   endpoints:
     web:

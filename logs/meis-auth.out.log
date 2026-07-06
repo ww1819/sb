@@ -7,6 +7,7 @@
  =========|_|==============|___/=/_/_/_/
  :: Spring Boot ::                (v3.2.5)
 
+<<<<<<< HEAD
 2026-07-03T15:51:29.157+08:00  INFO 61276 --- [meis-auth] [           main] com.meis.saas.boot.MeisAuthApplication   : Starting MeisAuthApplication using Java 17.0.18 with PID 61276 (E:\workspace\sb\meis-auth\target\meis-auth-1.0.0-SNAPSHOT.jar started by Administrator in E:\workspace\sb)
 2026-07-03T15:51:29.165+08:00  INFO 61276 --- [meis-auth] [           main] com.meis.saas.boot.MeisAuthApplication   : The following 1 profile is active: "dev"
 2026-07-03T15:51:35.688+08:00  INFO 61276 --- [meis-auth] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
@@ -19,10 +20,25 @@
 2026-07-03T15:51:50.205+08:00  INFO 61276 --- [meis-auth] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.20]
 2026-07-03T15:51:50.447+08:00  INFO 61276 --- [meis-auth] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
 2026-07-03T15:51:50.451+08:00  INFO 61276 --- [meis-auth] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 21091 ms
+=======
+2026-07-06T10:19:26.238+08:00  INFO 26840 --- [meis-auth] [           main] com.meis.saas.boot.MeisAuthApplication   : Starting MeisAuthApplication using Java 17.0.12 with PID 26840 (E:\workspace\sb\meis-auth\target\meis-auth-1.0.0-SNAPSHOT.jar started by Administrator in E:\workspace\sb)
+2026-07-06T10:19:26.243+08:00  INFO 26840 --- [meis-auth] [           main] com.meis.saas.boot.MeisAuthApplication   : The following 1 profile is active: "dev"
+2026-07-06T10:19:27.521+08:00  INFO 26840 --- [meis-auth] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-07-06T10:19:27.524+08:00  INFO 26840 --- [meis-auth] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-07-06T10:19:27.542+08:00  INFO 26840 --- [meis-auth] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 3 ms. Found 0 Redis repository interfaces.
+2026-07-06T10:19:27.675+08:00  WARN 26840 --- [meis-auth] [           main] o.m.s.mapper.ClassPathMapperScanner      : No MyBatis mapper was found in '[com.meis.saas.boot]' package. Please check your configuration.
+2026-07-06T10:19:27.766+08:00  INFO 26840 --- [meis-auth] [           main] o.s.cloud.context.scope.GenericScope     : BeanFactory id=9e647576-0010-36ad-8866-5decf24dcde9
+2026-07-06T10:19:29.044+08:00  INFO 26840 --- [meis-auth] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8081 (http)
+2026-07-06T10:19:29.057+08:00  INFO 26840 --- [meis-auth] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-07-06T10:19:29.058+08:00  INFO 26840 --- [meis-auth] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.20]
+2026-07-06T10:19:29.118+08:00  INFO 26840 --- [meis-auth] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-07-06T10:19:29.120+08:00  INFO 26840 --- [meis-auth] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 2795 ms
+>>>>>>> 475840a7cb337ab27739aa9936c88bb7ae3a7ae5
  _ _   |_  _ _|_. ___ _ |    _ 
 | | |\/|_)(_| | |_\  |_)||_|_\ 
      /               |         
                         3.5.5 
+<<<<<<< HEAD
 2026-07-03T15:52:03.923+08:00  INFO 61276 --- [meis-auth] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
 2026-07-03T15:52:04.253+08:00  INFO 61276 --- [meis-auth] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8081 (http) with context path ''
 2026-07-03T15:52:07.899+08:00  INFO 61276 --- [meis-auth] [           main] com.meis.saas.boot.MeisAuthApplication   : Started MeisAuthApplication in 40.95 seconds (process running for 41.86)
@@ -131,3 +147,14 @@ Caused by: java.net.ConnectException: Connection refused: getsockopt
 2026-07-03T16:50:29.647+08:00  INFO 61276 --- [meis-auth] [nio-8081-exec-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
 2026-07-03T16:50:30.126+08:00  INFO 61276 --- [meis-auth] [nio-8081-exec-1] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@67625059
 2026-07-03T16:50:30.132+08:00  INFO 61276 --- [meis-auth] [nio-8081-exec-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+=======
+2026-07-06T10:19:36.250+08:00  INFO 26840 --- [meis-auth] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
+2026-07-06T10:19:36.660+08:00  INFO 26840 --- [meis-auth] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8081 (http) with context path ''
+2026-07-06T10:19:38.246+08:00  INFO 26840 --- [meis-auth] [           main] com.meis.saas.boot.MeisAuthApplication   : Started MeisAuthApplication in 12.536 seconds (process running for 12.942)
+2026-07-06T10:22:52.263+08:00  INFO 26840 --- [meis-auth] [nio-8081-exec-4] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-07-06T10:22:52.263+08:00  INFO 26840 --- [meis-auth] [nio-8081-exec-4] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-07-06T10:22:52.264+08:00  INFO 26840 --- [meis-auth] [nio-8081-exec-4] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+2026-07-06T10:22:52.356+08:00  INFO 26840 --- [meis-auth] [nio-8081-exec-4] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-07-06T10:22:52.514+08:00  INFO 26840 --- [meis-auth] [nio-8081-exec-4] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@37f3e9d7
+2026-07-06T10:22:52.517+08:00  INFO 26840 --- [meis-auth] [nio-8081-exec-4] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+>>>>>>> 475840a7cb337ab27739aa9936c88bb7ae3a7ae5
