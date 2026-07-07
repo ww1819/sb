@@ -69,6 +69,7 @@
       title="科室导入"
       import-url="/system/departments/import"
       template-url="/system/departments/import/template"
+      template-filename="department_import_template.xlsx"
       @success="load"
     />
   </SystemPageCard>

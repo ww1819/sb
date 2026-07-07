@@ -39,7 +39,7 @@ import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { UploadFile, UploadUserFile } from 'element-plus'
 import http from '@/api/http'
-import { downloadApiFile } from '@/utils/fileDownload'
+import { downloadApiFile, resolveTemplateFilename } from '@/utils/fileDownload'
 
 export interface ImportResultData {
   successCount: number
@@ -52,6 +52,7 @@ const props = defineProps<{
   title?: string
   importUrl: string
   templateUrl: string
+  templateFilename?: string
 }>()
 
 const emit = defineEmits<{
@@ -81,10 +82,11 @@ function onRemove() {
 
 async function downloadTemplate() {
   try {
-    const name = props.templateUrl.split('/').filter(Boolean).slice(-2)[0] || 'template'
-    await downloadApiFile(props.templateUrl, `${name}_import_template.xlsx`)
-  } catch {
-    ElMessage.error('模板下载失败')
+    const filename = props.templateFilename ?? resolveTemplateFilename(props.templateUrl)
+    await downloadApiFile(props.templateUrl, filename)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : '模板下载失败'
+    ElMessage.error(msg)
   }
 }
 

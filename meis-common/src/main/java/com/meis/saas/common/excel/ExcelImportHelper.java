@@ -6,6 +6,7 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLEncoder;
@@ -110,9 +111,17 @@ public final class ExcelImportHelper {
             if (!filename.toLowerCase(Locale.ROOT).endsWith(".xlsx")) {
                 filename = filename.replaceAll("\\.(csv|xls)$", "") + ".xlsx";
             }
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            workbook.write(bos);
+            byte[] bytes = bos.toByteArray();
+
+            resp.reset();
+            resp.setBufferSize(bytes.length);
             resp.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-            resp.setHeader("Content-Disposition", "attachment;filename=" + URLEncoder.encode(filename, StandardCharsets.UTF_8));
-            workbook.write(resp.getOutputStream());
+            resp.setHeader("Content-Disposition",
+                    "attachment; filename=\"" + filename + "\"; filename*=UTF-8''" + URLEncoder.encode(filename, StandardCharsets.UTF_8));
+            resp.setContentLength(bytes.length);
+            resp.getOutputStream().write(bytes);
             resp.getOutputStream().flush();
         }
     }

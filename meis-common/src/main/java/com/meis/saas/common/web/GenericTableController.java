@@ -4,6 +4,7 @@ import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.tenant.TenantContext;import com.meis.saas.common.excel.CsvExportHelper;
 import com.meis.saas.common.excel.ExcelExportHelper;
 import com.meis.saas.common.excel.ExcelImportHelper;
+import com.meis.saas.common.excel.ImportFieldDef;
 import com.meis.saas.common.excel.ImportFieldRegistry;
 import com.meis.saas.common.excel.ImportProfileService;
 import com.meis.saas.common.excel.ImportResult;
@@ -23,8 +24,12 @@ import java.util.*;
  * 通用表 CRUD（租户 Schema 内），供各业务微服务快速暴露 API。
  */
 public abstract class GenericTableController {
-    @Autowired
+    @Autowired(required = false)
     private ImportProfileService importProfileService;
+
+    protected void setImportProfileService(ImportProfileService service) {
+        this.importProfileService = service;
+    }
 
     protected abstract JdbcTemplate jdbc();
     protected abstract Set<String> tables();
@@ -91,7 +96,7 @@ public abstract class GenericTableController {
         check(table);
         String biz = importBusinessType(table);
         if (biz == null) throw new BizException(400, "table import not supported: " + table);
-        var fields = importProfileService.resolveFields(biz, profile);
+        var fields = resolveImportFields(biz, profile);
         ExcelImportHelper.writeTemplate(resp, table + "_import_template.xlsx", fields);
     }
 
@@ -102,10 +107,19 @@ public abstract class GenericTableController {
         check(table);
         String biz = importBusinessType(table);
         if (biz == null) throw new BizException(400, "table import not supported: " + table);
-        var fields = importProfileService.resolveFields(biz, profile);
-        var columns = importProfileService.standardColumns(biz, fields);
+        var fields = resolveImportFields(biz, profile);
+        var columns = importProfileService != null
+                ? importProfileService.standardColumns(biz, fields)
+                : new LinkedHashSet<>(fields.stream().map(ImportFieldDef::effectiveColumn).filter(Objects::nonNull).toList());
         ImportResult result = SimpleTableImporter.importRows(jdbc(), table, ExcelImportHelper.parseRows(file, fields), columns);
         return Result.ok(result);
+    }
+
+    private List<ImportFieldDef> resolveImportFields(String businessType, String profile) {
+        if (importProfileService != null) {
+            return importProfileService.resolveFields(businessType, profile);
+        }
+        return ImportFieldRegistry.get(businessType);
     }
 
     @PostMapping("/{table}/generate-pinyin")

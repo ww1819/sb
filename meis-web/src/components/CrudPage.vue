@@ -100,6 +100,7 @@
       :title="`${config.title}导入`"
       :import-url="importUrl"
       :template-url="importTemplateUrl"
+      :template-filename="`${config.table}_import_template.xlsx`"
       @success="load"
     />
   </SystemPageCard>
