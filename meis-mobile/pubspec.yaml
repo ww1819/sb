@@ -1,5 +1,5 @@
 name: meis_mobile
-description: MEIS 医院设备管理移动端骨架
+description: MEIS 医院设备管理移动端
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -9,7 +9,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  http: ^1.2.2
+  flutter_riverpod: ^2.6.1
+  dio: ^5.7.0
+  go_router: ^14.6.2
   shared_preferences: ^2.3.2
 
 dev_dependencies:
