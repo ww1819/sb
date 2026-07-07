@@ -42,6 +42,7 @@ CREATE TABLE department (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     dept_code VARCHAR(3) UNIQUE NOT NULL,
     dept_name VARCHAR(100) NOT NULL,
+    pinyin_code VARCHAR(50),
     parent_id UUID REFERENCES department(id),
     campus_id UUID REFERENCES campus(id),
     building_id UUID REFERENCES building(id),
@@ -55,6 +56,8 @@ CREATE TABLE department (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS idx_department_pinyin_code ON department(pinyin_code);
 
 -- 1.4 用户表
 CREATE TABLE sys_user (
@@ -136,6 +139,7 @@ CREATE TABLE supplier (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     supplier_code VARCHAR(20) UNIQUE NOT NULL,
     supplier_name VARCHAR(200) NOT NULL,
+    pinyin_code VARCHAR(50),
     unified_social_credit_code VARCHAR(18),
     legal_representative VARCHAR(50),
     contact_person VARCHAR(50),
@@ -151,11 +155,14 @@ CREATE TABLE supplier (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE INDEX IF NOT EXISTS idx_supplier_pinyin_code ON supplier(pinyin_code);
+
 -- 2.3 生产厂商表
 CREATE TABLE manufacturer (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     manufacturer_code VARCHAR(20) UNIQUE NOT NULL,
     manufacturer_name VARCHAR(200) NOT NULL,
+    pinyin_code VARCHAR(50),
     country VARCHAR(50),
     is_domestic BOOLEAN,
     contact_phone VARCHAR(20),
@@ -164,6 +171,8 @@ CREATE TABLE manufacturer (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS idx_manufacturer_pinyin_code ON manufacturer(pinyin_code);
 
 -- ================================================================================
 -- 3. 采购管理模块

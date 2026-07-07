@@ -13,9 +13,9 @@ import { ref } from 'vue'
 import http from '@/api/http'
 import CrudPage from '@/components/CrudPage.vue'
 import DeviceDetailTabs from '@/components/DeviceDetailTabs.vue'
-import type { PageConfig } from '@/config/pageRegistry'
+import { getPageConfig } from '@/config/pageRegistry'
 
-const config: PageConfig = { title: '设备台账', apiBase: '/asset', table: 'medical_device' }
+const config = getPageConfig('/asset/device')!
 const selectedDevice = ref<Record<string, unknown> | null>(null)
 
 async function openDevice(row: Record<string, unknown>) {

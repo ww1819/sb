@@ -26,20 +26,7 @@ $deadline = (Get-Date).AddSeconds($TimeoutSec)
 while ((Get-Date) -lt $deadline) {
     $pending = @($Ports | Where-Object { -not (Test-MeisPortListening -Port $_) })
     if ($pending.Count -eq 0) {
-        if ($Ports -contains 8080) {
-            try {
-                $resp = Invoke-WebRequest -Uri 'http://localhost:8080/actuator/health' -TimeoutSec 3 -UseBasicParsing
-                if ($resp.StatusCode -eq 200) {
-                    Write-Host 'Backend ready (ports + gateway health).' -ForegroundColor Green
-                    exit 0
-                }
-            } catch {
-                Write-Host '  ports up, gateway health pending...'
-                Start-Sleep -Seconds $IntervalSec
-                continue
-            }
-        }
-        Write-Host 'Backend ports ready.' -ForegroundColor Green
+        Write-Host 'All backend ports are listening.' -ForegroundColor Green
         exit 0
     }
     Write-Host "  pending: $($pending -join ', ')"

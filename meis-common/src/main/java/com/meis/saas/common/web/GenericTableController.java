@@ -1,12 +1,20 @@
 package com.meis.saas.common.web;
 
 import com.meis.saas.common.exception.BizException;
-import com.meis.saas.common.result.Result;
-import com.meis.saas.common.tenant.TenantContext;
+import com.meis.saas.common.tenant.TenantContext;import com.meis.saas.common.excel.CsvExportHelper;
 import com.meis.saas.common.excel.ExcelExportHelper;
+import com.meis.saas.common.excel.ExcelImportHelper;
+import com.meis.saas.common.excel.ImportFieldRegistry;
+import com.meis.saas.common.excel.ImportProfileService;
+import com.meis.saas.common.excel.ImportResult;
+import com.meis.saas.common.excel.SimpleTableImporter;
+import com.meis.saas.common.result.Result;
+import com.meis.saas.common.web.PinyinCodeBatchUpdater;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.*;
@@ -15,6 +23,9 @@ import java.util.*;
  * 通用表 CRUD（租户 Schema 内），供各业务微服务快速暴露 API。
  */
 public abstract class GenericTableController {
+    @Autowired
+    private ImportProfileService importProfileService;
+
     protected abstract JdbcTemplate jdbc();
     protected abstract Set<String> tables();
 
@@ -73,6 +84,48 @@ public abstract class GenericTableController {
         ExcelExportHelper.exportCsv(jdbc(), table, resp);
     }
 
+    @GetMapping("/{table}/import/template")
+    public void importTemplate(@PathVariable String table,
+                               @RequestParam(required = false) String profile,
+                               HttpServletResponse resp) throws IOException {
+        check(table);
+        String biz = importBusinessType(table);
+        if (biz == null) throw new BizException(400, "table import not supported: " + table);
+        var fields = importProfileService.resolveFields(biz, profile);
+        ExcelImportHelper.writeTemplate(resp, table + "_import_template.xlsx", fields);
+    }
+
+    @PostMapping("/{table}/import")
+    public Result<ImportResult> importFile(@PathVariable String table,
+                                           @RequestParam("file") MultipartFile file,
+                                           @RequestParam(required = false) String profile) throws IOException {
+        check(table);
+        String biz = importBusinessType(table);
+        if (biz == null) throw new BizException(400, "table import not supported: " + table);
+        var fields = importProfileService.resolveFields(biz, profile);
+        var columns = importProfileService.standardColumns(biz, fields);
+        ImportResult result = SimpleTableImporter.importRows(jdbc(), table, ExcelImportHelper.parseRows(file, fields), columns);
+        return Result.ok(result);
+    }
+
+    @PostMapping("/{table}/generate-pinyin")
+    public Result<Map<String, Object>> generatePinyin(@PathVariable String table, @RequestBody Map<String, Object> body) {
+        check(table);
+        Map<String, String> meta = PinyinCodeBatchUpdater.pinyinMeta(table);
+        if (meta == null) throw new BizException(400, "table pinyin not supported: " + table);
+        int count;
+        if (Boolean.TRUE.equals(body.get("all"))) {
+            count = PinyinCodeBatchUpdater.updateByKeyword(jdbc(), meta.get("table"), meta.get("nameColumn"), meta.get("codeColumn"),
+                    body.get("keyword") == null ? null : body.get("keyword").toString());
+        } else {
+            @SuppressWarnings("unchecked")
+            List<String> idStrs = (List<String>) body.get("ids");
+            List<UUID> ids = idStrs == null ? List.of() : idStrs.stream().map(UUID::fromString).toList();
+            count = PinyinCodeBatchUpdater.updateByIds(jdbc(), meta.get("table"), meta.get("nameColumn"), ids);
+        }
+        return Result.ok(Map.of("updated", count));
+    }
+
     @DeleteMapping("/{table}/{id}")
     public Result<Void> delete(@PathVariable String table, @PathVariable String id) {
         check(table);
@@ -83,5 +136,13 @@ public abstract class GenericTableController {
     private void check(String table) {
         if (!tables().contains(table)) throw new BizException(400, "table not allowed: " + table);
         if ("public".equals(TenantContext.getSchemaName())) throw new BizException(403, "tenant context required");
+    }
+
+    private static String importBusinessType(String table) {
+        return switch (table) {
+            case "supplier" -> ImportFieldRegistry.SUPPLIER;
+            case "manufacturer" -> ImportFieldRegistry.MANUFACTURER;
+            default -> null;
+        };
     }
 }

@@ -50,6 +50,7 @@ export const tableSchemas: Record<string, FieldSchema[]> = {
   department: [
     { prop: 'dept_code', label: '科室编码', list: true, required: true },
     { prop: 'dept_name', label: '科室名称', list: true, required: true },
+    { prop: 'pinyin_code', label: '拼音简码', list: true },
     { prop: 'is_clinical', label: '临床科室', list: true },
     { prop: 'sort_order', label: '排序', type: 'number', list: true },
     { prop: 'is_active', label: '启用', list: true }

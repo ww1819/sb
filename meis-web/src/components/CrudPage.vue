@@ -10,7 +10,12 @@
   >
     <template #actions>
       <el-button v-permission="'add'" type="primary" @click="openForm()">新增</el-button>
+      <el-button v-if="showImport" @click="importVisible = true">导入</el-button>
       <el-button @click="exportCsv">导出</el-button>
+      <template v-if="showPinyinCode">
+        <el-button :disabled="!selectedIds.length" @click="generatePinyin(false)">生成简码（选中）</el-button>
+        <el-button @click="generatePinyin(true)">生成简码（全部结果）</el-button>
+      </template>
       <slot name="toolbar-extra" />
     </template>
 
@@ -47,13 +52,16 @@
     </template>
 
     <el-table
+      ref="tableRef"
       v-loading="loading"
       :data="rows"
       stripe
       class="system-table"
       :height="tableHeight"
       @row-dblclick="onRowDblClick"
+      @selection-change="onSelectionChange"
     >
+      <el-table-column v-if="showPinyinCode" type="selection" width="48" fixed="left" />
       <el-table-column
         v-for="f in listFields"
         :key="f.prop"
@@ -85,12 +93,23 @@
         <GroupedFormFields :table="config.table" :model="form" :fields="formFields" />
       </el-form>
     </FormDrawer>
+
+    <ImportDialog
+      v-if="showImport"
+      v-model="importVisible"
+      :title="`${config.title}导入`"
+      :import-url="importUrl"
+      :template-url="importTemplateUrl"
+      @success="load"
+    />
   </SystemPageCard>
 </template>
 
 <script setup lang="ts">
 import { computed, onActivated, onMounted, reactive, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import http from '@/api/http'
+import { downloadApiFile } from '@/utils/fileDownload'
 import FormDrawer from './FormDrawer.vue'
 import FieldRenderer from './FieldRenderer.vue'
 import SystemPageCard from './system/SystemPageCard.vue'
@@ -100,6 +119,7 @@ import PageEmpty from './table/PageEmpty.vue'
 import type { PageConfig } from '@/config/pageRegistry'
 import { getListFields, getSchema } from '@/config/pageSchemas'
 import GroupedFormFields from './form/GroupedFormFields.vue'
+import ImportDialog from './ImportDialog.vue'
 import { columnAlign } from '@/utils/tableCell'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
 import { useDict } from '@/composables/useDict'
@@ -117,8 +137,11 @@ const keyword = ref('')
 const filterValues = reactive<Record<string, string | number | undefined>>({})
 const filterOptions = reactive<Record<string, { label: string; value: string }[]>>({})
 const formVisible = ref(false)
+const importVisible = ref(false)
 const form = ref<Record<string, unknown>>({})
 const formTitle = ref('新增')
+const tableRef = ref()
+const selectedIds = ref<string[]>([])
 
 const tableHeight = useSystemTableHeight()
 
@@ -135,6 +158,13 @@ const formFields = computed(() => {
   if (s.length) return s
   return listFields.value
 })
+
+const showImport = computed(() => props.config.importable === true)
+const showPinyinCode = computed(() => props.config.pinyinCode === true)
+const importUrl = computed(() => props.config.importUrl ?? `${props.config.apiBase}/${props.config.table}/import`)
+const importTemplateUrl = computed(() => props.config.importTemplateUrl ?? `${props.config.apiBase}/${props.config.table}/import/template`)
+const exportUrl = computed(() => props.config.exportUrl ?? `${props.config.apiBase}/${props.config.table}/export`)
+const pinyinCodeUrl = computed(() => props.config.pinyinCodeUrl ?? `${props.config.apiBase}/${props.config.table}/generate-pinyin`)
 
 async function load() {
   loading.value = true
@@ -193,8 +223,30 @@ async function remove(row: Record<string, unknown>) {
   load()
 }
 
-function exportCsv() {
-  window.open(`/api${props.config.apiBase}/${props.config.table}/export`, '_blank')
+function onSelectionChange(rows: Record<string, unknown>[]) {
+  selectedIds.value = rows.map((r) => String(r.id))
+}
+
+async function exportCsv() {
+  try {
+    await downloadApiFile(exportUrl.value, `${props.config.table}_export.csv`)
+  } catch {
+    ElMessage.error('导出失败')
+  }
+}
+
+async function generatePinyin(all: boolean) {
+  try {
+    const body: Record<string, unknown> = all
+      ? { all: true, keyword: keyword.value || undefined }
+      : { ids: selectedIds.value }
+    const { data } = await http.post(pinyinCodeUrl.value, body)
+    ElMessage.success(`已更新 ${data.data?.updated ?? 0} 条拼音简码`)
+    tableRef.value?.clearSelection()
+    load()
+  } catch {
+    ElMessage.error('生成拼音简码失败')
+  }
 }
 
 function onRowDblClick(row: Record<string, unknown>) {

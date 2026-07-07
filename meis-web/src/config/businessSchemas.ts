@@ -131,6 +131,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   supplier: [
     { prop: 'supplier_code', label: '供应商编码', list: true, required: true },
     { prop: 'supplier_name', label: '供应商名称', list: true, required: true },
+    { prop: 'pinyin_code', label: '拼音简码', list: true },
     { prop: 'unified_social_credit_code', label: '统一社会信用代码', list: true },
     { prop: 'legal_representative', label: '法人代表' },
     { prop: 'contact_person', label: '联系人', list: true },
@@ -145,6 +146,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   manufacturer: [
     { prop: 'manufacturer_code', label: '厂商编码', list: true, required: true },
     { prop: 'manufacturer_name', label: '厂商名称', list: true, required: true },
+    { prop: 'pinyin_code', label: '拼音简码', list: true },
     { prop: 'country', label: '国家/地区', list: true },
     { prop: 'is_domestic', label: '国产厂商', type: 'boolean', list: true },
     { prop: 'contact_phone', label: '联系电话', list: true },
