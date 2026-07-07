@@ -20,7 +20,30 @@
         placeholder="关键词搜索"
         @search="onSearch"
         @reset="onReset"
-      />
+      >
+        <template v-if="config.listFilters?.length" #filters>
+          <template v-for="f in config.listFilters" :key="f.key">
+            <el-select
+              v-if="f.dictType"
+              v-model="filterValues[f.key]"
+              :placeholder="f.label"
+              clearable
+              class="filter-item"
+              @change="onSearch"
+            >
+              <el-option v-for="o in filterOptions[f.key] ?? []" :key="o.value" :label="o.label" :value="o.value" />
+            </el-select>
+            <el-input-number
+              v-else-if="f.type === 'number'"
+              v-model="filterValues[f.key]"
+              :placeholder="f.label"
+              controls-position="right"
+              class="filter-item filter-number"
+              @change="onSearch"
+            />
+          </template>
+        </template>
+      </PageFilterBar>
     </template>
 
     <el-table
@@ -66,7 +89,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, onMounted, ref, watch } from 'vue'
+import { computed, onActivated, onMounted, reactive, ref, watch } from 'vue'
 import http from '@/api/http'
 import FormDrawer from './FormDrawer.vue'
 import FieldRenderer from './FieldRenderer.vue'
@@ -79,9 +102,11 @@ import { getListFields, getSchema } from '@/config/pageSchemas'
 import GroupedFormFields from './form/GroupedFormFields.vue'
 import { columnAlign } from '@/utils/tableCell'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
+import { useDict } from '@/composables/useDict'
 
 const props = defineProps<{ config: PageConfig }>()
 const emit = defineEmits<{ detail: [row: Record<string, unknown>] }>()
+const { loadDict } = useDict()
 
 const loading = ref(false)
 const rows = ref<Record<string, unknown>[]>([])
@@ -89,6 +114,8 @@ const total = ref(0)
 const page = ref(1)
 const size = ref(20)
 const keyword = ref('')
+const filterValues = reactive<Record<string, string | number | undefined>>({})
+const filterOptions = reactive<Record<string, { label: string; value: string }[]>>({})
 const formVisible = ref(false)
 const form = ref<Record<string, unknown>>({})
 const formTitle = ref('新增')
@@ -112,9 +139,17 @@ const formFields = computed(() => {
 async function load() {
   loading.value = true
   try {
-    const { data } = await http.get(`${props.config.apiBase}/${props.config.table}/page`, {
-      params: { page: page.value, size: size.value, keyword: keyword.value }
-    })
+    const url = props.config.listPageUrl ?? `${props.config.apiBase}/${props.config.table}/page`
+    const params: Record<string, string | number> = {
+      page: page.value,
+      size: size.value
+    }
+    if (keyword.value) params.keyword = keyword.value
+    for (const f of props.config.listFilters ?? []) {
+      const v = filterValues[f.key]
+      if (v !== undefined && v !== null && v !== '') params[f.key] = v
+    }
+    const { data } = await http.get(url, { params })
     rows.value = data.data?.records ?? []
     total.value = data.data?.total ?? 0
   } finally {
@@ -129,6 +164,9 @@ function onSearch() {
 
 function onReset() {
   keyword.value = ''
+  for (const f of props.config.listFilters ?? []) {
+    filterValues[f.key] = undefined
+  }
   page.value = 1
   load()
 }
@@ -167,6 +205,9 @@ watch(() => props.config, load, { deep: true })
 
 let initialized = false
 onMounted(async () => {
+  for (const f of props.config.listFilters ?? []) {
+    if (f.dictType) filterOptions[f.key] = await loadDict(f.dictType)
+  }
   await load()
   initialized = true
 })

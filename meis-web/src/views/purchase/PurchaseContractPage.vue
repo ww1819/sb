@@ -4,6 +4,8 @@
       <template #toolbar-extra>
         <el-button v-if="contract?.id" type="warning" @click="save">保存合同</el-button>
         <el-button v-if="contract?.id" type="primary" @click="submit">提交审批</el-button>
+        <el-button v-if="contract?.id" @click="printContract">打印合同</el-button>
+        <el-button @click="exportContract">导出列表</el-button>
       </template>
     </CrudPage>
 
@@ -19,8 +21,16 @@
                 <FieldRenderer v-model="row[f.prop]" :field="f" />
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="80">
-              <template #default="{ $index }">
+            <el-table-column label="操作" width="140">
+              <template #default="{ row, $index }">
+                <el-button
+                  v-if="row.id && (!row.approval_status || row.approval_status === 'draft')"
+                  link
+                  type="primary"
+                  @click="submitPayment(row)"
+                >
+                  提交审批
+                </el-button>
                 <el-button link type="danger" @click="payments.splice($index, 1)">删</el-button>
               </template>
             </el-table-column>
@@ -45,6 +55,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import http from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 import CrudPage from '@/components/CrudPage.vue'
@@ -52,11 +63,12 @@ import AppModal from '@/components/AppModal.vue'
 import GroupedFormFields from '@/components/form/GroupedFormFields.vue'
 import FieldRenderer from '@/components/FieldRenderer.vue'
 import ApprovalPanel from '@/components/ApprovalPanel.vue'
-import type { PageConfig } from '@/config/pageRegistry'
+import { getPageConfig } from '@/config/pageRegistry'
 import { getDetailFields } from '@/config/pageSchemas'
+import { printContractDoc } from '@/utils/printDoc'
 
 const auth = useAuthStore()
-const config: PageConfig = { title: '采购合同', apiBase: '/purchase', table: 'purchase_contract' }
+const config = getPageConfig('/purchase/contract')!
 const crudRef = ref<InstanceType<typeof CrudPage> | null>(null)
 const visible = ref(false)
 const contract = ref<Record<string, unknown> | null>(null)
@@ -71,7 +83,13 @@ async function openDetail(row: Record<string, unknown>) {
 }
 
 function addPayment() {
-  payments.value.push({ payment_no: 'PAY' + Date.now(), payment_stage: 'advance', payment_amount: 0, status: 'pending' })
+  payments.value.push({
+    payment_no: 'PAY' + Date.now(),
+    payment_stage: 'advance',
+    payment_amount: 0,
+    status: 'pending',
+    approval_status: 'draft'
+  })
 }
 
 async function save() {
@@ -84,6 +102,17 @@ async function save() {
 async function submit() {
   if (!contract.value?.id) return
   await http.post(`/purchase/contract/${contract.value.id}/submit`, { applicantId: auth.user?.userId })
+  ElMessage.success('已提交合同审批')
+  await reload()
+}
+
+async function submitPayment(row: Record<string, unknown>) {
+  if (!contract.value?.id || !row.id) return
+  await http.post('/purchase/contract', { ...contract.value, payments: payments.value })
+  await http.post(`/purchase/contract/${contract.value.id}/payments/${row.id}/submit`, {
+    applicantId: auth.user?.userId
+  })
+  ElMessage.success('已提交付款审批')
   await reload()
 }
 
@@ -93,6 +122,15 @@ async function reload() {
   contract.value = data.data
   payments.value = (data.data?.payments as Record<string, unknown>[]) ?? []
   crudRef.value?.load()
+}
+
+function printContract() {
+  if (!contract.value) return
+  printContractDoc({ ...contract.value, payments: payments.value })
+}
+
+function exportContract() {
+  window.open('/api/purchase/purchase_contract/export', '_blank')
 }
 </script>
 

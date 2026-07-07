@@ -120,7 +120,7 @@
 
             </el-button>
 
-            <PageBreadcrumb :items="breadcrumbItems" />
+            <PageBreadcrumb v-if="showBreadcrumb" :items="breadcrumbItems" />
 
           </div>
 
@@ -186,7 +186,7 @@
 
           <PageBreadcrumb
 
-            v-if="!layoutStore.contentFullscreen && layoutStore.isTopNav"
+            v-if="!layoutStore.contentFullscreen && layoutStore.isTopNav && showBreadcrumb"
 
             class="top-nav-breadcrumb"
 
@@ -389,6 +389,11 @@ const breadcrumbItems = computed(() =>
   resolveBreadcrumb(modules.value, tabsStore.activePath, titleMap.value)
 
 )
+
+const showBreadcrumb = computed(() => {
+  const path = tabsStore.activePath
+  return path !== homePath.value && breadcrumbItems.value.length > 0
+})
 
 const currentPageTitle = computed(
 
@@ -1004,7 +1009,7 @@ async function logout() {
 
 
 
-.page-view > * {
+.page-view > *:only-child {
 
   flex: 1;
 

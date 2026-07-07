@@ -1,21 +1,38 @@
 <template>
   <MasterDetailPage
+    ref="pageRef"
     :config="config"
     save-url="/purchase/plan"
     business-type="purchase_plan"
-  />
+  >
+    <template #toolbar-extra>
+      <el-button v-if="selectedId" @click="printPlan">打印计划</el-button>
+      <el-button @click="exportPlan">导出列表</el-button>
+    </template>
+  </MasterDetailPage>
 </template>
 
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import MasterDetailPage from '@/components/MasterDetailPage.vue'
-import type { PageConfig } from '@/config/pageRegistry'
+import { getPageConfig } from '@/config/pageRegistry'
+import { printPlanDoc } from '@/utils/printDoc'
+import http from '@/api/http'
 
-const config: PageConfig = {
-  title: '采购计划',
-  apiBase: '/purchase',
-  table: 'purchase_plan',
-  masterDetail: true,
-  detailTable: 'purchase_plan_item',
-  foreignKey: 'plan_id'
+const config = getPageConfig('/purchase/plan')!
+const pageRef = ref<InstanceType<typeof MasterDetailPage>>()
+const selectedId = computed(() => pageRef.value?.selectedId)
+
+async function printPlan() {
+  const id = selectedId.value
+  if (!id) return
+  const { data } = await http.get(`/purchase/plan/${id}`)
+  if (data.code !== 0 || !data.data) return
+  const p = data.data
+  printPlanDoc(p)
+}
+
+function exportPlan() {
+  window.open('/api/purchase/purchase_plan/export', '_blank')
 }
 </script>

@@ -1,14 +1,6 @@
 <template>
-  <div class="dashboard dashboard-stagger page-view--scroll">
-    <div class="dashboard-hero">
-      <div>
-        <h2 class="hero-title">{{ profile.title }}</h2>
-        <p class="hero-sub">{{ profile.subtitle }}</p>
-      </div>
-      <el-tag type="info" effect="plain" round>{{ roleLabel }}</el-tag>
-    </div>
-
-    <el-row :gutter="16" class="kpi-row">
+  <div class="dashboard page-view--scroll">
+    <el-row :gutter="12" class="kpi-row">
       <el-col v-for="item in profile.kpis" :key="item.key" :span="kpiSpan">
         <StatCard
           :title="item.title"
@@ -21,60 +13,73 @@
       </el-col>
     </el-row>
 
-    <el-row :gutter="16" class="section">
-      <el-col :span="profile.showTodos ? 12 : 24">
+    <el-tabs v-model="activeTab" class="dashboard-tabs" @tab-change="onTabChange">
+      <el-tab-pane name="workspace">
+        <template #label>
+          <span>日常办公</span>
+          <el-badge v-if="todos.length" :value="todos.length" class="tab-badge" />
+        </template>
+        <el-row :gutter="16">
+          <el-col :xs="24" :lg="profile.showTodos ? 14 : 24">
+            <el-card shadow="never" class="panel-card">
+              <template #header>
+                <div class="panel-header">快捷入口</div>
+              </template>
+              <QuickEntryGrid :items="quickEntries" @navigate="go" />
+            </el-card>
+          </el-col>
+          <el-col v-if="profile.showTodos" :xs="24" :lg="10">
+            <el-card shadow="never" class="panel-card panel-card--fill">
+              <template #header>
+                <div class="panel-header">待办事项</div>
+              </template>
+              <FeedList :items="todos" type-field="todo_type" empty-text="暂无待办事项" :limit="12" />
+            </el-card>
+          </el-col>
+        </el-row>
+      </el-tab-pane>
+
+      <el-tab-pane v-if="activeCharts.length" name="charts" lazy>
+        <template #label>数据分析</template>
+        <el-row :gutter="16" class="charts-row">
+          <el-col
+            v-for="chart in activeCharts"
+            :key="chart.key"
+            :xs="24"
+            :lg="chart.span"
+          >
+            <ChartCard :title="chart.title" :option="chart.option" :height="chart.height" />
+          </el-col>
+        </el-row>
+      </el-tab-pane>
+
+      <el-tab-pane v-if="profile.showMessages" name="messages" lazy>
+        <template #label>
+          <span>消息中心</span>
+          <el-badge v-if="unreadCount" :value="unreadCount" class="tab-badge" />
+        </template>
         <el-card shadow="never" class="panel-card">
           <template #header>
-            <div class="panel-header">快捷入口</div>
-          </template>
-          <QuickEntryGrid :items="quickEntries" @navigate="go" />
-        </el-card>
-      </el-col>
-      <el-col v-if="profile.showTodos" :span="12">
-        <el-card shadow="never" class="panel-card">
-          <template #header>
-            <div class="panel-header">待办事项</div>
-          </template>
-          <FeedList :items="todos" type-field="todo_type" empty-text="暂无待办事项" max-height="220px" />
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <el-row v-if="chartRow1.length" :gutter="16" class="section">
-      <el-col v-for="chart in chartRow1" :key="chart.key" :span="chart.span">
-        <ChartCard :title="chart.title" :option="chart.option" :height="chart.height" />
-      </el-col>
-    </el-row>
-
-    <el-row v-if="chartRow2.length" :gutter="16" class="section">
-      <el-col v-for="chart in chartRow2" :key="chart.key" :span="chart.span">
-        <ChartCard :title="chart.title" :option="chart.option" :height="chart.height" />
-      </el-col>
-    </el-row>
-
-    <el-row v-if="profile.showMessages" :gutter="16" class="section">
-      <el-col :span="24">
-        <el-card shadow="never" class="panel-card">
-          <template #header>
-            <div class="panel-header">消息中心</div>
+            <div class="panel-header">消息通知</div>
           </template>
           <FeedList
             :items="messages"
             type-field="message_type"
             unread-field="is_read"
             empty-text="暂无消息"
-            max-height="280px"
+            :limit="20"
           />
         </el-card>
-      </el-col>
-    </el-row>
+      </el-tab-pane>
+    </el-tabs>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import type { EChartsOption } from 'echarts'
+import type { TabPaneName } from 'element-plus'
 import http from '@/api/http'
 import { useTabsStore } from '@/stores/tabs'
 import { useLayoutStore } from '@/stores/layout'
@@ -89,28 +94,23 @@ import { buildBarOption, buildLineOption, buildPieOption } from '@/composables/u
 const router = useRouter()
 const tabs = useTabsStore()
 const layoutStore = useLayoutStore()
-const { profile, profileId } = useDashboardProfile()
+const { profile } = useDashboardProfile()
 
 const stats = ref<Record<string, unknown>>({})
 const todos = ref<Record<string, unknown>[]>([])
 const messages = ref<Record<string, unknown>[]>([])
+const activeTab = ref('workspace')
 
 const kpiSpan = computed(() => (profile.value.kpis.length === 3 ? 8 : 6))
 
-const roleLabel = computed(() => {
-  const map: Record<string, string> = {
-    admin: '管理员视图',
-    asset: '资产管理视图',
-    repair: '维修工程师视图',
-    purchase: '采购管理视图'
-  }
-  return map[profileId.value] ?? '工作台'
-})
-
 const quickEntries = computed(() => {
   const paths = new Set(profile.value.quickPaths)
-  return ALL_QUICK_ENTRIES.filter((item) => paths.has(item.path)).slice(0, 4)
+  return ALL_QUICK_ENTRIES.filter((item) => paths.has(item.path))
 })
+
+const unreadCount = computed(() =>
+  messages.value.filter((m) => !m.is_read).length
+)
 
 const emptyLine: EChartsOption = buildLineOption([], [])
 const emptyBar: EChartsOption = buildBarOption([], [])
@@ -168,36 +168,31 @@ function chartOptions() {
   } as Record<DashboardChartKey, EChartsOption>
 }
 
-const chartMeta: Record<DashboardChartKey, { title: string; height?: string }> = {
-  trend: { title: '维修趋势' },
-  brand: { title: '品牌 TOP10' },
-  status: { title: '设备状态', height: '220px' },
-  origin: { title: '国产/进口', height: '220px' },
-  newDevice: { title: '新增设备', height: '220px' },
-  deptValue: { title: '科室资产价值', height: '220px' }
+const chartMeta: Record<DashboardChartKey, { title: string; height: string; wide?: boolean }> = {
+  trend: { title: '维修趋势', height: '320px', wide: true },
+  brand: { title: '品牌 TOP10', height: '320px', wide: true },
+  status: { title: '设备状态', height: '300px' },
+  origin: { title: '国产/进口', height: '300px' },
+  newDevice: { title: '新增设备', height: '300px', wide: true },
+  deptValue: { title: '科室资产价值', height: '320px', wide: true }
 }
 
 const activeCharts = computed(() => {
   void layoutStore.themeRevision
   const options = chartOptions()
-  return profile.value.charts.map((key) => ({
-    key,
-    title: chartMeta[key].title,
-    height: chartMeta[key].height,
-    option: options[key]
-  }))
-})
-
-const chartRow1 = computed(() => {
-  const list = activeCharts.value
-  if (list.length <= 2) return list.map((c) => ({ ...c, span: list.length === 1 ? 24 : 12 }))
-  return list.slice(0, 2).map((c) => ({ ...c, span: 12 }))
-})
-
-const chartRow2 = computed(() => {
-  const list = activeCharts.value
-  if (list.length <= 2) return []
-  return list.slice(2).map((c) => ({ ...c, span: list.slice(2).length === 1 ? 24 : 8 }))
+  const keys = profile.value.charts
+  return keys.map((key, index) => {
+    const meta = chartMeta[key]
+    const isWide = meta.wide ?? false
+    const isLastOdd = keys.length % 2 === 1 && index === keys.length - 1
+    return {
+      key,
+      title: meta.title,
+      height: meta.height,
+      option: options[key],
+      span: isLastOdd ? 24 : isWide ? 12 : 12
+    }
+  })
 })
 
 watch(() => layoutStore.themeRevision, () => {
@@ -215,6 +210,12 @@ onMounted(async () => {
   messages.value = msgRes.data.data ?? []
 })
 
+function onTabChange(name: TabPaneName) {
+  if (name === 'charts') {
+    nextTick(() => window.dispatchEvent(new Event('resize')))
+  }
+}
+
 function go(path: string) {
   tabs.open(path, path)
   router.push(path)
@@ -228,46 +229,43 @@ function numVal(v: unknown) {
 
 <style scoped>
 .dashboard {
-  height: 100%;
+  min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
 }
 
-.dashboard-hero {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-  padding: 18px 20px;
-  border-radius: var(--meis-card-radius);
-  border: 1px solid var(--meis-border-light);
-  background: linear-gradient(135deg, var(--el-color-primary-light-9) 0%, #fff 100%);
-  box-shadow: var(--meis-card-shadow);
-}
-
-html.dark .dashboard-hero {
-  background: linear-gradient(135deg, rgba(22, 119, 255, 0.12) 0%, #1d1d1d 100%);
-}
-
-.hero-title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--meis-text-primary);
-}
-
-.hero-sub {
-  margin: 6px 0 0;
-  font-size: var(--meis-font-subtitle);
-  color: var(--meis-text-secondary);
-}
-
 .kpi-row {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
-.section {
+.dashboard-tabs {
+  background: transparent;
+}
+
+.dashboard-tabs :deep(.el-tabs__header) {
+  margin-bottom: 12px;
+}
+
+.dashboard-tabs :deep(.el-tabs__content) {
+  overflow: visible;
+}
+
+.tab-badge {
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.tab-badge :deep(.el-badge__content) {
+  position: relative;
+  top: 0;
+  transform: none;
+}
+
+.charts-row {
+  margin-bottom: 8px;
+}
+
+.charts-row .el-col {
   margin-bottom: 16px;
 }
 
@@ -277,15 +275,19 @@ html.dark .dashboard-hero {
   box-shadow: var(--meis-card-shadow);
 }
 
+.panel-card--fill {
+  min-height: 240px;
+}
+
 .panel-card :deep(.el-card__header) {
-  padding: 14px 20px;
+  padding: 10px 16px;
   border-bottom: 1px solid var(--meis-border-light);
 }
 
 .panel-header {
   position: relative;
-  padding-left: 12px;
-  font-size: 15px;
+  padding-left: 10px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--meis-text-primary);
 }

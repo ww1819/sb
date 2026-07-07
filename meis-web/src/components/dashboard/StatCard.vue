@@ -35,9 +35,9 @@ const bgColor = computed(() => props.bgColor ?? 'rgba(22, 119, 255, 0.08)')
 <style scoped>
 .stat-card {
   display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  padding: 20px;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
   background: #fff;
   border: 1px solid var(--meis-border-light);
   border-radius: var(--meis-card-radius);
@@ -52,8 +52,8 @@ const bgColor = computed(() => props.bgColor ?? 'rgba(22, 119, 255, 0.08)')
 
 .stat-icon {
   flex-shrink: 0;
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -68,7 +68,7 @@ const bgColor = computed(() => props.bgColor ?? 'rgba(22, 119, 255, 0.08)')
 }
 
 .stat-value {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--meis-text-primary);
   line-height: 1.2;
@@ -76,14 +76,12 @@ const bgColor = computed(() => props.bgColor ?? 'rgba(22, 119, 255, 0.08)')
 }
 
 .stat-title {
-  margin-top: 6px;
-  font-size: 14px;
+  margin-top: 2px;
+  font-size: 13px;
   color: var(--meis-text-secondary);
 }
 
 .stat-hint {
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--meis-text-secondary);
+  display: none;
 }
 </style>

@@ -16,7 +16,7 @@ export type FieldGroup =
 export interface FieldSchema {
   prop: string
   label: string
-  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'textarea' | 'boolean' | 'json'
+  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'textarea' | 'boolean' | 'json' | 'file'
   dictType?: string
   linkTable?: string
   group?: FieldGroup

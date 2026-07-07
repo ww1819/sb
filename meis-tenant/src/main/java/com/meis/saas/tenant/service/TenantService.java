@@ -33,13 +33,30 @@ public class TenantService {
     }
 
     public void update(String id, Map<String, Object> body) {
+        List<Map<String, Object>> before = jdbc.queryForList(
+                "SELECT package_code FROM public.sys_tenant WHERE id = ?::uuid", id);
+        String oldPackage = before.isEmpty() || before.get(0).get("package_code") == null
+                ? "standard" : before.get(0).get("package_code").toString();
+        String newPackage = body.get("package_code") != null ? body.get("package_code").toString() : oldPackage;
+
         jdbc.update("UPDATE sys_tenant SET tenant_name=?, status=?, package_code=?, credit_code=? WHERE id=?::uuid",
-                body.get("tenant_name"), body.get("status"), body.get("package_code"), body.get("credit_code"), id);
+                body.get("tenant_name"), body.get("status"), newPackage, body.get("credit_code"), id);
+
+        if (!newPackage.equals(oldPackage)) {
+            mergePackageMenus(UUID.fromString(id), newPackage);
+        }
     }
 
-    /**
-     * 开户：DDL/Flyway 不可放在 Spring 事务内（会与 Flyway 第二连接争锁）。
-     */
+    private void mergePackageMenus(UUID tenantId, String packageCode) {
+        List<String> packageMenus = tenantMenuService.packageMenus(packageCode);
+        if (packageMenus.isEmpty()) return;
+        List<String> current = tenantMenuService.getAuthorizedMenus(tenantId);
+        java.util.LinkedHashSet<String> merged = new java.util.LinkedHashSet<>(current);
+        merged.addAll(packageMenus);
+        tenantMenuService.saveAuthorizedMenus(tenantId, new java.util.ArrayList<>(merged));
+        log.info("Merged package {} menus into tenant {}", packageCode, tenantId);
+    }
+
     public Map<String, Object> create(TenantCreateRequest req) {
         if (req.getTenantCode() == null || req.getTenantName() == null) {
             throw new BizException(400, "tenantCode and tenantName required");

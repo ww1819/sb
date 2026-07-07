@@ -1,6 +1,7 @@
 package com.meis.saas.common.workflow;
 
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.notify.NotificationHelper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ public class ApprovalInstanceService {
                 "INSERT INTO sys_approval_instance (id, flow_id, business_type, business_id, business_no, title, applicant_id, status, current_node_order) VALUES (?,?,?,?,?,?,?,?,?)",
                 instanceId, flowId, businessType, businessId, businessNo, title, applicantId, "pending", 1);
         updateBusinessStatus(businessType, businessId, "pending");
+        NotificationHelper.push(jdbc, "审批待办", title + " 已提交，等待审批", "approval");
         return getInstance(instanceId);
     }
 
@@ -76,6 +78,7 @@ public class ApprovalInstanceService {
         if ("reject".equals(action)) {
             jdbc.update("UPDATE sys_approval_instance SET status = 'rejected', updated_at = NOW() WHERE id = ?::uuid", instanceId);
             updateBusinessStatus(inst.get("business_type").toString(), UUID.fromString(inst.get("business_id").toString()), "rejected");
+            NotificationHelper.push(jdbc, "审批驳回", inst.get("title") + " 已被驳回", "approval");
             return getInstance(instanceId);
         }
 
@@ -85,6 +88,7 @@ public class ApprovalInstanceService {
         if (nextNodes.isEmpty()) {
             jdbc.update("UPDATE sys_approval_instance SET status = 'approved', updated_at = NOW() WHERE id = ?::uuid", instanceId);
             updateBusinessStatus(inst.get("business_type").toString(), UUID.fromString(inst.get("business_id").toString()), "approved");
+            NotificationHelper.push(jdbc, "审批通过", inst.get("title") + " 审批已通过", "approval");
         } else {
             int next = ((Number) nextNodes.get(0).get("node_order")).intValue();
             jdbc.update("UPDATE sys_approval_instance SET current_node_order = ?, updated_at = NOW() WHERE id = ?::uuid", next, instanceId);
@@ -95,7 +99,16 @@ public class ApprovalInstanceService {
     private void updateBusinessStatus(String businessType, UUID businessId, String status) {
         switch (businessType) {
             case "purchase_plan" -> jdbc.update("UPDATE purchase_plan SET approval_status = ? WHERE id = ?::uuid", status, businessId);
-            case "purchase_contract" -> jdbc.update("UPDATE purchase_contract SET approval_status = ? WHERE id = ?::uuid", status, businessId);
+            case "purchase_contract" -> {
+                jdbc.update("UPDATE purchase_contract SET approval_status = ? WHERE id = ?::uuid", status, businessId);
+                if ("approved".equals(status)) createPurchaseAcceptance(businessId);
+            }
+            case "purchase_project" -> jdbc.update("UPDATE purchase_project SET approval_status = ? WHERE id = ?::uuid", status, businessId);
+            case "purchase_acceptance" -> jdbc.update("UPDATE purchase_acceptance SET approval_status = ? WHERE id = ?::uuid", status, businessId);
+            case "contract_payment" -> {
+                jdbc.update("UPDATE contract_payment SET approval_status = ? WHERE id = ?::uuid", status, businessId);
+                if ("approved".equals(status)) markPaymentPaid(businessId);
+            }
             case "device_scrap" -> {
                 jdbc.update("UPDATE device_scrap SET approval_status = ?, status = ? WHERE id = ?::uuid", status, status, businessId);
                 if ("approved".equals(status)) autoDisposeScrap(businessId);
@@ -140,6 +153,48 @@ public class ApprovalInstanceService {
             jdbc.update("UPDATE medical_device SET device_status = 'scrap', updated_at = NOW() WHERE id = ?::uuid",
                     row.get(0).get("device_id"));
             jdbc.update("UPDATE device_scrap SET status = 'approved', updated_at = NOW() WHERE id = ?::uuid", id);
+        }
+    }
+
+    private void createPurchaseAcceptance(UUID contractId) {
+        var existing = jdbc.queryForList(
+                "SELECT id FROM purchase_acceptance WHERE contract_id = ?::uuid LIMIT 1", contractId);
+        if (!existing.isEmpty()) return;
+        var contracts = jdbc.queryForList("SELECT * FROM purchase_contract WHERE id = ?::uuid", contractId);
+        if (contracts.isEmpty()) return;
+        Map<String, Object> contract = contracts.get(0);
+        UUID id = UUID.randomUUID();
+        Object chainNo = contract.get("business_chain_no");
+        jdbc.update("""
+            INSERT INTO purchase_acceptance (id, acceptance_no, contract_id, project_id, supplier_id, acceptance_status, business_chain_no)
+            VALUES (?::uuid, ?, ?::uuid, ?::uuid, ?::uuid, 'pending', ?)
+            """,
+                id, "AC" + System.currentTimeMillis(), contractId,
+                contract.get("project_id"), contract.get("supplier_id"), chainNo);
+        jdbc.update("UPDATE purchase_contract SET acceptance_status = 'pending', updated_at = NOW() WHERE id = ?::uuid", contractId);
+    }
+
+    private void markPaymentPaid(UUID paymentId) {
+        var rows = jdbc.queryForList("SELECT contract_id FROM contract_payment WHERE id = ?::uuid", paymentId);
+        if (rows.isEmpty()) return;
+        jdbc.update("UPDATE contract_payment SET status = 'paid', updated_at = NOW() WHERE id = ?::uuid", paymentId);
+        Object contractId = rows.get(0).get("contract_id");
+        if (contractId == null) return;
+        var contract = jdbc.queryForList("SELECT contract_amount FROM purchase_contract WHERE id = ?::uuid", contractId);
+        if (contract.isEmpty()) return;
+        double contractAmount = ((Number) contract.get(0).getOrDefault("contract_amount", 0)).doubleValue();
+        var paid = jdbc.queryForList("""
+            SELECT COALESCE(SUM(payment_amount), 0) AS paid FROM contract_payment
+            WHERE contract_id = ?::uuid AND status = 'paid'
+            """, contractId);
+        double paidAmount = ((Number) paid.get(0).get("paid")).doubleValue();
+        double progress = contractAmount > 0 ? Math.min(100, paidAmount / contractAmount * 100) : 0;
+        jdbc.update("""
+            UPDATE purchase_contract SET paid_amount = ?, payment_progress = ?, updated_at = NOW()
+            WHERE id = ?::uuid
+            """, paidAmount, progress, contractId);
+        if (progress >= 99.9) {
+            jdbc.update("UPDATE purchase_contract SET status = 'completed', updated_at = NOW() WHERE id = ?::uuid", contractId);
         }
     }
 

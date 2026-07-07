@@ -11,6 +11,12 @@
     v-model="model"
     :disabled="field.readonly"
   />
+  <FileUploadField
+    v-else-if="field.type === 'file'"
+    v-model="fileModel"
+    :placeholder="field.label"
+    :disabled="field.readonly"
+  />
   <component v-else :is="inputComponent" v-model="model" v-bind="attrs" :disabled="field.readonly">
     <template v-if="useDictSelect && options.length">
       <el-option v-for="o in options" :key="o.value" :label="o.label" :value="o.value" />
@@ -23,6 +29,7 @@ import { computed, onMounted, ref } from 'vue'
 import type { FieldSchema } from '@/config/pageSchemas'
 import { useDict } from '@/composables/useDict'
 import RefSelect from '@/components/form/RefSelect.vue'
+import FileUploadField from '@/components/form/FileUploadField.vue'
 
 const props = defineProps<{ field: FieldSchema; modelValue: unknown }>()
 const emit = defineEmits<{ 'update:modelValue': [v: unknown] }>()
@@ -31,6 +38,11 @@ const options = ref<{ label: string; value: string }[]>([])
 
 const model = computed({
   get: () => props.modelValue,
+  set: (v) => emit('update:modelValue', v)
+})
+
+const fileModel = computed({
+  get: () => (props.modelValue == null ? '' : String(props.modelValue)),
   set: (v) => emit('update:modelValue', v)
 })
 

@@ -1,5 +1,6 @@
 package com.meis.saas.tenant.config;
 
+import com.meis.saas.common.cache.MeisCacheEviction;
 import com.meis.saas.common.flyway.TenantFlywayService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,7 @@ import java.util.Map;
 public class TenantStartupRunner implements ApplicationRunner {
     private final JdbcTemplate jdbc;
     private final TenantFlywayService tenantFlyway;
+    private final MeisCacheEviction cacheEviction;
 
     @Value("${meis.flyway.public-locations:classpath:db/migrations/public}")
     private String publicLocations;
@@ -43,6 +45,17 @@ public class TenantStartupRunner implements ApplicationRunner {
             } catch (Exception e) {
                 log.error("Tenant schema migration skipped for {} ({}): {}", code, schema, e.getMessage());
             }
+        }
+        evictMenuCaches();
+    }
+
+    private void evictMenuCaches() {
+        List<String> tenantIds = jdbc.queryForList(
+                "SELECT id::text FROM public.sys_tenant WHERE status = 'active'", String.class);
+        cacheEviction.evictPlatformMenus();
+        for (String tenantId : tenantIds) {
+            cacheEviction.evictTenantMenus(tenantId);
+            cacheEviction.evictTenantPermissions(tenantId);
         }
     }
 
