@@ -4,8 +4,7 @@
       <el-button type="primary" @click="openForm()">新增科室</el-button>
       <el-button @click="importVisible = true">导入</el-button>
       <el-button @click="exportCsv">导出</el-button>
-      <el-button :disabled="!selectedIds.length" @click="generatePinyin(false)">生成简码（选中）</el-button>
-      <el-button @click="generatePinyin(true)">生成简码（全部结果）</el-button>
+      <el-button @click="openPinyinDialog">生成简码</el-button>
     </template>
     <el-table
       ref="tableRef"
@@ -18,7 +17,7 @@
       :height="tableHeight"
       @selection-change="onSelectionChange"
     >
-      <el-table-column type="selection" width="48" />
+      <el-table-column type="selection" width="48" reserve-selection />
       <el-table-column prop="dept_code" label="科室编码" width="100" />
       <el-table-column prop="dept_name" label="科室名称" />
       <el-table-column prop="pinyin_code" label="拼音简码" width="100" />
@@ -83,6 +82,8 @@ import SystemPageCard from '@/components/system/SystemPageCard.vue'
 import ImportDialog from '@/components/ImportDialog.vue'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
 import { downloadApiFile } from '@/utils/fileDownload'
+import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
+import { executePinyinGenerate, promptPinyinScope } from '@/composables/usePinyinGenerate'
 
 const tableHeight = useSystemTableHeight()
 
@@ -94,7 +95,7 @@ const visible = ref(false)
 const importVisible = ref(false)
 const form = ref<any>({ is_active: true, is_clinical: false, sort_order: 0 })
 const tableRef = ref()
-const selectedIds = ref<string[]>([])
+const { selectedCount, syncFromTable, selectedIds, clear: clearSelection } = useCrossPageSelection()
 
 const filteredList = computed(() => {
   const kw = keyword.value.trim().toLowerCase()
@@ -121,11 +122,18 @@ async function load() {
 }
 
 function onSelectionChange(rows: any[]) {
-  selectedIds.value = rows.map((r) => String(r.id))
+  syncFromTable(rows)
 }
 
-function applyFilter() {}
-function resetFilter() { keyword.value = '' }
+function applyFilter() {
+  clearSelection()
+  tableRef.value?.clearSelection()
+}
+function resetFilter() {
+  keyword.value = ''
+  clearSelection()
+  tableRef.value?.clearSelection()
+}
 
 function openForm(row?: any) {
   form.value = row ? { ...row } : { dept_code: '', dept_name: '', is_active: true, is_clinical: false, sort_order: 0 }
@@ -154,15 +162,19 @@ async function exportCsv() {
   }
 }
 
-async function generatePinyin(all: boolean) {
+async function openPinyinDialog() {
+  const scope = await promptPinyinScope(selectedCount.value)
+  if (!scope) return
   try {
-    const body = all
-      ? { all: true, keyword: keyword.value || undefined }
-      : { ids: selectedIds.value }
-    const { data } = await http.post('/system/departments/generate-pinyin', body)
-    ElMessage.success(`已更新 ${data.data?.updated ?? 0} 条拼音简码`)
-    tableRef.value?.clearSelection()
-    load()
+    const ok = await executePinyinGenerate('/system/departments/generate-pinyin', scope, {
+      selectedIds: selectedIds(),
+      keyword: keyword.value || undefined
+    })
+    if (ok) {
+      clearSelection()
+      tableRef.value?.clearSelection()
+      load()
+    }
   } catch {
     ElMessage.error('生成拼音简码失败')
   }

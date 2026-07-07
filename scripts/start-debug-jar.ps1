@@ -26,6 +26,39 @@ if (-not (Test-Path $jar)) {
     throw "Missing $jar - run scripts\build.ps1 first"
 }
 
+$jarInfo = Get-Item $jar
+if ($jarInfo.Length -lt 1MB) {
+    throw @"
+JAR too small ($([math]::Round($jarInfo.Length / 1KB)) KB): $jar
+Likely only 'mvn compile' was run, or 'mvn package' failed mid-way.
+Run: powershell -File scripts\build.ps1
+(or: mvn -pl $Service -am clean package -DskipTests)
+"@
+}
+
+$jarExe = Join-Path $env:JAVA_HOME 'bin\jar.exe'
+if (Test-Path $jarExe) {
+    $mfDir = Join-Path $env:TEMP "meis-jar-check-$([guid]::NewGuid().ToString('N'))"
+    New-Item -ItemType Directory -Path $mfDir | Out-Null
+    try {
+        Push-Location $mfDir
+        & $jarExe xf $jar META-INF/MANIFEST.MF 2>$null | Out-Null
+        if (Test-Path 'META-INF/MANIFEST.MF') {
+            $mf = Get-Content 'META-INF/MANIFEST.MF' -Raw
+            if ($mf -notmatch 'Main-Class:\s*.+' -and $mf -notmatch 'Start-Class:\s*.+') {
+                throw @"
+Invalid JAR (no Main-Class): $jar
+Rebuild with: powershell -File scripts\build.ps1
+"@
+            }
+        }
+    }
+    finally {
+        Pop-Location
+        Remove-Item $mfDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 if (Test-MeisPortListening -Port $DebugPort) {
     Write-Host "JDWP already listening on :$DebugPort ($Service)"
     exit 0

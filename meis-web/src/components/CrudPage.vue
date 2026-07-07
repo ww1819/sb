@@ -13,8 +13,7 @@
       <el-button v-if="showImport" @click="importVisible = true">导入</el-button>
       <el-button @click="exportCsv">导出</el-button>
       <template v-if="showPinyinCode">
-        <el-button :disabled="!selectedIds.length" @click="generatePinyin(false)">生成简码（选中）</el-button>
-        <el-button @click="generatePinyin(true)">生成简码（全部结果）</el-button>
+        <el-button @click="openPinyinDialog">生成简码</el-button>
       </template>
       <slot name="toolbar-extra" />
     </template>
@@ -55,13 +54,14 @@
       ref="tableRef"
       v-loading="loading"
       :data="rows"
+      row-key="id"
       stripe
       class="system-table"
       :height="tableHeight"
       @row-dblclick="onRowDblClick"
       @selection-change="onSelectionChange"
     >
-      <el-table-column v-if="showPinyinCode" type="selection" width="48" fixed="left" />
+      <el-table-column v-if="showPinyinCode" type="selection" width="48" fixed="left" reserve-selection />
       <el-table-column
         v-for="f in listFields"
         :key="f.prop"
@@ -124,6 +124,8 @@ import ImportDialog from './ImportDialog.vue'
 import { columnAlign } from '@/utils/tableCell'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
 import { useDict } from '@/composables/useDict'
+import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
+import { executePinyinGenerate, promptPinyinScope } from '@/composables/usePinyinGenerate'
 
 const props = defineProps<{ config: PageConfig }>()
 const emit = defineEmits<{ detail: [row: Record<string, unknown>] }>()
@@ -142,7 +144,7 @@ const importVisible = ref(false)
 const form = ref<Record<string, unknown>>({})
 const formTitle = ref('新增')
 const tableRef = ref()
-const selectedIds = ref<string[]>([])
+const { selectedCount, syncFromTable, selectedIds, clear: clearSelection } = useCrossPageSelection()
 
 const tableHeight = useSystemTableHeight()
 
@@ -190,6 +192,8 @@ async function load() {
 
 function onSearch() {
   page.value = 1
+  clearSelection()
+  tableRef.value?.clearSelection()
   load()
 }
 
@@ -199,6 +203,8 @@ function onReset() {
     filterValues[f.key] = undefined
   }
   page.value = 1
+  clearSelection()
+  tableRef.value?.clearSelection()
   load()
 }
 
@@ -224,8 +230,26 @@ async function remove(row: Record<string, unknown>) {
   load()
 }
 
-function onSelectionChange(rows: Record<string, unknown>[]) {
-  selectedIds.value = rows.map((r) => String(r.id))
+function onSelectionChange(selection: Record<string, unknown>[]) {
+  syncFromTable(selection)
+}
+
+async function openPinyinDialog() {
+  const scope = await promptPinyinScope(selectedCount.value)
+  if (!scope) return
+  try {
+    const ok = await executePinyinGenerate(pinyinCodeUrl.value, scope, {
+      selectedIds: selectedIds(),
+      keyword: keyword.value || undefined
+    })
+    if (ok) {
+      clearSelection()
+      tableRef.value?.clearSelection()
+      load()
+    }
+  } catch {
+    ElMessage.error('生成拼音简码失败')
+  }
 }
 
 async function exportCsv() {
@@ -233,20 +257,6 @@ async function exportCsv() {
     await downloadApiFile(exportUrl.value, `${props.config.table}_export.csv`)
   } catch {
     ElMessage.error('导出失败')
-  }
-}
-
-async function generatePinyin(all: boolean) {
-  try {
-    const body: Record<string, unknown> = all
-      ? { all: true, keyword: keyword.value || undefined }
-      : { ids: selectedIds.value }
-    const { data } = await http.post(pinyinCodeUrl.value, body)
-    ElMessage.success(`已更新 ${data.data?.updated ?? 0} 条拼音简码`)
-    tableRef.value?.clearSelection()
-    load()
-  } catch {
-    ElMessage.error('生成拼音简码失败')
   }
 }
 
