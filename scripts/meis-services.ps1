@@ -2,7 +2,7 @@
 $script:MeisRoot = Split-Path $PSScriptRoot -Parent
 
 function Resolve-MeisJavaHome {
-    foreach ($jdkHome in @($env:MEIS_JAVA_HOME, 'E:\workspace\jdk-17', 'C:\Program Files\Java\jdk-17')) {
+    foreach ($jdkHome in @($env:MEIS_JAVA_HOME, 'E:\workspace\jdk-17', 'C:\Program Files\Java\jdk-17', 'D:\Program Files\Java\jdk-17')) {
         if (-not $jdkHome) { continue }
         $java = Join-Path $jdkHome 'bin\java.exe'
         if (Test-Path $java) { return $jdkHome }

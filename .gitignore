@@ -7,3 +7,17 @@ target/
 
 # Frontend dependencies
 node_modules/
+.idea/compiler.xml
+.idea/.gitignore
+.idea/encodings.xml
+.idea/jarRepositories.xml
+.idea/misc.xml
+.idea/vcs.xml
+meis-web/tsconfig.tsbuildinfo
+scripts/db-config.bat
+scripts/meis-services.ps1
+.vscode/extensions.json
+.vscode/launch.json
+.vscode/settings.json
+.vscode/tasks.json
+meis-web/tsconfig.tsbuildinfo

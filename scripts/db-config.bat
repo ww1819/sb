@@ -1,7 +1,7 @@
 @echo off
 REM ========== MEIS 数据库连接配置（按需修改）==========
 REM PostgreSQL 安装目录下的 bin 文件夹（不要带末尾反斜杠）
-set "PG_BIN_DIR=E:\PGSQL\bin"
+set "PG_BIN_DIR=D:\Program Files\PostgreSQL\18\bin"
 
 set "DB_HOST=localhost"
 set "DB_PORT=5432"
@@ -16,5 +16,5 @@ set "SUPER_USER=postgres"
 set "SUPER_PASSWORD=aspt"
 
 REM 备份文件存放目录
-set "BACKUP_DIR=E:\backup\meis"
+set "BACKUP_DIR=D:\DBBACKUP\meis"
 REM =====================================================
