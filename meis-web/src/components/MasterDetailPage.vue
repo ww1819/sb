@@ -134,5 +134,7 @@ async function onApprovalChanged() {
   await reloadMaster()
   crudRef.value?.load()
 }
+
+defineExpose({ selectedId })
 </script>
 

@@ -11,6 +11,7 @@ export type FieldGroup =
   | 'workflow'
   | 'time'
   | 'status'
+  | 'compliance'
   | 'other'
 
 export interface FieldSchema {
@@ -100,7 +101,7 @@ export function getGroupedFields(table: string): { group: FieldGroup; fields: Fi
     if (!groups.has(g)) groups.set(g, [])
     groups.get(g)!.push(f)
   }
-  const order: FieldGroup[] = ['basic', 'finance', 'location', 'time', 'status', 'workflow', 'approval', 'attachment', 'remark', 'other']
+  const order: FieldGroup[] = ['basic', 'finance', 'location', 'time', 'status', 'workflow', 'approval', 'compliance', 'attachment', 'remark', 'other']
   return order.filter((g) => groups.has(g)).map((g) => ({ group: g, fields: groups.get(g)! }))
 }
 
@@ -112,6 +113,7 @@ const groupTitleMap: Record<FieldGroup, string> = {
   status: '状态信息',
   workflow: '流程信息',
   approval: '审批信息',
+  compliance: '合规信息',
   attachment: '附件',
   remark: '备注',
   detail: '明细',
