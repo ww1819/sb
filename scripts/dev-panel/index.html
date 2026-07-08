@@ -55,7 +55,7 @@
     button.primary:hover:not(:disabled) { background: var(--accent-hover); }
     button.danger { border-color: #7a3048; color: #ffb4c8; }
     button.warn { border-color: #6b5520; color: #ffd88a; }
-    main { padding: 20px 24px 40px; max-width: 1400px; margin: 0 auto; }
+    main { padding: 20px 24px 40px; max-width: 1680px; margin: 0 auto; }
     .stats {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -107,6 +107,44 @@
     .dot.debug { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
     .actions { display: flex; flex-wrap: wrap; gap: 4px; }
     .actions button { padding: 4px 8px; font-size: 0.78rem; border-radius: 6px; }
+    .log-watch {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+    .log-watch input { cursor: pointer; }
+    .svc-name { font-weight: 600; }
+    .svc-id { color: var(--muted); font-size: 0.76rem; margin-top: 2px; }
+    .svc-desc { color: var(--muted); font-size: 0.8rem; line-height: 1.4; max-width: 220px; }
+    .jar-meta { font-size: 0.74rem; color: var(--muted); margin-top: 2px; }
+    .build-opts {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 108px;
+    }
+    .build-opt {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.76rem;
+      color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+    }
+    .build-opt input { cursor: pointer; }
+    .build-opts button {
+      padding: 3px 8px;
+      font-size: 0.74rem;
+      border-radius: 5px;
+      margin-top: 2px;
+      align-self: flex-start;
+    }
     .mono { font-family: Consolas, monospace; font-size: 0.82rem; }
     .toast {
       position: fixed;
@@ -178,8 +216,12 @@
       padding: 4px 10px;
       border-bottom: 1px solid rgba(45, 58, 79, 0.45);
       word-break: break-word;
+      cursor: pointer;
     }
-    .log-line:hover { background: rgba(91, 141, 239, 0.08); }
+    .log-line.log-header { cursor: default; }
+    .log-line.log-active { background: rgba(91, 141, 239, 0.18); outline: 1px solid rgba(91, 141, 239, 0.35); }
+    .log-line:hover:not(.log-header) { background: rgba(91, 141, 239, 0.12); }
+    .log-line .msg-preview { color: #c5d0e0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .log-line .ts { color: #7d8fa8; }
     .log-line .svc { color: #8eb4ff; }
     .log-line .lvl { font-weight: 600; }
@@ -189,6 +231,144 @@
     .log-line.lvl-EVENT .lvl, .log-line.lvl-EVENT .msg { color: #b388ff; }
     .log-line .msg { color: #c5d0e0; white-space: pre-wrap; }
     .log-empty { padding: 24px; text-align: center; color: var(--muted); }
+    .log-drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      z-index: 200;
+      display: none;
+    }
+    .log-drawer-backdrop.open { display: block; }
+    .log-drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: min(720px, 92vw);
+      height: 100vh;
+      background: #121a28;
+      border-left: 1px solid var(--border);
+      box-shadow: -8px 0 32px rgba(0, 0, 0, 0.45);
+      z-index: 201;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.2s ease;
+    }
+    .log-drawer.open { transform: translateX(0); }
+    .log-drawer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      background: #1a2332;
+    }
+    .log-drawer-tabs { display: flex; gap: 6px; }
+    .log-drawer-tabs button {
+      padding: 6px 10px;
+      font-size: 0.8rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .log-drawer-tabs button.active {
+      background: rgba(91, 141, 239, 0.2);
+      border-color: var(--accent);
+      color: var(--text);
+    }
+    .log-drawer-meta {
+      padding: 10px 14px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      line-height: 1.5;
+    }
+    .log-drawer-body {
+      flex: 1;
+      margin: 0;
+      padding: 14px;
+      overflow: auto;
+      font-family: Consolas, "Cascadia Mono", monospace;
+      font-size: 0.8rem;
+      line-height: 1.55;
+      color: #d4deec;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #0b1018;
+    }
+    .log-drawer-footer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+      background: #1a2332;
+    }
+    .log-drawer-footer input {
+      flex: 1;
+      min-width: 140px;
+      background: #0f1419;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 0.8rem;
+    }
+    .log-drawer-hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+      padding: 0 0 8px;
+    }
+    .log-svc-filter-wrap { position: relative; }
+    .log-svc-filter-wrap > button {
+      min-width: 148px;
+      text-align: left;
+      font-size: 0.82rem;
+    }
+    .log-svc-menu {
+      display: none;
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      z-index: 50;
+      min-width: 280px;
+      max-height: 320px;
+      overflow: auto;
+      background: #1a2332;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+    }
+    .log-svc-menu.open { display: block; }
+    .log-svc-actions { display: flex; gap: 6px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    .log-svc-actions button { padding: 4px 8px; font-size: 0.74rem; border-radius: 5px; }
+    .log-svc-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 2px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    .log-svc-item .mono { color: var(--muted); font-size: 0.72rem; margin-left: auto; }
+    .log-drawer-svc-filter {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      max-height: 200px;
+      overflow: auto;
+      background: #151d2b;
+    }
+    .log-drawer-svc-title {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
     pre.legacy-log {
       margin: 0;
       max-height: 220px;
@@ -212,15 +392,17 @@
   <header>
     <div>
       <h1>MEIS 开发控制面板</h1>
-      <div class="sub">前后端服务启停 / 调试 / 重启 · 自动刷新状态</div>
+      <div class="sub">前后端启停 / 调试 / 编译 / 重启 · 代码变更后勾选编译选项再重启生效</div>
     </div>
     <div class="toolbar">
-      <button class="primary" onclick="act('backend/start-all')">启动全部后端</button>
+      <button class="primary" onclick="act('backend/start-all')" title="启动全部 15 个微服务，已运行的自动跳过">启动全部后端</button>
+      <button class="primary" onclick="act('backend/start-core')" title="仅启动核心：租户/认证/系统/文件/网关，已运行的自动跳过">启动核心后端</button>
       <button class="danger" onclick="act('backend/stop-all')">停止全部后端</button>
       <button class="warn" onclick="act('backend/restart-all')">重启全部后端</button>
       <button onclick="act('build/install')">Maven Install</button>
       <button onclick="act('build/backend')">打包后端</button>
       <button onclick="refresh()">刷新状态</button>
+      <button class="danger" onclick="shutdownPanel()" title="关闭面板进程并释放 5099 端口，不影响已启动的前后端服务">关闭面板</button>
     </div>
   </header>
 
@@ -231,7 +413,7 @@
     <table>
       <thead>
         <tr>
-          <th>服务</th><th>端口</th><th>状态</th><th>链接</th><th>操作</th>
+          <th>服务</th><th>说明</th><th>端口</th><th>状态</th><th>链接</th><th>编译</th><th>操作</th><th>汇入日志</th>
         </tr>
       </thead>
       <tbody id="frontend-row"></tbody>
@@ -241,7 +423,7 @@
     <table>
       <thead>
         <tr>
-          <th>服务</th><th>HTTP</th><th>JDWP</th><th>JAR</th><th>操作</th>
+          <th>服务</th><th>说明</th><th>HTTP</th><th>JDWP</th><th>JAR</th><th>编译</th><th>操作</th><th>汇入日志</th>
         </tr>
       </thead>
       <tbody id="service-rows"></tbody>
@@ -250,18 +432,22 @@
     <div class="log-panel">
       <h3>运行日志（带时间戳，便于排查启动与运行错误）</h3>
       <div class="log-toolbar">
-        <label>服务
-          <select id="log-service" onchange="onLogFilterChange()">
-            <option value="all">全部服务</option>
-          </select>
-        </label>
+        <div class="log-svc-filter-wrap">
+          <button type="button" id="log-filter-btn" onclick="toggleLogFilterMenu(event)">服务: 全部服务 ▾</button>
+          <div id="log-svc-menu" class="log-svc-menu">
+            <div id="log-svc-filter-toolbar-list"></div>
+          </div>
+        </div>
         <label><input type="checkbox" id="log-errors-only" onchange="refreshLogs()" /> 仅错误/警告</label>
         <label><input type="checkbox" id="log-debug" onchange="refreshLogs()" /> 调试日志</label>
         <label><input type="checkbox" id="log-auto" checked onchange="toggleLogAuto()" /> 自动刷新</label>
         <button onclick="refreshLogs()">刷新日志</button>
         <button onclick="scrollLogBottom()">滚到底部</button>
+        <button onclick="toggleLogDrawer(true, 'all')">全部文本</button>
+        <button onclick="toggleLogDrawer(true, 'single')">日志详情</button>
         <span class="log-meta" id="log-meta">—</span>
       </div>
+      <div class="log-drawer-hint">点击任意日志行查看完整内容；「全部文本」可浏览当前筛选下的所有日志</div>
       <div class="log-console" id="log-console">
         <div class="log-empty">加载中…</div>
       </div>
@@ -270,15 +456,400 @@
 
   <div class="toast" id="toast"></div>
 
+  <div id="log-drawer-backdrop" class="log-drawer-backdrop" onclick="toggleLogDrawer(false)"></div>
+  <aside id="log-drawer" class="log-drawer" aria-label="日志详情">
+    <div class="log-drawer-header">
+      <div class="log-drawer-tabs">
+        <button type="button" id="log-tab-single" class="active" onclick="setLogDrawerTab('single')">选中条目</button>
+        <button type="button" id="log-tab-all" onclick="setLogDrawerTab('all')">全部文本</button>
+      </div>
+      <button type="button" onclick="toggleLogDrawer(false)">关闭</button>
+    </div>
+    <div class="log-drawer-svc-filter">
+      <div class="log-drawer-svc-title">显示服务（与左侧工具栏联动，可多选）</div>
+      <div id="log-svc-filter-drawer-list"></div>
+    </div>
+    <div class="log-drawer-meta" id="log-drawer-meta">点击列表中的日志行查看详情</div>
+    <pre class="log-drawer-body" id="log-drawer-body"></pre>
+    <div class="log-drawer-footer">
+      <button type="button" onclick="copyLogDrawer()">复制文本</button>
+      <button type="button" onclick="openLogDrawerInNewWindow()">新窗口打开</button>
+      <input type="search" id="log-drawer-search" placeholder="在全部文本中搜索…" oninput="renderLogDrawer()" />
+    </div>
+  </aside>
+
   <script>
+    const LOG_WATCH_KEY = 'meis-dev-panel-log-watch'
+    const LOG_FILTER_KEY = 'meis-dev-panel-log-filter'
+    const BUILD_OPTS_KEY = 'meis-dev-panel-build-opts'
     let busy = false
     let timer = null
     let logTimer = null
     let logFollowBottom = true
     let pinnedService = 'all'
+    let logWatch = {}
+    let logFilter = {}
+    let logServiceOptions = []
+    let buildOpts = {}
+    let knownServiceNames = []
+    let coreServiceNames = []
+    let cachedLogEntries = []
+    let selectedLogIndex = -1
+    let logDrawerTab = 'single'
+    let logDrawerOpen = false
+
+    function defaultBackendBuildOpts() {
+      return { clean: false, package: true }
+    }
+
+    function defaultFrontendBuildOpts() {
+      return { npmInstall: false, typecheck: false, build: false }
+    }
+
+    function loadBuildOpts(names) {
+      const saved = localStorage.getItem(BUILD_OPTS_KEY)
+      if (saved) {
+        try { buildOpts = JSON.parse(saved) || {} } catch { buildOpts = {} }
+      }
+      for (const name of names) {
+        if (!buildOpts[name]) {
+          buildOpts[name] = name === 'meis-web' ? defaultFrontendBuildOpts() : defaultBackendBuildOpts()
+        }
+      }
+      saveBuildOpts()
+    }
+
+    function saveBuildOpts() {
+      localStorage.setItem(BUILD_OPTS_KEY, JSON.stringify(buildOpts))
+    }
+
+    function setBuildOpt(name, key, checked) {
+      if (!buildOpts[name]) {
+        buildOpts[name] = name === 'meis-web' ? defaultFrontendBuildOpts() : defaultBackendBuildOpts()
+      }
+      buildOpts[name][key] = !!checked
+      saveBuildOpts()
+    }
+
+    function backendBuildQuery(name) {
+      const o = buildOpts[name] || defaultBackendBuildOpts()
+      const qs = new URLSearchParams()
+      if (o.clean) qs.set('clean', '1')
+      if (o.package) qs.set('package', '1')
+      const s = qs.toString()
+      return s ? ('?' + s) : ''
+    }
+
+    function frontendBuildQuery() {
+      const o = buildOpts['meis-web'] || defaultFrontendBuildOpts()
+      const qs = new URLSearchParams()
+      if (o.npmInstall) qs.set('npmInstall', '1')
+      if (o.typecheck) qs.set('typecheck', '1')
+      if (o.build) qs.set('build', '1')
+      const s = qs.toString()
+      return s ? ('?' + s) : ''
+    }
+
+    function renderBackendBuildOpts(name) {
+      const o = buildOpts[name] || defaultBackendBuildOpts()
+      return `
+        <div class="build-opts">
+          <label class="build-opt" title="mvn clean，清除 target 后需配合 package">
+            <input type="checkbox" ${o.clean ? 'checked' : ''} onchange="setBuildOpt('${name}','clean',this.checked)" /> clean
+          </label>
+          <label class="build-opt" title="mvn package -pl 模块 -am，Java 代码变更后重启前建议勾选">
+            <input type="checkbox" ${o.package ? 'checked' : ''} onchange="setBuildOpt('${name}','package',this.checked)" /> package
+          </label>
+          <button onclick="serviceBuild('${name}')">编译</button>
+        </div>
+      `
+    }
+
+    function renderFrontendBuildOpts() {
+      const o = buildOpts['meis-web'] || defaultFrontendBuildOpts()
+      return `
+        <div class="build-opts">
+          <label class="build-opt" title="依赖变更后执行 npm install">
+            <input type="checkbox" ${o.npmInstall ? 'checked' : ''} onchange="setBuildOpt('meis-web','npmInstall',this.checked)" /> install
+          </label>
+          <label class="build-opt" title="TypeScript / Vue 类型检查 (vue-tsc)">
+            <input type="checkbox" ${o.typecheck ? 'checked' : ''} onchange="setBuildOpt('meis-web','typecheck',this.checked)" /> 类型检查
+          </label>
+          <label class="build-opt" title="生产构建验证 (vite build)">
+            <input type="checkbox" ${o.build ? 'checked' : ''} onchange="setBuildOpt('meis-web','build',this.checked)" /> build
+          </label>
+          <button onclick="frontendBuild()">编译</button>
+        </div>
+      `
+    }
+
+    function renderServiceInfo(item) {
+      const isCore = coreServiceNames.includes(item.name)
+      return `
+        <div class="svc-name">${escapeHtml(item.labelZh || item.name)}${isCore ? ' <span style="color:var(--accent);font-size:0.72rem">核心</span>' : ''}</div>
+        <div class="svc-id mono">${escapeHtml(item.name)}</div>
+        <div class="svc-desc">${escapeHtml(item.descZh || '')}</div>
+      `
+    }
+
+    function loadLogFilter(names) {
+      const saved = localStorage.getItem(LOG_FILTER_KEY)
+      if (saved) {
+        try { logFilter = JSON.parse(saved) || {} } catch { logFilter = {} }
+      }
+      for (const name of names) {
+        if (logFilter[name] === undefined) logFilter[name] = true
+      }
+      saveLogFilter()
+      updateLogFilterButtonLabel()
+    }
+
+    function saveLogFilter() {
+      localStorage.setItem(LOG_FILTER_KEY, JSON.stringify(logFilter))
+    }
+
+    function getActiveLogFilters() {
+      return knownServiceNames.filter(n => logFilter[n] !== false)
+    }
+
+    function getLogFilterParam() {
+      const active = getActiveLogFilters()
+      if (active.length === 0) return '&filter='
+      if (active.length >= knownServiceNames.length) return ''
+      return '&filter=' + encodeURIComponent(active.join(','))
+    }
+
+    function logFilterSummary() {
+      const active = getActiveLogFilters()
+      if (active.length === 0) return '无服务'
+      if (active.length >= knownServiceNames.length) return '全部服务'
+      if (active.length === 1) {
+        const opt = logServiceOptions.find(s => s.name === active[0])
+        return opt?.labelZh ? (opt.labelZh + ' / ' + active[0]) : active[0]
+      }
+      return active.length + ' 个服务'
+    }
+
+    function updateLogFilterButtonLabel() {
+      const btn = document.getElementById('log-filter-btn')
+      if (btn) btn.textContent = '服务: ' + logFilterSummary() + ' ▾'
+    }
+
+    function renderLogServiceFilterChecks(containerId) {
+      const el = document.getElementById(containerId)
+      if (!el) return
+      const opts = logServiceOptions.length
+        ? logServiceOptions
+        : knownServiceNames.map(n => ({ name: n, labelZh: n }))
+      el.innerHTML = '<div class="log-svc-actions">' +
+        '<button type="button" onclick="setLogFilterAll(true)">全选</button>' +
+        '<button type="button" onclick="setLogFilterAll(false)">清空</button>' +
+        '</div>' +
+        opts.map(s => {
+          const name = s.name
+          const label = s.labelZh || name
+          const checked = logFilter[name] !== false
+          return '<label class="log-svc-item"><input type="checkbox" ' + (checked ? 'checked' : '') +
+            ' onchange="setLogFilterChecked(\'' + name + '\', this.checked)" />' +
+            '<span>' + escapeHtml(label) + '</span><span class="mono">' + escapeHtml(name) + '</span></label>'
+        }).join('')
+    }
+
+    function syncLogServiceFilterUi() {
+      renderLogServiceFilterChecks('log-svc-filter-toolbar-list')
+      renderLogServiceFilterChecks('log-svc-filter-drawer-list')
+      updateLogFilterButtonLabel()
+    }
+
+    function setLogFilterChecked(name, checked) {
+      logFilter[name] = !!checked
+      saveLogFilter()
+      syncLogServiceFilterUi()
+      refreshLogs()
+    }
+
+    function setLogFilterAll(checked) {
+      knownServiceNames.forEach(n => { logFilter[n] = !!checked })
+      saveLogFilter()
+      syncLogServiceFilterUi()
+      refreshLogs()
+    }
+
+    function selectOnlyLogFilter(name) {
+      knownServiceNames.forEach(n => { logFilter[n] = (n === name) })
+      saveLogFilter()
+      syncLogServiceFilterUi()
+    }
+
+    function toggleLogFilterMenu(ev) {
+      if (ev) ev.stopPropagation()
+      const menu = document.getElementById('log-svc-menu')
+      menu.classList.toggle('open')
+      if (menu.classList.contains('open')) syncLogServiceFilterUi()
+    }
+
+    function loadLogWatch(names) {
+      const saved = localStorage.getItem(LOG_WATCH_KEY)
+      if (saved) {
+        try { logWatch = JSON.parse(saved) || {} } catch { logWatch = {} }
+      }
+      for (const name of names) {
+        if (logWatch[name] === undefined) logWatch[name] = true
+      }
+      knownServiceNames = names.slice()
+      saveLogWatch()
+    }
+
+    function saveLogWatch() {
+      localStorage.setItem(LOG_WATCH_KEY, JSON.stringify(logWatch))
+    }
+
+    function isLogWatched(name) {
+      return logWatch[name] !== false
+    }
+
+    function getWatchedParam() {
+      if (!knownServiceNames.length) return ''
+      const watched = knownServiceNames.filter(isLogWatched)
+      if (watched.length === knownServiceNames.length) return ''
+      return '&watched=' + encodeURIComponent(watched.join(','))
+    }
+
+    function toggleLogWatch(name, checked) {
+      logWatch[name] = !!checked
+      saveLogWatch()
+      refreshLogs()
+    }
 
     function escapeHtml(s) {
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    }
+
+    function logEntryText(e) {
+      if (!e) return ''
+      let t = e.text ?? e.Text ?? ''
+      if (t && typeof t === 'object') {
+        t = t.value ?? JSON.stringify(t, null, 2)
+      }
+      return String(t)
+    }
+
+    function normalizeLogEntry(raw) {
+      return {
+        ts: String(raw?.ts ?? raw?.Ts ?? ''),
+        service: String(raw?.service ?? raw?.Service ?? ''),
+        level: String(raw?.level ?? raw?.Level ?? 'INFO'),
+        stream: String(raw?.stream ?? raw?.Stream ?? ''),
+        text: logEntryText(raw)
+      }
+    }
+
+    function ensureLogEntriesArray(entries) {
+      if (!entries) return []
+      if (Array.isArray(entries)) return entries
+      if (typeof entries === 'object') return Object.values(entries)
+      return []
+    }
+
+    function formatLogEntryLine(e) {
+      return (e.ts || '—') + ' [' + (e.level || 'INFO') + '] [' + (e.service || '') + '] ' + logEntryText(e)
+    }
+
+    function logPreview(e, maxLen = 96) {
+      const t = logEntryText(e)
+      if (t.length <= maxLen) return t
+      return t.slice(0, maxLen) + '…'
+    }
+
+    function setLogDrawerTab(tab) {
+      logDrawerTab = tab
+      document.getElementById('log-tab-single').classList.toggle('active', tab === 'single')
+      document.getElementById('log-tab-all').classList.toggle('active', tab === 'all')
+      renderLogDrawer()
+    }
+
+    function toggleLogDrawer(open, tab) {
+      logDrawerOpen = !!open
+      if (tab) setLogDrawerTab(tab)
+      document.getElementById('log-drawer').classList.toggle('open', logDrawerOpen)
+      document.getElementById('log-drawer-backdrop').classList.toggle('open', logDrawerOpen)
+      if (logDrawerOpen) renderLogDrawer()
+    }
+
+    function getLogDrawerText() {
+      if (logDrawerTab === 'all') {
+        const q = (document.getElementById('log-drawer-search').value || '').trim().toLowerCase()
+        const lines = cachedLogEntries.map(formatLogEntryLine)
+        if (!q) return lines.join('\n')
+        return lines.filter(line => line.toLowerCase().includes(q)).join('\n')
+      }
+      if (selectedLogIndex < 0 || !cachedLogEntries[selectedLogIndex]) {
+        return '（未选中日志，请在左侧列表点击一行）'
+      }
+      const e = cachedLogEntries[selectedLogIndex]
+      return formatLogEntryLine(e) + '\n\n' + logEntryText(e)
+    }
+
+    function renderLogDrawer() {
+      const meta = document.getElementById('log-drawer-meta')
+      const body = document.getElementById('log-drawer-body')
+      const search = document.getElementById('log-drawer-search')
+      search.style.display = logDrawerTab === 'all' ? 'block' : 'none'
+
+      if (logDrawerTab === 'single') {
+        const e = cachedLogEntries[selectedLogIndex]
+        if (!e) {
+          meta.textContent = '点击列表中的日志行查看详情'
+        } else {
+          meta.innerHTML = '<strong>' + escapeHtml(e.service) + '</strong> · ' +
+            escapeHtml(e.ts) + ' · <span style="color:var(--accent)">' + escapeHtml(e.level) + '</span>' +
+            (e.stream ? ' · ' + escapeHtml(e.stream) : '')
+        }
+      } else {
+        const q = (search.value || '').trim()
+        meta.textContent = '全部文本 · 共 ' + cachedLogEntries.length + ' 条' +
+          (q ? ' · 搜索: ' + q : '')
+      }
+      body.textContent = getLogDrawerText()
+    }
+
+    function selectLogEntry(idx) {
+      selectedLogIndex = idx
+      document.querySelectorAll('.log-line[data-idx]').forEach(el => {
+        el.classList.toggle('log-active', Number(el.dataset.idx) === idx)
+      })
+      if (logDrawerOpen && logDrawerTab === 'single') renderLogDrawer()
+    }
+
+    function onLogLineClick(idx) {
+      selectLogEntry(idx)
+      toggleLogDrawer(true, 'single')
+    }
+
+    async function copyLogDrawer() {
+      const text = getLogDrawerText()
+      try {
+        await navigator.clipboard.writeText(text)
+        showToast('已复制到剪贴板', true)
+      } catch {
+        showToast('复制失败', false)
+      }
+    }
+
+    function openLogDrawerInNewWindow() {
+      const text = getLogDrawerText()
+      const title = logDrawerTab === 'all' ? 'MEIS 全部日志' : ('MEIS 日志 - ' + (cachedLogEntries[selectedLogIndex]?.service || ''))
+      const w = window.open('', '_blank', 'width=960,height=720')
+      if (!w) {
+        showToast('无法打开新窗口（请允许弹窗）', false)
+        return
+      }
+      w.document.title = title
+      w.document.body.style.cssText = 'margin:0;background:#0b1018;color:#d4deec;font-family:Consolas,monospace'
+      const pre = w.document.createElement('pre')
+      pre.style.cssText = 'margin:0;padding:16px;white-space:pre-wrap;word-break:break-word;line-height:1.55'
+      pre.textContent = text
+      w.document.body.appendChild(pre)
     }
 
     function showToast(msg, ok = true) {
@@ -290,15 +861,19 @@
 
     async function api(path, method = 'GET') {
       const res = await fetch(path, { method })
-      return res.json()
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.message || ('HTTP ' + res.status))
+      }
+      return data
     }
 
-    async function act(path) {
+    async function act(path, buildQuery = '') {
       if (busy) return
       busy = true
       document.body.classList.add('busy')
       try {
-        const data = await api('/api/' + path, 'POST')
+        const data = await api('/api/' + path + buildQuery, 'POST')
         showToast(data.message || (data.ok ? '完成' : '失败'), data.ok !== false)
         await refresh()
         await refreshLogs()
@@ -310,14 +885,44 @@
       }
     }
 
+    async function shutdownPanel() {
+      if (!confirm('关闭开发控制面板？\n（不会停止已启动的前后端服务，仅释放 :5099）')) return
+      try {
+        const data = await api('/api/panel/shutdown', 'POST')
+        showToast(data.message || '面板正在关闭', true)
+        document.getElementById('log-meta').textContent = '面板已关闭'
+        document.body.classList.add('busy')
+        setTimeout(() => {
+          document.body.innerHTML = '<div style="padding:40px;font-family:sans-serif;color:#e7ecf3;background:#0f1419;min-height:100vh"><h2>开发控制面板已关闭</h2><p>端口 5099 已释放。重新启动请运行 VS Code「开发控制面板」或：</p><pre style="background:#1a2332;padding:12px;border-radius:8px">powershell -File scripts\\dev-panel.ps1</pre></div>'
+        }, 600)
+      } catch (e) {
+        showToast('关闭失败（面板可能已卡死）。请运行 VS Code「关闭开发控制面板」或 scripts\\stop-dev-panel.ps1', false)
+      }
+    }
+
+    async function frontendAct(action) {
+      const buildQuery = (action === 'stop') ? '' : frontendBuildQuery()
+      await act('frontend/' + action, buildQuery)
+    }
+
+    async function frontendBuild() {
+      const q = frontendBuildQuery()
+      if (!q) {
+        showToast('请至少勾选一个前端编译选项', false)
+        return
+      }
+      await act('frontend/build', q)
+    }
+
     async function serviceAct(name, action) {
       if (busy) return
       busy = true
       document.body.classList.add('busy')
       pinnedService = name
-      document.getElementById('log-service').value = name
+      selectOnlyLogFilter(name)
+      const buildQuery = (action === 'stop' || action === 'log') ? '' : backendBuildQuery(name)
       try {
-        const data = await api('/api/service/' + name + '/' + action, 'POST')
+        const data = await api('/api/service/' + name + '/' + action + buildQuery, 'POST')
         showToast((name + ': ') + (data.message || '完成'), data.ok !== false)
         await refresh()
         await refreshLogs()
@@ -329,8 +934,28 @@
       }
     }
 
+    async function serviceBuild(name) {
+      const q = backendBuildQuery(name)
+      if (!q) {
+        showToast('请至少勾选 clean 或 package', false)
+        return
+      }
+      if (busy) return
+      busy = true
+      document.body.classList.add('busy')
+      try {
+        const data = await api('/api/service/' + name + '/build' + q, 'POST')
+        showToast((name + ': ') + (data.message || '完成'), data.ok !== false)
+        await refresh()
+      } catch (e) {
+        showToast(e.message, false)
+      } finally {
+        busy = false
+        document.body.classList.remove('busy')
+      }
+    }
+
     function onLogFilterChange() {
-      pinnedService = document.getElementById('log-service').value
       refreshLogs()
     }
 
@@ -351,36 +976,55 @@
     }
 
     async function refreshLogs() {
-      const service = document.getElementById('log-service').value || pinnedService || 'all'
       const errorsOnly = document.getElementById('log-errors-only').checked ? '1' : '0'
       const debug = document.getElementById('log-debug').checked ? '1' : '0'
       const el = document.getElementById('log-console')
       const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48
 
       try {
-        const data = await api('/api/logs/stream?service=' + encodeURIComponent(service) + '&lines=120&errorsOnly=' + errorsOnly + '&debug=' + debug)
-        populateLogServiceSelect(data.services || [])
-        document.getElementById('log-service').value = service
-        document.getElementById('log-meta').textContent = '更新: ' + (data.fetchedAt || '—') + ' · ' + (data.entries?.length || 0) + ' 条'
+        const watchParam = getWatchedParam()
+        const filterParam = getLogFilterParam()
+        const data = await api('/api/logs/stream?service=all&lines=200&errorsOnly=' + errorsOnly + '&debug=' + debug + watchParam + filterParam)
+        if (Array.isArray(data.services)) {
+          logServiceOptions = data.services
+          syncLogServiceFilterUi()
+        }
+        document.getElementById('log-meta').textContent = '更新: ' + (data.fetchedAt || '—') + ' · ' + (data.entries?.length || 0) + ' 条 · ' + logFilterSummary()
 
-        const entries = (data.entries || []).slice().reverse()
+        const entries = ensureLogEntriesArray(data.entries).map(normalizeLogEntry).slice().reverse()
+        cachedLogEntries = entries
+        if (selectedLogIndex >= entries.length) selectedLogIndex = -1
+
         if (!entries.length) {
-          el.innerHTML = '<div class="log-empty">暂无日志（服务未启动或 logs 目录无输出）</div>'
+          const watchedCount = knownServiceNames.filter(isLogWatched).length
+          const filterCount = getActiveLogFilters().length
+          let hint = '暂无日志（服务未启动或 logs 目录无输出）'
+          if (filterCount === 0) {
+            hint = '未勾选任何显示服务，请在「服务」筛选中至少勾选一个（含 meis-web 前端）'
+          } else if (watchedCount === 0) {
+            hint = '未勾选任何服务的「汇入日志」，请在服务列表右侧勾选'
+          } else if (document.getElementById('log-errors-only').checked) {
+            hint = '当前筛选下无错误/警告日志'
+          }
+          el.innerHTML = '<div class="log-empty">' + escapeHtml(hint) + '</div>'
+          if (logDrawerOpen) renderLogDrawer()
           return
         }
 
-        el.innerHTML = '<div class="log-line" style="position:sticky;top:0;background:#151d2b;font-weight:600;z-index:1">' +
-          '<span class="ts">时间</span><span class="svc">服务</span><span class="lvl">级别</span><span class="msg">内容</span></div>' +
-          entries.map(e => {
+        el.innerHTML = '<div class="log-line log-header" style="position:sticky;top:0;background:#151d2b;font-weight:600;z-index:1">' +
+          '<span class="ts">时间</span><span class="svc">服务</span><span class="lvl">级别</span><span class="msg">内容（点击查看全文）</span></div>' +
+          entries.map((e, idx) => {
           const lvl = e.level || 'INFO'
-          const cls = 'log-line lvl-' + lvl
-          return '<div class="' + cls + '">' +
+          const cls = 'log-line lvl-' + lvl + (idx === selectedLogIndex ? ' log-active' : '')
+          return '<div class="' + cls + '" data-idx="' + idx + '" onclick="onLogLineClick(' + idx + ')" title="点击查看完整日志">' +
             '<span class="ts">' + escapeHtml(e.ts || '') + '</span>' +
             '<span class="svc">' + escapeHtml(e.service || '') + '</span>' +
             '<span class="lvl">' + escapeHtml(lvl) + '</span>' +
-            '<span class="msg">' + escapeHtml(e.text || '') + '</span>' +
+            '<span class="msg msg-preview">' + escapeHtml(logPreview(e)) + '</span>' +
             '</div>'
         }).join('')
+
+        if (logDrawerOpen) renderLogDrawer()
 
         if (logFollowBottom || nearBottom) {
           el.scrollTop = el.scrollHeight
@@ -390,19 +1034,8 @@
       }
     }
 
-    function populateLogServiceSelect(services) {
-      const sel = document.getElementById('log-service')
-      const current = sel.value || 'all'
-      const opts = (services || ['all']).map(s => '<option value="' + s + '">' + (s === 'all' ? '全部服务' : s) + '</option>').join('')
-      if (sel.innerHTML !== opts) {
-        sel.innerHTML = opts
-        sel.value = current
-      }
-    }
-
     function showLog(name, debug = false) {
-      pinnedService = name
-      document.getElementById('log-service').value = name
+      selectOnlyLogFilter(name)
       document.getElementById('log-debug').checked = !!debug
       refreshLogs()
       document.querySelector('.log-panel').scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -426,16 +1059,25 @@
 
     function renderFrontend(fe) {
       if (!fe) return
+      const feWatch = isLogWatched(fe.name)
       document.getElementById('frontend-row').innerHTML = `
         <tr>
-          <td>${fe.name}</td>
+          <td class="mono">${fe.name}</td>
+          <td>${renderServiceInfo(fe)}</td>
           <td class="mono">:${fe.port}</td>
           <td>${statusDot(fe.httpUp)}</td>
           <td><a href="${fe.url}" target="_blank">${fe.url}</a></td>
+          <td>${renderFrontendBuildOpts()}</td>
           <td class="actions">
-            <button onclick="act('frontend/start')">启动</button>
-            <button onclick="act('frontend/stop')">停止</button>
-            <button onclick="act('frontend/restart')">重启</button>
+            <button onclick="frontendAct('start')">启动</button>
+            <button onclick="frontendAct('stop')">停止</button>
+            <button onclick="frontendAct('restart')">重启</button>
+          </td>
+          <td>
+            <label class="log-watch" title="勾选后该服务日志汇入底部综合窗口">
+              <input type="checkbox" ${feWatch ? 'checked' : ''} onchange="toggleLogWatch('${fe.name}', this.checked)" />
+              汇入
+            </label>
           </td>
         </tr>
       `
@@ -445,9 +1087,14 @@
       document.getElementById('service-rows').innerHTML = (list || []).map(s => `
         <tr>
           <td class="mono">${s.name}</td>
+          <td>${renderServiceInfo(s)}</td>
           <td>${statusDot(s.httpUp)} <span class="mono">:${s.port}</span></td>
           <td>${s.debugUp ? '<span class="dot debug"></span>调试' : '<span class="muted">—</span>'} ${s.debugPort ? '<span class="mono">:' + s.debugPort + '</span>' : ''}</td>
-          <td>${s.jarExists ? (s.jarSizeKb + ' KB') : '<span style="color:var(--err)">缺失</span>'}</td>
+          <td>
+            ${s.jarExists ? (s.jarSizeKb + ' KB') : '<span style="color:var(--err)">缺失</span>'}
+            ${s.jarMtime ? '<div class="jar-meta">JAR ' + escapeHtml(s.jarMtime) + '</div>' : ''}
+          </td>
+          <td>${renderBackendBuildOpts(s.name)}</td>
           <td class="actions">
             <button onclick="serviceAct('${s.name}','start')">启动</button>
             <button onclick="serviceAct('${s.name}','start-debug')">调试</button>
@@ -456,6 +1103,12 @@
             <button onclick="showLog('${s.name}')">日志</button>
             <button onclick="showLog('${s.name}',true)">调试日志</button>
           </td>
+          <td>
+            <label class="log-watch" title="勾选后该服务日志汇入底部综合窗口">
+              <input type="checkbox" ${isLogWatched(s.name) ? 'checked' : ''} onchange="toggleLogWatch('${s.name}', this.checked)" />
+              汇入
+            </label>
+          </td>
         </tr>
       `).join('')
     }
@@ -463,6 +1116,11 @@
     async function refresh() {
       try {
         const data = await api('/api/status')
+        coreServiceNames = data.coreServices || []
+        const names = ['meis-web', 'panel'].concat((data.services || []).map(s => s.name))
+        loadLogWatch(names)
+        loadLogFilter(names)
+        loadBuildOpts(names)
         renderStats(data)
         renderFrontend(data.frontend)
         renderServices(data.services)
@@ -479,6 +1137,14 @@
     document.getElementById('log-console').addEventListener('scroll', (e) => {
       const el = e.target
       logFollowBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48
+    })
+
+    document.addEventListener('click', (e) => {
+      const wrap = document.querySelector('.log-svc-filter-wrap')
+      const menu = document.getElementById('log-svc-menu')
+      if (wrap && menu && !wrap.contains(e.target)) {
+        menu.classList.remove('open')
+      }
     })
   </script>
 </body>

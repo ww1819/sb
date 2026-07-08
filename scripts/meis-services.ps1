@@ -48,14 +48,61 @@ $script:MeisServices = @(
     @{ name = "meis-gateway"; port = 8080; debugPort = 5800 }
 )
 
+# Core backend for local dev: tenant/auth/system + common file API + gateway (gateway last)
+$script:MeisCoreServiceNames = @(
+    'meis-tenant',
+    'meis-auth',
+    'meis-system',
+    'meis-file',
+    'meis-gateway'
+)
+
+$script:MeisServiceMetaCache = $null
+
+function Get-MeisServiceMetaMap {
+    if ($null -ne $script:MeisServiceMetaCache) { return $script:MeisServiceMetaCache }
+    $metaPath = Join-Path $PSScriptRoot 'dev-panel\services-meta.json'
+    if (-not (Test-Path $metaPath)) {
+        $script:MeisServiceMetaCache = @{}
+        return $script:MeisServiceMetaCache
+    }
+    $raw = Get-Content $metaPath -Raw -Encoding UTF8
+    $script:MeisServiceMetaCache = @{}
+    foreach ($prop in ($raw | ConvertFrom-Json).PSObject.Properties) {
+        $script:MeisServiceMetaCache[$prop.Name] = @{
+            labelZh = [string]$prop.Value.labelZh
+            descZh  = [string]$prop.Value.descZh
+        }
+    }
+    return $script:MeisServiceMetaCache
+}
+
+function Get-MeisServiceMetaEntry {
+    param([Parameter(Mandatory = $true)][string]$ServiceName)
+    $map = Get-MeisServiceMetaMap
+    if ($map.ContainsKey($ServiceName)) {
+        return $map[$ServiceName]
+    }
+    return @{ labelZh = $ServiceName; descZh = '' }
+}
+
 $script:MeisFrontendPort = 5173
 
 function Stop-MeisServices {
     $killed = @{}
 
-    # 1) by jar name in java command line
+    foreach ($s in $script:MeisServices) {
+        $n = Stop-MeisServiceByName $s.name
+        if ($n -gt 0) {
+            $killed["svc:$($s.name)"] = $n
+        }
+    }
+
+    Start-Sleep -Seconds 1
+
+    # Fallback: any java process running a meis jar
     Get-CimInstance Win32_Process -Filter "Name='java.exe'" -ErrorAction SilentlyContinue | ForEach-Object {
-        if ($_.CommandLine -and $_.CommandLine -match 'meis-[a-z-]+-1\.0\.0-SNAPSHOT\.jar') {
+        if ($_.CommandLine -and $_.CommandLine -match 'meis-[a-z-]+.*\.jar') {
             $procId = $_.ProcessId
             if (-not $killed.ContainsKey($procId)) {
                 Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
@@ -65,28 +112,37 @@ function Stop-MeisServices {
         }
     }
 
-    Start-Sleep -Seconds 1
+    Start-Sleep -Milliseconds 500
 
-    # 2) by listen port (fallback)
+    # Fallback: listeners on known backend ports (skip System PID 4)
     foreach ($port in $script:MeisServicePorts) {
-        $lines = netstat -ano | Select-String ":\s*$port\s+.*LISTENING"
-        foreach ($line in $lines) {
-            if ($line -match '\s+(\d+)\s*$') {
-                $procId = [int]$matches[1]
-                if ($procId -gt 0 -and -not $killed.ContainsKey($procId)) {
-                    Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
-                    $killed[$procId] = $true
-                    Write-Host "Stopped PID $procId (port $port)"
-                }
-            }
+        foreach ($procId in (Get-MeisProcessIdsOnPort -Port $port)) {
+            if ($procId -le 4 -or $killed.ContainsKey($procId)) { continue }
+            Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
+            $killed[$procId] = $true
+            Write-Host "Stopped PID $procId (port $port)"
         }
     }
 
-    if ($killed.Count -eq 0) {
+    $stillUp = @()
+    foreach ($s in $script:MeisServices) {
+        if (Test-MeisPortListening -Port $s.port) {
+            $stillUp += $s.name
+        }
+    }
+
+    $count = $killed.Count
+    if ($count -eq 0 -and $stillUp.Count -eq 0) {
         Write-Host "No MEIS backend processes found."
     } else {
-        Write-Host "Stopped $($killed.Count) process(es)."
+        Write-Host "Stopped $count process handle(s)."
     }
+    if ($stillUp.Count -gt 0) {
+        Write-Host "Still listening: $($stillUp -join ', ')" -ForegroundColor Yellow
+    }
+
+    $msg = if ($stillUp.Count -eq 0) { "all backend stopped ($count killed)" } else { "partial stop ($count killed), still up: $($stillUp -join ', ')" }
+    return @{ ok = ($stillUp.Count -eq 0); message = $msg; killed = $count; stillUp = $stillUp }
 }
 
 function Test-MeisPortListening {
@@ -142,10 +198,30 @@ function Ensure-MeisRedis {
     return $false
 }
 
+function Get-MeisCoreServiceDefinitions {
+    return @($script:MeisCoreServiceNames | ForEach-Object { Get-MeisServiceDefinition $_ })
+}
+
+function Get-MeisServicesStartList {
+    param(
+        [switch]$CoreOnly,
+        [string[]]$ServiceNames = $null
+    )
+    if ($CoreOnly) {
+        return @(Get-MeisCoreServiceDefinitions)
+    }
+    if ($ServiceNames -and $ServiceNames.Count -gt 0) {
+        return @($ServiceNames | ForEach-Object { Get-MeisServiceDefinition $_ })
+    }
+    return @($script:MeisServices)
+}
+
 function Start-MeisServices {
     param(
         [string]$Profile = "dev",
-        [switch]$FollowLogs
+        [switch]$FollowLogs,
+        [switch]$CoreOnly,
+        [string[]]$ServiceNames = $null
     )
 
     $env:JAVA_HOME = Resolve-MeisJavaHome
@@ -156,9 +232,19 @@ function Start-MeisServices {
     $logDir = Join-Path $root "logs"
     if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
 
-    Write-Host "Starting MEIS services (profile: $Profile) ..."
+    $targets = Get-MeisServicesStartList -CoreOnly:$CoreOnly -ServiceNames $ServiceNames
+    $scopeLabel = if ($CoreOnly) { 'core backend' } else { 'all backend' }
+    Write-Host "Starting MEIS $scopeLabel services (profile: $Profile) ..."
     $redisOk = Ensure-MeisRedis
-    foreach ($s in $script:MeisServices) {
+
+    $skipped = @()
+    $launched = @()
+    foreach ($s in $targets) {
+        if (Test-MeisPortListening -Port $s.port) {
+            $skipped += $s.name
+            Write-Host "  skip $($s.name) (already listening :$($s.port))" -ForegroundColor DarkGray
+            continue
+        }
         $jar = Join-Path $root "$($s.name)\target\$($s.name)-1.0.0-SNAPSHOT.jar"
         if (-not (Test-Path $jar)) {
             throw "Missing $jar - run scripts\build.ps1 first"
@@ -176,12 +262,33 @@ function Start-MeisServices {
         Start-Process -FilePath $javaExe -ArgumentList $javaArgs -WorkingDirectory $root `
             -WindowStyle Minimized -RedirectStandardOutput $stdout -RedirectStandardError $stderr | Out-Null
         Write-Host "  launch $($s.name) -> port $($s.port)"
+        $launched += $s.name
         Start-Sleep -Seconds 1
     }
 
-    Write-Host "Waiting for services to bind ports ..."
+    if ($launched.Count -eq 0 -and $skipped.Count -gt 0) {
+        Write-Host "All $($targets.Count) service(s) already running, nothing to start." -ForegroundColor Green
+        return @{
+            ok = $true
+            message = "all $($targets.Count) already running"
+            skipped = $skipped
+            launched = $launched
+        }
+    }
+
+    if ($launched.Count -eq 0) {
+        Write-Host "No services to start." -ForegroundColor Yellow
+        return @{ ok = $true; message = 'no services to start'; skipped = $skipped; launched = $launched }
+    }
+
+    Write-Host "Waiting for newly started services to bind ports ..."
     $failed = @()
-    foreach ($s in $script:MeisServices) {
+    foreach ($s in $targets) {
+        if ($s.name -in $skipped) {
+            Write-Host "  OK $($s.name) :$($s.port) (already running)" -ForegroundColor Green
+            continue
+        }
+        if ($s.name -notin $launched) { continue }
         $ready = $false
         for ($i = 0; $i -lt 20; $i++) {
             if (Test-MeisPortListening -Port $s.port) {
@@ -210,7 +317,8 @@ function Start-MeisServices {
         Write-Host 'Common causes: Flyway migration error, port in use, jar not rebuilt' -ForegroundColor Yellow
     } else {
         Write-Host ''
-        Write-Host 'All services are listening.' -ForegroundColor Green
+        $summary = "started $($launched.Count), skipped $($skipped.Count)"
+        Write-Host "Services ready ($summary)." -ForegroundColor Green
     }
     Write-Host 'Gateway: http://localhost:8080'
     Write-Host ''
@@ -230,6 +338,10 @@ function Start-MeisServices {
             Get-Content $gwLog -Tail 40 -Wait
         }
     }
+
+    $msg = "launched $($launched.Count), skipped $($skipped.Count)"
+    if ($failed.Count -gt 0) { $msg += ", failed $($failed.Count)" }
+    return @{ ok = ($failed.Count -eq 0); message = $msg; skipped = $skipped; launched = $launched; failed = @($failed | ForEach-Object { $_.name }) }
 }
 
 function Get-MeisServiceDefinition {
@@ -341,14 +453,138 @@ function Start-MeisServiceByName {
     throw "Timeout starting $ServiceName - see $stderr"
 }
 
+function Get-MeisServiceMeta {
+    param([Parameter(Mandatory = $true)][string]$ServiceName)
+    $svc = Get-MeisServiceDefinition $ServiceName
+    $meta = Get-MeisServiceMetaEntry $ServiceName
+    return @{
+        name    = $svc.name
+        labelZh = $meta.labelZh
+        descZh  = $meta.descZh
+    }
+}
+
+function Invoke-MeisMavenModule {
+    param(
+        [Parameter(Mandatory = $true)][string]$Module,
+        [switch]$Clean,
+        [switch]$Package,
+        [switch]$Install
+    )
+    $mvn = Resolve-MeisMaven
+    $env:JAVA_HOME = Resolve-MeisJavaHome
+    $goals = @()
+    if ($Clean) { $goals += 'clean' }
+    if ($Install) {
+        $goals += 'install'
+    } elseif ($Package -or $goals.Count -eq 0) {
+        $goals += 'package'
+    }
+    $mvnArgs = $goals + @('-DskipTests', '-pl', $Module, '-am')
+    Push-Location $script:MeisRoot
+    try {
+        & $mvn @mvnArgs
+        if ($LASTEXITCODE -ne 0) {
+            throw "Maven $($goals -join ' ') failed: $Module"
+        }
+    } finally {
+        Pop-Location
+    }
+    return @{ ok = $true; message = ($Module + ': mvn ' + ($goals -join ' ') + ' OK') }
+}
+
+function Build-MeisServiceModule {
+    param(
+        [Parameter(Mandatory = $true)][string]$ServiceName,
+        [switch]$Clean,
+        [switch]$Package
+    )
+    if (-not $Clean -and -not $Package) {
+        throw 'Select at least one build step: clean or package'
+    }
+    return Invoke-MeisMavenModule -Module $ServiceName -Clean:$Clean -Package:$Package
+}
+
+function Build-MeisFrontendProject {
+    param(
+        [switch]$NpmInstall,
+        [switch]$TypeCheck,
+        [switch]$Build
+    )
+    if (-not $NpmInstall -and -not $TypeCheck -and -not $Build) {
+        throw 'Select at least one build step: npmInstall, typecheck or build'
+    }
+    $webDir = Join-Path $script:MeisRoot 'meis-web'
+    if (-not (Test-Path (Join-Path $webDir 'package.json'))) {
+        throw "meis-web not found: $webDir"
+    }
+    Push-Location $webDir
+    try {
+        $steps = @()
+        if ($NpmInstall) {
+            & npm install
+            if ($LASTEXITCODE -ne 0) { throw 'npm install failed' }
+            $steps += 'npm install'
+        }
+        if ($TypeCheck) {
+            & npx vue-tsc -b
+            if ($LASTEXITCODE -ne 0) { throw 'vue-tsc failed' }
+            $steps += 'vue-tsc'
+        }
+        if ($Build) {
+            & npm run build
+            if ($LASTEXITCODE -ne 0) { throw 'npm run build failed' }
+            $steps += 'vite build'
+        }
+    } finally {
+        Pop-Location
+    }
+    return @{ ok = $true; message = ('meis-web: ' + ($steps -join ' + ') + ' OK') }
+}
+
+function Invoke-MeisServiceBuildSteps {
+    param(
+        [Parameter(Mandatory = $true)][string]$ServiceName,
+        [switch]$Clean,
+        [switch]$Package
+    )
+    if (-not $Clean -and -not $Package) { return $null }
+    return Build-MeisServiceModule -ServiceName $ServiceName -Clean:$Clean -Package:$Package
+}
+
+function Invoke-MeisFrontendBuildSteps {
+    param(
+        [switch]$NpmInstall,
+        [switch]$TypeCheck,
+        [switch]$Build
+    )
+    if (-not $NpmInstall -and -not $TypeCheck -and -not $Build) { return $null }
+    return Build-MeisFrontendProject -NpmInstall:$NpmInstall -TypeCheck:$TypeCheck -Build:$Build
+}
+
 function Restart-MeisServiceByName {
     param(
         [Parameter(Mandatory = $true)][string]$ServiceName,
         [string]$Profile = 'dev',
-        [switch]$Debug
+        [switch]$Debug,
+        [switch]$Clean,
+        [switch]$Package
     )
+    Invoke-MeisServiceBuildSteps -ServiceName $ServiceName -Clean:$Clean -Package:$Package | Out-Null
     Stop-MeisServiceByName $ServiceName | Out-Null
     Start-Sleep -Seconds 1
+    return Start-MeisServiceByName -ServiceName $ServiceName -Profile $Profile -Debug:$Debug
+}
+
+function Start-MeisServiceByNameWithBuild {
+    param(
+        [Parameter(Mandatory = $true)][string]$ServiceName,
+        [string]$Profile = 'dev',
+        [switch]$Debug,
+        [switch]$Clean,
+        [switch]$Package
+    )
+    Invoke-MeisServiceBuildSteps -ServiceName $ServiceName -Clean:$Clean -Package:$Package | Out-Null
     return Start-MeisServiceByName -ServiceName $ServiceName -Profile $Profile -Debug:$Debug
 }
 
@@ -359,22 +595,29 @@ function Get-MeisServiceStatusList {
         $debugUp = $false
         if ($s.debugPort) { $debugUp = Test-MeisPortListening -Port $s.debugPort }
         $jar = Join-Path $script:MeisRoot "$($s.name)\target\$($s.name)-1.0.0-SNAPSHOT.jar"
+        $meta = Get-MeisServiceMetaEntry $s.name
         $list += [ordered]@{
             name       = $s.name
+            labelZh    = $meta.labelZh
+            descZh     = $meta.descZh
             port       = $s.port
             debugPort  = $s.debugPort
             httpUp     = $httpUp
             debugUp    = $debugUp
             jarExists  = Test-Path $jar
             jarSizeKb  = if (Test-Path $jar) { [math]::Round((Get-Item $jar).Length / 1KB) } else { 0 }
+            jarMtime   = if (Test-Path $jar) { (Get-Item $jar).LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
         }
     }
     return $list
 }
 
 function Get-MeisFrontendStatus {
+    $meta = Get-MeisServiceMetaEntry 'meis-web'
     return [ordered]@{
         name    = 'meis-web'
+        labelZh = $meta.labelZh
+        descZh  = $meta.descZh
         port    = $script:MeisFrontendPort
         httpUp  = Test-MeisPortListening -Port $script:MeisFrontendPort
         url     = "http://localhost:$($script:MeisFrontendPort)"
@@ -425,8 +668,24 @@ function Start-MeisFrontend {
 }
 
 function Restart-MeisFrontend {
+    param(
+        [switch]$NpmInstall,
+        [switch]$TypeCheck,
+        [switch]$Build
+    )
+    Invoke-MeisFrontendBuildSteps -NpmInstall:$NpmInstall -TypeCheck:$TypeCheck -Build:$Build | Out-Null
     Stop-MeisFrontend | Out-Null
     Start-Sleep -Seconds 1
+    return Start-MeisFrontend
+}
+
+function Start-MeisFrontendWithBuild {
+    param(
+        [switch]$NpmInstall,
+        [switch]$TypeCheck,
+        [switch]$Build
+    )
+    Invoke-MeisFrontendBuildSteps -NpmInstall:$NpmInstall -TypeCheck:$TypeCheck -Build:$Build | Out-Null
     return Start-MeisFrontend
 }
 
@@ -434,9 +693,9 @@ function Get-MeisServiceLogTail {
     param(
         [Parameter(Mandatory = $true)][string]$ServiceName,
         [int]$Lines = 40,
-        [switch]$Debug
+        [switch]$DebugLogs
     )
-    $entries = Get-MeisPanelLogEntries -ServiceName $ServiceName -Lines $Lines -Debug:$Debug
+    $entries = Get-MeisPanelLogEntries -ServiceName $ServiceName -Lines $Lines -DebugLogs:$DebugLogs
     return @($entries | ForEach-Object { $_.text })
 }
 
@@ -489,24 +748,69 @@ function Read-MeisLogFileEntries {
     return $entries
 }
 
+function Test-MeisServiceInWatchList {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [AllowNull()][string[]]$Watched
+    )
+    if ($null -eq $Watched) { return $true }
+    return $Name -in $Watched
+}
+
+function Add-MeisServiceLogEntries {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$LogDir,
+        [int]$Lines,
+        [switch]$DebugLogs,
+        [switch]$PreferDebug
+    )
+
+    $suffix = if ($DebugLogs -or $PreferDebug) { '.debug' } else { '' }
+    $errLog = Join-Path $LogDir "$Name$suffix.err.log"
+    $outLog = Join-Path $LogDir "$Name$suffix.out.log"
+    $result = @()
+    $result += Read-MeisLogFileEntries -ServiceName $Name -LogPath $errLog -Stream 'stderr' -Lines $Lines
+    $result += Read-MeisLogFileEntries -ServiceName $Name -LogPath $outLog -Stream 'stdout' -Lines $Lines
+    return $result
+}
+
+function Test-MeisServiceInFilterList {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [AllowNull()][string[]]$Filtered
+    )
+    if ($null -eq $Filtered) { return $true }
+    return $Name -in $Filtered
+}
+
 function Get-MeisPanelLogEntries {
     param(
         [string]$ServiceName = 'all',
         [int]$Lines = 100,
-        [switch]$Debug,
-        [switch]$ErrorsOnly
+        [switch]$DebugLogs,
+        [switch]$ErrorsOnly,
+        [AllowNull()][string[]]$Watched = $null,
+        [AllowNull()][string[]]$Filtered = $null
     )
 
     $entries = @()
-    $suffix = if ($Debug) { '.debug' } else { '' }
     $logDir = Join-Path $script:MeisRoot 'logs'
-
-    $panelLog = Join-Path $logDir 'dev-panel-events.log'
-    if (Test-Path $panelLog) {
-        $entries += Read-MeisLogFileEntries -ServiceName 'panel' -LogPath $panelLog -Stream 'event' -Lines $Lines
+    $statusByName = @{}
+    foreach ($s in Get-MeisServiceStatusList) {
+        $statusByName[$s.name] = $s
     }
 
-    if ($ServiceName -eq 'all' -or $ServiceName -eq 'meis-web') {
+    $includePanel = (Test-MeisServiceInWatchList -Name 'panel' -Watched $Watched) -and (Test-MeisServiceInFilterList -Name 'panel' -Filtered $Filtered)
+    if ($includePanel) {
+        $panelLog = Join-Path $logDir 'dev-panel-events.log'
+        if (Test-Path $panelLog) {
+            $entries += Read-MeisLogFileEntries -ServiceName 'panel' -LogPath $panelLog -Stream 'event' -Lines $Lines
+        }
+    }
+
+    $includeWeb = (Test-MeisServiceInWatchList -Name 'meis-web' -Watched $Watched) -and (Test-MeisServiceInFilterList -Name 'meis-web' -Filtered $Filtered)
+    if ($includeWeb -and ($ServiceName -eq 'all' -or $ServiceName -eq 'meis-web' -or $null -ne $Filtered)) {
         $feErr = Join-Path $logDir 'meis-web.dev.err.log'
         $feOut = Join-Path $logDir 'meis-web.dev.out.log'
         $entries += Read-MeisLogFileEntries -ServiceName 'meis-web' -LogPath $feErr -Stream 'stderr' -Lines $Lines
@@ -514,13 +818,16 @@ function Get-MeisPanelLogEntries {
     }
 
     if ($ServiceName -ne 'meis-web') {
-        $targets = if ($ServiceName -eq 'all') { $script:MeisServices } else { @(Get-MeisServiceDefinition $ServiceName) }
+        $targets = if ($ServiceName -eq 'all' -or $null -ne $Filtered) { $script:MeisServices } else { @(Get-MeisServiceDefinition $ServiceName) }
         foreach ($s in $targets) {
             $name = $s.name
-            $errLog = Join-Path $logDir "$name$suffix.err.log"
-            $outLog = Join-Path $logDir "$name$suffix.out.log"
-            $entries += Read-MeisLogFileEntries -ServiceName $name -LogPath $errLog -Stream 'stderr' -Lines $Lines
-            $entries += Read-MeisLogFileEntries -ServiceName $name -LogPath $outLog -Stream 'stdout' -Lines $Lines
+            if (-not (Test-MeisServiceInWatchList -Name $name -Watched $Watched)) { continue }
+            if (-not (Test-MeisServiceInFilterList -Name $name -Filtered $Filtered)) { continue }
+            $preferDebug = $false
+            if ($statusByName.ContainsKey($name)) {
+                $preferDebug = [bool]$statusByName[$name].debugUp
+            }
+            $entries += Add-MeisServiceLogEntries -Name $name -LogDir $logDir -Lines $Lines -DebugLogs:$DebugLogs -PreferDebug:$preferDebug
         }
     }
 
@@ -530,10 +837,24 @@ function Get-MeisPanelLogEntries {
         })
     }
 
-    return @($entries | Sort-Object { $_.ts + $_.service + $_.text } -Descending | Select-Object -First ($Lines * 4))
+    return @($entries | Sort-Object { $_.ts + $_.service + $_.text } -Descending | Select-Object -First ($Lines * 4) | ForEach-Object {
+        [PSCustomObject]@{
+            ts      = [string]$_.ts
+            service = [string]$_.service
+            stream  = [string]$_.stream
+            level   = [string]$_.level
+            text    = [string]$_.text
+        }
+    })
 }
 
 function Get-MeisPanelLogServices {
-    $names = @('all') + @($script:MeisServices | ForEach-Object { $_.name }) + @('meis-web', 'panel')
-    return $names
+    $meta = Get-MeisServiceMetaMap
+    $list = @([ordered]@{ name = 'panel'; labelZh = '面板事件' })
+    $list += [ordered]@{ name = 'meis-web'; labelZh = if ($meta['meis-web']) { $meta['meis-web'].labelZh } else { '前端 Web' } }
+    foreach ($s in $script:MeisServices) {
+        $m = Get-MeisServiceMetaEntry $s.name
+        $list += [ordered]@{ name = $s.name; labelZh = $m.labelZh }
+    }
+    return $list
 }
