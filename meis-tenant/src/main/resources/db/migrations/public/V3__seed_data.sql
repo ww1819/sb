@@ -1,45 +1,13 @@
--- Platform menu catalog and tenant authorization (MEIS V2.0)
-ALTER TABLE sys_tenant ADD COLUMN IF NOT EXISTS credit_code VARCHAR(50);
-ALTER TABLE sys_tenant ADD COLUMN IF NOT EXISTS package_code VARCHAR(50) DEFAULT 'standard';
+﻿-- MEIS consolidated Flyway migration (auto-generated, do not split into per-feature files)
+-- Categories: V1 tables | V2 extensions | V3 seed data
 
-CREATE TABLE IF NOT EXISTS sys_menu (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    menu_code VARCHAR(100) UNIQUE NOT NULL,
-    parent_code VARCHAR(100),
-    menu_name VARCHAR(100) NOT NULL,
-    menu_type VARCHAR(20) NOT NULL DEFAULT 'menu',
-    path VARCHAR(200),
-    icon VARCHAR(50),
-    sort_order INTEGER DEFAULT 0,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
+-- [V1__platform.sql]
+-- demo tenant metadata (schema created by meis-tenant service)
+INSERT INTO sys_tenant (id, tenant_code, tenant_name, schema_name, status)
+VALUES ('00000000-0000-0000-0000-000000000001', 'demo', '演示医院', 'tenant_demo', 'active')
+ON CONFLICT (tenant_code) DO NOTHING;
 
-CREATE TABLE IF NOT EXISTS sys_tenant_menu (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    tenant_id UUID NOT NULL REFERENCES sys_tenant(id) ON DELETE CASCADE,
-    menu_code VARCHAR(100) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(tenant_id, menu_code)
-);
-
-CREATE TABLE IF NOT EXISTS sys_package (
-    package_code VARCHAR(50) PRIMARY KEY,
-    package_name VARCHAR(100) NOT NULL,
-    max_users INTEGER DEFAULT 500,
-    description TEXT,
-    is_active BOOLEAN DEFAULT TRUE
-);
-
-CREATE TABLE IF NOT EXISTS sys_package_menu (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    package_code VARCHAR(50) NOT NULL REFERENCES sys_package(package_code) ON DELETE CASCADE,
-    menu_code VARCHAR(100) NOT NULL,
-    UNIQUE(package_code, menu_code)
-);
-
-CREATE INDEX IF NOT EXISTS idx_tenant_menu_tenant ON sys_tenant_menu(tenant_id);
-
+-- [V2__platform_menu.sql]
 -- packages
 INSERT INTO sys_package (package_code, package_name, max_users, description) VALUES
 ('basic', '基础版', 50, '采购+资产基础'),
@@ -48,6 +16,7 @@ INSERT INTO sys_package (package_code, package_name, max_users, description) VAL
 ('flagship', '旗舰版', 2000, '全模块+集成')
 ON CONFLICT (package_code) DO NOTHING;
 
+-- [V2__platform_menu.sql]
 -- menu catalog (modules + menus + key buttons)
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
 ('mod_dashboard', NULL, '工作台', 'module', '/dashboard', 1),
@@ -93,6 +62,7 @@ INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_o
 ('system_approval', 'mod_system', '审批配置', 'menu', '/system/approval', 7)
 ON CONFLICT (menu_code) DO NOTHING;
 
+-- [V2__platform_menu.sql]
 -- standard package = all tenant menus
 INSERT INTO sys_package_menu (package_code, menu_code)
 SELECT 'standard', menu_code FROM sys_menu
@@ -100,21 +70,123 @@ WHERE menu_type IN ('module','menu')
   AND menu_code NOT LIKE 'platform_%' AND menu_code <> 'mod_platform'
 ON CONFLICT DO NOTHING;
 
+-- [V2__platform_menu.sql]
 INSERT INTO sys_package_menu (package_code, menu_code)
 SELECT 'flagship', menu_code FROM sys_menu
 WHERE menu_type IN ('module','menu')
   AND menu_code NOT LIKE 'platform_%' AND menu_code <> 'mod_platform'
 ON CONFLICT DO NOTHING;
 
+-- [V2__platform_menu.sql]
 -- demo tenant: grant standard package menus
 INSERT INTO sys_tenant_menu (tenant_id, menu_code)
 SELECT '00000000-0000-0000-0000-000000000001', pm.menu_code
 FROM sys_package_menu pm WHERE pm.package_code = 'standard'
 ON CONFLICT DO NOTHING;
 
+-- [V2__platform_menu.sql]
 UPDATE sys_tenant SET package_code = 'standard' WHERE tenant_code = 'demo';
 
+-- [V2__platform_menu.sql]
 -- platform admin seed
 INSERT INTO platform_user (username, password_hash, real_name)
 SELECT 'platform', '$2a$10$RFmAL1Ss2C.mxB.aT.Z9s.leTG8dX52WWn86CVk/grwDupZ92hcwO', '平台管理员'
 WHERE NOT EXISTS (SELECT 1 FROM platform_user WHERE username = 'platform');
+
+-- [V3__platform_admin_menu.sql]
+-- Platform admin menus (not in sys_tenant_menu)
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('mod_platform', NULL, '平台管理', 'module', NULL, 99),
+('platform_tenant', 'mod_platform', '租户列表', 'menu', '/tenant/list', 1),
+('platform_tenant_menu', 'mod_platform', '租户菜单授权', 'menu', '/platform/tenant-menu', 2),
+('platform_package', 'mod_platform', '套餐管理', 'menu', '/platform/package', 3)
+ON CONFLICT (menu_code) DO NOTHING;
+
+-- [V4__purchase_menus.sql]
+-- MEIS V8: 采购模块菜单补全（供应商、设备分类、安装验收）
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('purchase_supplier', 'mod_purchase', '供应商管理', 'menu', '/purchase/supplier', 4),
+('purchase_category', 'mod_purchase', '设备分类', 'menu', '/purchase/category', 5),
+('purchase_acceptance', 'mod_purchase', '安装验收', 'menu', '/purchase/acceptance', 6)
+ON CONFLICT (menu_code) DO NOTHING;
+
+-- [V4__purchase_menus.sql]
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('purchase_supplier', 'purchase_category', 'purchase_acceptance')
+ON CONFLICT DO NOTHING;
+
+-- [V4__purchase_menus.sql]
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT '00000000-0000-0000-0000-000000000001', m.menu_code
+FROM sys_menu m
+WHERE m.menu_code IN ('purchase_supplier', 'purchase_category', 'purchase_acceptance')
+ON CONFLICT DO NOTHING;
+
+-- [V5__purchase_phase456_menus.sql]
+-- MEIS V9: 生产厂商菜单
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('purchase_manufacturer', 'mod_purchase', '生产厂商', 'menu', '/purchase/manufacturer', 7),
+('purchase_dashboard', 'mod_purchase', '采购看板', 'menu', '/purchase/dashboard', 8)
+ON CONFLICT (menu_code) DO NOTHING;
+
+-- [V5__purchase_phase456_menus.sql]
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('purchase_manufacturer', 'purchase_dashboard')
+ON CONFLICT DO NOTHING;
+
+-- [V5__purchase_phase456_menus.sql]
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT '00000000-0000-0000-0000-000000000001', m.menu_code
+FROM sys_menu m
+WHERE m.menu_code IN ('purchase_manufacturer', 'purchase_dashboard')
+ON CONFLICT DO NOTHING;
+
+-- [V6__purchase_trace_menu.sql]
+-- MEIS V10: 采购业务追溯菜单
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('purchase_trace', 'mod_purchase', '业务追溯', 'menu', '/purchase/trace', 9)
+ON CONFLICT (menu_code) DO NOTHING;
+
+-- [V6__purchase_trace_menu.sql]
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code = 'purchase_trace'
+ON CONFLICT DO NOTHING;
+
+-- [V6__purchase_trace_menu.sql]
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT '00000000-0000-0000-0000-000000000001', 'purchase_trace'
+FROM sys_menu m WHERE m.menu_code = 'purchase_trace'
+ON CONFLICT DO NOTHING;
+
+-- [V7__purchase_report_menu.sql]
+-- MEIS V11: 采购预算执行报表菜单
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('purchase_report', 'mod_purchase', '预算执行', 'menu', '/purchase/report', 10)
+ON CONFLICT (menu_code) DO NOTHING;
+
+-- [V7__purchase_report_menu.sql]
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code = 'purchase_report'
+ON CONFLICT DO NOTHING;
+
+-- [V7__purchase_report_menu.sql]
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT '00000000-0000-0000-0000-000000000001', 'purchase_report'
+FROM sys_menu m WHERE m.menu_code = 'purchase_report'
+ON CONFLICT DO NOTHING;

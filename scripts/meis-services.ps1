@@ -221,6 +221,7 @@ function Start-MeisServices {
         [string]$Profile = "dev",
         [switch]$FollowLogs,
         [switch]$CoreOnly,
+        [switch]$EnableJdwp,
         [string[]]$ServiceNames = $null
     )
 
@@ -234,7 +235,8 @@ function Start-MeisServices {
 
     $targets = Get-MeisServicesStartList -CoreOnly:$CoreOnly -ServiceNames $ServiceNames
     $scopeLabel = if ($CoreOnly) { 'core backend' } else { 'all backend' }
-    Write-Host "Starting MEIS $scopeLabel services (profile: $Profile) ..."
+    $modeLabel = if ($EnableJdwp) { 'debug' } else { 'normal' }
+    Write-Host "Starting MEIS $scopeLabel services ($modeLabel, profile: $Profile) ..."
     $redisOk = Ensure-MeisRedis
 
     $skipped = @()
@@ -242,16 +244,23 @@ function Start-MeisServices {
     foreach ($s in $targets) {
         if (Test-MeisPortListening -Port $s.port) {
             $skipped += $s.name
-            Write-Host "  skip $($s.name) (already listening :$($s.port))" -ForegroundColor DarkGray
+            $hint = if ($EnableJdwp) { " (already listening :$($s.port), use restart-debug to attach JDWP)" } else { " (already listening :$($s.port))" }
+            Write-Host "  skip $($s.name)$hint" -ForegroundColor DarkGray
             continue
         }
         $jar = Join-Path $root "$($s.name)\target\$($s.name)-1.0.0-SNAPSHOT.jar"
         if (-not (Test-Path $jar)) {
             throw "Missing $jar - run scripts\build.ps1 first"
         }
-        $stdout = Join-Path $logDir "$($s.name).out.log"
-        $stderr = Join-Path $logDir "$($s.name).err.log"
-        $javaArgs = @(
+        $suffix = if ($EnableJdwp) { '.debug' } else { '' }
+        $stdout = Join-Path $logDir "$($s.name)$suffix.out.log"
+        $stderr = Join-Path $logDir "$($s.name)$suffix.err.log"
+        $javaArgs = @()
+        if ($EnableJdwp) {
+            if (-not $s.debugPort) { throw "No debug port for $($s.name)" }
+            $javaArgs += "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:$($s.debugPort)"
+        }
+        $javaArgs += @(
             "-jar", $jar,
             "--spring.profiles.active=$Profile",
             "--spring.cloud.nacos.discovery.enabled=false"
@@ -261,7 +270,8 @@ function Start-MeisServices {
         }
         Start-Process -FilePath $javaExe -ArgumentList $javaArgs -WorkingDirectory $root `
             -WindowStyle Minimized -RedirectStandardOutput $stdout -RedirectStandardError $stderr | Out-Null
-        Write-Host "  launch $($s.name) -> port $($s.port)"
+        $jdwpInfo = if ($EnableJdwp) { ", JDWP :$($s.debugPort)" } else { '' }
+        Write-Host "  launch $($s.name) -> port $($s.port)$jdwpInfo"
         $launched += $s.name
         Start-Sleep -Seconds 1
     }
@@ -291,9 +301,12 @@ function Start-MeisServices {
         if ($s.name -notin $launched) { continue }
         $ready = $false
         for ($i = 0; $i -lt 20; $i++) {
-            if (Test-MeisPortListening -Port $s.port) {
+            $httpReady = Test-MeisPortListening -Port $s.port
+            $debugReady = (-not $EnableJdwp) -or ((-not $s.debugPort) -or (Test-MeisPortListening -Port $s.debugPort))
+            if ($httpReady -and $debugReady) {
                 $ready = $true
-                Write-Host "  OK $($s.name) :$($s.port)" -ForegroundColor Green
+                $jdwpInfo = if ($EnableJdwp -and $s.debugPort) { ", JDWP :$($s.debugPort)" } else { '' }
+                Write-Host "  OK $($s.name) :$($s.port)$jdwpInfo" -ForegroundColor Green
                 break
             }
             Start-Sleep -Seconds 1
@@ -401,7 +414,7 @@ function Start-MeisServiceByName {
     param(
         [Parameter(Mandatory = $true)][string]$ServiceName,
         [string]$Profile = 'dev',
-        [switch]$Debug
+        [switch]$EnableJdwp
     )
 
     $svc = Get-MeisServiceDefinition $ServiceName
@@ -419,12 +432,12 @@ function Start-MeisServiceByName {
 
     $logDir = Join-Path $root 'logs'
     if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
-    $suffix = if ($Debug) { '.debug' } else { '' }
+    $suffix = if ($EnableJdwp) { '.debug' } else { '' }
     $stdout = Join-Path $logDir "$ServiceName$suffix.out.log"
     $stderr = Join-Path $logDir "$ServiceName$suffix.err.log"
 
     $javaArgs = @()
-    if ($Debug) {
+    if ($EnableJdwp) {
         if (-not $svc.debugPort) { throw "No debug port for $ServiceName" }
         $javaArgs += "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:$($svc.debugPort)"
     }
@@ -443,9 +456,9 @@ function Start-MeisServiceByName {
     $deadline = (Get-Date).AddSeconds(120)
     while ((Get-Date) -lt $deadline) {
         $httpReady = Test-MeisPortListening -Port $svc.port
-        $debugReady = (-not $Debug) -or (Test-MeisPortListening -Port $svc.debugPort)
+        $debugReady = (-not $EnableJdwp) -or (Test-MeisPortListening -Port $svc.debugPort)
         if ($httpReady -and $debugReady) {
-            $msg = if ($Debug) { "running on :$($svc.port), JDWP :$($svc.debugPort)" } else { "running on :$($svc.port)" }
+            $msg = if ($EnableJdwp) { "running on :$($svc.port), JDWP :$($svc.debugPort)" } else { "running on :$($svc.port)" }
             return @{ ok = $true; message = $msg }
         }
         Start-Sleep -Seconds 1
@@ -469,15 +482,20 @@ function Invoke-MeisMavenModule {
         [Parameter(Mandatory = $true)][string]$Module,
         [switch]$Clean,
         [switch]$Package,
+        [switch]$Compile,
         [switch]$Install
     )
     $mvn = Resolve-MeisMaven
     $env:JAVA_HOME = Resolve-MeisJavaHome
     $goals = @()
     if ($Clean) { $goals += 'clean' }
-    if ($Install) {
+    if ($Package) {
+        $goals += 'package'
+    } elseif ($Compile) {
+        $goals += 'compile'
+    } elseif ($Install) {
         $goals += 'install'
-    } elseif ($Package -or $goals.Count -eq 0) {
+    } elseif ($goals.Count -eq 0) {
         $goals += 'package'
     }
     $mvnArgs = $goals + @('-DskipTests', '-pl', $Module, '-am')
@@ -493,16 +511,82 @@ function Invoke-MeisMavenModule {
     return @{ ok = $true; message = ($Module + ': mvn ' + ($goals -join ' ') + ' OK') }
 }
 
+function Get-MeisServiceClassSourceModules {
+    param([Parameter(Mandatory = $true)][string]$ServiceName)
+    $modules = @('meis-common')
+    if ($ServiceName -eq 'meis-tenant') { $modules += 'meis-api' }
+    $modules += $ServiceName
+    return @($modules | Select-Object -Unique)
+}
+
+function Sync-MeisServiceClassesToJar {
+    param([Parameter(Mandatory = $true)][string]$ServiceName)
+
+    $env:JAVA_HOME = Resolve-MeisJavaHome
+    $jarExe = Join-Path $env:JAVA_HOME 'bin\jar.exe'
+    if (-not (Test-Path $jarExe)) { throw "jar.exe not found under JAVA_HOME" }
+
+    $root = $script:MeisRoot
+    $jar = Join-Path $root "$ServiceName\target\$ServiceName-1.0.0-SNAPSHOT.jar"
+    if (-not (Test-Path $jar)) {
+        throw "缺少 $jar，请先执行一次 package 完整打包"
+    }
+
+    $sources = Get-MeisServiceClassSourceModules $ServiceName
+    $staging = Join-Path $env:TEMP "meis-jar-sync-$ServiceName-$(Get-Random)"
+    $bootClasses = Join-Path $staging 'BOOT-INF\classes'
+    New-Item -ItemType Directory -Path $bootClasses -Force | Out-Null
+    $fileCount = 0
+
+    foreach ($mod in $sources) {
+        $cls = Join-Path $root "$mod\target\classes"
+        if (-not (Test-Path $cls)) { continue }
+        Get-ChildItem $cls -Recurse -File | ForEach-Object {
+            $rel = $_.FullName.Substring($cls.Length + 1)
+            $dest = Join-Path $bootClasses $rel
+            $destDir = Split-Path $dest -Parent
+            if (-not (Test-Path $destDir)) { New-Item -ItemType Directory -Path $destDir -Force | Out-Null }
+            Copy-Item $_.FullName $dest -Force
+            $fileCount++
+        }
+    }
+
+    if ($fileCount -eq 0) {
+        Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue
+        throw "未找到可同步的 class/resource，请先执行 compile"
+    }
+
+    Push-Location $staging
+    try {
+        & $jarExe uf $jar BOOT-INF
+        if ($LASTEXITCODE -ne 0) { throw "jar update failed: $ServiceName" }
+    } finally {
+        Pop-Location
+        Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    return @{ ok = $true; message = ($ServiceName + ": 已加载 $fileCount 个类/资源到 JAR") }
+}
+
 function Build-MeisServiceModule {
     param(
         [Parameter(Mandatory = $true)][string]$ServiceName,
         [switch]$Clean,
-        [switch]$Package
+        [switch]$Package,
+        [switch]$Compile,
+        [switch]$LoadClasses
     )
-    if (-not $Clean -and -not $Package) {
-        throw 'Select at least one build step: clean or package'
+    if (-not $Clean -and -not $Package -and -not $Compile -and -not $LoadClasses) {
+        throw 'Select at least one build step: clean, package, compile or loadClasses'
     }
-    return Invoke-MeisMavenModule -Module $ServiceName -Clean:$Clean -Package:$Package
+    if ($LoadClasses) {
+        if ($Clean) {
+            Invoke-MeisMavenModule -Module $ServiceName -Clean | Out-Null
+        }
+        Invoke-MeisMavenModule -Module $ServiceName -Compile | Out-Null
+        return Sync-MeisServiceClassesToJar -ServiceName $ServiceName
+    }
+    return Invoke-MeisMavenModule -Module $ServiceName -Clean:$Clean -Package:$Package -Compile:$Compile
 }
 
 function Build-MeisFrontendProject {
@@ -546,10 +630,12 @@ function Invoke-MeisServiceBuildSteps {
     param(
         [Parameter(Mandatory = $true)][string]$ServiceName,
         [switch]$Clean,
-        [switch]$Package
+        [switch]$Package,
+        [switch]$Compile,
+        [switch]$LoadClasses
     )
-    if (-not $Clean -and -not $Package) { return $null }
-    return Build-MeisServiceModule -ServiceName $ServiceName -Clean:$Clean -Package:$Package
+    if (-not $Clean -and -not $Package -and -not $Compile -and -not $LoadClasses) { return $null }
+    return Build-MeisServiceModule -ServiceName $ServiceName -Clean:$Clean -Package:$Package -Compile:$Compile -LoadClasses:$LoadClasses
 }
 
 function Invoke-MeisFrontendBuildSteps {
@@ -566,26 +652,30 @@ function Restart-MeisServiceByName {
     param(
         [Parameter(Mandatory = $true)][string]$ServiceName,
         [string]$Profile = 'dev',
-        [switch]$Debug,
+        [switch]$EnableJdwp,
         [switch]$Clean,
-        [switch]$Package
+        [switch]$Package,
+        [switch]$Compile,
+        [switch]$LoadClasses
     )
-    Invoke-MeisServiceBuildSteps -ServiceName $ServiceName -Clean:$Clean -Package:$Package | Out-Null
+    Invoke-MeisServiceBuildSteps -ServiceName $ServiceName -Clean:$Clean -Package:$Package -Compile:$Compile -LoadClasses:$LoadClasses | Out-Null
     Stop-MeisServiceByName $ServiceName | Out-Null
     Start-Sleep -Seconds 1
-    return Start-MeisServiceByName -ServiceName $ServiceName -Profile $Profile -Debug:$Debug
+    return Start-MeisServiceByName -ServiceName $ServiceName -Profile $Profile -EnableJdwp:$EnableJdwp
 }
 
 function Start-MeisServiceByNameWithBuild {
     param(
         [Parameter(Mandatory = $true)][string]$ServiceName,
         [string]$Profile = 'dev',
-        [switch]$Debug,
+        [switch]$EnableJdwp,
         [switch]$Clean,
-        [switch]$Package
+        [switch]$Package,
+        [switch]$Compile,
+        [switch]$LoadClasses
     )
-    Invoke-MeisServiceBuildSteps -ServiceName $ServiceName -Clean:$Clean -Package:$Package | Out-Null
-    return Start-MeisServiceByName -ServiceName $ServiceName -Profile $Profile -Debug:$Debug
+    Invoke-MeisServiceBuildSteps -ServiceName $ServiceName -Clean:$Clean -Package:$Package -Compile:$Compile -LoadClasses:$LoadClasses | Out-Null
+    return Start-MeisServiceByName -ServiceName $ServiceName -Profile $Profile -EnableJdwp:$EnableJdwp
 }
 
 function Get-MeisServiceStatusList {

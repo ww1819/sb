@@ -1,52 +1,46 @@
 package com.meis.saas.tenant.config;
 
 import com.meis.saas.common.cache.MeisCacheEviction;
-import com.meis.saas.common.flyway.TenantFlywayService;
+import com.meis.saas.tenant.flyway.TenantSchemaMigrator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import java.util.List;
 import java.util.Map;
 
 @Slf4j
 @Component
+@Order(0)
 @RequiredArgsConstructor
 public class TenantStartupRunner implements ApplicationRunner {
-    private final JdbcTemplate jdbc;
-    private final TenantFlywayService tenantFlyway;
-    private final MeisCacheEviction cacheEviction;
 
-    @Value("${meis.flyway.public-locations:classpath:db/migrations/public}")
-    private String publicLocations;
+    private final JdbcTemplate jdbc;
+    private final TenantSchemaMigrator tenantSchemaMigrator;
+    private final MeisCacheEviction cacheEviction;
 
     @Override
     public void run(ApplicationArguments args) {
-        tenantFlyway.migratePublic(publicLocations);
-        log.info("Public schema migrated");
-        ensurePlatformAdmin();
-        ensureDemoTenant();
-
-        List<Map<String, Object>> tenants = jdbc.queryForList(
-                "SELECT tenant_code, schema_name FROM public.sys_tenant WHERE status = 'active'");
-        for (Map<String, Object> t : tenants) {
-            String schema = t.get("schema_name").toString();
-            String code = t.get("tenant_code").toString();
-            try {
-                tenantFlyway.createSchema(schema);
-                tenantFlyway.migrate(schema);
-                ensureTenantAdminPassword(schema, code);
-                log.info("Tenant schema ready: {} ({})", code, schema);
-            } catch (Exception e) {
-                log.error("Tenant schema migration skipped for {} ({}): {}", code, schema, e.getMessage());
+        try {
+            ensureDemoTenant();
+            tenantSchemaMigrator.migrateAllActiveTenants();
+            ensurePlatformAdmin();
+            List<Map<String, Object>> tenants = jdbc.queryForList(
+                    "SELECT tenant_code, schema_name FROM public.sys_tenant WHERE status = 'active'");
+            for (Map<String, Object> t : tenants) {
+                ensureTenantAdminPassword(t.get("schema_name").toString(), t.get("tenant_code").toString());
             }
+            evictMenuCaches();
+        } catch (Exception e) {
+            log.error("Tenant startup failed: {}", e.getMessage(), e);
+            throw new IllegalStateException(
+                    "meis-tenant 启动失败：租户 schema 迁移未完成。原因: " + e.getMessage(), e);
         }
-        evictMenuCaches();
     }
 
     private void evictMenuCaches() {

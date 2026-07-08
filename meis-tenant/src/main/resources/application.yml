@@ -4,7 +4,11 @@ spring:
   application:
     name: meis-tenant
   flyway:
-    enabled: false
+    enabled: true
+    schemas: public
+    default-schema: public
+    locations: classpath:db/migrations/public
+    baseline-on-migrate: true
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:meis}
     username: ${POSTGRES_USER:med}
@@ -20,6 +24,8 @@ spring:
 meis:
   jwt:
     secret: meis-saas-jwt-secret-change-in-production-256bits
+  flyway:
+    tenant-locations: classpath:db/migrations/tenant
   cache:
     enabled: true
 management:

@@ -82,7 +82,7 @@ function Write-JsonResponse {
 function Start-PanelBackgroundJob {
     param(
         [Parameter(Mandatory = $true)][string]$Label,
-        [Parameter(Mandatory = $true)][ValidateSet('start-all', 'start-core', 'restart-all', 'build-backend', 'build-install')]
+        [Parameter(Mandatory = $true)][ValidateSet('start-all', 'start-core', 'start-debug-all', 'start-debug-core', 'restart-all', 'build-backend', 'build-install')]
         [string]$Action
     )
     $scriptsDir = $PSScriptRoot
@@ -94,6 +94,8 @@ function Start-PanelBackgroundJob {
         switch ($ActionName) {
             'start-all' { Start-MeisServices -Profile 'dev' }
             'start-core' { Start-MeisServices -Profile 'dev' -CoreOnly }
+            'start-debug-all' { Start-MeisServices -Profile 'dev' -EnableJdwp }
+            'start-debug-core' { Start-MeisServices -Profile 'dev' -CoreOnly -EnableJdwp }
             'restart-all' {
                 Stop-MeisServices
                 Start-Sleep -Seconds 2
@@ -139,8 +141,10 @@ function Invoke-PanelAction {
 function Read-PanelBackendBuildOptions {
     param($Query)
     return @{
-        clean   = $Query['clean'] -eq '1'
-        package = $Query['package'] -eq '1'
+        clean       = $Query['clean'] -eq '1'
+        package     = $Query['package'] -eq '1'
+        compile     = $Query['compile'] -eq '1'
+        loadClasses = $Query['loadClasses'] -eq '1'
     }
 }
 
@@ -247,6 +251,18 @@ function Handle-PanelRequest {
             Write-JsonResponse -Response $res -Data $r
             return
         }
+        if ($path -eq '/api/backend/start-debug-all') {
+            Add-MeisPanelEvent 'START all backend with JDWP (background, skip running)'
+            $r = Start-PanelBackgroundJob -Label 'start-debug-all-backend' -Action 'start-debug-all'
+            Write-JsonResponse -Response $res -Data $r
+            return
+        }
+        if ($path -eq '/api/backend/start-debug-core') {
+            Add-MeisPanelEvent 'START core backend with JDWP (background, skip running)'
+            $r = Start-PanelBackgroundJob -Label 'start-debug-core-backend' -Action 'start-debug-core'
+            Write-JsonResponse -Response $res -Data $r
+            return
+        }
         if ($path -eq '/api/backend/restart-all') {
             Add-MeisPanelEvent 'RESTART all backend (background)'
             $r = Start-PanelBackgroundJob -Label 'restart-all-backend' -Action 'restart-all'
@@ -310,7 +326,7 @@ function Handle-PanelRequest {
             return
         }
 
-        if ($path -match "^/api/service/([a-z0-9-]+)/(stop|start|restart|start-debug|build)$") {
+        if ($path -match "^/api/service/([a-z0-9-]+)/(stop|start|restart|start-debug|build|reload-classes)$") {
             $name = $Matches[1]
             $action = $Matches[2]
             $bo = Read-PanelBackendBuildOptions $req.QueryString
@@ -319,23 +335,28 @@ function Handle-PanelRequest {
                 'stop' { Invoke-PanelAction { Stop-MeisServiceByName $name; @{ message = ($name + ' stopped') } } -EventMessage $eventLabel }
                 'start' {
                     Invoke-PanelAction {
-                        Start-MeisServiceByNameWithBuild -ServiceName $name -Clean:$bo.clean -Package:$bo.package
+                        Start-MeisServiceByNameWithBuild -ServiceName $name -Clean:$bo.clean -Package:$bo.package -Compile:$bo.compile -LoadClasses:$bo.loadClasses
                     } -EventMessage $eventLabel
                 }
                 'start-debug' {
                     Invoke-PanelAction {
-                        Start-MeisServiceByNameWithBuild -ServiceName $name -Debug -Clean:$bo.clean -Package:$bo.package
+                        Start-MeisServiceByNameWithBuild -ServiceName $name -EnableJdwp -Clean:$bo.clean -Package:$bo.package -Compile:$bo.compile -LoadClasses:$bo.loadClasses
                     } -EventMessage ($eventLabel + ' (debug)')
                 }
                 'restart' {
                     Invoke-PanelAction {
-                        Restart-MeisServiceByName -ServiceName $name -Clean:$bo.clean -Package:$bo.package
+                        Restart-MeisServiceByName -ServiceName $name -Clean:$bo.clean -Package:$bo.package -Compile:$bo.compile -LoadClasses:$bo.loadClasses
                     } -EventMessage $eventLabel
                 }
                 'build' {
                     Invoke-PanelAction {
-                        Build-MeisServiceModule -ServiceName $name -Clean:$bo.clean -Package:$bo.package
+                        Build-MeisServiceModule -ServiceName $name -Clean:$bo.clean -Package:$bo.package -Compile:$bo.compile -LoadClasses:$bo.loadClasses
                     } -EventMessage ('BUILD ' + $name)
+                }
+                'reload-classes' {
+                    Invoke-PanelAction {
+                        Build-MeisServiceModule -ServiceName $name -LoadClasses -Clean:$bo.clean
+                    } -EventMessage ('RELOAD-CLASSES ' + $name)
                 }
             }
             Write-JsonResponse -Response $res -Data $r
@@ -345,7 +366,7 @@ function Handle-PanelRequest {
             $name = $Matches[1]
             $bo = Read-PanelBackendBuildOptions $req.QueryString
             $r = Invoke-PanelAction {
-                Restart-MeisServiceByName -ServiceName $name -Debug -Clean:$bo.clean -Package:$bo.package
+                Restart-MeisServiceByName -ServiceName $name -EnableJdwp -Clean:$bo.clean -Package:$bo.package -Compile:$bo.compile -LoadClasses:$bo.loadClasses
             } -EventMessage ("RESTART-DEBUG " + $name)
             Write-JsonResponse -Response $res -Data $r
             return

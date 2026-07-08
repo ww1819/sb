@@ -9,7 +9,7 @@
   },
   "meis-tenant": {
     "labelZh": "租户服务",
-    "descZh": "租户开户、Schema 迁移与多租户元数据管理"
+    "descZh": "租户开户；进程内 Flyway 自动补齐库结构（唯一迁库入口）"
   },
   "meis-auth": {
     "labelZh": "认证服务",

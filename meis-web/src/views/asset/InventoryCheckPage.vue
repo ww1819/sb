@@ -1,17 +1,167 @@
 <template>
-  <MasterDetailPage :config="config" save-url="/asset/inventory" />
+  <div class="inventory-page">
+    <CrudPage
+      ref="crudRef"
+      :config="config"
+      detail-mode
+      hide-add
+      delete-url="/asset/inventory"
+      @detail="openDetail"
+      @add="createNew"
+      @deleted="onDeleted"
+    >
+      <template #toolbar-extra>
+        <el-button type="primary" @click="createNew">新增</el-button>
+        <el-button v-if="master?.id" type="warning" @click="saveMaster">保存</el-button>
+      </template>
+    </CrudPage>
+
+    <AppModal v-model="visible" :title="modalTitle" size="xl">
+      <template v-if="master">
+        <GroupedFormFields :table="config.table" :model="master" />
+        <el-card header="盘点明细" class="detail-card">
+          <el-table :data="items" border max-height="360">
+            <el-table-column
+              v-for="f in itemFields"
+              :key="f.prop"
+              :prop="f.prop"
+              :label="f.label"
+              :min-width="f.width ?? 120"
+            >
+              <template #default="{ row }">
+                <FieldRenderer
+                  v-if="!f.readonly && (f.linkTable || f.dictType || f.type === 'boolean')"
+                  v-model="row[f.prop]"
+                  :field="f"
+                />
+                <el-input
+                  v-else-if="!f.readonly && f.type === 'textarea'"
+                  v-model="row[f.prop]"
+                  type="textarea"
+                  :rows="2"
+                />
+                <span v-else>{{ row[f.prop] ?? '-' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="80" fixed="right">
+              <template #default="{ $index }">
+                <el-button link type="danger" @click="items.splice($index, 1)">删</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-button class="add-btn" type="primary" plain @click="pickerVisible = true">从台账选择设备</el-button>
+        </el-card>
+      </template>
+      <template #footer>
+        <el-button @click="visible = false">取消</el-button>
+        <el-button type="primary" @click="saveMaster">保存</el-button>
+      </template>
+    </AppModal>
+
+    <DeviceLedgerPicker
+      v-model="pickerVisible"
+      :dept-id="deptId"
+      :campus-id="campusId"
+      :check-id="checkId"
+      :exclude-ids="excludeDeviceIds"
+      @confirm="onDevicesPicked"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
-import MasterDetailPage from '@/components/MasterDetailPage.vue'
-import type { PageConfig } from '@/config/pageRegistry'
+import { computed, ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import http from '@/api/http'
+import CrudPage from '@/components/CrudPage.vue'
+import AppModal from '@/components/AppModal.vue'
+import GroupedFormFields from '@/components/form/GroupedFormFields.vue'
+import FieldRenderer from '@/components/FieldRenderer.vue'
+import DeviceLedgerPicker from '@/components/asset/DeviceLedgerPicker.vue'
+import { getPageConfig } from '@/config/pageRegistry'
+import { getDetailFields } from '@/config/pageSchemas'
 
-const config: PageConfig = {
-  title: '资产盘点',
-  apiBase: '/asset',
-  table: 'inventory_check',
-  masterDetail: true,
-  detailTable: 'inventory_check_item',
-  foreignKey: 'check_id'
+const config = getPageConfig('/asset/inventory')!
+const crudRef = ref<InstanceType<typeof CrudPage> | null>(null)
+const visible = ref(false)
+const pickerVisible = ref(false)
+const master = ref<Record<string, unknown> | null>(null)
+const items = ref<Record<string, unknown>[]>([])
+const itemFields = getDetailFields('inventory_check_item')
+
+const modalTitle = computed(() => (master.value?.id ? '资产盘点 编辑' : '资产盘点 新增'))
+const deptId = computed(() => (master.value?.dept_id ? String(master.value.dept_id) : ''))
+const campusId = computed(() => (master.value?.campus_id ? String(master.value.campus_id) : ''))
+const checkId = computed(() => (master.value?.id ? String(master.value.id) : ''))
+const excludeDeviceIds = computed(() =>
+  items.value.map((item) => String(item.device_id ?? '')).filter((id) => id && id !== 'undefined')
+)
+
+function createNew() {
+  master.value = {
+    check_type: 'annual',
+    status: 'planning',
+    check_year: new Date().getFullYear()
+  }
+  items.value = []
+  visible.value = true
+}
+
+async function openDetail(row: Record<string, unknown>) {
+  const { data } = await http.get(`/asset/inventory/${row.id}`)
+  master.value = data.data
+  items.value = (data.data?.items as Record<string, unknown>[]) ?? []
+  visible.value = true
+}
+
+function onDeleted(row: Record<string, unknown>) {
+  if (master.value?.id && String(master.value.id) === String(row.id)) {
+    visible.value = false
+    master.value = null
+    items.value = []
+  }
+}
+
+function onDevicesPicked(devices: Record<string, unknown>[]) {
+  const existing = new Set(excludeDeviceIds.value)
+  for (const device of devices) {
+    const id = String(device.id ?? '')
+    if (!id || existing.has(id)) continue
+    existing.add(id)
+    items.value.push({
+      device_id: id,
+      device_code: device.device_code,
+      device_name: device.device_name,
+      expected_location: device.location_detail ?? '',
+      actual_location: '',
+      is_found: false,
+      is_matched: false,
+      condition_status: '',
+      remark: ''
+    })
+  }
+}
+
+async function saveMaster() {
+  if (!master.value) return
+  if (!master.value.dept_id) {
+    ElMessage.warning('请先选择科室')
+    return
+  }
+  const { data } = await http.post('/asset/inventory', { ...master.value, items: items.value })
+  master.value = data.data
+  items.value = (data.data?.items as Record<string, unknown>[]) ?? []
+  visible.value = false
+  ElMessage.success('保存成功')
+  crudRef.value?.load()
 }
 </script>
+
+<style scoped>
+.detail-card {
+  margin-top: 16px;
+}
+.add-btn {
+  margin-top: 12px;
+}
+</style>

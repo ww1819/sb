@@ -392,11 +392,13 @@
   <header>
     <div>
       <h1>MEIS 开发控制面板</h1>
-      <div class="sub">前后端启停 / 调试 / 编译 / 重启 · 代码变更后勾选编译选项再重启生效</div>
+      <div class="sub">前后端启停 / 调试 / 编译 / 重启 · 日常改代码勾选「加载类和资源」比 package 更快</div>
     </div>
     <div class="toolbar">
       <button class="primary" onclick="act('backend/start-all')" title="启动全部 15 个微服务，已运行的自动跳过">启动全部后端</button>
       <button class="primary" onclick="act('backend/start-core')" title="仅启动核心：租户/认证/系统/文件/网关，已运行的自动跳过">启动核心后端</button>
+      <button class="warn" onclick="act('backend/start-debug-all')" title="全部后端以 JDWP 调试模式启动，已运行的自动跳过">调试全部后端</button>
+      <button class="warn" onclick="act('backend/start-debug-core')" title="核心后端以 JDWP 调试模式启动，已运行的自动跳过">调试核心后端</button>
       <button class="danger" onclick="act('backend/stop-all')">停止全部后端</button>
       <button class="warn" onclick="act('backend/restart-all')">重启全部后端</button>
       <button onclick="act('build/install')">Maven Install</button>
@@ -499,7 +501,7 @@
     let logDrawerOpen = false
 
     function defaultBackendBuildOpts() {
-      return { clean: false, package: true }
+      return { clean: false, package: false, compile: false, loadClasses: true }
     }
 
     function defaultFrontendBuildOpts() {
@@ -536,8 +538,15 @@
       const qs = new URLSearchParams()
       if (o.clean) qs.set('clean', '1')
       if (o.package) qs.set('package', '1')
+      if (o.compile) qs.set('compile', '1')
+      if (o.loadClasses) qs.set('loadClasses', '1')
       const s = qs.toString()
       return s ? ('?' + s) : ''
+    }
+
+    function hasBackendBuildOption(name) {
+      const o = buildOpts[name] || defaultBackendBuildOpts()
+      return !!(o.clean || o.package || o.compile || o.loadClasses)
     }
 
     function frontendBuildQuery() {
@@ -554,13 +563,20 @@
       const o = buildOpts[name] || defaultBackendBuildOpts()
       return `
         <div class="build-opts">
-          <label class="build-opt" title="mvn clean，清除 target 后需配合 package">
-            <input type="checkbox" ${o.clean ? 'checked' : ''} onchange="setBuildOpt('${name}','clean',this.checked)" /> clean
+          <label class="build-opt" title="mvn compile + 将 class/资源写入已有 JAR，比 package 快，适合日常改代码后重启">
+            <input type="checkbox" ${o.loadClasses ? 'checked' : ''} onchange="setBuildOpt('${name}','loadClasses',this.checked)" /> 加载类和资源
           </label>
-          <label class="build-opt" title="mvn package -pl 模块 -am，Java 代码变更后重启前建议勾选">
+          <label class="build-opt" title="仅 mvn compile，不更新 JAR">
+            <input type="checkbox" ${o.compile ? 'checked' : ''} onchange="setBuildOpt('${name}','compile',this.checked)" /> compile
+          </label>
+          <label class="build-opt" title="mvn package 完整打包，依赖或资源结构变更时用">
             <input type="checkbox" ${o.package ? 'checked' : ''} onchange="setBuildOpt('${name}','package',this.checked)" /> package
           </label>
+          <label class="build-opt" title="mvn clean，清除 target 后需配合其他选项">
+            <input type="checkbox" ${o.clean ? 'checked' : ''} onchange="setBuildOpt('${name}','clean',this.checked)" /> clean
+          </label>
           <button onclick="serviceBuild('${name}')">编译</button>
+          <button onclick="serviceReloadClasses('${name}')" title="仅 compile + 加载类和资源，不重启">热加载</button>
         </div>
       `
     }
@@ -921,6 +937,12 @@
       pinnedService = name
       selectOnlyLogFilter(name)
       const buildQuery = (action === 'stop' || action === 'log') ? '' : backendBuildQuery(name)
+      if (action !== 'stop' && action !== 'log' && !hasBackendBuildOption(name)) {
+        showToast(name + ': 请至少勾选一个编译选项', false)
+        busy = false
+        document.body.classList.remove('busy')
+        return
+      }
       try {
         const data = await api('/api/service/' + name + '/' + action + buildQuery, 'POST')
         showToast((name + ': ') + (data.message || '完成'), data.ok !== false)
@@ -935,17 +957,33 @@
     }
 
     async function serviceBuild(name) {
-      const q = backendBuildQuery(name)
-      if (!q) {
-        showToast('请至少勾选 clean 或 package', false)
+      if (!hasBackendBuildOption(name)) {
+        showToast('请至少勾选一个编译选项', false)
         return
       }
+      const q = backendBuildQuery(name)
       if (busy) return
       busy = true
       document.body.classList.add('busy')
       try {
         const data = await api('/api/service/' + name + '/build' + q, 'POST')
         showToast((name + ': ') + (data.message || '完成'), data.ok !== false)
+        await refresh()
+      } catch (e) {
+        showToast(e.message, false)
+      } finally {
+        busy = false
+        document.body.classList.remove('busy')
+      }
+    }
+
+    async function serviceReloadClasses(name) {
+      if (busy) return
+      busy = true
+      document.body.classList.add('busy')
+      try {
+        const data = await api('/api/service/' + name + '/reload-classes', 'POST')
+        showToast((name + ': ') + (data.message || '热加载完成'), data.ok !== false)
         await refresh()
       } catch (e) {
         showToast(e.message, false)

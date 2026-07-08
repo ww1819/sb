@@ -218,7 +218,7 @@ public final class MedicalDeviceImporter {
     private static String friendlyError(Exception e) {
         String msg = e.getMessage();
         if (msg != null && msg.contains("42703")) {
-            return "数据库缺少台账扩展字段，请执行 V15 迁移或 scripts/apply-tenant-patches.ps1 -Schema <租户schema>";
+            return "数据库缺少台账扩展字段，请重启 meis-tenant 以执行 Flyway V15 迁移";
         }
         return msg != null ? msg : e.getClass().getSimpleName();
     }

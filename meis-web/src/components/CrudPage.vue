@@ -9,7 +9,7 @@
     @page-change="load"
   >
     <template #actions>
-      <el-button v-permission="'add'" type="primary" @click="openForm()">新增</el-button>
+      <el-button v-if="!hideAdd" v-permission="'add'" type="primary" @click="onAdd">新增</el-button>
       <el-button v-if="showImport" @click="importVisible = true">导入</el-button>
       <el-button @click="exportCsv">导出</el-button>
       <template v-if="showPinyinCode">
@@ -78,7 +78,7 @@
       <el-table-column label="操作" width="160" fixed="right">
         <template #default="{ row }">
           <div class="table-actions">
-            <el-button link type="primary" @click="openForm(row)">编辑</el-button>
+            <el-button link type="primary" @click="onEdit(row)">编辑</el-button>
             <el-button link type="danger" @click="remove(row)">删除</el-button>
           </div>
         </template>
@@ -88,7 +88,7 @@
       </template>
     </el-table>
 
-    <FormDrawer v-model="formVisible" :title="formTitle" size="lg" @save="save">
+    <FormDrawer v-if="!detailMode" v-model="formVisible" :title="formTitle" size="lg" @save="save">
       <el-form label-width="120px">
         <GroupedFormFields :table="config.table" :model="form" :fields="formFields" />
       </el-form>
@@ -108,7 +108,7 @@
 
 <script setup lang="ts">
 import { computed, onActivated, onMounted, reactive, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import { downloadApiFile } from '@/utils/fileDownload'
 import FormDrawer from './FormDrawer.vue'
@@ -128,8 +128,13 @@ import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
 import { executePinyinGenerate, promptPinyinScope } from '@/composables/usePinyinGenerate'
 import { preloadRefLabelMaps } from '@/composables/useRefLabelMap'
 
-const props = defineProps<{ config: PageConfig }>()
-const emit = defineEmits<{ detail: [row: Record<string, unknown>] }>()
+const props = defineProps<{
+  config: PageConfig
+  detailMode?: boolean
+  hideAdd?: boolean
+  deleteUrl?: string
+}>()
+const emit = defineEmits<{ detail: [row: Record<string, unknown>]; add: []; deleted: [row: Record<string, unknown>] }>()
 const { loadDict } = useDict()
 
 const loading = ref(false)
@@ -231,9 +236,31 @@ async function save() {
   load()
 }
 
+function onAdd() {
+  if (props.detailMode) emit('add')
+  else openForm()
+}
+
+function onEdit(row: Record<string, unknown>) {
+  if (props.detailMode) emit('detail', row)
+  else openForm(row)
+}
+
 async function remove(row: Record<string, unknown>) {
-  await http.delete(`${props.config.apiBase}/${props.config.table}/${row.id}`)
-  load()
+  try {
+    await ElMessageBox.confirm('确认删除该记录？', '删除', { type: 'warning' })
+    const url = props.deleteUrl
+      ? `${props.deleteUrl}/${row.id}`
+      : `${props.config.apiBase}/${props.config.table}/${row.id}`
+    await http.delete(url)
+    emit('deleted', row)
+    ElMessage.success('已删除')
+    load()
+  } catch (e) {
+    if (e !== 'cancel' && e !== 'close') {
+      ElMessage.error('删除失败')
+    }
+  }
 }
 
 function onSelectionChange(selection: Record<string, unknown>[]) {

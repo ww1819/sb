@@ -66,9 +66,13 @@ public abstract class GenericTableController {
         if ("medical_device".equals(table)) {
             MedicalDeviceFieldHelper.applyDerivedFields(body);
         }
-        if (!body.containsKey("id")) body.put("id", UUID.randomUUID().toString());
+        prepareInsertDefaults(table, body);
+        normalizeUuidFields(body);
+        if (!body.containsKey("id") || isBlank(body.get("id"))) {
+            body.put("id", UUID.randomUUID().toString());
+        }
         String cols = String.join(",", body.keySet());
-        String vals = String.join(",", body.keySet().stream().map(k -> "?").toList());
+        String vals = String.join(",", body.keySet().stream().map(GenericTableController::placeholder).toList());
         jdbc().update("INSERT INTO " + table + " (" + cols + ") VALUES (" + vals + ")", body.values().toArray());
         return Result.ok(body);
     }
@@ -80,10 +84,14 @@ public abstract class GenericTableController {
         if ("medical_device".equals(table)) {
             MedicalDeviceFieldHelper.applyDerivedFields(body);
         }
+        normalizeUuidFields(body);
         if (body.isEmpty()) return Result.ok();
         List<String> sets = new ArrayList<>();
         List<Object> args = new ArrayList<>();
-        body.forEach((k, v) -> { sets.add(k + " = ?"); args.add(v); });
+        body.forEach((k, v) -> {
+            sets.add(k + " = " + placeholder(k));
+            args.add(v);
+        });
         args.add(id);
         jdbc().update("UPDATE " + table + " SET " + String.join(",", sets) + " WHERE id = ?::uuid", args.toArray());
         return Result.ok();
@@ -156,6 +164,52 @@ public abstract class GenericTableController {
     private void check(String table) {
         if (!tables().contains(table)) throw new BizException(400, "table not allowed: " + table);
         if ("public".equals(TenantContext.getSchemaName())) throw new BizException(403, "tenant context required");
+    }
+
+    /** 补齐单据号等必填默认值，避免通用 CRUD 插入因 NOT NULL 失败。 */
+    private static void prepareInsertDefaults(String table, Map<String, Object> body) {
+        String ts = String.valueOf(System.currentTimeMillis());
+        switch (table) {
+            case "inventory_check" -> {
+                if (isBlank(body.get("check_no"))) body.put("check_no", "IC" + ts);
+                if (isBlank(body.get("status"))) body.put("status", "planning");
+            }
+            case "device_entry" -> {
+                if (isBlank(body.get("entry_no"))) body.put("entry_no", "EN" + ts);
+                if (isBlank(body.get("status"))) body.put("status", "draft");
+            }
+            case "device_outbound" -> {
+                if (isBlank(body.get("outbound_no"))) body.put("outbound_no", "OB" + ts);
+            }
+            case "asset_transfer" -> {
+                if (isBlank(body.get("transfer_no"))) body.put("transfer_no", "TF" + ts);
+            }
+            case "device_scrap" -> {
+                if (isBlank(body.get("scrap_no"))) body.put("scrap_no", "SC" + ts);
+            }
+            default -> { }
+        }
+    }
+
+    /** UUID 列空串转 null，避免 PostgreSQL 类型错误。 */
+    private static void normalizeUuidFields(Map<String, Object> body) {
+        for (Map.Entry<String, Object> e : body.entrySet()) {
+            if (!isUuidColumn(e.getKey())) continue;
+            Object v = e.getValue();
+            if (v instanceof String s && s.isBlank()) e.setValue(null);
+        }
+    }
+
+    private static boolean isUuidColumn(String column) {
+        return "id".equals(column) || column.endsWith("_id");
+    }
+
+    private static String placeholder(String column) {
+        return isUuidColumn(column) ? "?::uuid" : "?";
+    }
+
+    private static boolean isBlank(Object v) {
+        return v == null || (v instanceof String s && s.isBlank());
     }
 
     private static String importBusinessType(String table) {
