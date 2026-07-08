@@ -1,4 +1,8 @@
 {
+  "panel": {
+    "labelZh": "面板事件",
+    "descZh": "开发控制面板操作记录"
+  },
   "meis-web": {
     "labelZh": "前端 Web",
     "descZh": "Vue 管理界面，Vite 热更新开发服务"

@@ -126,6 +126,7 @@ import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
 import { useDict } from '@/composables/useDict'
 import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
 import { executePinyinGenerate, promptPinyinScope } from '@/composables/usePinyinGenerate'
+import { preloadRefLabelMaps } from '@/composables/useRefLabelMap'
 
 const props = defineProps<{ config: PageConfig }>()
 const emit = defineEmits<{ detail: [row: Record<string, unknown>] }>()
@@ -168,6 +169,11 @@ const importUrl = computed(() => props.config.importUrl ?? `${props.config.apiBa
 const importTemplateUrl = computed(() => props.config.importTemplateUrl ?? `${props.config.apiBase}/${props.config.table}/import/template`)
 const exportUrl = computed(() => props.config.exportUrl ?? `${props.config.apiBase}/${props.config.table}/export`)
 const pinyinCodeUrl = computed(() => props.config.pinyinCodeUrl ?? `${props.config.apiBase}/${props.config.table}/generate-pinyin`)
+
+async function loadRefLabels() {
+  const linkTables = listFields.value.filter((f) => f.linkTable).map((f) => f.linkTable!)
+  await preloadRefLabelMaps(linkTables)
+}
 
 async function load() {
   loading.value = true
@@ -271,6 +277,7 @@ onMounted(async () => {
   for (const f of props.config.listFilters ?? []) {
     if (f.dictType) filterOptions[f.key] = await loadDict(f.dictType)
   }
+  await loadRefLabels()
   await load()
   initialized = true
 })

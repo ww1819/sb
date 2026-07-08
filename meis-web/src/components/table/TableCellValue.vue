@@ -17,6 +17,7 @@ import {
   isNumericField,
   isStatusField
 } from '@/utils/tableCell'
+import { resolveRefLabel } from '@/composables/useRefLabelMap'
 
 const props = defineProps<{
   field: FieldSchema
@@ -32,6 +33,11 @@ const showNumeric = computed(() => isNumericField(props.field.prop, props.field.
 const formattedNumber = computed(() => formatCellNumber(props.value, showAmount.value))
 const displayText = computed(() => {
   if (props.value === null || props.value === undefined || props.value === '') return '-'
+  if (props.field.linkTable) {
+    const label = resolveRefLabel(props.field.linkTable, props.value)
+    if (label && label !== String(props.value)) return label
+    if (label) return label
+  }
   return formatStatusLabel(props.value, props.field.prop)
 })
 </script>

@@ -13,7 +13,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import http from '@/api/http'
 import { refSelectConfig } from '@/config/refSelectConfig'
 
@@ -35,11 +35,11 @@ const model = computed({
 
 async function load() {
   const meta = refSelectConfig[props.linkTable]
-  if (!meta || loaded.value) return
+  if (!meta) return
   loading.value = true
   try {
-    const { data } = await http.get(meta.url, { params: { limit: 500 } })
-    const rows = data.data ?? []
+    const { data } = await http.get(meta.url, { params: { limit: 5000 } })
+    const rows = data.data?.records ?? data.data ?? []
     const vk = meta.valueKey ?? 'id'
     options.value = rows.map((r: Record<string, unknown>) => ({
       label: String(r[meta.labelKey] ?? r[vk] ?? ''),
@@ -52,6 +52,17 @@ async function load() {
 }
 
 function onOpen(visible: boolean) {
-  if (visible) void load()
+  if (visible && !loaded.value) void load()
 }
+
+onMounted(() => {
+  void load()
+})
+
+watch(
+  () => props.modelValue,
+  (v) => {
+    if (v != null && v !== '' && !loaded.value) void load()
+  }
+)
 </script>

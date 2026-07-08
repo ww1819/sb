@@ -849,9 +849,10 @@ function Get-MeisPanelLogEntries {
 }
 
 function Get-MeisPanelLogServices {
-    $meta = Get-MeisServiceMetaMap
-    $list = @([ordered]@{ name = 'panel'; labelZh = '面板事件' })
-    $list += [ordered]@{ name = 'meis-web'; labelZh = if ($meta['meis-web']) { $meta['meis-web'].labelZh } else { '前端 Web' } }
+    $panelMeta = Get-MeisServiceMetaEntry 'panel'
+    $webMeta = Get-MeisServiceMetaEntry 'meis-web'
+    $list = @([ordered]@{ name = 'panel'; labelZh = $panelMeta.labelZh })
+    $list += [ordered]@{ name = 'meis-web'; labelZh = $webMeta.labelZh }
     foreach ($s in $script:MeisServices) {
         $m = Get-MeisServiceMetaEntry $s.name
         $list += [ordered]@{ name = $s.name; labelZh = $m.labelZh }
