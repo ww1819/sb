@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MEIS 开发控制面板</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --border: #2d3a4f;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --ok: #3dd68c;
+      --down: #5c6b80;
+      --warn: #f5a524;
+      --err: #f31260;
+      --accent: #5b8def;
+      --accent-hover: #7aa3f5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(180deg, #151d2b, var(--bg));
+    }
+    h1 { margin: 0; font-size: 1.35rem; font-weight: 600; }
+    .sub { color: var(--muted); font-size: 0.85rem; margin-top: 4px; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+    button {
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    button:hover:not(:disabled) { background: #243044; border-color: #4a5f7a; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button.primary:hover:not(:disabled) { background: var(--accent-hover); }
+    button.danger { border-color: #7a3048; color: #ffb4c8; }
+    button.warn { border-color: #6b5520; color: #ffd88a; }
+    main { padding: 20px 24px 40px; max-width: 1400px; margin: 0 auto; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .stat {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .stat .label { color: var(--muted); font-size: 0.78rem; }
+    .stat .value { font-size: 1.4rem; font-weight: 600; margin-top: 4px; }
+    .section-title {
+      font-size: 0.95rem;
+      color: var(--muted);
+      margin: 24px 0 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.88rem;
+    }
+    th { background: #1f2a3d; color: var(--muted); font-weight: 500; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(91, 141, 239, 0.06); }
+    .dot {
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .dot.up { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+    .dot.down { background: var(--down); }
+    .dot.debug { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
+    .actions { display: flex; flex-wrap: wrap; gap: 4px; }
+    .actions button { padding: 4px 8px; font-size: 0.78rem; border-radius: 6px; }
+    .mono { font-family: Consolas, monospace; font-size: 0.82rem; }
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      max-width: 420px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      background: #243044;
+      border: 1px solid var(--border);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      z-index: 100;
+      display: none;
+      font-size: 0.88rem;
+    }
+    .toast.show { display: block; }
+    .toast.err { border-color: var(--err); color: #ffb4c8; }
+    .toast.ok { border-color: var(--ok); }
+    .log-panel {
+      margin-top: 20px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .log-panel h3 { margin: 0 0 8px; font-size: 0.9rem; color: var(--muted); }
+    pre {
+      margin: 0;
+      max-height: 220px;
+      overflow: auto;
+      font-size: 0.78rem;
+      line-height: 1.45;
+      color: #b8c5d9;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .busy::after {
+      content: ' …';
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse { 50% { opacity: 0.4; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>MEIS 开发控制面板</h1>
+      <div class="sub">前后端服务启停 / 调试 / 重启 · 自动刷新状态</div>
+    </div>
+    <div class="toolbar">
+      <button class="primary" onclick="act('backend/start-all')">启动全部后端</button>
+      <button class="danger" onclick="act('backend/stop-all')">停止全部后端</button>
+      <button class="warn" onclick="act('backend/restart-all')">重启全部后端</button>
+      <button onclick="act('build/install')">Maven Install</button>
+      <button onclick="act('build/backend')">打包后端</button>
+      <button onclick="refresh()">刷新状态</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="stats" id="stats"></div>
+
+    <div class="section-title">前端</div>
+    <table>
+      <thead>
+        <tr>
+          <th>服务</th><th>端口</th><th>状态</th><th>链接</th><th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="frontend-row"></tbody>
+    </table>
+
+    <div class="section-title">后端微服务</div>
+    <table>
+      <thead>
+        <tr>
+          <th>服务</th><th>HTTP</th><th>JDWP</th><th>JAR</th><th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="service-rows"></tbody>
+    </table>
+
+    <div class="log-panel">
+      <h3 id="log-title">服务日志（点击「日志」查看最近输出）</h3>
+      <pre id="log-content">—</pre>
+    </div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let busy = false
+    let timer = null
+
+    function showToast(msg, ok = true) {
+      const el = document.getElementById('toast')
+      el.textContent = msg
+      el.className = 'toast show ' + (ok ? 'ok' : 'err')
+      setTimeout(() => el.classList.remove('show'), 5000)
+    }
+
+    async function api(path, method = 'GET') {
+      const res = await fetch(path, { method })
+      return res.json()
+    }
+
+    async function act(path) {
+      if (busy) return
+      busy = true
+      document.body.classList.add('busy')
+      try {
+        const data = await api('/api/' + path, 'POST')
+        showToast(data.message || (data.ok ? '完成' : '失败'), data.ok !== false)
+        await refresh()
+      } catch (e) {
+        showToast(e.message, false)
+      } finally {
+        busy = false
+        document.body.classList.remove('busy')
+      }
+    }
+
+    async function serviceAct(name, action) {
+      if (busy) return
+      busy = true
+      document.body.classList.add('busy')
+      try {
+        const data = await api('/api/service/' + name + '/' + action, 'POST')
+        showToast((name + ': ') + (data.message || '完成'), data.ok !== false)
+        await refresh()
+      } catch (e) {
+        showToast(e.message, false)
+      } finally {
+        busy = false
+        document.body.classList.remove('busy')
+      }
+    }
+
+    async function showLog(name, debug = false) {
+      document.getElementById('log-title').textContent = name + (debug ? ' (debug)' : '') + ' 最近日志'
+      const q = debug ? '?debug=1' : ''
+      const data = await api('/api/logs/' + name + q)
+      document.getElementById('log-content').textContent = (data.lines || []).join('\n') || '(无日志)'
+    }
+
+    function statusDot(up) {
+      return '<span class="dot ' + (up ? 'up' : 'down') + '"></span>' + (up ? '运行中' : '已停止')
+    }
+
+    function renderStats(data) {
+      const up = (data.services || []).filter(s => s.httpUp).length
+      const total = (data.services || []).length
+      const fe = data.frontend?.httpUp ? 1 : 0
+      document.getElementById('stats').innerHTML = `
+        <div class="stat"><div class="label">后端在线</div><div class="value">${up}/${total}</div></div>
+        <div class="stat"><div class="label">前端</div><div class="value">${fe ? '运行' : '停止'}</div></div>
+        <div class="stat"><div class="label">Redis</div><div class="value">${data.redisUp ? 'OK' : '—'}</div></div>
+        <div class="stat"><div class="label">网关</div><div class="value" style="font-size:0.95rem"><a href="${data.gatewayUrl}" target="_blank">:8080</a></div></div>
+      `
+    }
+
+    function renderFrontend(fe) {
+      if (!fe) return
+      document.getElementById('frontend-row').innerHTML = `
+        <tr>
+          <td>${fe.name}</td>
+          <td class="mono">:${fe.port}</td>
+          <td>${statusDot(fe.httpUp)}</td>
+          <td><a href="${fe.url}" target="_blank">${fe.url}</a></td>
+          <td class="actions">
+            <button onclick="act('frontend/start')">启动</button>
+            <button onclick="act('frontend/stop')">停止</button>
+            <button onclick="act('frontend/restart')">重启</button>
+          </td>
+        </tr>
+      `
+    }
+
+    function renderServices(list) {
+      document.getElementById('service-rows').innerHTML = (list || []).map(s => `
+        <tr>
+          <td class="mono">${s.name}</td>
+          <td>${statusDot(s.httpUp)} <span class="mono">:${s.port}</span></td>
+          <td>${s.debugUp ? '<span class="dot debug"></span>调试' : '<span class="muted">—</span>'} ${s.debugPort ? '<span class="mono">:' + s.debugPort + '</span>' : ''}</td>
+          <td>${s.jarExists ? (s.jarSizeKb + ' KB') : '<span style="color:var(--err)">缺失</span>'}</td>
+          <td class="actions">
+            <button onclick="serviceAct('${s.name}','start')">启动</button>
+            <button onclick="serviceAct('${s.name}','start-debug')">调试</button>
+            <button onclick="serviceAct('${s.name}','restart')">重启</button>
+            <button onclick="serviceAct('${s.name}','stop')">停止</button>
+            <button onclick="showLog('${s.name}')">日志</button>
+            <button onclick="showLog('${s.name}',true)">调试日志</button>
+          </td>
+        </tr>
+      `).join('')
+    }
+
+    async function refresh() {
+      try {
+        const data = await api('/api/status')
+        renderStats(data)
+        renderFrontend(data.frontend)
+        renderServices(data.services)
+      } catch (e) {
+        showToast('无法获取状态: ' + e.message, false)
+      }
+    }
+
+    refresh()
+    timer = setInterval(refresh, 4000)
+  </script>
+</body>
+</html>

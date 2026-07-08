@@ -279,6 +279,8 @@ CREATE TABLE medical_device (
     device_name VARCHAR(200) NOT NULL,
     brand VARCHAR(100),
     model VARCHAR(100),
+    specification VARCHAR(200),
+    registration_no VARCHAR(100),
     serial_number VARCHAR(100),
     category_id UUID REFERENCES medical_device_category(id),
     
@@ -306,6 +308,12 @@ CREATE TABLE medical_device (
     purchase_date DATE,
     acceptance_date DATE,
     enable_date DATE,
+    production_date DATE,
+    service_life_years INTEGER,
+    calibration_period_days INTEGER,
+    last_calibration_date DATE,
+    next_calibration_date DATE,
+    service_expiry_date DATE,
     warranty_end_date DATE,
     
     -- 状态信息

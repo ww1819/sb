@@ -8,6 +8,7 @@ import com.meis.saas.common.excel.ImportFieldDef;
 import com.meis.saas.common.excel.ImportFieldRegistry;
 import com.meis.saas.common.excel.ImportProfileService;
 import com.meis.saas.common.excel.ImportResult;
+import com.meis.saas.common.excel.MedicalDeviceFieldHelper;
 import com.meis.saas.common.excel.SimpleTableImporter;
 import com.meis.saas.common.result.Result;
 import jakarta.servlet.http.HttpServletResponse;
@@ -62,6 +63,9 @@ public abstract class GenericTableController {
     @PostMapping("/{table}")
     public Result<Map<String, Object>> create(@PathVariable String table, @RequestBody Map<String, Object> body) {
         check(table);
+        if ("medical_device".equals(table)) {
+            MedicalDeviceFieldHelper.applyDerivedFields(body);
+        }
         if (!body.containsKey("id")) body.put("id", UUID.randomUUID().toString());
         String cols = String.join(",", body.keySet());
         String vals = String.join(",", body.keySet().stream().map(k -> "?").toList());
@@ -73,6 +77,9 @@ public abstract class GenericTableController {
     public Result<Void> update(@PathVariable String table, @PathVariable String id, @RequestBody Map<String, Object> body) {
         check(table);
         body.remove("id");
+        if ("medical_device".equals(table)) {
+            MedicalDeviceFieldHelper.applyDerivedFields(body);
+        }
         if (body.isEmpty()) return Result.ok();
         List<String> sets = new ArrayList<>();
         List<Object> args = new ArrayList<>();

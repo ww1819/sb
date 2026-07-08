@@ -73,11 +73,15 @@ public final class ImportFieldRegistry {
                 f("device_name", "设备名称", "string", "device_name", true, 20),
                 f("brand", "品牌", "string", "brand", false, 30),
                 f("model", "型号", "string", "model", false, 40),
+                f("specification", "规格", "string", "specification", false, 45),
                 f("serial_number", "序列号", "string", "serial_number", false, 50),
                 f("category_code", "分类编码", "lookup", null, false, 60),
                 f("manufacturer_code", "生产厂商编码", "lookup", null, false, 70),
+                f("manufacturer_name", "生产厂家", "lookup", null, false, 75),
                 f("supplier_code", "供应商编码", "lookup", null, false, 80),
+                f("supplier_name", "供应商", "lookup", null, false, 85),
                 f("dept_code", "使用科室编码", "lookup", null, false, 90),
+                f("dept_name", "使用科室", "lookup", null, false, 95),
                 f("campus_name", "院区名称", "lookup", null, false, 100),
                 f("original_value", "原值", "number", "original_value", false, 110),
                 f("net_value", "净值", "number", "net_value", false, 120),
@@ -85,9 +89,12 @@ public final class ImportFieldRegistry {
                 f("device_status", "设备状态", "string", "device_status", false, 140),
                 f("risk_level", "风险等级", "string", "risk_level", false, 150),
                 f("purchase_date", "购置日期", "date", "purchase_date", false, 160),
-                f("enable_date", "启用日期", "date", "enable_date", false, 170),
-                f("remark", "备注", "string", "remark", false, 180),
-                f("is_active", "启用", "boolean", "is_active", false, 190)
+                f("acceptance_date", "验收日期", "date", "acceptance_date", false, 165),
+                f("production_date", "生产日期", "date", "production_date", false, 170),
+                f("service_life_years", "使用年限", "number", "service_life_years", false, 175),
+                f("enable_date", "启用日期", "date", "enable_date", false, 180),
+                f("remark", "备注", "string", "remark", false, 190),
+                f("is_active", "启用", "boolean", "is_active", false, 200)
         ));
 
         return Map.copyOf(map);

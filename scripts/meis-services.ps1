@@ -31,22 +31,24 @@ function Resolve-MeisMaven {
 $script:MeisServicePorts = @(8082, 8081, 8083, 8084, 8085, 8086, 8087, 8088, 8089, 8090, 8091, 8092, 8093, 8094, 8080)
 
 $script:MeisServices = @(
-    @{ name = "meis-tenant"; port = 8082 },
-    @{ name = "meis-auth"; port = 8081 },
-    @{ name = "meis-system"; port = 8083 },
-    @{ name = "meis-purchase"; port = 8084 },
-    @{ name = "meis-asset"; port = 8085 },
-    @{ name = "meis-repair"; port = 8086 },
-    @{ name = "meis-maintain"; port = 8087 },
-    @{ name = "meis-qc"; port = 8088 },
-    @{ name = "meis-maintenance-contract"; port = 8089 },
-    @{ name = "meis-special"; port = 8090 },
-    @{ name = "meis-analytics"; port = 8091 },
-    @{ name = "meis-file"; port = 8092 },
-    @{ name = "meis-notification"; port = 8093 },
-    @{ name = "meis-integration"; port = 8094 },
-    @{ name = "meis-gateway"; port = 8080 }
+    @{ name = "meis-tenant"; port = 8082; debugPort = 5802 },
+    @{ name = "meis-auth"; port = 8081; debugPort = 5801 },
+    @{ name = "meis-system"; port = 8083; debugPort = 5803 },
+    @{ name = "meis-purchase"; port = 8084; debugPort = 5804 },
+    @{ name = "meis-asset"; port = 8085; debugPort = 5805 },
+    @{ name = "meis-repair"; port = 8086; debugPort = 5806 },
+    @{ name = "meis-maintain"; port = 8087; debugPort = 5807 },
+    @{ name = "meis-qc"; port = 8088; debugPort = 5808 },
+    @{ name = "meis-maintenance-contract"; port = 8089; debugPort = 5809 },
+    @{ name = "meis-special"; port = 8090; debugPort = 5810 },
+    @{ name = "meis-analytics"; port = 8091; debugPort = 5811 },
+    @{ name = "meis-file"; port = 8092; debugPort = 5812 },
+    @{ name = "meis-notification"; port = 8093; debugPort = 5813 },
+    @{ name = "meis-integration"; port = 8094; debugPort = 5814 },
+    @{ name = "meis-gateway"; port = 8080; debugPort = 5800 }
 )
+
+$script:MeisFrontendPort = 5173
 
 function Stop-MeisServices {
     $killed = @{}
@@ -228,4 +230,217 @@ function Start-MeisServices {
             Get-Content $gwLog -Tail 40 -Wait
         }
     }
+}
+
+function Get-MeisServiceDefinition {
+    param([Parameter(Mandatory = $true)][string]$ServiceName)
+    $svc = $script:MeisServices | Where-Object { $_.name -eq $ServiceName } | Select-Object -First 1
+    if (-not $svc) { throw "Unknown service: $ServiceName" }
+    return $svc
+}
+
+function Get-MeisProcessIdsOnPort {
+    param([int]$Port)
+    $pids = @()
+    $lines = netstat -ano | Select-String ":\s*$Port\s+.*LISTENING"
+    foreach ($line in $lines) {
+        if ($line -match '\s+(\d+)\s*$') {
+            $procId = [int]$matches[1]
+            if ($procId -gt 0) { $pids += $procId }
+        }
+    }
+    return $pids | Select-Object -Unique
+}
+
+function Stop-MeisServiceByName {
+    param([Parameter(Mandatory = $true)][string]$ServiceName)
+    $svc = Get-MeisServiceDefinition $ServiceName
+    $killed = @{}
+
+    Get-CimInstance Win32_Process -Filter "Name='java.exe'" -ErrorAction SilentlyContinue | ForEach-Object {
+        if ($_.CommandLine -and $_.CommandLine -match "$([regex]::Escape($ServiceName))-1\.0\.0-SNAPSHOT\.jar") {
+            $procId = $_.ProcessId
+            if (-not $killed.ContainsKey($procId)) {
+                Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
+                $killed[$procId] = $true
+            }
+        }
+    }
+
+    Start-Sleep -Milliseconds 400
+    foreach ($procId in (Get-MeisProcessIdsOnPort -Port $svc.port)) {
+        if (-not $killed.ContainsKey($procId)) {
+            Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
+            $killed[$procId] = $true
+        }
+    }
+    if ($svc.debugPort) {
+        foreach ($procId in (Get-MeisProcessIdsOnPort -Port $svc.debugPort)) {
+            if (-not $killed.ContainsKey($procId)) {
+                Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
+                $killed[$procId] = $true
+            }
+        }
+    }
+    return $killed.Count
+}
+
+function Start-MeisServiceByName {
+    param(
+        [Parameter(Mandatory = $true)][string]$ServiceName,
+        [string]$Profile = 'dev',
+        [switch]$Debug
+    )
+
+    $svc = Get-MeisServiceDefinition $ServiceName
+    if (Test-MeisPortListening -Port $svc.port) {
+        return @{ ok = $true; message = "already running on :$($svc.port)" }
+    }
+
+    $env:JAVA_HOME = Resolve-MeisJavaHome
+    $javaExe = Join-Path $env:JAVA_HOME 'bin\java.exe'
+    $root = $script:MeisRoot
+    $jar = Join-Path $root "$ServiceName\target\$ServiceName-1.0.0-SNAPSHOT.jar"
+    if (-not (Test-Path $jar)) {
+        throw "Missing $jar - run scripts\build.ps1 first"
+    }
+
+    $logDir = Join-Path $root 'logs'
+    if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
+    $suffix = if ($Debug) { '.debug' } else { '' }
+    $stdout = Join-Path $logDir "$ServiceName$suffix.out.log"
+    $stderr = Join-Path $logDir "$ServiceName$suffix.err.log"
+
+    $javaArgs = @()
+    if ($Debug) {
+        if (-not $svc.debugPort) { throw "No debug port for $ServiceName" }
+        $javaArgs += "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:$($svc.debugPort)"
+    }
+    $javaArgs += @(
+        '-jar', $jar,
+        "--spring.profiles.active=$Profile",
+        '--spring.cloud.nacos.discovery.enabled=false'
+    )
+    if (-not (Test-MeisRedisAvailable)) {
+        $javaArgs += '--meis.cache.enabled=false'
+    }
+
+    Start-Process -FilePath $javaExe -ArgumentList $javaArgs -WorkingDirectory $root `
+        -WindowStyle Hidden -RedirectStandardOutput $stdout -RedirectStandardError $stderr | Out-Null
+
+    $deadline = (Get-Date).AddSeconds(120)
+    while ((Get-Date) -lt $deadline) {
+        $httpReady = Test-MeisPortListening -Port $svc.port
+        $debugReady = (-not $Debug) -or (Test-MeisPortListening -Port $svc.debugPort)
+        if ($httpReady -and $debugReady) {
+            $msg = if ($Debug) { "running on :$($svc.port), JDWP :$($svc.debugPort)" } else { "running on :$($svc.port)" }
+            return @{ ok = $true; message = $msg }
+        }
+        Start-Sleep -Seconds 1
+    }
+    throw "Timeout starting $ServiceName - see $stderr"
+}
+
+function Restart-MeisServiceByName {
+    param(
+        [Parameter(Mandatory = $true)][string]$ServiceName,
+        [string]$Profile = 'dev',
+        [switch]$Debug
+    )
+    Stop-MeisServiceByName $ServiceName | Out-Null
+    Start-Sleep -Seconds 1
+    return Start-MeisServiceByName -ServiceName $ServiceName -Profile $Profile -Debug:$Debug
+}
+
+function Get-MeisServiceStatusList {
+    $list = @()
+    foreach ($s in $script:MeisServices) {
+        $httpUp = Test-MeisPortListening -Port $s.port
+        $debugUp = $false
+        if ($s.debugPort) { $debugUp = Test-MeisPortListening -Port $s.debugPort }
+        $jar = Join-Path $script:MeisRoot "$($s.name)\target\$($s.name)-1.0.0-SNAPSHOT.jar"
+        $list += [ordered]@{
+            name       = $s.name
+            port       = $s.port
+            debugPort  = $s.debugPort
+            httpUp     = $httpUp
+            debugUp    = $debugUp
+            jarExists  = Test-Path $jar
+            jarSizeKb  = if (Test-Path $jar) { [math]::Round((Get-Item $jar).Length / 1KB) } else { 0 }
+        }
+    }
+    return $list
+}
+
+function Get-MeisFrontendStatus {
+    return [ordered]@{
+        name    = 'meis-web'
+        port    = $script:MeisFrontendPort
+        httpUp  = Test-MeisPortListening -Port $script:MeisFrontendPort
+        url     = "http://localhost:$($script:MeisFrontendPort)"
+    }
+}
+
+function Stop-MeisFrontend {
+    $killed = 0
+    foreach ($procId in (Get-MeisProcessIdsOnPort -Port $script:MeisFrontendPort)) {
+        Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
+        $killed++
+    }
+    $pidFile = Join-Path $script:MeisRoot 'logs\frontend-dev.pid'
+    if (Test-Path $pidFile) {
+        $saved = Get-Content $pidFile -ErrorAction SilentlyContinue
+        if ($saved -match '^\d+$') {
+            Stop-Process -Id ([int]$saved) -Force -ErrorAction SilentlyContinue
+        }
+        Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+    }
+    return $killed
+}
+
+function Start-MeisFrontend {
+    if (Test-MeisPortListening -Port $script:MeisFrontendPort) {
+        return @{ ok = $true; message = "already running on :$($script:MeisFrontendPort)" }
+    }
+    $webDir = Join-Path $script:MeisRoot 'meis-web'
+    if (-not (Test-Path (Join-Path $webDir 'package.json'))) {
+        throw "meis-web not found: $webDir"
+    }
+    $logDir = Join-Path $script:MeisRoot 'logs'
+    if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
+    $stdout = Join-Path $logDir 'meis-web.dev.out.log'
+    $stderr = Join-Path $logDir 'meis-web.dev.err.log'
+    $proc = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'npm run dev' -WorkingDirectory $webDir `
+        -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+    Set-Content (Join-Path $logDir 'frontend-dev.pid') $proc.Id
+
+    $deadline = (Get-Date).AddSeconds(90)
+    while ((Get-Date) -lt $deadline) {
+        if (Test-MeisPortListening -Port $script:MeisFrontendPort) {
+            return @{ ok = $true; message = "running on :$($script:MeisFrontendPort)" }
+        }
+        Start-Sleep -Seconds 1
+    }
+    throw "Timeout starting frontend - see $stderr"
+}
+
+function Restart-MeisFrontend {
+    Stop-MeisFrontend | Out-Null
+    Start-Sleep -Seconds 1
+    return Start-MeisFrontend
+}
+
+function Get-MeisServiceLogTail {
+    param(
+        [Parameter(Mandatory = $true)][string]$ServiceName,
+        [int]$Lines = 40,
+        [switch]$Debug
+    )
+    $suffix = if ($Debug) { '.debug' } else { '' }
+    $log = Join-Path $script:MeisRoot "logs\$ServiceName$suffix.err.log"
+    if (-not (Test-Path $log)) {
+        $log = Join-Path $script:MeisRoot "logs\$ServiceName$suffix.out.log"
+    }
+    if (-not (Test-Path $log)) { return @() }
+    return @(Get-Content $log -Tail $Lines -ErrorAction SilentlyContinue)
 }
