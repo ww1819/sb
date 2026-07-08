@@ -4,10 +4,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.flywaydb.core.Flyway;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -22,6 +24,7 @@ public class TenantSchemaMigrator {
 
     private final DataSource dataSource;
     private final JdbcTemplate jdbcTemplate;
+    private final Environment environment;
 
     @Value("${meis.flyway.tenant-locations:classpath:db/migrations/tenant}")
     private String tenantLocations;
@@ -43,15 +46,23 @@ public class TenantSchemaMigrator {
     public void migrate(String schemaName) {
         validateSchemaName(schemaName);
         jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS " + schemaName);
-        Flyway.configure()
+        Flyway flyway = Flyway.configure()
                 .dataSource(dataSource)
                 .schemas(schemaName)
                 .defaultSchema(schemaName)
                 .locations(tenantLocations)
                 .baselineOnMigrate(true)
-                .load()
-                .migrate();
+                .load();
+        if (isDevProfile()) {
+            log.info("dev profile: Flyway repair + migrate (tenant schema {})", schemaName);
+            flyway.repair();
+        }
+        flyway.migrate();
         log.info("Flyway migrated tenant schema {}", schemaName);
+    }
+
+    private boolean isDevProfile() {
+        return Arrays.stream(environment.getActiveProfiles()).anyMatch("dev"::equals);
     }
 
     private static void validateSchemaName(String schemaName) {

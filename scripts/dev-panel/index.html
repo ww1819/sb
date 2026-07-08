@@ -107,6 +107,10 @@
     .dot.debug { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
     .actions { display: flex; flex-wrap: wrap; gap: 4px; }
     .actions button { padding: 4px 8px; font-size: 0.78rem; border-radius: 6px; }
+    .actions button.hot-reload {
+      border-color: #6b5520;
+      color: #ffd88a;
+    }
     .log-watch {
       display: inline-flex;
       align-items: center;
@@ -125,8 +129,23 @@
     .build-opts {
       display: flex;
       flex-direction: column;
+      gap: 8px;
+      min-width: 140px;
+    }
+    .build-section {
+      display: flex;
+      flex-direction: column;
       gap: 4px;
-      min-width: 108px;
+    }
+    .build-section + .build-section {
+      padding-top: 8px;
+      border-top: 1px solid rgba(45, 58, 79, 0.55);
+    }
+    .build-section-label {
+      font-size: 0.68rem;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
     }
     .build-opt {
       display: inline-flex;
@@ -138,12 +157,30 @@
       user-select: none;
     }
     .build-opt input { cursor: pointer; }
-    .build-opts button {
+    .build-mode-select {
+      background: #0f1419;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 6px;
+      font-size: 0.76rem;
+      width: 100%;
+      cursor: pointer;
+    }
+    .build-mode-hint {
+      font-size: 0.7rem;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .build-opts-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .build-opts-actions button {
       padding: 3px 8px;
       font-size: 0.74rem;
       border-radius: 5px;
-      margin-top: 2px;
-      align-self: flex-start;
     }
     .mono { font-family: Consolas, monospace; font-size: 0.82rem; }
     .toast {
@@ -392,7 +429,7 @@
   <header>
     <div>
       <h1>MEIS 开发控制面板</h1>
-      <div class="sub">前后端启停 / 调试 / 编译 / 重启 · 日常改代码勾选「加载类和资源」比 package 更快</div>
+      <div class="sub">构建与启停分离 · 前端 Vite 开发服自带热更新 · 后端调试运行中可用热加载</div>
     </div>
     <div class="toolbar">
       <button class="primary" onclick="act('backend/start-all')" title="启动全部 15 个微服务，已运行的自动跳过">启动全部后端</button>
@@ -415,7 +452,7 @@
     <table>
       <thead>
         <tr>
-          <th>服务</th><th>说明</th><th>端口</th><th>状态</th><th>链接</th><th>编译</th><th>操作</th><th>汇入日志</th>
+          <th>服务</th><th>说明</th><th>端口</th><th>状态</th><th>链接</th><th>构建</th><th>操作</th><th>汇入日志</th>
         </tr>
       </thead>
       <tbody id="frontend-row"></tbody>
@@ -425,7 +462,7 @@
     <table>
       <thead>
         <tr>
-          <th>服务</th><th>说明</th><th>HTTP</th><th>JDWP</th><th>JAR</th><th>编译</th><th>操作</th><th>汇入日志</th>
+          <th>服务</th><th>说明</th><th>HTTP</th><th>JDWP</th><th>JAR</th><th>构建</th><th>操作</th><th>汇入日志</th>
         </tr>
       </thead>
       <tbody id="service-rows"></tbody>
@@ -485,8 +522,12 @@
     const LOG_FILTER_KEY = 'meis-dev-panel-log-filter'
     const BUILD_OPTS_KEY = 'meis-dev-panel-build-opts'
     let busy = false
+    let busySince = 0
+    let busySafetyTimer = null
     let timer = null
     let logTimer = null
+    let refreshInFlight = false
+    let refreshLogsInFlight = false
     let logFollowBottom = true
     let pinnedService = 'all'
     let logWatch = {}
@@ -499,102 +540,213 @@
     let selectedLogIndex = -1
     let logDrawerTab = 'single'
     let logDrawerOpen = false
+    let lastServiceList = []
+    let buildPendingUntil = {}
+    let debugPendingUntil = {}
+    let debugPendingSince = {}
 
-    function defaultBackendBuildOpts() {
-      return { clean: false, package: false, compile: false, loadClasses: true }
+    function isDebugRunning(svc) {
+      return !!(svc && svc.debugUp && svc.httpUp)
     }
 
-    function defaultFrontendBuildOpts() {
-      return { npmInstall: false, typecheck: false, build: false }
+    function markDebugPending(name, seconds = 150) {
+      debugPendingUntil[name] = Date.now() + seconds * 1000
+      debugPendingSince[name] = Date.now()
+    }
+
+    function isDebugPending(name) {
+      const until = debugPendingUntil[name]
+      if (!until) return false
+      if (Date.now() >= until) {
+        clearDebugPending(name)
+        return false
+      }
+      return true
+    }
+
+    function clearDebugPending(name) {
+      delete debugPendingUntil[name]
+      delete debugPendingSince[name]
+    }
+
+    function updateDebugPendingFromStatus(services) {
+      for (const s of (services || [])) {
+        if (isDebugRunning(s)) {
+          clearDebugPending(s.name)
+          continue
+        }
+        if (!isDebugPending(s.name)) continue
+        const since = debugPendingSince[s.name] || 0
+        const elapsed = Date.now() - since
+        // JDWP 曾短暂起来又退出（Flyway 等启动失败）：10 秒后解除「启动中」
+        if (!s.debugUp && !s.httpUp && elapsed > 10000) {
+          clearDebugPending(s.name)
+        }
+      }
+    }
+
+    function renderJdwpCell(s) {
+      const port = s.debugPort ? ('<span class="mono">:' + s.debugPort + '</span>') : ''
+      if (isDebugRunning(s)) {
+        return '<span class="dot debug"></span>调试 ' + port
+      }
+      if (isDebugPending(s.name) || (s.debugUp && !s.httpUp)) {
+        return '<span class="dot debug"></span>启动中 ' + port
+      }
+      return '<span class="muted">—</span> ' + port
+    }
+
+    function renderServiceActions(s) {
+      const name = s.name
+      const debugRunning = isDebugRunning(s)
+      const debugPending = isDebugPending(name)
+      let html = ''
+      if (!debugRunning) {
+        html += `<button onclick="serviceAct('${name}','start')">启动</button>`
+      }
+      if (!debugRunning && !debugPending) {
+        html += `<button onclick="serviceAct('${name}','start-debug')">调试</button>`
+      }
+      if (debugPending && !debugRunning) {
+        html += `<span style="font-size:0.74rem;color:var(--warn);align-self:center">调试启动中…</span>`
+      }
+      if (debugRunning) {
+        html += `<button class="hot-reload" onclick="serviceReloadClasses('${name}')" title="调试运行中：compile + 写入 JAR，不重启进程">热加载</button>`
+      }
+      html += `<button onclick="serviceAct('${name}','restart')">重启</button>`
+      html += `<button onclick="serviceAct('${name}','stop')">停止</button>`
+      html += `<button onclick="showLog('${name}')">日志</button>`
+      html += `<button onclick="showLog('${name}',true)">调试日志</button>`
+      return html
+    }
+
+    const BACKEND_BUILD_ACTIONS = {
+      quick: { label: '快速更新', hint: 'compile + 写入 JAR' },
+      package: { label: '完整打包', hint: 'mvn package' },
+      'clean-package': { label: '清理重建', hint: 'clean + package' }
+    }
+
+    const FRONTEND_BUILD_ACTIONS = {
+      install: { label: '依赖安装', hint: 'npm install，package.json 变更后' },
+      typecheck: { label: '类型检查', hint: 'vue-tsc，不启动服务' },
+      build: { label: '生产构建', hint: 'vite build，验证生产包' }
+    }
+
+    let frontendPendingUntil = 0
+
+    function isFrontendPending() {
+      if (!frontendPendingUntil) return false
+      if (Date.now() >= frontendPendingUntil) {
+        frontendPendingUntil = 0
+        return false
+      }
+      return true
+    }
+
+    function markFrontendPending(seconds = 120) {
+      frontendPendingUntil = Date.now() + seconds * 1000
+    }
+
+    function clearFrontendPending() {
+      frontendPendingUntil = 0
     }
 
     function loadBuildOpts(names) {
-      const saved = localStorage.getItem(BUILD_OPTS_KEY)
-      if (saved) {
-        try { buildOpts = JSON.parse(saved) || {} } catch { buildOpts = {} }
+      // 后端构建模式已改为按钮，无需持久化；保留 key 避免旧数据报错
+      buildOpts = {}
+    }
+
+    function markBuildPending(name, seconds = 120) {
+      buildPendingUntil[name] = Date.now() + seconds * 1000
+    }
+
+    function isBuildPending(name) {
+      const until = buildPendingUntil[name]
+      if (!until) return false
+      if (Date.now() >= until) {
+        delete buildPendingUntil[name]
+        return false
       }
-      for (const name of names) {
-        if (!buildOpts[name]) {
-          buildOpts[name] = name === 'meis-web' ? defaultFrontendBuildOpts() : defaultBackendBuildOpts()
-        }
+      return true
+    }
+
+    function pollServiceStatus() {
+      setTimeout(refresh, 2000)
+      setTimeout(refresh, 6000)
+      setTimeout(refresh, 15000)
+      setTimeout(refresh, 30000)
+      setTimeout(refresh, 60000)
+    }
+
+    function renderJarCell(s) {
+      if (s.buildInProgress || isBuildPending(s.name)) {
+        return '<span style="color:var(--warn)">构建中…</span>'
       }
-      saveBuildOpts()
-    }
-
-    function saveBuildOpts() {
-      localStorage.setItem(BUILD_OPTS_KEY, JSON.stringify(buildOpts))
-    }
-
-    function setBuildOpt(name, key, checked) {
-      if (!buildOpts[name]) {
-        buildOpts[name] = name === 'meis-web' ? defaultFrontendBuildOpts() : defaultBackendBuildOpts()
+      if (s.jarExists) {
+        const size = s.jarHealthy
+          ? (s.jarSizeKb + ' KB')
+          : ('<span style="color:var(--err)" title="JAR 异常，请点完整打包">' + s.jarSizeKb + ' KB 异常</span>')
+        return size + (s.jarMtime ? '<div class="jar-meta">JAR ' + escapeHtml(s.jarMtime) + '</div>' : '')
       }
-      buildOpts[name][key] = !!checked
-      saveBuildOpts()
+      return '<span style="color:var(--err)">缺失</span>'
     }
 
-    function backendBuildQuery(name) {
-      const o = buildOpts[name] || defaultBackendBuildOpts()
-      const qs = new URLSearchParams()
-      if (o.clean) qs.set('clean', '1')
-      if (o.package) qs.set('package', '1')
-      if (o.compile) qs.set('compile', '1')
-      if (o.loadClasses) qs.set('loadClasses', '1')
-      const s = qs.toString()
-      return s ? ('?' + s) : ''
-    }
-
-    function hasBackendBuildOption(name) {
-      const o = buildOpts[name] || defaultBackendBuildOpts()
-      return !!(o.clean || o.package || o.compile || o.loadClasses)
-    }
-
-    function frontendBuildQuery() {
-      const o = buildOpts['meis-web'] || defaultFrontendBuildOpts()
-      const qs = new URLSearchParams()
-      if (o.npmInstall) qs.set('npmInstall', '1')
-      if (o.typecheck) qs.set('typecheck', '1')
-      if (o.build) qs.set('build', '1')
-      const s = qs.toString()
-      return s ? ('?' + s) : ''
-    }
-
-    function renderBackendBuildOpts(name) {
-      const o = buildOpts[name] || defaultBackendBuildOpts()
+    function renderFrontendBuildOpts(fe) {
+      const buttons = Object.entries(FRONTEND_BUILD_ACTIONS).map(([mode, meta]) =>
+        `<button onclick="frontendBuild('${mode}')" title="${escapeHtml(meta.hint)}">${meta.label}</button>`
+      ).join('')
+      const hint = fe?.buildInProgress || isBuildPending('meis-web')
+        ? '<div class="build-mode-hint" style="color:var(--warn)">构建中…</div>'
+        : '<div class="build-mode-hint">仅构建，不启动 Vite</div>'
       return `
         <div class="build-opts">
-          <label class="build-opt" title="mvn compile + 将 class/资源写入已有 JAR，比 package 快，适合日常改代码后重启">
-            <input type="checkbox" ${o.loadClasses ? 'checked' : ''} onchange="setBuildOpt('${name}','loadClasses',this.checked)" /> 加载类和资源
-          </label>
-          <label class="build-opt" title="仅 mvn compile，不更新 JAR">
-            <input type="checkbox" ${o.compile ? 'checked' : ''} onchange="setBuildOpt('${name}','compile',this.checked)" /> compile
-          </label>
-          <label class="build-opt" title="mvn package 完整打包，依赖或资源结构变更时用">
-            <input type="checkbox" ${o.package ? 'checked' : ''} onchange="setBuildOpt('${name}','package',this.checked)" /> package
-          </label>
-          <label class="build-opt" title="mvn clean，清除 target 后需配合其他选项">
-            <input type="checkbox" ${o.clean ? 'checked' : ''} onchange="setBuildOpt('${name}','clean',this.checked)" /> clean
-          </label>
-          <button onclick="serviceBuild('${name}')">编译</button>
-          <button onclick="serviceReloadClasses('${name}')" title="仅 compile + 加载类和资源，不重启">热加载</button>
+          <span class="build-section-label">仅构建，不启停</span>
+          <div class="build-opts-actions">${buttons}</div>
+          ${hint}
         </div>
       `
     }
 
-    function renderFrontendBuildOpts() {
-      const o = buildOpts['meis-web'] || defaultFrontendBuildOpts()
+    function renderFrontendActions(fe) {
+      const running = fe.httpUp
+      const pending = isFrontendPending()
+      let html = ''
+      if (!running && !pending) {
+        html += `<button onclick="frontendAct('start')">启动开发服</button>`
+      }
+      if (pending && !running) {
+        html += `<span style="font-size:0.74rem;color:var(--warn);align-self:center">Vite 启动中…</span>`
+      }
+      if (running || pending) {
+        html += `<button onclick="frontendAct('stop')">停止</button>`
+        html += `<button onclick="frontendAct('restart')">重启</button>`
+      }
+      if (running) {
+        html += `<span style="font-size:0.72rem;color:var(--muted);align-self:center" title="保存代码后浏览器自动刷新">热更新已启用</span>`
+      }
+      return html
+    }
+
+    function renderFrontendStatus(fe) {
+      if (fe.httpUp) return statusDot(true)
+      if (isFrontendPending()) return '<span class="dot debug"></span>启动中'
+      return statusDot(false)
+    }
+    function renderBackendBuildOpts(svc) {
+      const name = svc.name
+      const canQuick = svc.jarExists && svc.jarHealthy
+      const buttons = Object.entries(BACKEND_BUILD_ACTIONS).map(([mode, meta]) => {
+        const disabled = (mode === 'quick' && !canQuick) ? ' disabled' : ''
+        const tip = (mode === 'quick' && !canQuick)
+          ? 'JAR 缺失或异常，请先点「完整打包」'
+          : meta.hint
+        return `<button${disabled} onclick="serviceBuild('${name}','${mode}')" title="${escapeHtml(tip)}">${meta.label}</button>`
+      }).join('')
       return `
         <div class="build-opts">
-          <label class="build-opt" title="依赖变更后执行 npm install">
-            <input type="checkbox" ${o.npmInstall ? 'checked' : ''} onchange="setBuildOpt('meis-web','npmInstall',this.checked)" /> install
-          </label>
-          <label class="build-opt" title="TypeScript / Vue 类型检查 (vue-tsc)">
-            <input type="checkbox" ${o.typecheck ? 'checked' : ''} onchange="setBuildOpt('meis-web','typecheck',this.checked)" /> 类型检查
-          </label>
-          <label class="build-opt" title="生产构建验证 (vite build)">
-            <input type="checkbox" ${o.build ? 'checked' : ''} onchange="setBuildOpt('meis-web','build',this.checked)" /> build
-          </label>
-          <button onclick="frontendBuild()">编译</button>
+          <span class="build-section-label">仅构建，不启停</span>
+          <div class="build-opts-actions">${buttons}</div>
+          ${canQuick ? '' : '<div class="build-mode-hint">JAR 缺失时请先用「完整打包」</div>'}
         </div>
       `
     }
@@ -868,36 +1020,93 @@
       w.document.body.appendChild(pre)
     }
 
+    function localizePanelMessage(msg) {
+      const m = String(msg || '')
+      if (m.includes('JAR too small')) return 'JAR 异常偏小，快速更新可能已损坏产物，请改选「完整打包」后编译再启动'
+      if (m.includes('Missing JAR')) return '缺少 JAR，请先选「完整打包」并编译'
+      if (m.includes('Run full package')) return 'JAR 需要完整打包，请将构建模式改为「完整打包」后点编译'
+      if (m.includes('in background')) return m.replace(/.* in background/i, '已提交后台，请稍候刷新状态')
+      if (m.includes('Select at least one build step')) return '未指定构建步骤，请重新点击构建按钮'
+      if (m.includes('FlywayValidateException') || m.includes('checksum mismatch') || m.includes('Validate failed')) {
+        return 'Flyway 迁移校验失败（脚本已变更）。请完整打包 meis-tenant 后重启；dev 环境会自动 repair'
+      }
+      return m
+    }
+
     function showToast(msg, ok = true) {
       const el = document.getElementById('toast')
-      el.textContent = msg
+      el.textContent = localizePanelMessage(msg)
       el.className = 'toast show ' + (ok ? 'ok' : 'err')
       setTimeout(() => el.classList.remove('show'), 5000)
     }
 
-    async function api(path, method = 'GET') {
-      const res = await fetch(path, { method })
-      const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.message || ('HTTP ' + res.status))
+    function tryAcquireBusy() {
+      if (busy) {
+        const secs = Math.round((Date.now() - busySince) / 1000)
+        showToast('有操作正在进行（已 ' + secs + ' 秒），请稍候…', false)
+        return false
       }
-      return data
+      busy = true
+      busySince = Date.now()
+      document.body.classList.add('busy')
+      if (busySafetyTimer) clearTimeout(busySafetyTimer)
+      busySafetyTimer = setTimeout(() => {
+        if (busy) releaseBusy('操作超时，已自动解除锁定')
+      }, 180000)
+      return true
+    }
+
+    function releaseBusy(hint) {
+      busy = false
+      busySince = 0
+      document.body.classList.remove('busy')
+      if (busySafetyTimer) {
+        clearTimeout(busySafetyTimer)
+        busySafetyTimer = null
+      }
+      if (hint) showToast(hint, false)
+    }
+
+    async function api(path, method = 'GET', timeoutMs = 30000) {
+      const controller = new AbortController()
+      const timerId = setTimeout(() => controller.abort(), timeoutMs)
+      try {
+        const res = await fetch(path, { method, signal: controller.signal })
+        let data
+        try {
+          data = await res.json()
+        } catch {
+          throw new Error('响应解析失败 (HTTP ' + res.status + ')')
+        }
+        if (!res.ok) {
+          throw new Error(data.message || ('HTTP ' + res.status))
+        }
+        return data
+      } catch (e) {
+        if (e.name === 'AbortError') {
+          throw new Error('请求超时（面板可能正忙），请稍后重试')
+        }
+        throw e
+      } finally {
+        clearTimeout(timerId)
+      }
     }
 
     async function act(path, buildQuery = '') {
-      if (busy) return
-      busy = true
-      document.body.classList.add('busy')
+      if (!tryAcquireBusy()) return
       try {
-        const data = await api('/api/' + path + buildQuery, 'POST')
+        const data = await api('/api/' + path + buildQuery, 'POST', 60000)
         showToast(data.message || (data.ok ? '完成' : '失败'), data.ok !== false)
         await refresh()
         await refreshLogs()
+        if (path === 'backend/stop-all') {
+          setTimeout(refresh, 3000)
+          setTimeout(refresh, 8000)
+        }
       } catch (e) {
         showToast(e.message, false)
       } finally {
-        busy = false
-        document.body.classList.remove('busy')
+        releaseBusy()
       }
     }
 
@@ -917,79 +1126,100 @@
     }
 
     async function frontendAct(action) {
-      const buildQuery = (action === 'stop') ? '' : frontendBuildQuery()
-      await act('frontend/' + action, buildQuery)
+      if (!tryAcquireBusy()) return
+      selectOnlyLogFilter('meis-web')
+      const labels = { start: '启动开发服', restart: '重启', stop: '停止' }
+      try {
+        showToast('meis-web: 正在' + (labels[action] || action) + '…', true)
+        if (action === 'start' || action === 'restart') markFrontendPending()
+        if (action === 'stop') clearFrontendPending()
+        const data = await api('/api/frontend/' + action, 'POST', action === 'stop' ? 15000 : 30000)
+        showToast('meis-web: ' + (labels[action] || action) + ' 已提交后台，请稍候刷新状态', data.ok !== false)
+        pollServiceStatus()
+        refreshLogs()
+      } catch (e) {
+        showToast(e.message, false)
+        if (action !== 'stop') clearFrontendPending()
+      } finally {
+        releaseBusy()
+      }
     }
 
-    async function frontendBuild() {
-      const q = frontendBuildQuery()
-      if (!q) {
-        showToast('请至少勾选一个前端编译选项', false)
-        return
+    async function frontendBuild(mode) {
+      if (!FRONTEND_BUILD_ACTIONS[mode]) return
+      if (!tryAcquireBusy()) return
+      try {
+        const label = FRONTEND_BUILD_ACTIONS[mode].label
+        showToast('meis-web: 正在' + label + '…', true)
+        const data = await api('/api/frontend/build?mode=' + encodeURIComponent(mode), 'POST', 30000)
+        showToast('meis-web: ' + label + ' 已提交后台，请稍候刷新状态', data.ok !== false)
+        markBuildPending('meis-web', mode === 'install' ? 300 : 180)
+        pollServiceStatus()
+      } catch (e) {
+        showToast(e.message, false)
+      } finally {
+        releaseBusy()
       }
-      await act('frontend/build', q)
     }
 
     async function serviceAct(name, action) {
-      if (busy) return
-      busy = true
-      document.body.classList.add('busy')
+      if (!tryAcquireBusy()) return
       pinnedService = name
       selectOnlyLogFilter(name)
-      const buildQuery = (action === 'stop' || action === 'log') ? '' : backendBuildQuery(name)
-      if (action !== 'stop' && action !== 'log' && !hasBackendBuildOption(name)) {
-        showToast(name + ': 请至少勾选一个编译选项', false)
-        busy = false
-        document.body.classList.remove('busy')
-        return
-      }
+      const labels = { start: '启动', 'start-debug': '调试', restart: '重启', stop: '停止' }
       try {
-        const data = await api('/api/service/' + name + '/' + action + buildQuery, 'POST')
-        showToast((name + ': ') + (data.message || '完成'), data.ok !== false)
-        await refresh()
-        await refreshLogs()
+        showToast(name + ': 正在' + (labels[action] || action) + '…', true)
+        if (action === 'start-debug') markDebugPending(name)
+        if (action === 'stop') clearDebugPending(name)
+        const data = await api('/api/service/' + name + '/' + action, 'POST', 30000)
+        showToast(name + ': ' + (labels[action] || action) + ' 已提交后台，请稍候刷新状态', data.ok !== false)
+        pollServiceStatus()
+        refreshLogs()
       } catch (e) {
         showToast(e.message, false)
       } finally {
-        busy = false
-        document.body.classList.remove('busy')
+        releaseBusy()
       }
     }
 
-    async function serviceBuild(name) {
-      if (!hasBackendBuildOption(name)) {
-        showToast('请至少勾选一个编译选项', false)
+    async function serviceBuild(name, mode) {
+      if (!BACKEND_BUILD_ACTIONS[mode]) mode = 'quick'
+      const svc = lastServiceList.find(s => s.name === name)
+      if (mode === 'quick' && svc && (!svc.jarExists || !svc.jarHealthy)) {
+        showToast(name + ': JAR 缺失或异常，请先点「完整打包」', false)
         return
       }
-      const q = backendBuildQuery(name)
-      if (busy) return
-      busy = true
-      document.body.classList.add('busy')
+      if (!tryAcquireBusy()) return
       try {
-        const data = await api('/api/service/' + name + '/build' + q, 'POST')
-        showToast((name + ': ') + (data.message || '完成'), data.ok !== false)
-        await refresh()
+        const label = BACKEND_BUILD_ACTIONS[mode].label
+        showToast(name + ': 正在' + label + '…', true)
+        const data = await api('/api/service/' + name + '/build?mode=' + encodeURIComponent(mode), 'POST', 30000)
+        showToast(name + ': ' + label + ' 已提交后台，请稍候刷新状态', data.ok !== false)
+        markBuildPending(name, mode === 'clean-package' ? 180 : 120)
+        pollServiceStatus()
       } catch (e) {
         showToast(e.message, false)
       } finally {
-        busy = false
-        document.body.classList.remove('busy')
+        releaseBusy()
       }
     }
 
     async function serviceReloadClasses(name) {
-      if (busy) return
-      busy = true
-      document.body.classList.add('busy')
+      const svc = lastServiceList.find(s => s.name === name)
+      if (!isDebugRunning(svc)) {
+        showToast('热加载仅适用于调试运行中的服务（HTTP + JDWP 均就绪）', false)
+        return
+      }
+      if (!tryAcquireBusy()) return
       try {
-        const data = await api('/api/service/' + name + '/reload-classes', 'POST')
-        showToast((name + ': ') + (data.message || '热加载完成'), data.ok !== false)
-        await refresh()
+        showToast(name + ': 正在热加载…', true)
+        const data = await api('/api/service/' + name + '/reload-classes', 'POST', 30000)
+        showToast((name + ': ') + (data.message || '热加载已提交'), data.ok !== false)
+        pollServiceStatus()
       } catch (e) {
         showToast(e.message, false)
       } finally {
-        busy = false
-        document.body.classList.remove('busy')
+        releaseBusy()
       }
     }
 
@@ -1014,6 +1244,8 @@
     }
 
     async function refreshLogs() {
+      if (document.hidden || refreshLogsInFlight) return
+      refreshLogsInFlight = true
       const errorsOnly = document.getElementById('log-errors-only').checked ? '1' : '0'
       const debug = document.getElementById('log-debug').checked ? '1' : '0'
       const el = document.getElementById('log-console')
@@ -1022,7 +1254,7 @@
       try {
         const watchParam = getWatchedParam()
         const filterParam = getLogFilterParam()
-        const data = await api('/api/logs/stream?service=all&lines=200&errorsOnly=' + errorsOnly + '&debug=' + debug + watchParam + filterParam)
+        const data = await api('/api/logs/stream?service=all&lines=200&errorsOnly=' + errorsOnly + '&debug=' + debug + watchParam + filterParam, 'GET', 25000)
         if (Array.isArray(data.services)) {
           logServiceOptions = data.services
           syncLogServiceFilterUi()
@@ -1068,7 +1300,11 @@
           el.scrollTop = el.scrollHeight
         }
       } catch (e) {
-        el.innerHTML = '<div class="log-empty">日志加载失败: ' + escapeHtml(e.message) + '</div>'
+        if (!document.hidden) {
+          el.innerHTML = '<div class="log-empty">日志加载失败: ' + escapeHtml(e.message) + '</div>'
+        }
+      } finally {
+        refreshLogsInFlight = false
       }
     }
 
@@ -1103,14 +1339,10 @@
           <td class="mono">${fe.name}</td>
           <td>${renderServiceInfo(fe)}</td>
           <td class="mono">:${fe.port}</td>
-          <td>${statusDot(fe.httpUp)}</td>
-          <td><a href="${fe.url}" target="_blank">${fe.url}</a></td>
-          <td>${renderFrontendBuildOpts()}</td>
-          <td class="actions">
-            <button onclick="frontendAct('start')">启动</button>
-            <button onclick="frontendAct('stop')">停止</button>
-            <button onclick="frontendAct('restart')">重启</button>
-          </td>
+          <td>${renderFrontendStatus(fe)}</td>
+          <td>${fe.httpUp ? ('<a href="' + fe.url + '" target="_blank">' + fe.url + '</a>') : '<span class="muted">—</span>'}</td>
+          <td>${renderFrontendBuildOpts(fe)}</td>
+          <td class="actions">${renderFrontendActions(fe)}</td>
           <td>
             <label class="log-watch" title="勾选后该服务日志汇入底部综合窗口">
               <input type="checkbox" ${feWatch ? 'checked' : ''} onchange="toggleLogWatch('${fe.name}', this.checked)" />
@@ -1122,25 +1354,16 @@
     }
 
     function renderServices(list) {
-      document.getElementById('service-rows').innerHTML = (list || []).map(s => `
+      lastServiceList = list || []
+      document.getElementById('service-rows').innerHTML = lastServiceList.map(s => `
         <tr>
           <td class="mono">${s.name}</td>
           <td>${renderServiceInfo(s)}</td>
           <td>${statusDot(s.httpUp)} <span class="mono">:${s.port}</span></td>
-          <td>${s.debugUp ? '<span class="dot debug"></span>调试' : '<span class="muted">—</span>'} ${s.debugPort ? '<span class="mono">:' + s.debugPort + '</span>' : ''}</td>
-          <td>
-            ${s.jarExists ? (s.jarSizeKb + ' KB') : '<span style="color:var(--err)">缺失</span>'}
-            ${s.jarMtime ? '<div class="jar-meta">JAR ' + escapeHtml(s.jarMtime) + '</div>' : ''}
-          </td>
-          <td>${renderBackendBuildOpts(s.name)}</td>
-          <td class="actions">
-            <button onclick="serviceAct('${s.name}','start')">启动</button>
-            <button onclick="serviceAct('${s.name}','start-debug')">调试</button>
-            <button onclick="serviceAct('${s.name}','restart')">重启</button>
-            <button onclick="serviceAct('${s.name}','stop')">停止</button>
-            <button onclick="showLog('${s.name}')">日志</button>
-            <button onclick="showLog('${s.name}',true)">调试日志</button>
-          </td>
+          <td>${renderJdwpCell(s)}</td>
+          <td>${renderJarCell(s)}</td>
+          <td>${renderBackendBuildOpts(s)}</td>
+          <td class="actions">${renderServiceActions(s)}</td>
           <td>
             <label class="log-watch" title="勾选后该服务日志汇入底部综合窗口">
               <input type="checkbox" ${isLogWatched(s.name) ? 'checked' : ''} onchange="toggleLogWatch('${s.name}', this.checked)" />
@@ -1152,8 +1375,10 @@
     }
 
     async function refresh() {
+      if (refreshInFlight) return
+      refreshInFlight = true
       try {
-        const data = await api('/api/status')
+        const data = await api('/api/status', 'GET', 20000)
         coreServiceNames = data.coreServices || []
         const names = ['meis-web', 'panel'].concat((data.services || []).map(s => s.name))
         loadLogWatch(names)
@@ -1161,11 +1386,51 @@
         loadBuildOpts(names)
         renderStats(data)
         renderFrontend(data.frontend)
+        if (data.frontend?.httpUp) clearFrontendPending()
         renderServices(data.services)
+        updateDebugPendingFromStatus(data.services)
+        for (const s of (data.services || [])) {
+          if (s.jarExists && s.jarHealthy) delete buildPendingUntil[s.name]
+          if (isDebugRunning(s)) clearDebugPending(s.name)
+        }
       } catch (e) {
-        showToast('无法获取状态: ' + e.message, false)
+        // 轮询失败不弹 toast，避免后台标签页刷屏
+        if (!document.hidden) {
+          console.warn('status refresh failed:', e.message)
+        }
+      } finally {
+        refreshInFlight = false
       }
     }
+
+    function pauseAutoRefresh() {
+      if (timer) {
+        clearInterval(timer)
+        timer = null
+      }
+      if (logTimer) {
+        clearInterval(logTimer)
+        logTimer = null
+      }
+    }
+
+    function resumeAutoRefresh() {
+      if (!timer) timer = setInterval(refresh, 4000)
+      toggleLogAuto()
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        pauseAutoRefresh()
+        return
+      }
+      if (busy && busySince && Date.now() - busySince > 15000) {
+        releaseBusy('页面恢复，已重置操作状态')
+      }
+      resumeAutoRefresh()
+      refresh()
+      refreshLogs()
+    })
 
     refresh()
     refreshLogs()

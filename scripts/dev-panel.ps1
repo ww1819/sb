@@ -10,6 +10,7 @@ $ErrorActionPreference = 'Stop'
 $panelDir = Join-Path $PSScriptRoot 'dev-panel'
 $htmlPath = Join-Path $panelDir 'index.html'
 if (-not (Test-Path $htmlPath)) { throw "Missing panel UI: $htmlPath" }
+$script:PanelBuildPending = @{}
 
 function Test-PanelClientDisconnectError {
     param([System.Exception]$Ex)
@@ -82,7 +83,7 @@ function Write-JsonResponse {
 function Start-PanelBackgroundJob {
     param(
         [Parameter(Mandatory = $true)][string]$Label,
-        [Parameter(Mandatory = $true)][ValidateSet('start-all', 'start-core', 'start-debug-all', 'start-debug-core', 'restart-all', 'build-backend', 'build-install')]
+        [Parameter(Mandatory = $true)][ValidateSet('start-all', 'start-core', 'start-debug-all', 'start-debug-core', 'restart-all', 'stop-all', 'build-backend', 'build-install')]
         [string]$Action
     )
     $scriptsDir = $PSScriptRoot
@@ -101,6 +102,7 @@ function Start-PanelBackgroundJob {
                 Start-Sleep -Seconds 2
                 Start-MeisServices -Profile 'dev'
             }
+            'stop-all' { Stop-MeisServices | Out-Null }
             'build-backend' {
                 $mvn = Resolve-MeisMaven
                 $env:JAVA_HOME = Resolve-MeisJavaHome
@@ -116,6 +118,131 @@ function Start-PanelBackgroundJob {
         }
     } -ArgumentList $Action, $scriptsDir, $root
     return @{ ok = $true; message = ($Label + ' started in background') }
+}
+
+function Start-PanelServiceBackgroundJob {
+    param(
+        [Parameter(Mandatory = $true)][string]$ServiceName,
+        [Parameter(Mandatory = $true)][ValidateSet('start', 'start-debug', 'restart', 'build', 'reload-classes')]
+        [string]$Action,
+        [string]$BuildMode = '',
+        [bool]$DoEnableJdwp = $false
+    )
+    $scriptsDir = $PSScriptRoot
+    $root = $script:MeisRoot
+    if ($Action -eq 'build') {
+        $script:PanelBuildPending[$ServiceName] = (Get-Date)
+    }
+    $null = Start-Job -ScriptBlock {
+        param($ActionName, $Name, $ScriptsDir, $Root, $BuildMode, $DoEnableJdwp)
+        Set-Location $Root
+        . (Join-Path $ScriptsDir 'meis-services.ps1')
+        try {
+            switch ($ActionName) {
+                'start' {
+                    Start-MeisServiceByName -ServiceName $Name -Profile 'dev' | Out-Null
+                }
+                'start-debug' {
+                    Start-MeisServiceByName -ServiceName $Name -Profile 'dev' -EnableJdwp | Out-Null
+                }
+                'restart' {
+                    Stop-MeisServiceByName $Name | Out-Null
+                    Start-Sleep -Seconds 1
+                    Start-MeisServiceByName -ServiceName $Name -Profile 'dev' -EnableJdwp:$DoEnableJdwp | Out-Null
+                }
+                'build' {
+                    switch ($BuildMode) {
+                        'clean-package' {
+                            Invoke-MeisMavenModule -Module $Name -Clean -Package | Out-Null
+                        }
+                        'package' {
+                            Invoke-MeisMavenModule -Module $Name -Package | Out-Null
+                        }
+                        'quick' {
+                            $health = Test-MeisServiceJarHealthy $Name
+                            if (-not $health.ok) {
+                                Invoke-MeisMavenModule -Module $Name -Package | Out-Null
+                            }
+                            Invoke-MeisMavenModule -Module $Name -Compile | Out-Null
+                            Sync-MeisServiceClassesToJar -ServiceName $Name | Out-Null
+                        }
+                        default {
+                            throw ('Unknown build mode: ' + $BuildMode)
+                        }
+                    }
+                }
+                'reload-classes' {
+                    Build-MeisServiceModule -ServiceName $Name -LoadClasses | Out-Null
+                }
+            }
+        } catch {
+            Add-MeisPanelEvent (($ActionName.ToUpper() + ' ' + $Name + ' FAILED: ' + $_.Exception.Message))
+            throw
+        }
+    } -ArgumentList $Action, $ServiceName, $scriptsDir, $root, $BuildMode, [bool]$DoEnableJdwp
+    $verb = switch ($Action) {
+        'start' { 'starting' }
+        'start-debug' { 'starting (debug)' }
+        'restart' { 'restarting' }
+        'build' { 'building' }
+        'reload-classes' { 'hot-reloading' }
+    }
+    return @{ ok = $true; message = ($ServiceName + ' ' + $verb + ' in background') }
+}
+
+function Start-PanelFrontendBackgroundJob {
+    param(
+        [Parameter(Mandatory = $true)][ValidateSet('start', 'restart', 'build')]
+        [string]$Action,
+        [string]$BuildMode = ''
+    )
+    $scriptsDir = $PSScriptRoot
+    $root = $script:MeisRoot
+    if ($Action -eq 'build') {
+        $script:PanelBuildPending['meis-web'] = Get-Date
+    }
+    $null = Start-Job -ScriptBlock {
+        param($ActionName, $Mode, $ScriptsDir, $Root)
+        Set-Location $Root
+        . (Join-Path $ScriptsDir 'meis-services.ps1')
+        try {
+            switch ($ActionName) {
+                'start' {
+                    Start-MeisFrontend | Out-Null
+                }
+                'restart' {
+                    Stop-MeisFrontend | Out-Null
+                    Start-Sleep -Seconds 1
+                    Start-MeisFrontend | Out-Null
+                }
+                'build' {
+                    switch ($Mode) {
+                        'install' {
+                            Build-MeisFrontendProject -NpmInstall | Out-Null
+                        }
+                        'typecheck' {
+                            Build-MeisFrontendProject -TypeCheck | Out-Null
+                        }
+                        'build' {
+                            Build-MeisFrontendProject -Build | Out-Null
+                        }
+                        default {
+                            throw ('Unknown frontend build mode: ' + $Mode)
+                        }
+                    }
+                }
+            }
+        } catch {
+            Add-MeisPanelEvent (('FRONTEND ' + $ActionName.ToUpper() + ' FAILED: ' + $_.Exception.Message))
+            throw
+        }
+    } -ArgumentList $Action, $BuildMode, $scriptsDir, $root
+    $verb = switch ($Action) {
+        'start' { 'starting dev server' }
+        'restart' { 'restarting dev server' }
+        'build' { 'building' }
+    }
+    return @{ ok = $true; message = ('meis-web ' + $verb + ' in background') }
 }
 
 function Invoke-PanelAction {
@@ -138,23 +265,40 @@ function Invoke-PanelAction {
     }
 }
 
-function Read-PanelBackendBuildOptions {
-    param($Query)
-    return @{
-        clean       = $Query['clean'] -eq '1'
-        package     = $Query['package'] -eq '1'
-        compile     = $Query['compile'] -eq '1'
-        loadClasses = $Query['loadClasses'] -eq '1'
+function Get-PanelFrontendStatus {
+    $fe = Get-MeisFrontendStatus
+    $building = $false
+    if ($script:PanelBuildPending.ContainsKey('meis-web')) {
+        $started = $script:PanelBuildPending['meis-web']
+        if (((Get-Date) - $started).TotalSeconds -lt 600) {
+            $building = $true
+        } else {
+            $script:PanelBuildPending.Remove('meis-web') | Out-Null
+        }
     }
+    $fe.buildInProgress = $building
+    return $fe
 }
 
-function Read-PanelFrontendBuildOptions {
-    param($Query)
-    return @{
-        npmInstall = $Query['npmInstall'] -eq '1'
-        typeCheck  = $Query['typecheck'] -eq '1'
-        build      = $Query['build'] -eq '1'
+function Get-PanelServiceStatusList {
+    $list = @(Get-MeisServiceStatusList)
+    $now = Get-Date
+    foreach ($item in $list) {
+        $name = [string]$item.name
+        $building = $false
+        if ($script:PanelBuildPending.ContainsKey($name)) {
+            $started = $script:PanelBuildPending[$name]
+            $elapsed = ($now - $started).TotalSeconds
+            $jar = Join-Path $script:MeisRoot "$name\target\$name-1.0.0-SNAPSHOT.jar"
+            if ($elapsed -lt 300 -and -not (Test-Path $jar)) {
+                $building = $true
+            } else {
+                $script:PanelBuildPending.Remove($name) | Out-Null
+            }
+        }
+        $item.buildInProgress = $building
     }
+    return $list
 }
 
 function Handle-PanelRequest {
@@ -183,9 +327,9 @@ function Handle-PanelRequest {
             gatewayUrl = 'http://localhost:8080'
             panelPort = $Port
             redisUp = Test-MeisRedisAvailable
-            frontend = Get-MeisFrontendStatus
+            frontend = Get-PanelFrontendStatus
             coreServices = @($script:MeisCoreServiceNames)
-            services = @(Get-MeisServiceStatusList)
+            services = @(Get-PanelServiceStatusList)
         }
         Write-JsonResponse -Response $res -Data $payload
         return
@@ -235,7 +379,8 @@ function Handle-PanelRequest {
 
     if ($method -eq 'POST') {
         if ($path -eq '/api/backend/stop-all') {
-            $r = Invoke-PanelAction { Stop-MeisServices } -EventMessage 'STOP all backend'
+            Add-MeisPanelEvent 'STOP all backend (background)'
+            $r = Start-PanelBackgroundJob -Label 'stop-all-backend' -Action 'stop-all'
             Write-JsonResponse -Response $res -Data $r
             return
         }
@@ -270,10 +415,8 @@ function Handle-PanelRequest {
             return
         }
         if ($path -eq '/api/frontend/start') {
-            $bo = Read-PanelFrontendBuildOptions $req.QueryString
-            $r = Invoke-PanelAction {
-                Start-MeisFrontendWithBuild -NpmInstall:$bo.npmInstall -TypeCheck:$bo.typeCheck -Build:$bo.build
-            } -EventMessage 'START frontend'
+            Add-MeisPanelEvent 'START frontend dev server (background)'
+            $r = Start-PanelFrontendBackgroundJob -Action 'start'
             Write-JsonResponse -Response $res -Data $r
             return
         }
@@ -283,18 +426,16 @@ function Handle-PanelRequest {
             return
         }
         if ($path -eq '/api/frontend/restart') {
-            $bo = Read-PanelFrontendBuildOptions $req.QueryString
-            $r = Invoke-PanelAction {
-                Restart-MeisFrontend -NpmInstall:$bo.npmInstall -TypeCheck:$bo.typeCheck -Build:$bo.build
-            } -EventMessage 'RESTART frontend'
+            Add-MeisPanelEvent 'RESTART frontend dev server (background)'
+            $r = Start-PanelFrontendBackgroundJob -Action 'restart'
             Write-JsonResponse -Response $res -Data $r
             return
         }
         if ($path -eq '/api/frontend/build') {
-            $bo = Read-PanelFrontendBuildOptions $req.QueryString
-            $r = Invoke-PanelAction {
-                Build-MeisFrontendProject -NpmInstall:$bo.npmInstall -TypeCheck:$bo.typeCheck -Build:$bo.build
-            } -EventMessage 'BUILD frontend'
+            $mode = [string]$req.QueryString.Get('mode')
+            if ([string]::IsNullOrWhiteSpace($mode)) { $mode = 'typecheck' }
+            Add-MeisPanelEvent ('BUILD frontend (background, mode=' + $mode + ')')
+            $r = Start-PanelFrontendBackgroundJob -Action 'build' -BuildMode $mode
             Write-JsonResponse -Response $res -Data $r
             return
         }
@@ -329,34 +470,30 @@ function Handle-PanelRequest {
         if ($path -match "^/api/service/([a-z0-9-]+)/(stop|start|restart|start-debug|build|reload-classes)$") {
             $name = $Matches[1]
             $action = $Matches[2]
-            $bo = Read-PanelBackendBuildOptions $req.QueryString
             $eventLabel = ($action.ToUpper() + ' ' + $name)
             $r = switch ($action) {
                 'stop' { Invoke-PanelAction { Stop-MeisServiceByName $name; @{ message = ($name + ' stopped') } } -EventMessage $eventLabel }
                 'start' {
-                    Invoke-PanelAction {
-                        Start-MeisServiceByNameWithBuild -ServiceName $name -Clean:$bo.clean -Package:$bo.package -Compile:$bo.compile -LoadClasses:$bo.loadClasses
-                    } -EventMessage $eventLabel
+                    Add-MeisPanelEvent ($eventLabel + ' (background)')
+                    Start-PanelServiceBackgroundJob -ServiceName $name -Action 'start'
                 }
                 'start-debug' {
-                    Invoke-PanelAction {
-                        Start-MeisServiceByNameWithBuild -ServiceName $name -EnableJdwp -Clean:$bo.clean -Package:$bo.package -Compile:$bo.compile -LoadClasses:$bo.loadClasses
-                    } -EventMessage ($eventLabel + ' (debug)')
+                    Add-MeisPanelEvent ($eventLabel + ' (background, debug)')
+                    Start-PanelServiceBackgroundJob -ServiceName $name -Action 'start-debug'
                 }
                 'restart' {
-                    Invoke-PanelAction {
-                        Restart-MeisServiceByName -ServiceName $name -Clean:$bo.clean -Package:$bo.package -Compile:$bo.compile -LoadClasses:$bo.loadClasses
-                    } -EventMessage $eventLabel
+                    Add-MeisPanelEvent ($eventLabel + ' (background)')
+                    Start-PanelServiceBackgroundJob -ServiceName $name -Action 'restart'
                 }
                 'build' {
-                    Invoke-PanelAction {
-                        Build-MeisServiceModule -ServiceName $name -Clean:$bo.clean -Package:$bo.package -Compile:$bo.compile -LoadClasses:$bo.loadClasses
-                    } -EventMessage ('BUILD ' + $name)
+                    $modeLabel = [string]$req.QueryString.Get('mode')
+                    if ([string]::IsNullOrWhiteSpace($modeLabel)) { $modeLabel = 'quick' }
+                    Add-MeisPanelEvent ('BUILD ' + $name + ' (background, mode=' + $modeLabel + ')')
+                    Start-PanelServiceBackgroundJob -ServiceName $name -Action 'build' -BuildMode $modeLabel
                 }
                 'reload-classes' {
-                    Invoke-PanelAction {
-                        Build-MeisServiceModule -ServiceName $name -LoadClasses -Clean:$bo.clean
-                    } -EventMessage ('RELOAD-CLASSES ' + $name)
+                    Add-MeisPanelEvent ('RELOAD-CLASSES ' + $name + ' (background)')
+                    Start-PanelServiceBackgroundJob -ServiceName $name -Action 'reload-classes'
                 }
             }
             Write-JsonResponse -Response $res -Data $r
@@ -364,10 +501,8 @@ function Handle-PanelRequest {
         }
         if ($path -match "^/api/service/([a-z0-9-]+)/restart-debug$") {
             $name = $Matches[1]
-            $bo = Read-PanelBackendBuildOptions $req.QueryString
-            $r = Invoke-PanelAction {
-                Restart-MeisServiceByName -ServiceName $name -EnableJdwp -Clean:$bo.clean -Package:$bo.package -Compile:$bo.compile -LoadClasses:$bo.loadClasses
-            } -EventMessage ("RESTART-DEBUG " + $name)
+            Add-MeisPanelEvent ("RESTART-DEBUG " + $name + ' (background)')
+            $r = Start-PanelServiceBackgroundJob -ServiceName $name -Action 'restart' -DoEnableJdwp:$true
             Write-JsonResponse -Response $res -Data $r
             return
         }

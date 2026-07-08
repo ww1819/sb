@@ -426,8 +426,9 @@ function Start-MeisServiceByName {
     $javaExe = Join-Path $env:JAVA_HOME 'bin\java.exe'
     $root = $script:MeisRoot
     $jar = Join-Path $root "$ServiceName\target\$ServiceName-1.0.0-SNAPSHOT.jar"
-    if (-not (Test-Path $jar)) {
-        throw "Missing $jar - run scripts\build.ps1 first"
+    $jarHealth = Test-MeisServiceJarHealthy $ServiceName
+    if (-not $jarHealth.ok) {
+        throw $jarHealth.message
     }
 
     $logDir = Join-Path $root 'logs'
@@ -519,8 +520,52 @@ function Get-MeisServiceClassSourceModules {
     return @($modules | Select-Object -Unique)
 }
 
+function Test-MeisServiceJarHealthy {
+    param([Parameter(Mandatory = $true)][string]$ServiceName)
+
+    $jar = Join-Path $script:MeisRoot "$ServiceName\target\$ServiceName-1.0.0-SNAPSHOT.jar"
+    if (-not (Test-Path $jar)) {
+        return @{ ok = $false; message = 'Missing JAR. Select full package mode and build first.' }
+    }
+
+    $size = (Get-Item $jar).Length
+    if ($size -lt 1048576) {
+        $kb = [math]::Round($size / 1024)
+        return @{ ok = $false; message = "JAR too small ($kb KB). Quick-update may have corrupted it; run full package build." }
+    }
+
+    $env:JAVA_HOME = Resolve-MeisJavaHome
+    $jarExe = Join-Path $env:JAVA_HOME 'bin\jar.exe'
+    if (-not (Test-Path $jarExe)) {
+        return @{ ok = $false; message = 'jar.exe not found under JAVA_HOME' }
+    }
+
+    $listing = @(& $jarExe tf $jar 2>$null)
+    if ($LASTEXITCODE -ne 0 -or $listing.Count -eq 0) {
+        return @{ ok = $false; message = 'JAR unreadable. Run full package build.' }
+    }
+    $hasLib = $false
+    $hasManifest = $false
+    foreach ($line in $listing) {
+        if ($line -like 'BOOT-INF/lib/*') { $hasLib = $true }
+        if ($line -eq 'META-INF/MANIFEST.MF') { $hasManifest = $true }
+        if ($hasLib -and $hasManifest) { break }
+    }
+    if (-not $hasManifest) {
+        return @{ ok = $false; message = 'JAR missing MANIFEST.MF. Run full package build.' }
+    }
+    if (-not $hasLib) {
+        return @{ ok = $false; message = 'JAR missing BOOT-INF/lib. Run full package build.' }
+    }
+
+    return @{ ok = $true; message = 'ok' }
+}
+
 function Sync-MeisServiceClassesToJar {
     param([Parameter(Mandatory = $true)][string]$ServiceName)
+
+    $health = Test-MeisServiceJarHealthy $ServiceName
+    if (-not $health.ok) { throw $health.message }
 
     $env:JAVA_HOME = Resolve-MeisJavaHome
     $jarExe = Join-Path $env:JAVA_HOME 'bin\jar.exe'
@@ -528,44 +573,65 @@ function Sync-MeisServiceClassesToJar {
 
     $root = $script:MeisRoot
     $jar = Join-Path $root "$ServiceName\target\$ServiceName-1.0.0-SNAPSHOT.jar"
-    if (-not (Test-Path $jar)) {
-        throw "缺少 $jar，请先执行一次 package 完整打包"
-    }
-
     $sources = Get-MeisServiceClassSourceModules $ServiceName
-    $staging = Join-Path $env:TEMP "meis-jar-sync-$ServiceName-$(Get-Random)"
-    $bootClasses = Join-Path $staging 'BOOT-INF\classes'
-    New-Item -ItemType Directory -Path $bootClasses -Force | Out-Null
-    $fileCount = 0
+    $workDir = Join-Path $env:TEMP "meis-jar-sync-$ServiceName-$(Get-Random)"
+    New-Item -ItemType Directory -Path $workDir -Force | Out-Null
+    $jarNew = "$jar.new"
+    $jarBackup = "$jar.bak"
 
-    foreach ($mod in $sources) {
-        $cls = Join-Path $root "$mod\target\classes"
-        if (-not (Test-Path $cls)) { continue }
-        Get-ChildItem $cls -Recurse -File | ForEach-Object {
-            $rel = $_.FullName.Substring($cls.Length + 1)
-            $dest = Join-Path $bootClasses $rel
-            $destDir = Split-Path $dest -Parent
-            if (-not (Test-Path $destDir)) { New-Item -ItemType Directory -Path $destDir -Force | Out-Null }
-            Copy-Item $_.FullName $dest -Force
-            $fileCount++
-        }
-    }
-
-    if ($fileCount -eq 0) {
-        Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue
-        throw "未找到可同步的 class/resource，请先执行 compile"
-    }
-
-    Push-Location $staging
     try {
-        & $jarExe uf $jar BOOT-INF
-        if ($LASTEXITCODE -ne 0) { throw "jar update failed: $ServiceName" }
-    } finally {
-        Pop-Location
-        Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue
-    }
+        Push-Location $workDir
+        & $jarExe xf $jar
+        if ($LASTEXITCODE -ne 0) { throw "无法解压 JAR: $ServiceName" }
 
-    return @{ ok = $true; message = ($ServiceName + ": 已加载 $fileCount 个类/资源到 JAR") }
+        $manifest = Join-Path $workDir 'META-INF\MANIFEST.MF'
+        if (-not (Test-Path $manifest)) {
+            throw 'JAR missing MANIFEST.MF. Run full package build first.'
+        }
+
+        $bootClasses = Join-Path $workDir 'BOOT-INF\classes'
+        if (-not (Test-Path $bootClasses)) {
+            New-Item -ItemType Directory -Path $bootClasses -Force | Out-Null
+        }
+
+        $fileCount = 0
+        foreach ($mod in $sources) {
+            $cls = Join-Path $root "$mod\target\classes"
+            if (-not (Test-Path $cls)) { continue }
+            Get-ChildItem $cls -Recurse -File | ForEach-Object {
+                $rel = $_.FullName.Substring($cls.Length + 1)
+                $dest = Join-Path $bootClasses $rel
+                $destDir = Split-Path $dest -Parent
+                if (-not (Test-Path $destDir)) { New-Item -ItemType Directory -Path $destDir -Force | Out-Null }
+                Copy-Item $_.FullName $dest -Force
+                $fileCount++
+            }
+        }
+
+        if ($fileCount -eq 0) {
+            throw "未找到可同步的 class/resource，请先执行 compile"
+        }
+
+        if (Test-Path $jarNew) { Remove-Item $jarNew -Force }
+        & $jarExe cfm $jarNew 'META-INF/MANIFEST.MF' .
+        if ($LASTEXITCODE -ne 0) { throw "JAR 重新打包失败: $ServiceName" }
+        Pop-Location
+
+        Copy-Item $jar $jarBackup -Force
+        try {
+            Move-Item $jarNew $jar -Force
+            Remove-Item $jarBackup -Force -ErrorAction SilentlyContinue
+        } catch {
+            if (Test-Path $jarBackup) { Move-Item $jarBackup $jar -Force }
+            throw "JAR 替换失败: $ServiceName"
+        }
+
+        return @{ ok = $true; message = ($ServiceName + ": 已加载 $fileCount 个类/资源到 JAR") }
+    } finally {
+        Pop-Location -ErrorAction SilentlyContinue
+        Remove-Item $workDir -Recurse -Force -ErrorAction SilentlyContinue
+        if (Test-Path $jarNew) { Remove-Item $jarNew -Force -ErrorAction SilentlyContinue }
+    }
 }
 
 function Build-MeisServiceModule {
@@ -580,6 +646,10 @@ function Build-MeisServiceModule {
         throw 'Select at least one build step: clean, package, compile or loadClasses'
     }
     if ($LoadClasses) {
+        $health = Test-MeisServiceJarHealthy $ServiceName
+        if (-not $health.ok) {
+            Invoke-MeisMavenModule -Module $ServiceName -Package | Out-Null
+        }
         if ($Clean) {
             Invoke-MeisMavenModule -Module $ServiceName -Clean | Out-Null
         }
@@ -685,6 +755,9 @@ function Get-MeisServiceStatusList {
         $debugUp = $false
         if ($s.debugPort) { $debugUp = Test-MeisPortListening -Port $s.debugPort }
         $jar = Join-Path $script:MeisRoot "$($s.name)\target\$($s.name)-1.0.0-SNAPSHOT.jar"
+        $jarExists = Test-Path $jar
+        $jarSizeKb = if ($jarExists) { [math]::Round((Get-Item $jar).Length / 1KB) } else { 0 }
+        $jarHealthy = $jarExists -and $jarSizeKb -ge 1024
         $meta = Get-MeisServiceMetaEntry $s.name
         $list += [ordered]@{
             name       = $s.name
@@ -694,9 +767,10 @@ function Get-MeisServiceStatusList {
             debugPort  = $s.debugPort
             httpUp     = $httpUp
             debugUp    = $debugUp
-            jarExists  = Test-Path $jar
-            jarSizeKb  = if (Test-Path $jar) { [math]::Round((Get-Item $jar).Length / 1KB) } else { 0 }
-            jarMtime   = if (Test-Path $jar) { (Get-Item $jar).LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
+            jarExists  = $jarExists
+            jarSizeKb  = $jarSizeKb
+            jarHealthy = $jarHealthy
+            jarMtime   = if ($jarExists) { (Get-Item $jar).LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
         }
     }
     return $list
