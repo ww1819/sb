@@ -10,6 +10,24 @@ function Resolve-MeisJavaHome {
     throw 'JDK 17 not found. Install to E:\workspace\jdk-17 or set MEIS_JAVA_HOME.'
 }
 
+function Resolve-MeisMaven {
+    foreach ($candidate in @(
+        $env:MEIS_MAVEN_CMD,
+        $env:MEIS_MAVEN_HOME,
+        'D:\JAVA\apache-maven-3.8.4',
+        'C:\apache-maven-3.8.4',
+        'E:\workspace\apache-maven-3.8.4'
+    )) {
+        if (-not $candidate) { continue }
+        if ($candidate -match '\\mvn\.cmd$' -and (Test-Path $candidate)) { return $candidate }
+        $cmd = Join-Path $candidate 'bin\mvn.cmd'
+        if (Test-Path $cmd) { return $cmd }
+    }
+    $inPath = Get-Command mvn -ErrorAction SilentlyContinue
+    if ($inPath) { return $inPath.Source }
+    throw 'Maven not found. Install to D:\JAVA\apache-maven-3.8.4 or set MEIS_MAVEN_HOME / MEIS_MAVEN_CMD.'
+}
+
 $script:MeisServicePorts = @(8082, 8081, 8083, 8084, 8085, 8086, 8087, 8088, 8089, 8090, 8091, 8092, 8093, 8094, 8080)
 
 $script:MeisServices = @(

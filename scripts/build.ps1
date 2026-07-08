@@ -2,12 +2,14 @@
 $ErrorActionPreference = "Stop"
 . "$PSScriptRoot\meis-services.ps1"
 $env:JAVA_HOME = Resolve-MeisJavaHome
+$mvn = Resolve-MeisMaven
 $env:Path = "$env:JAVA_HOME\bin;" + $env:Path
 Write-Host "Using JAVA_HOME: $env:JAVA_HOME"
+Write-Host "Using Maven: $mvn"
 Set-Location $PSScriptRoot\..
 
 Write-Host "Building MEIS backend..."
-mvn -q package -DskipTests
+& $mvn -q package -DskipTests
 if ($LASTEXITCODE -ne 0) { throw "Maven build failed" }
 
 if (Test-Path "meis-web\package.json") {
