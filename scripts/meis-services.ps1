@@ -436,11 +436,104 @@ function Get-MeisServiceLogTail {
         [int]$Lines = 40,
         [switch]$Debug
     )
-    $suffix = if ($Debug) { '.debug' } else { '' }
-    $log = Join-Path $script:MeisRoot "logs\$ServiceName$suffix.err.log"
-    if (-not (Test-Path $log)) {
-        $log = Join-Path $script:MeisRoot "logs\$ServiceName$suffix.out.log"
+    $entries = Get-MeisPanelLogEntries -ServiceName $ServiceName -Lines $Lines -Debug:$Debug
+    return @($entries | ForEach-Object { $_.text })
+}
+
+function Add-MeisPanelEvent {
+    param([Parameter(Mandatory = $true)][string]$Message)
+    $logDir = Join-Path $script:MeisRoot 'logs'
+    if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
+    $line = (Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + ' [PANEL] ' + $Message
+    Add-Content -Path (Join-Path $logDir 'dev-panel-events.log') -Value $line -Encoding UTF8
+}
+
+function Read-MeisLogFileEntries {
+    param(
+        [Parameter(Mandatory = $true)][string]$ServiceName,
+        [Parameter(Mandatory = $true)][string]$LogPath,
+        [Parameter(Mandatory = $true)][string]$Stream,
+        [int]$Lines = 80
+    )
+    if (-not (Test-Path $LogPath)) { return @() }
+    $fileTime = (Get-Item $LogPath).LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss')
+    $rawLines = @(Get-Content $LogPath -Tail $Lines -Encoding UTF8 -ErrorAction SilentlyContinue)
+    $entries = @()
+    foreach ($line in $rawLines) {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        $ts = $fileTime
+        $level = 'INFO'
+        if ($line -match '^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})') {
+            $ts = $Matches[1] + ' ' + $Matches[2]
+        }
+        if ($line -match '\s(TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\s') {
+            $level = $Matches[1]
+        } elseif ($line -match '(?i)\b(error|exception|failed|failure)\b') {
+            $level = 'ERROR'
+        } elseif ($line -match '(?i)\bwarn(ing)?\b') {
+            $level = 'WARN'
+        }
+        if ($Stream -eq 'event') {
+            $level = 'EVENT'
+        } elseif ($Stream -eq 'stderr' -and $level -eq 'INFO') {
+            $level = 'WARN'
+        }
+        $entries += [ordered]@{
+            ts      = $ts
+            service = $ServiceName
+            stream  = $Stream
+            level   = $level
+            text    = $line
+        }
     }
-    if (-not (Test-Path $log)) { return @() }
-    return @(Get-Content $log -Tail $Lines -ErrorAction SilentlyContinue)
+    return $entries
+}
+
+function Get-MeisPanelLogEntries {
+    param(
+        [string]$ServiceName = 'all',
+        [int]$Lines = 100,
+        [switch]$Debug,
+        [switch]$ErrorsOnly
+    )
+
+    $entries = @()
+    $suffix = if ($Debug) { '.debug' } else { '' }
+    $logDir = Join-Path $script:MeisRoot 'logs'
+
+    $panelLog = Join-Path $logDir 'dev-panel-events.log'
+    if (Test-Path $panelLog) {
+        $entries += Read-MeisLogFileEntries -ServiceName 'panel' -LogPath $panelLog -Stream 'event' -Lines $Lines
+    }
+
+    if ($ServiceName -eq 'all' -or $ServiceName -eq 'meis-web') {
+        $feErr = Join-Path $logDir 'meis-web.dev.err.log'
+        $feOut = Join-Path $logDir 'meis-web.dev.out.log'
+        $entries += Read-MeisLogFileEntries -ServiceName 'meis-web' -LogPath $feErr -Stream 'stderr' -Lines $Lines
+        $entries += Read-MeisLogFileEntries -ServiceName 'meis-web' -LogPath $feOut -Stream 'stdout' -Lines $Lines
+    }
+
+    if ($ServiceName -ne 'meis-web') {
+        $targets = if ($ServiceName -eq 'all') { $script:MeisServices } else { @(Get-MeisServiceDefinition $ServiceName) }
+        foreach ($s in $targets) {
+            $name = $s.name
+            $errLog = Join-Path $logDir "$name$suffix.err.log"
+            $outLog = Join-Path $logDir "$name$suffix.out.log"
+            $entries += Read-MeisLogFileEntries -ServiceName $name -LogPath $errLog -Stream 'stderr' -Lines $Lines
+            $entries += Read-MeisLogFileEntries -ServiceName $name -LogPath $outLog -Stream 'stdout' -Lines $Lines
+        }
+    }
+
+    if ($ErrorsOnly) {
+        $entries = @($entries | Where-Object {
+            $_.level -in @('ERROR', 'WARN') -or $_.text -match '(?i)exception|error|failed|failure|caused by:'
+        })
+    }
+
+    return @($entries | Sort-Object { $_.ts + $_.service + $_.text } -Descending | Select-Object -First ($Lines * 4))
+}
+
+function Get-MeisPanelLogServices {
+    $names = @('all') + @($script:MeisServices | ForEach-Object { $_.name }) + @('meis-web', 'panel')
+    return $names
 }

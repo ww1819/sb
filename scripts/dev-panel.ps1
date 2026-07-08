@@ -73,13 +73,19 @@ function Start-PanelBackgroundJob {
 }
 
 function Invoke-PanelAction {
-    param([scriptblock]$Action)
+    param(
+        [scriptblock]$Action,
+        [string]$EventMessage
+    )
     try {
+        if ($EventMessage) { Add-MeisPanelEvent $EventMessage }
         $result = & $Action
         $msg = 'done'
         if ($result -and $result.message) { $msg = [string]$result.message }
+        if ($EventMessage) { Add-MeisPanelEvent ($EventMessage + ' -> ' + $msg) }
         return @{ ok = $true; data = $result; message = $msg }
     } catch {
+        if ($EventMessage) { Add-MeisPanelEvent ($EventMessage + ' FAILED: ' + $_.Exception.Message) }
         return @{ ok = $false; message = $_.Exception.Message }
     }
 }
@@ -112,51 +118,79 @@ function Handle-PanelRequest {
         return
     }
 
+    if ($method -eq 'GET' -and $path -eq '/api/logs/stream') {
+        $service = $req.QueryString['service']
+        if (-not $service) { $service = 'all' }
+        $lines = 100
+        if ($req.QueryString['lines'] -match '^\d+$') { $lines = [int]$req.QueryString['lines'] }
+        $debug = $req.QueryString['debug'] -eq '1'
+        $errorsOnly = $req.QueryString['errorsOnly'] -eq '1'
+        $entries = Get-MeisPanelLogEntries -ServiceName $service -Lines $lines -Debug:$debug -ErrorsOnly:$errorsOnly
+        Write-JsonResponse -Response $res -Data @{
+            service = $service
+            entries = $entries
+            services = @(Get-MeisPanelLogServices)
+            fetchedAt = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+        }
+        return
+    }
+
     if ($method -eq 'GET' -and $path -match "^/api/logs/([a-z0-9-]+)$") {
         $name = $Matches[1]
         $debug = $req.QueryString['debug'] -eq '1'
-        $lines = Get-MeisServiceLogTail -ServiceName $name -Lines 60 -Debug:$debug
-        Write-JsonResponse -Response $res -Data @{ name = $name; lines = $lines }
+        $lines = 80
+        if ($req.QueryString['lines'] -match '^\d+$') { $lines = [int]$req.QueryString['lines'] }
+        $entries = Get-MeisPanelLogEntries -ServiceName $name -Lines $lines -Debug:$debug
+        Write-JsonResponse -Response $res -Data @{
+            name = $name
+            entries = $entries
+            lines = @($entries | ForEach-Object { $_.text })
+            fetchedAt = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+        }
         return
     }
 
     if ($method -eq 'POST') {
         if ($path -eq '/api/backend/stop-all') {
-            $r = Invoke-PanelAction { Stop-MeisServices; @{ message = 'all backend stopped' } }
+            $r = Invoke-PanelAction { Stop-MeisServices; @{ message = 'all backend stopped' } } -EventMessage 'STOP all backend'
             Write-JsonResponse -Response $res -Data $r
             return
         }
         if ($path -eq '/api/backend/start-all') {
+            Add-MeisPanelEvent 'START all backend (background)'
             $r = Start-PanelBackgroundJob -Label 'start-all-backend' -Action 'start-all'
             Write-JsonResponse -Response $res -Data $r
             return
         }
         if ($path -eq '/api/backend/restart-all') {
+            Add-MeisPanelEvent 'RESTART all backend (background)'
             $r = Start-PanelBackgroundJob -Label 'restart-all-backend' -Action 'restart-all'
             Write-JsonResponse -Response $res -Data $r
             return
         }
         if ($path -eq '/api/frontend/start') {
-            $r = Invoke-PanelAction { Start-MeisFrontend }
+            $r = Invoke-PanelAction { Start-MeisFrontend } -EventMessage 'START frontend'
             Write-JsonResponse -Response $res -Data $r
             return
         }
         if ($path -eq '/api/frontend/stop') {
-            $r = Invoke-PanelAction { Stop-MeisFrontend; @{ message = 'frontend stopped' } }
+            $r = Invoke-PanelAction { Stop-MeisFrontend; @{ message = 'frontend stopped' } } -EventMessage 'STOP frontend'
             Write-JsonResponse -Response $res -Data $r
             return
         }
         if ($path -eq '/api/frontend/restart') {
-            $r = Invoke-PanelAction { Restart-MeisFrontend }
+            $r = Invoke-PanelAction { Restart-MeisFrontend } -EventMessage 'RESTART frontend'
             Write-JsonResponse -Response $res -Data $r
             return
         }
         if ($path -eq '/api/build/backend') {
+            Add-MeisPanelEvent 'BUILD backend (background)'
             $r = Start-PanelBackgroundJob -Label 'build-backend' -Action 'build-backend'
             Write-JsonResponse -Response $res -Data $r
             return
         }
         if ($path -eq '/api/build/install') {
+            Add-MeisPanelEvent 'MAVEN INSTALL (background)'
             $r = Start-PanelBackgroundJob -Label 'maven-install' -Action 'build-install'
             Write-JsonResponse -Response $res -Data $r
             return
@@ -165,18 +199,19 @@ function Handle-PanelRequest {
         if ($path -match "^/api/service/([a-z0-9-]+)/(stop|start|restart|start-debug)$") {
             $name = $Matches[1]
             $action = $Matches[2]
+            $eventLabel = ($action.ToUpper() + ' ' + $name)
             $r = switch ($action) {
-                'stop' { Invoke-PanelAction { Stop-MeisServiceByName $name; @{ message = ($name + ' stopped') } } }
-                'start' { Invoke-PanelAction { Start-MeisServiceByName -ServiceName $name } }
-                'start-debug' { Invoke-PanelAction { Start-MeisServiceByName -ServiceName $name -Debug } }
-                'restart' { Invoke-PanelAction { Restart-MeisServiceByName -ServiceName $name } }
+                'stop' { Invoke-PanelAction { Stop-MeisServiceByName $name; @{ message = ($name + ' stopped') } } -EventMessage $eventLabel }
+                'start' { Invoke-PanelAction { Start-MeisServiceByName -ServiceName $name } -EventMessage $eventLabel }
+                'start-debug' { Invoke-PanelAction { Start-MeisServiceByName -ServiceName $name -Debug } -EventMessage ($eventLabel + ' (debug)') }
+                'restart' { Invoke-PanelAction { Restart-MeisServiceByName -ServiceName $name } -EventMessage $eventLabel }
             }
             Write-JsonResponse -Response $res -Data $r
             return
         }
         if ($path -match "^/api/service/([a-z0-9-]+)/restart-debug$") {
             $name = $Matches[1]
-            $r = Invoke-PanelAction { Restart-MeisServiceByName -ServiceName $name -Debug }
+            $r = Invoke-PanelAction { Restart-MeisServiceByName -ServiceName $name -Debug } -EventMessage ("RESTART-DEBUG " + $name)
             Write-JsonResponse -Response $res -Data $r
             return
         }

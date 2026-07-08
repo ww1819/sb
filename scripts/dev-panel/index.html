@@ -133,7 +133,63 @@
       padding: 12px;
     }
     .log-panel h3 { margin: 0 0 8px; font-size: 0.9rem; color: var(--muted); }
-    pre {
+    .log-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .log-toolbar label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .log-toolbar select {
+      background: #0f1419;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 0.82rem;
+    }
+    .log-meta {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-left: auto;
+    }
+    .log-console {
+      margin: 0;
+      max-height: 420px;
+      overflow: auto;
+      font-size: 0.78rem;
+      line-height: 1.5;
+      background: #0b1018;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: Consolas, "Cascadia Mono", monospace;
+    }
+    .log-line {
+      display: grid;
+      grid-template-columns: 148px 130px 56px 1fr;
+      gap: 8px;
+      padding: 4px 10px;
+      border-bottom: 1px solid rgba(45, 58, 79, 0.45);
+      word-break: break-word;
+    }
+    .log-line:hover { background: rgba(91, 141, 239, 0.08); }
+    .log-line .ts { color: #7d8fa8; }
+    .log-line .svc { color: #8eb4ff; }
+    .log-line .lvl { font-weight: 600; }
+    .log-line.lvl-ERROR .lvl, .log-line.lvl-ERROR .msg { color: #ff6b8a; }
+    .log-line.lvl-WARN .lvl, .log-line.lvl-WARN .msg { color: #ffc857; }
+    .log-line.lvl-INFO .lvl { color: #6eb5ff; }
+    .log-line.lvl-EVENT .lvl, .log-line.lvl-EVENT .msg { color: #b388ff; }
+    .log-line .msg { color: #c5d0e0; white-space: pre-wrap; }
+    .log-empty { padding: 24px; text-align: center; color: var(--muted); }
+    pre.legacy-log {
       margin: 0;
       max-height: 220px;
       overflow: auto;
@@ -192,8 +248,23 @@
     </table>
 
     <div class="log-panel">
-      <h3 id="log-title">服务日志（点击「日志」查看最近输出）</h3>
-      <pre id="log-content">—</pre>
+      <h3>运行日志（带时间戳，便于排查启动与运行错误）</h3>
+      <div class="log-toolbar">
+        <label>服务
+          <select id="log-service" onchange="onLogFilterChange()">
+            <option value="all">全部服务</option>
+          </select>
+        </label>
+        <label><input type="checkbox" id="log-errors-only" onchange="refreshLogs()" /> 仅错误/警告</label>
+        <label><input type="checkbox" id="log-debug" onchange="refreshLogs()" /> 调试日志</label>
+        <label><input type="checkbox" id="log-auto" checked onchange="toggleLogAuto()" /> 自动刷新</label>
+        <button onclick="refreshLogs()">刷新日志</button>
+        <button onclick="scrollLogBottom()">滚到底部</button>
+        <span class="log-meta" id="log-meta">—</span>
+      </div>
+      <div class="log-console" id="log-console">
+        <div class="log-empty">加载中…</div>
+      </div>
     </div>
   </main>
 
@@ -202,6 +273,13 @@
   <script>
     let busy = false
     let timer = null
+    let logTimer = null
+    let logFollowBottom = true
+    let pinnedService = 'all'
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    }
 
     function showToast(msg, ok = true) {
       const el = document.getElementById('toast')
@@ -223,6 +301,7 @@
         const data = await api('/api/' + path, 'POST')
         showToast(data.message || (data.ok ? '完成' : '失败'), data.ok !== false)
         await refresh()
+        await refreshLogs()
       } catch (e) {
         showToast(e.message, false)
       } finally {
@@ -235,10 +314,13 @@
       if (busy) return
       busy = true
       document.body.classList.add('busy')
+      pinnedService = name
+      document.getElementById('log-service').value = name
       try {
         const data = await api('/api/service/' + name + '/' + action, 'POST')
         showToast((name + ': ') + (data.message || '完成'), data.ok !== false)
         await refresh()
+        await refreshLogs()
       } catch (e) {
         showToast(e.message, false)
       } finally {
@@ -247,11 +329,83 @@
       }
     }
 
-    async function showLog(name, debug = false) {
-      document.getElementById('log-title').textContent = name + (debug ? ' (debug)' : '') + ' 最近日志'
-      const q = debug ? '?debug=1' : ''
-      const data = await api('/api/logs/' + name + q)
-      document.getElementById('log-content').textContent = (data.lines || []).join('\n') || '(无日志)'
+    function onLogFilterChange() {
+      pinnedService = document.getElementById('log-service').value
+      refreshLogs()
+    }
+
+    function toggleLogAuto() {
+      const on = document.getElementById('log-auto').checked
+      if (on && !logTimer) {
+        logTimer = setInterval(refreshLogs, 3000)
+      } else if (!on && logTimer) {
+        clearInterval(logTimer)
+        logTimer = null
+      }
+    }
+
+    function scrollLogBottom() {
+      const el = document.getElementById('log-console')
+      el.scrollTop = el.scrollHeight
+      logFollowBottom = true
+    }
+
+    async function refreshLogs() {
+      const service = document.getElementById('log-service').value || pinnedService || 'all'
+      const errorsOnly = document.getElementById('log-errors-only').checked ? '1' : '0'
+      const debug = document.getElementById('log-debug').checked ? '1' : '0'
+      const el = document.getElementById('log-console')
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48
+
+      try {
+        const data = await api('/api/logs/stream?service=' + encodeURIComponent(service) + '&lines=120&errorsOnly=' + errorsOnly + '&debug=' + debug)
+        populateLogServiceSelect(data.services || [])
+        document.getElementById('log-service').value = service
+        document.getElementById('log-meta').textContent = '更新: ' + (data.fetchedAt || '—') + ' · ' + (data.entries?.length || 0) + ' 条'
+
+        const entries = (data.entries || []).slice().reverse()
+        if (!entries.length) {
+          el.innerHTML = '<div class="log-empty">暂无日志（服务未启动或 logs 目录无输出）</div>'
+          return
+        }
+
+        el.innerHTML = '<div class="log-line" style="position:sticky;top:0;background:#151d2b;font-weight:600;z-index:1">' +
+          '<span class="ts">时间</span><span class="svc">服务</span><span class="lvl">级别</span><span class="msg">内容</span></div>' +
+          entries.map(e => {
+          const lvl = e.level || 'INFO'
+          const cls = 'log-line lvl-' + lvl
+          return '<div class="' + cls + '">' +
+            '<span class="ts">' + escapeHtml(e.ts || '') + '</span>' +
+            '<span class="svc">' + escapeHtml(e.service || '') + '</span>' +
+            '<span class="lvl">' + escapeHtml(lvl) + '</span>' +
+            '<span class="msg">' + escapeHtml(e.text || '') + '</span>' +
+            '</div>'
+        }).join('')
+
+        if (logFollowBottom || nearBottom) {
+          el.scrollTop = el.scrollHeight
+        }
+      } catch (e) {
+        el.innerHTML = '<div class="log-empty">日志加载失败: ' + escapeHtml(e.message) + '</div>'
+      }
+    }
+
+    function populateLogServiceSelect(services) {
+      const sel = document.getElementById('log-service')
+      const current = sel.value || 'all'
+      const opts = (services || ['all']).map(s => '<option value="' + s + '">' + (s === 'all' ? '全部服务' : s) + '</option>').join('')
+      if (sel.innerHTML !== opts) {
+        sel.innerHTML = opts
+        sel.value = current
+      }
+    }
+
+    function showLog(name, debug = false) {
+      pinnedService = name
+      document.getElementById('log-service').value = name
+      document.getElementById('log-debug').checked = !!debug
+      refreshLogs()
+      document.querySelector('.log-panel').scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
 
     function statusDot(up) {
@@ -318,7 +472,14 @@
     }
 
     refresh()
+    refreshLogs()
     timer = setInterval(refresh, 4000)
+    toggleLogAuto()
+
+    document.getElementById('log-console').addEventListener('scroll', (e) => {
+      const el = e.target
+      logFollowBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48
+    })
   </script>
 </body>
 </html>
