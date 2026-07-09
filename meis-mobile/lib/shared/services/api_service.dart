@@ -1,9 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../constants/app_constants.dart';
-import '../models/auth_user.dart';
-import '../storage/app_prefs.dart';
+import '../../core/constants/app_constants.dart';
+import '../../core/models/auth_user.dart';
+import '../../core/storage/app_prefs.dart';
 
 class ApiException implements Exception {
   ApiException(this.message, {this.statusCode});

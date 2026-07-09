@@ -18,7 +18,7 @@ if defined BACKUP_FILE (
 echo.
 
 if defined BACKUP_FILE (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0restore-db.ps1" ^
+    "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0restore-db.ps1" ^
       -PgBinDir "%PG_BIN_DIR%" ^
       -DbHost "%DB_HOST%" ^
       -Port %DB_PORT% ^
@@ -30,7 +30,7 @@ if defined BACKUP_FILE (
       -BackupDir "%BACKUP_DIR%" ^
       -BackupFile "%BACKUP_FILE%"
 ) else (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0restore-db.ps1" ^
+    "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0restore-db.ps1" ^
       -PgBinDir "%PG_BIN_DIR%" ^
       -DbHost "%DB_HOST%" ^
       -Port %DB_PORT% ^

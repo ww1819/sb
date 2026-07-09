@@ -10,6 +10,34 @@
 4. **登录** — 医院编码 + 用户名 + 密码
 5. **首页** — 报修 / 盘点 / 保养 / 巡检 / 消息
 
+## 本机环境（已确认）
+
+- Flutter：`E:\flutter`（Dart 3.12.2）
+- PATH：已包含 `E:\flutter\bin`
+- 国内镜像：`PUB_HOSTED_URL` / `FLUTTER_STORAGE_BASE_URL`
+
+## 一键启动（Windows 桌面）
+
+```bat
+REM 1. 先启动 MEIS 后端
+scripts\start.bat
+
+REM 2. 首次：生成 android/windows 平台工程
+scripts\setup-mobile.bat
+
+REM 3. 运行 App（弹出独立窗口）
+scripts\run-mobile.bat
+```
+
+## 手动命令
+
+```powershell
+cd e:\workspace\sb\meis-mobile
+flutter create . --project-name meis_mobile --platforms=windows,android,web
+flutter pub get
+flutter run -d windows
+```
+
 ## 首次运行
 
 ```bash

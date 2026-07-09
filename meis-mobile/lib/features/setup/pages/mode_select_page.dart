@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/models/server_config.dart';
 import '../../../shared/widgets/meis_brand_header.dart';
 import '../../../shared/widgets/mode_select_card.dart';
+import '../providers/setup_provider.dart';
 
-class ModeSelectPage extends StatelessWidget {
+class ModeSelectPage extends ConsumerWidget {
   const ModeSelectPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -34,14 +37,20 @@ class ModeSelectPage extends StatelessWidget {
                 icon: Icons.wifi,
                 title: '局域网',
                 description: '通过 IP 和端口连接院内服务器',
-                onTap: () => context.push('/setup/lan'),
+                onTap: () {
+                  ref.read(setupProvider.notifier).setMode(SetupMode.lan);
+                  context.push('/setup/lan');
+                },
               ),
               const SizedBox(height: 12),
               ModeSelectCard(
                 icon: Icons.settings_ethernet,
                 title: '以太网',
                 description: '输入医院全称自动发现服务（开发中）',
-                onTap: () => context.push('/setup/ethernet'),
+                onTap: () {
+                  ref.read(setupProvider.notifier).setMode(SetupMode.ethernet);
+                  context.push('/setup/ethernet');
+                },
               ),
             ],
           ),
