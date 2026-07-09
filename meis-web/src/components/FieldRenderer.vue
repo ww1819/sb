@@ -1,4 +1,10 @@
 <template>
+  <RepairDevicePickerField
+    v-if="field.widget === 'repairDevicePicker'"
+    :model-value="model ?? {}"
+    :disabled="field.readonly"
+    @update:model-value="onRepairDeviceModel"
+  />
   <RefSelect
     v-if="field.linkTable"
     v-model="model"
@@ -30,8 +36,9 @@ import type { FieldSchema } from '@/config/pageSchemas'
 import { useDict } from '@/composables/useDict'
 import RefSelect from '@/components/form/RefSelect.vue'
 import FileUploadField from '@/components/form/FileUploadField.vue'
+import RepairDevicePickerField from '@/components/repair/RepairDevicePickerField.vue'
 
-const props = defineProps<{ field: FieldSchema; modelValue: unknown }>()
+const props = defineProps<{ field: FieldSchema; modelValue: unknown; model?: Record<string, unknown> }>()
 const emit = defineEmits<{ 'update:modelValue': [v: unknown] }>()
 const { loadDict } = useDict()
 const options = ref<{ label: string; value: string }[]>([])
@@ -40,6 +47,11 @@ const model = computed({
   get: () => props.modelValue,
   set: (v) => emit('update:modelValue', v)
 })
+
+function onRepairDeviceModel(v: Record<string, unknown>) {
+  if (!props.model) return
+  Object.assign(props.model, v)
+}
 
 const fileModel = computed({
   get: () => (props.modelValue == null ? '' : String(props.modelValue)),

@@ -17,6 +17,9 @@ import java.util.*;
 @RequestMapping("/api/asset/inventory")
 @RequiredArgsConstructor
 public class InventoryCheckController {
+    private static final String UUID_PATH =
+            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
+
     private final JdbcTemplate jdbc;
 
     @GetMapping("/page")
@@ -42,15 +45,6 @@ public class InventoryCheckController {
                 "SELECT * FROM inventory_check" + where + " ORDER BY created_at DESC NULLS LAST LIMIT ? OFFSET ?",
                 pageArgs.toArray());
         return Result.ok(PageResult.of(rows, total != null ? total : 0, query.getPage(), query.getSize()));
-    }
-
-    @GetMapping("/{id}")
-    public Result<Map<String, Object>> get(@PathVariable UUID id) {
-        var rows = jdbc.queryForList("SELECT * FROM inventory_check WHERE id = ?::uuid", id);
-        if (rows.isEmpty()) throw new BizException(404, "not found");
-        Map<String, Object> t = rows.get(0);
-        t.put("items", jdbc.queryForList("SELECT * FROM inventory_check_item WHERE check_id = ?::uuid ORDER BY device_code", id));
-        return Result.ok(t);
     }
 
     @GetMapping("/devices/candidates")
@@ -93,6 +87,15 @@ public class InventoryCheckController {
         }
         sql.append(" ORDER BY device_code LIMIT 500");
         return Result.ok(jdbc.queryForList(sql.toString(), args.toArray()));
+    }
+
+    @GetMapping("/{id:" + UUID_PATH + "}")
+    public Result<Map<String, Object>> get(@PathVariable UUID id) {
+        var rows = jdbc.queryForList("SELECT * FROM inventory_check WHERE id = ?::uuid", id);
+        if (rows.isEmpty()) throw new BizException(404, "not found");
+        Map<String, Object> t = rows.get(0);
+        t.put("items", jdbc.queryForList("SELECT * FROM inventory_check_item WHERE check_id = ?::uuid ORDER BY device_code", id));
+        return Result.ok(t);
     }
 
     @PostMapping
@@ -142,7 +145,7 @@ public class InventoryCheckController {
         return get(id);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{id:" + UUID_PATH + "}")
     @Transactional
     @OperationLog(module = "asset", description = "删除盘点任务")
     public Result<Void> delete(@PathVariable UUID id) {
@@ -153,7 +156,7 @@ public class InventoryCheckController {
         return Result.ok();
     }
 
-    @PostMapping("/{id}/approve")
+    @PostMapping("/{id:" + UUID_PATH + "}/approve")
     @Transactional
     @OperationLog(module = "asset", description = "审核盘点任务")
     public Result<Map<String, Object>> approve(@PathVariable UUID id) {
@@ -172,14 +175,14 @@ public class InventoryCheckController {
         return get(id);
     }
 
-    @PostMapping("/{id}/start")
+    @PostMapping("/{id:" + UUID_PATH + "}/start")
     @OperationLog(module = "asset", description = "开始盘点")
     public Result<Map<String, Object>> start(@PathVariable UUID id) {
         jdbc.update("UPDATE inventory_check SET status = 'in_progress', actual_start_at = NOW(), updated_at = NOW() WHERE id = ?::uuid", id);
         return get(id);
     }
 
-    @PostMapping("/{id}/scan")
+    @PostMapping("/{id:" + UUID_PATH + "}/scan")
     @OperationLog(module = "asset", description = "扫码盘点")
     public Result<Map<String, Object>> scan(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
         jdbc.update("""
@@ -192,7 +195,7 @@ public class InventoryCheckController {
         return get(id);
     }
 
-    @PostMapping("/{id}/complete")
+    @PostMapping("/{id:" + UUID_PATH + "}/complete")
     @OperationLog(module = "asset", description = "完成盘点")
     public Result<Map<String, Object>> complete(@PathVariable UUID id) {
         jdbc.update("""

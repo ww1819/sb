@@ -20,6 +20,7 @@ export interface FieldSchema {
   type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'textarea' | 'boolean' | 'json' | 'file'
   dictType?: string
   linkTable?: string
+  widget?: 'repairDevicePicker'
   group?: FieldGroup
   required?: boolean
   readonly?: boolean

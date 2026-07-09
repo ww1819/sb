@@ -8,13 +8,15 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.Instant;
 import java.util.*;
 
 @RestController
 @RequestMapping("/api/repair/workorder")
 @RequiredArgsConstructor
 public class RepairWorkorderController {
+    private static final String UUID_PATH =
+            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
+
     private final JdbcTemplate jdbc;
     private static final Map<String, Set<String>> TRANSITIONS = Map.of(
             "reported", Set.of("dispatched"),
@@ -24,7 +26,57 @@ public class RepairWorkorderController {
             "accepted", Set.of("closed")
     );
 
-    @GetMapping("/{id}")
+    @GetMapping("/devices/candidates")
+    public Result<List<Map<String, Object>>> deviceCandidates(
+            @RequestParam(required = false) String deptName,
+            @RequestParam(required = false) String deviceName,
+            @RequestParam(required = false) String specification,
+            @RequestParam(required = false) String deviceCode,
+            @RequestParam(required = false) String financialCode,
+            @RequestParam(required = false) String serialNumber) {
+        StringBuilder sql = new StringBuilder("""
+                SELECT d.id, d.device_code, d.device_name, d.specification, d.serial_number,
+                       d.financial_code, d.dept_id, d.device_status, dept.dept_name
+                FROM medical_device d
+                LEFT JOIN department dept ON dept.id = d.dept_id
+                WHERE d.is_active = true
+                  AND COALESCE(d.device_status, '') NOT IN ('maintenance', 'scrap')
+                  AND d.id NOT IN (
+                      SELECT device_id FROM repair_workorder
+                      WHERE device_id IS NOT NULL
+                        AND status IN ('reported', 'dispatched', 'in_progress')
+                  )
+                """);
+        List<Object> args = new ArrayList<>();
+        if (deptName != null && !deptName.isBlank()) {
+            sql.append(" AND dept.dept_name ILIKE ? ");
+            args.add("%" + deptName.trim() + "%");
+        }
+        if (deviceName != null && !deviceName.isBlank()) {
+            sql.append(" AND d.device_name ILIKE ? ");
+            args.add("%" + deviceName.trim() + "%");
+        }
+        if (specification != null && !specification.isBlank()) {
+            sql.append(" AND d.specification ILIKE ? ");
+            args.add("%" + specification.trim() + "%");
+        }
+        if (deviceCode != null && !deviceCode.isBlank()) {
+            sql.append(" AND d.device_code ILIKE ? ");
+            args.add("%" + deviceCode.trim() + "%");
+        }
+        if (financialCode != null && !financialCode.isBlank()) {
+            sql.append(" AND d.financial_code ILIKE ? ");
+            args.add("%" + financialCode.trim() + "%");
+        }
+        if (serialNumber != null && !serialNumber.isBlank()) {
+            sql.append(" AND d.serial_number ILIKE ? ");
+            args.add("%" + serialNumber.trim() + "%");
+        }
+        sql.append(" ORDER BY d.device_code LIMIT 500");
+        return Result.ok(jdbc.queryForList(sql.toString(), args.toArray()));
+    }
+
+    @GetMapping("/{id:" + UUID_PATH + "}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
         List<Map<String, Object>> rows = jdbc.queryForList("SELECT * FROM repair_workorder WHERE id = ?::uuid", id);
         if (rows.isEmpty()) throw new BizException(404, "workorder not found");
@@ -43,12 +95,16 @@ public class RepairWorkorderController {
             """,
                 id, woNo, body.get("device_id"), body.get("device_code"), body.get("device_name"),
                 body.get("reporter_id"), body.get("report_dept_id"),
-                body.getOrDefault("report_method", "web"), Instant.now(),
+                body.getOrDefault("report_method", "web"), body.get("report_time"),
                 body.get("fault_description"), body.getOrDefault("urgency_level", "normal"), "reported");
+        if (body.get("device_id") != null) {
+            jdbc.update("UPDATE medical_device SET device_status = 'maintenance', updated_at = NOW() WHERE id = ?::uuid",
+                    body.get("device_id"));
+        }
         return Result.ok(jdbc.queryForList("SELECT * FROM repair_workorder WHERE id = ?::uuid", id).get(0));
     }
 
-    @PostMapping("/{id}/transition")
+    @PostMapping("/{id:" + UUID_PATH + "}/transition")
     @OperationLog(module = "repair", description = "工单状态流转")
     public Result<Map<String, Object>> transition(@PathVariable UUID id, @RequestBody Map<String, String> body) {
         String target = body.get("status");
@@ -62,7 +118,7 @@ public class RepairWorkorderController {
         return Result.ok(jdbc.queryForList("SELECT * FROM repair_workorder WHERE id = ?::uuid", id).get(0));
     }
 
-    @PostMapping("/{id}/dispatch")
+    @PostMapping("/{id:" + UUID_PATH + "}/dispatch")
     @OperationLog(module = "repair", description = "派工")
     public Result<Map<String, Object>> dispatch(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
         jdbc.update("UPDATE repair_workorder SET assigned_engineer_id = ?::uuid, assigned_at = NOW(), status = 'dispatched', updated_at = NOW() WHERE id = ?::uuid",
@@ -70,13 +126,13 @@ public class RepairWorkorderController {
         return Result.ok(jdbc.queryForList("SELECT * FROM repair_workorder WHERE id = ?::uuid", id).get(0));
     }
 
-    @PostMapping("/{id}/accept")
+    @PostMapping("/{id:" + UUID_PATH + "}/accept")
     @OperationLog(module = "repair", description = "工程师接单")
     public Result<Map<String, Object>> accept(@PathVariable UUID id) {
         return transition(id, Map.of("status", "in_progress"));
     }
 
-    @PostMapping("/{id}/complete")
+    @PostMapping("/{id:" + UUID_PATH + "}/complete")
     @Transactional
     @OperationLog(module = "repair", description = "维修完成")
     public Result<Map<String, Object>> complete(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
@@ -97,7 +153,7 @@ public class RepairWorkorderController {
         return Result.ok(jdbc.queryForList("SELECT * FROM repair_workorder WHERE id = ?::uuid", id).get(0));
     }
 
-    @PostMapping("/{id}/verify")
+    @PostMapping("/{id:" + UUID_PATH + "}/verify")
     @OperationLog(module = "repair", description = "验收评价")
     public Result<Map<String, Object>> verify(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
         jdbc.update("""
