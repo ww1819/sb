@@ -4,7 +4,7 @@
 
 <script setup lang="ts">
 import CrudPage from '@/components/CrudPage.vue'
-import type { PageConfig } from '@/config/pageRegistry'
+import { getPageConfig } from '@/config/pageRegistry'
 
-const config: PageConfig = { title: '供应商管理', apiBase: '/system', table: 'supplier' }
+const config = getPageConfig('/purchase/supplier')!
 </script>

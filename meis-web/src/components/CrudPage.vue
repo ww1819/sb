@@ -9,8 +9,12 @@
     @page-change="load"
   >
     <template #actions>
-      <el-button v-permission="'add'" type="primary" @click="openForm()">新增</el-button>
+      <el-button v-if="!hideAdd" v-permission="'add'" type="primary" @click="onAdd">新增</el-button>
+      <el-button v-if="showImport" @click="importVisible = true">导入</el-button>
       <el-button @click="exportCsv">导出</el-button>
+      <template v-if="showPinyinCode">
+        <el-button @click="openPinyinDialog">生成简码</el-button>
+      </template>
       <slot name="toolbar-extra" />
     </template>
 
@@ -47,13 +51,17 @@
     </template>
 
     <el-table
+      ref="tableRef"
       v-loading="loading"
       :data="rows"
+      row-key="id"
       stripe
       class="system-table"
       :height="tableHeight"
       @row-dblclick="onRowDblClick"
+      @selection-change="onSelectionChange"
     >
+      <el-table-column v-if="showPinyinCode" type="selection" width="48" fixed="left" reserve-selection />
       <el-table-column
         v-for="f in listFields"
         :key="f.prop"
@@ -67,11 +75,27 @@
           <TableCellValue :field="f" :value="row[f.prop]" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="160" fixed="right">
+      <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
           <div class="table-actions">
-            <el-button link type="primary" @click="openForm(row)">编辑</el-button>
-            <el-button link type="danger" @click="remove(row)">删除</el-button>
+            <el-button
+              v-if="canEditRow(row)"
+              link
+              type="primary"
+              @click="onEdit(row)"
+            >
+              编辑
+            </el-button>
+            <el-button
+              v-else-if="detailMode"
+              link
+              type="primary"
+              @click="onEdit(row)"
+            >
+              查看
+            </el-button>
+            <el-button v-if="canDeleteRow(row)" link type="danger" @click="remove(row)">删除</el-button>
+            <slot name="row-actions" :row="row" />
           </div>
         </template>
       </el-table-column>
@@ -80,17 +104,29 @@
       </template>
     </el-table>
 
-    <FormDrawer v-model="formVisible" :title="formTitle" size="lg" @save="save">
+    <FormDrawer v-if="!detailMode" v-model="formVisible" :title="formTitle" size="lg" @save="save">
       <el-form label-width="120px">
         <GroupedFormFields :table="config.table" :model="form" :fields="formFields" />
       </el-form>
     </FormDrawer>
+
+    <ImportDialog
+      v-if="showImport"
+      v-model="importVisible"
+      :title="`${config.title}导入`"
+      :import-url="importUrl"
+      :template-url="importTemplateUrl"
+      :template-filename="`${config.table}_import_template.xlsx`"
+      @success="load"
+    />
   </SystemPageCard>
 </template>
 
 <script setup lang="ts">
 import { computed, onActivated, onMounted, reactive, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
+import { downloadApiFile } from '@/utils/fileDownload'
 import FormDrawer from './FormDrawer.vue'
 import FieldRenderer from './FieldRenderer.vue'
 import SystemPageCard from './system/SystemPageCard.vue'
@@ -100,12 +136,23 @@ import PageEmpty from './table/PageEmpty.vue'
 import type { PageConfig } from '@/config/pageRegistry'
 import { getListFields, getSchema } from '@/config/pageSchemas'
 import GroupedFormFields from './form/GroupedFormFields.vue'
+import ImportDialog from './ImportDialog.vue'
 import { columnAlign } from '@/utils/tableCell'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
 import { useDict } from '@/composables/useDict'
+import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
+import { executePinyinGenerate, promptPinyinScope } from '@/composables/usePinyinGenerate'
+import { preloadRefLabelMaps } from '@/composables/useRefLabelMap'
 
-const props = defineProps<{ config: PageConfig }>()
-const emit = defineEmits<{ detail: [row: Record<string, unknown>] }>()
+const props = defineProps<{
+  config: PageConfig
+  detailMode?: boolean
+  hideAdd?: boolean
+  deleteUrl?: string
+  canEdit?: (row: Record<string, unknown>) => boolean
+  canDelete?: (row: Record<string, unknown>) => boolean
+}>()
+const emit = defineEmits<{ detail: [row: Record<string, unknown>]; add: []; deleted: [row: Record<string, unknown>] }>()
 const { loadDict } = useDict()
 
 const loading = ref(false)
@@ -117,8 +164,11 @@ const keyword = ref('')
 const filterValues = reactive<Record<string, string | number | undefined>>({})
 const filterOptions = reactive<Record<string, { label: string; value: string }[]>>({})
 const formVisible = ref(false)
+const importVisible = ref(false)
 const form = ref<Record<string, unknown>>({})
 const formTitle = ref('新增')
+const tableRef = ref()
+const { selectedCount, syncFromTable, selectedIds, clear: clearSelection } = useCrossPageSelection()
 
 const tableHeight = useSystemTableHeight()
 
@@ -135,6 +185,26 @@ const formFields = computed(() => {
   if (s.length) return s
   return listFields.value
 })
+
+const showImport = computed(() => props.config.importable === true)
+const showPinyinCode = computed(() => props.config.pinyinCode === true)
+const importUrl = computed(() => props.config.importUrl ?? `${props.config.apiBase}/${props.config.table}/import`)
+const importTemplateUrl = computed(() => props.config.importTemplateUrl ?? `${props.config.apiBase}/${props.config.table}/import/template`)
+const exportUrl = computed(() => props.config.exportUrl ?? `${props.config.apiBase}/${props.config.table}/export`)
+const pinyinCodeUrl = computed(() => props.config.pinyinCodeUrl ?? `${props.config.apiBase}/${props.config.table}/generate-pinyin`)
+
+function canEditRow(row: Record<string, unknown>) {
+  return props.canEdit ? props.canEdit(row) : true
+}
+
+function canDeleteRow(row: Record<string, unknown>) {
+  return props.canDelete ? props.canDelete(row) : true
+}
+
+async function loadRefLabels() {
+  const linkTables = listFields.value.filter((f) => f.linkTable).map((f) => f.linkTable!)
+  await preloadRefLabelMaps(linkTables)
+}
 
 async function load() {
   loading.value = true
@@ -159,6 +229,8 @@ async function load() {
 
 function onSearch() {
   page.value = 1
+  clearSelection()
+  tableRef.value?.clearSelection()
   load()
 }
 
@@ -168,6 +240,8 @@ function onReset() {
     filterValues[f.key] = undefined
   }
   page.value = 1
+  clearSelection()
+  tableRef.value?.clearSelection()
   load()
 }
 
@@ -188,13 +262,61 @@ async function save() {
   load()
 }
 
-async function remove(row: Record<string, unknown>) {
-  await http.delete(`${props.config.apiBase}/${props.config.table}/${row.id}`)
-  load()
+function onAdd() {
+  if (props.detailMode) emit('add')
+  else openForm()
 }
 
-function exportCsv() {
-  window.open(`/api${props.config.apiBase}/${props.config.table}/export`, '_blank')
+function onEdit(row: Record<string, unknown>) {
+  if (props.detailMode) emit('detail', row)
+  else openForm(row)
+}
+
+async function remove(row: Record<string, unknown>) {
+  try {
+    await ElMessageBox.confirm('确认删除该记录？', '删除', { type: 'warning' })
+    const url = props.deleteUrl
+      ? `${props.deleteUrl}/${row.id}`
+      : `${props.config.apiBase}/${props.config.table}/${row.id}`
+    await http.delete(url)
+    emit('deleted', row)
+    ElMessage.success('已删除')
+    load()
+  } catch (e) {
+    if (e !== 'cancel' && e !== 'close') {
+      ElMessage.error('删除失败')
+    }
+  }
+}
+
+function onSelectionChange(selection: Record<string, unknown>[]) {
+  syncFromTable(selection)
+}
+
+async function openPinyinDialog() {
+  const scope = await promptPinyinScope(selectedCount.value)
+  if (!scope) return
+  try {
+    const ok = await executePinyinGenerate(pinyinCodeUrl.value, scope, {
+      selectedIds: selectedIds(),
+      keyword: keyword.value || undefined
+    })
+    if (ok) {
+      clearSelection()
+      tableRef.value?.clearSelection()
+      load()
+    }
+  } catch {
+    ElMessage.error('生成拼音简码失败')
+  }
+}
+
+async function exportCsv() {
+  try {
+    await downloadApiFile(exportUrl.value, `${props.config.table}_export.csv`)
+  } catch {
+    ElMessage.error('导出失败')
+  }
 }
 
 function onRowDblClick(row: Record<string, unknown>) {
@@ -208,6 +330,7 @@ onMounted(async () => {
   for (const f of props.config.listFilters ?? []) {
     if (f.dictType) filterOptions[f.key] = await loadDict(f.dictType)
   }
+  await loadRefLabels()
   await load()
   initialized = true
 })

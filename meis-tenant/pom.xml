@@ -7,22 +7,14 @@
     <dependency><groupId>com.meis.saas</groupId><artifactId>meis-api</artifactId></dependency>
     <dependency><groupId>com.meis.saas</groupId><artifactId>meis-common</artifactId></dependency>
     <dependency><groupId>org.springframework.security</groupId><artifactId>spring-security-crypto</artifactId></dependency>
+    <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-core</artifactId></dependency>
+    <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-database-postgresql</artifactId></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
     <dependency><groupId>com.alibaba.cloud</groupId><artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-actuator</artifactId></dependency>
     <dependency><groupId>org.projectlombok</groupId><artifactId>lombok</artifactId><optional>true</optional></dependency>
   </dependencies>
   <build>
-    <resources>
-      <!-- 唯一迁移源：仓库根 db/migrations，避免与 meis-tenant/resources 双份不一致 -->
-      <resource>
-        <directory>${project.basedir}/../db/migrations</directory>
-        <targetPath>db/migrations</targetPath>
-      </resource>
-      <resource>
-        <directory>src/main/resources</directory>
-      </resource>
-    </resources>
     <plugins><plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins>
   </build>
 </project>

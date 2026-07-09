@@ -2,8 +2,39 @@
 logs/
 *.log
 
-# Maven build output
+# Java / Maven compile output
 target/
+**/target/
+*.class
+*.jar
+*.war
+*.ear
 
-# Frontend dependencies
+# Eclipse / STS (e.g. meis-tenant/bin)
+bin/
+**/bin/
+.classpath
+.project
+.settings/
+.factorypath
+
+# IntelliJ IDEA
+.idea/
+*.iml
+out/
+**/out/
+
+# Frontend
 node_modules/
+dist/
+*.tsbuildinfo
+
+# Local IDE / editor (machine-specific)
+.vscode/extensions.json
+.vscode/launch.json
+.vscode/settings.json
+.vscode/tasks.json
+scripts/db-config.bat
+
+# Legacy local overrides (do not commit)
+scripts/meis-services.ps1

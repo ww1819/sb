@@ -40,6 +40,7 @@
         <hutool.version>5.8.27</hutool.version>
         <springdoc.version>2.5.0</springdoc.version>
         <minio.version>8.5.10</minio.version>
+        <poi.version>5.2.5</poi.version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -123,6 +124,11 @@
                 <groupId>io.minio</groupId>
                 <artifactId>minio</artifactId>
                 <version>${minio.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.poi</groupId>
+                <artifactId>poi-ooxml</artifactId>
+                <version>${poi.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

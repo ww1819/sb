@@ -2,7 +2,7 @@ package com.meis.saas.tenant.service;
 
 import com.meis.saas.api.dto.TenantCreateRequest;
 import com.meis.saas.common.exception.BizException;
-import com.meis.saas.common.flyway.TenantFlywayService;
+import com.meis.saas.tenant.flyway.TenantSchemaMigrator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -19,7 +19,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TenantService {
     private final JdbcTemplate jdbc;
-    private final TenantFlywayService tenantFlyway;
+    private final TenantSchemaMigrator tenantSchemaMigrator;
     private final TenantMenuService tenantMenuService;
 
     private static final String DEFAULT_ADMIN_USER = "admin";
@@ -80,8 +80,7 @@ public class TenantService {
                     id.toString(), code, req.getTenantName(), schema,
                     req.getHospitalLevel(), req.getContactName(), req.getContactPhone(), packageCode);
 
-            tenantFlyway.createSchema(schema);
-            tenantFlyway.migrate(schema);
+            tenantSchemaMigrator.migrate(schema);
 
             List<String> menuCodes = tenantMenuService.packageMenus(packageCode);
             if (!menuCodes.isEmpty()) {

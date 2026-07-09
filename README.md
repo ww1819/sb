@@ -9,7 +9,7 @@ Schema 多租户医院设备全生命周期管理平台。
 - `meis-web`：Vue3 管理端
 - `meis-mobile`：Flutter 骨架
 - `meis-desktop`：Electron 壳
-- `db/`：Flyway 迁移与源 SQL
+- `meis-tenant`：租户与 **Flyway 数据库迁移**（`src/main/resources/db/migrations`）
 - `docs/`：安装与部署文档
 - `deploy/`：Docker/K8s/Jenkins
 

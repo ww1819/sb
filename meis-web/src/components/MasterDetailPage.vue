@@ -6,6 +6,7 @@
         <el-button v-if="selectedId && showApproval && canSubmit" type="primary" @click="submitApproval">提交审批</el-button>
         <el-button v-if="selectedId && showApproval && canWithdraw" @click="withdrawApproval">撤回审批</el-button>
         <slot name="toolbar-extra" />
+      </template>
     </CrudPage>
 
     <AppModal v-model="detailVisible" :title="config.title + ' 编辑'" size="xl">
@@ -133,5 +134,7 @@ async function onApprovalChanged() {
   await reloadMaster()
   crudRef.value?.load()
 }
+
+defineExpose({ selectedId })
 </script>
 

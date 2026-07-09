@@ -96,33 +96,22 @@ powershell -File scripts\setup-postgres.ps1 -PostgresPassword aspt -DbName meis
 | 应用用户 | `med` |
 | 应用密码 | `med123456` |
 
-**说明**：`meis` 与演示库 `sb` 分离；业务数据在 `meis` 库内通过 Schema 多租户隔离。
+**说明**：`meis` 与演示库 `sb` 分离；业务数据在 `meis` 库内通过 Schema 多租户隔离。本脚本**不**建表、不跑 Flyway，结构由 `meis-tenant` 启动时自动补齐。
 
 ---
 
-## 四、数据库迁移（首次必做）
+## 四、数据库结构（自动迁库）
 
-Flyway 由 `meis-tenant` 服务在启动时执行：
+`scripts/setup-postgres.ps1` **仅**创建空库与应用账号，不建表。
 
-1. `public` 平台表（`sys_tenant` 等）
-2. 演示租户 Schema `tenant_demo`（全量业务表 + 种子管理员）
+| 范围 | 执行方式 |
+|------|----------|
+| `public` 平台表 | **Spring Flyway**（`meis-tenant` 的 `spring.flyway.enabled=true`，启动时自动跑 `db/migrations/public`） |
+| 各租户 `tenant_*` | `TenantSchemaMigrator`（同一服务启动时 + 开户时；多 schema 需单独迁库） |
 
-**先单独启动 tenant 服务完成迁移**（约 1 分钟）：
+启动 `meis-tenant` 即可（`start.ps1` 或开发面板），无需额外迁移脚本。失败时服务 fail-fast 退出。
 
-```powershell
-$env:JAVA_HOME='C:\Program Files\Java\jdk-17'
-java -jar meis-tenant\target\meis-tenant-1.0.0-SNAPSHOT.jar --spring.cloud.nacos.discovery.enabled=false
-```
-
-看到日志 `Tenant schema ready: demo (tenant_demo)` 后可关闭，或继续留在后台。
-
-验证：
-
-```powershell
-$env:PGPASSWORD='med123456'
-& "E:\PGSQL\bin\psql.exe" -U med -h localhost -d meis -c "SELECT tenant_code, schema_name FROM sys_tenant;"
-& "E:\PGSQL\bin\psql.exe" -U med -h localhost -d meis -c "SELECT username FROM tenant_demo.sys_user;"
-```
+结构变更：修改 `db/migrations` 后重新编译并重启 `meis-tenant`。
 
 ---
 
@@ -286,8 +275,9 @@ Invoke-RestMethod -Uri 'http://localhost:8081/api/auth/login' -Method POST `
 | `Missing *.jar` | 先执行 `scripts\build.ps1` |
 | 网关 503 / 404 | 确认微服务已启动；dev 模式检查 `meis-gateway` 的 `application-dev.yml` |
 | 登录失败 | 先启动 `meis-tenant` 完成迁移；确认 `tenant_demo.sys_user` 存在 |
+| `meis-tenant` 启动即退出 | 查看日志中的 Flyway 错误；迁库失败会主动 fail-fast，避免结构不全继续运行 |
 | 文件上传失败 | 确认 MinIO 已启动且 `meis-file` 配置正确 |
-| Flyway 冲突 | 仅 `meis-tenant` 执行迁移；其他服务已关闭 `spring.flyway.enabled` |
+| Flyway 冲突 | 仅 `meis-tenant` 执行迁移；其他服务已关闭 `spring.flyway.enabled`；结构变更只改 V1/V2/V3 三文件 |
 
 ---
 

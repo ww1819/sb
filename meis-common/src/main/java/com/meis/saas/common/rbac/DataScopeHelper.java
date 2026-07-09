@@ -1,6 +1,5 @@
 package com.meis.saas.common.rbac;
 
-import java.util.List;
 import java.util.stream.Collectors;
 
 public final class DataScopeHelper {

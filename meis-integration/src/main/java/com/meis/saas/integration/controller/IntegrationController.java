@@ -53,12 +53,4 @@ public class IntegrationController {
         ));
         return Result.ok(spec);
     }
-
-    private String toJson(Map<String, Object> m) {
-        try {
-            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(m);
-        } catch (Exception e) {
-            return "{}";
-        }
-    }
 }

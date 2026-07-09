@@ -78,8 +78,25 @@
 import { ref } from 'vue'
 import http from '@/api/http'
 
+interface PurchasePlanTrace {
+  business_chain_no?: string
+  plan_code?: string
+  approval_status?: string
+  total_budget?: number | string
+}
+
+interface PurchaseChain {
+  plan?: PurchasePlanTrace
+  projects?: Record<string, unknown>[]
+  contracts?: Record<string, unknown>[]
+  acceptances?: Record<string, unknown>[]
+  entries?: Record<string, unknown>[]
+  devices?: Record<string, unknown>[]
+  payments?: Record<string, unknown>[]
+}
+
 const keyword = ref('')
-const chains = ref<Record<string, unknown>[]>([])
+const chains = ref<PurchaseChain[]>([])
 const searched = ref(false)
 
 async function search() {

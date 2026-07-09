@@ -15,6 +15,12 @@ export interface PageConfig {
   foreignKey?: string
   listPageUrl?: string
   listFilters?: ListFilter[]
+  importable?: boolean
+  importUrl?: string
+  importTemplateUrl?: string
+  pinyinCode?: boolean
+  pinyinCodeUrl?: string
+  exportUrl?: string
 }
 
 export const pageRegistry: Record<string, PageConfig> = {
@@ -55,12 +61,19 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/purchase/acceptance/page',
     listFilters: [{ key: 'acceptance_status', label: '验收状态', dictType: 'acceptance_status' }]
   },
-  '/purchase/supplier': { title: '供应商管理', apiBase: '/system', table: 'supplier' },
+  '/purchase/supplier': { title: '供应商管理', apiBase: '/system', table: 'supplier', importable: true, pinyinCode: true },
   '/purchase/category': { title: '设备分类', apiBase: '/system', table: 'medical_device_category' },
-  '/purchase/manufacturer': { title: '生产厂商', apiBase: '/system', table: 'manufacturer' },
+  '/purchase/manufacturer': { title: '生产厂商', apiBase: '/system', table: 'manufacturer', importable: true, pinyinCode: true },
   '/purchase/dashboard': { title: '采购看板', apiBase: '/purchase', table: 'purchase_plan' },
   '/purchase/trace': { title: '业务追溯', apiBase: '/purchase', table: 'purchase_plan' },
-  '/asset/device': { title: '设备台账', apiBase: '/asset', table: 'medical_device' },
+  '/asset/device': {
+    title: '设备台账',
+    apiBase: '/asset',
+    table: 'medical_device',
+    importable: true,
+    importUrl: '/asset/medical_device/import',
+    importTemplateUrl: '/asset/medical_device/import/template'
+  },
   '/asset/entry': {
     title: '设备入库',
     apiBase: '/asset',
@@ -73,7 +86,16 @@ export const pageRegistry: Record<string, PageConfig> = {
   },
   '/asset/outbound': { title: '设备出库', apiBase: '/asset', table: 'device_outbound', masterDetail: true, detailTable: 'device_outbound_item', foreignKey: 'outbound_id' },
   '/asset/transfer': { title: '资产流转', apiBase: '/asset', table: 'asset_transfer' },
-  '/asset/inventory': { title: '资产盘点', apiBase: '/asset', table: 'inventory_check', masterDetail: true, detailTable: 'inventory_check_item', foreignKey: 'check_id' },
+  '/asset/inventory': {
+    title: '资产盘点',
+    apiBase: '/asset',
+    table: 'inventory_check',
+    masterDetail: true,
+    detailTable: 'inventory_check_item',
+    foreignKey: 'check_id',
+    listPageUrl: '/asset/inventory/page',
+    listFilters: [{ key: 'audit_status', label: '审核状态', dictType: 'audit_status' }]
+  },
   '/asset/scrap': { title: '设备报废', apiBase: '/asset', table: 'device_scrap' },
   '/asset/inspection': { title: '设备巡检', apiBase: '/asset', table: 'inspection_plan' },
   '/repair/workorder': { title: '维修工单', apiBase: '/repair', table: 'repair_workorder' },

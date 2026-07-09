@@ -2,10 +2,25 @@
   <SystemPageCard title="科室管理" subtitle="维护科室树与临床属性" :loading="loading" show-search @search="applyFilter" @reset="resetFilter" v-model:keyword="keyword">
     <template #actions>
       <el-button type="primary" @click="openForm()">新增科室</el-button>
+      <el-button @click="importVisible = true">导入</el-button>
+      <el-button @click="exportCsv">导出</el-button>
+      <el-button @click="openPinyinDialog">生成简码</el-button>
     </template>
-    <el-table :data="filteredList" border stripe row-key="id" default-expand-all class="system-table dept-tree-table" :height="tableHeight">
+    <el-table
+      ref="tableRef"
+      :data="filteredList"
+      border
+      stripe
+      row-key="id"
+      default-expand-all
+      class="system-table dept-tree-table"
+      :height="tableHeight"
+      @selection-change="onSelectionChange"
+    >
+      <el-table-column type="selection" width="48" reserve-selection />
       <el-table-column prop="dept_code" label="科室编码" width="100" />
       <el-table-column prop="dept_name" label="科室名称" />
+      <el-table-column prop="pinyin_code" label="拼音简码" width="100" />
       <el-table-column prop="campus_name" label="院区" width="120" />
       <el-table-column prop="is_clinical" label="临床科室" width="100">
         <template #default="{ row }">{{ row.is_clinical ? '是' : '否' }}</template>
@@ -28,6 +43,7 @@
       <el-form :model="form" label-width="100px">
         <el-form-item label="科室编码" required><el-input v-model="form.dept_code" maxlength="3" /></el-form-item>
         <el-form-item label="科室名称" required><el-input v-model="form.dept_name" /></el-form-item>
+        <el-form-item label="拼音简码"><el-input v-model="form.pinyin_code" placeholder="留空则按名称自动生成" /></el-form-item>
         <el-form-item label="上级科室">
           <el-select v-model="form.parent_id" clearable filterable style="width:100%">
             <el-option v-for="d in list" :key="d.id" :label="d.dept_name" :value="d.id" />
@@ -47,6 +63,14 @@
         <el-button type="primary" @click="save">保存</el-button>
       </template>
     </el-dialog>
+    <ImportDialog
+      v-model="importVisible"
+      title="科室导入"
+      import-url="/system/departments/import"
+      template-url="/system/departments/import/template"
+      template-filename="department_import_template.xlsx"
+      @success="load"
+    />
   </SystemPageCard>
 </template>
 
@@ -55,7 +79,11 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
+import ImportDialog from '@/components/ImportDialog.vue'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
+import { downloadApiFile } from '@/utils/fileDownload'
+import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
+import { executePinyinGenerate, promptPinyinScope } from '@/composables/usePinyinGenerate'
 
 const tableHeight = useSystemTableHeight()
 
@@ -64,13 +92,16 @@ const keyword = ref('')
 const loading = ref(false)
 const campuses = ref<any[]>([])
 const visible = ref(false)
+const importVisible = ref(false)
 const form = ref<any>({ is_active: true, is_clinical: false, sort_order: 0 })
+const tableRef = ref()
+const { selectedCount, syncFromTable, selectedIds, clear: clearSelection } = useCrossPageSelection()
 
 const filteredList = computed(() => {
   const kw = keyword.value.trim().toLowerCase()
   if (!kw) return list.value
   return list.value.filter((r) =>
-    [r.dept_code, r.dept_name, r.campus_name].some((v) => String(v || '').toLowerCase().includes(kw))
+    [r.dept_code, r.dept_name, r.pinyin_code, r.campus_name].some((v) => String(v || '').toLowerCase().includes(kw))
   )
 })
 
@@ -90,8 +121,19 @@ async function load() {
   }
 }
 
-function applyFilter() {}
-function resetFilter() { keyword.value = '' }
+function onSelectionChange(rows: any[]) {
+  syncFromTable(rows)
+}
+
+function applyFilter() {
+  clearSelection()
+  tableRef.value?.clearSelection()
+}
+function resetFilter() {
+  keyword.value = ''
+  clearSelection()
+  tableRef.value?.clearSelection()
+}
 
 function openForm(row?: any) {
   form.value = row ? { ...row } : { dept_code: '', dept_name: '', is_active: true, is_clinical: false, sort_order: 0 }
@@ -111,5 +153,30 @@ async function remove(row: any) {
   await http.delete(`/system/departments/${row.id}`)
   load()
 }
-</script>
 
+async function exportCsv() {
+  try {
+    await downloadApiFile('/system/departments/export', 'department_export.csv')
+  } catch {
+    ElMessage.error('导出失败')
+  }
+}
+
+async function openPinyinDialog() {
+  const scope = await promptPinyinScope(selectedCount.value)
+  if (!scope) return
+  try {
+    const ok = await executePinyinGenerate('/system/departments/generate-pinyin', scope, {
+      selectedIds: selectedIds(),
+      keyword: keyword.value || undefined
+    })
+    if (ok) {
+      clearSelection()
+      tableRef.value?.clearSelection()
+      load()
+    }
+  } catch {
+    ElMessage.error('生成拼音简码失败')
+  }
+}
+</script>
