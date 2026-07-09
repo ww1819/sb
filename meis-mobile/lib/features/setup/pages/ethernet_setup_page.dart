@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/models/server_config.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../providers/setup_provider.dart';
 
@@ -20,7 +19,6 @@ class _EthernetSetupPageState extends ConsumerState<EthernetSetupPage> {
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: ref.read(setupProvider).config.hospitalName ?? '');
-    ref.read(setupProvider.notifier).setMode(SetupMode.ethernet);
   }
 
   @override
@@ -75,7 +73,6 @@ class _EthernetSetupPageState extends ConsumerState<EthernetSetupPage> {
                   hintText: '例如 XX市第一人民医院',
                   prefixIcon: Icon(Icons.local_hospital_outlined),
                 ),
-                onChanged: ref.read(setupProvider.notifier).updateHospitalName,
               ),
               const Spacer(),
               ElevatedButton(

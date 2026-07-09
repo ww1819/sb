@@ -10,7 +10,7 @@ echo   DB=%DB_NAME% @ %DB_HOST%:%DB_PORT%
 echo   BACKUP_DIR=%BACKUP_DIR%
 echo.
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0backup-db.ps1" ^
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0backup-db.ps1" ^
   -PgBinDir "%PG_BIN_DIR%" ^
   -DbHost "%DB_HOST%" ^
   -Port %DB_PORT% ^

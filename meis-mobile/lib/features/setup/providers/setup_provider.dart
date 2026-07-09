@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/models/server_config.dart';
-import '../../core/storage/app_prefs.dart';
-import '../../shared/services/api_service.dart';
+import '../../../core/models/server_config.dart';
+import '../../../core/storage/app_prefs.dart';
+import '../../../shared/services/api_service.dart';
 
 class SetupState {
   const SetupState({
@@ -35,7 +35,7 @@ class SetupState {
 
 class SetupNotifier extends StateNotifier<SetupState> {
   SetupNotifier(this._prefs, this._api) : super(const SetupState()) {
-    _load();
+    Future.microtask(_load);
   }
 
   final AppPrefs _prefs;

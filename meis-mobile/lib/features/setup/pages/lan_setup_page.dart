@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_constants.dart';
-import '../../../core/models/server_config.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../providers/setup_provider.dart';
 
@@ -22,7 +21,6 @@ class _LanSetupPageState extends ConsumerState<LanSetupPage> {
   void initState() {
     super.initState();
     final config = ref.read(setupProvider).config;
-    ref.read(setupProvider.notifier).setMode(SetupMode.lan);
     _hostCtrl = TextEditingController(text: config.host);
     _portCtrl = TextEditingController(text: config.port.isEmpty ? AppConstants.defaultPort : config.port);
   }
@@ -99,7 +97,6 @@ class _LanSetupPageState extends ConsumerState<LanSetupPage> {
                   hintText: '例如 192.168.1.100',
                   prefixIcon: Icon(Icons.computer),
                 ),
-                onChanged: ref.read(setupProvider.notifier).updateHost,
               ),
               const SizedBox(height: 16),
               TextField(
@@ -110,7 +107,6 @@ class _LanSetupPageState extends ConsumerState<LanSetupPage> {
                   hintText: AppConstants.defaultPort,
                   prefixIcon: Icon(Icons.numbers),
                 ),
-                onChanged: ref.read(setupProvider.notifier).updatePort,
               ),
               if (setup.testPassed) ...[
                 const SizedBox(height: 16),
