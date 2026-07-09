@@ -122,3 +122,9 @@ COMMENT ON INDEX idx_device_next_calibration IS '索引：医疗设备台账.下
 
 CREATE INDEX IF NOT EXISTS idx_device_service_expiry ON medical_device(service_expiry_date);
 COMMENT ON INDEX idx_device_service_expiry IS '索引：医疗设备台账.使用年限到期日';
+
+-- =============================================================================
+-- 字段扩展（须在 V3 种子数据之前执行）
+-- =============================================================================
+ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS audit_status VARCHAR(20) DEFAULT 'pending';
+COMMENT ON COLUMN inventory_check.audit_status IS '审核状态';

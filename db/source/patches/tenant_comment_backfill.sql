@@ -1,5 +1,8 @@
-﻿-- MEIS tenant: backfill COMMENT ON for objects created before V1 carried metadata comments
--- Safe to re-run: COMMENT ON overwrites existing descriptions
+-- =============================================================================
+-- MEIS tenant comment backfill (idempotent: COMMENT ON overwrites)
+-- Source: V1 + V2 + V4 + V17 migration scripts
+-- Usage: scripts/apply-tenant-comments.ps1 -Schema tenant_demo
+-- =============================================================================
 
 COMMENT ON TABLE campus IS '院区表';
 COMMENT ON COLUMN campus.id IS '主键';
@@ -374,6 +377,7 @@ COMMENT ON COLUMN inventory_check.matched_count IS '盘实相符数量';
 COMMENT ON COLUMN inventory_check.mismatch_count IS '盘实不符数量';
 COMMENT ON COLUMN inventory_check.missing_count IS '盘亏数量';
 COMMENT ON COLUMN inventory_check.status IS '状态';
+COMMENT ON COLUMN inventory_check.audit_status IS '审核状态';
 COMMENT ON COLUMN inventory_check.report_url IS '报告附件URL';
 COMMENT ON COLUMN inventory_check.remark IS '备注';
 COMMENT ON COLUMN inventory_check.created_at IS '创建时间';
@@ -849,6 +853,40 @@ COMMENT ON COLUMN sys_notification.read_at IS 'read时间';
 COMMENT ON COLUMN sys_notification.related_entity_type IS 'related entity type';
 COMMENT ON COLUMN sys_notification.related_entity_id IS '关联relatedentity';
 COMMENT ON COLUMN sys_notification.created_at IS '创建时间';
+COMMENT ON COLUMN v_device_full_info.id IS '设备主键';
+COMMENT ON COLUMN v_device_full_info.device_code IS '设备编码';
+COMMENT ON COLUMN v_device_full_info.device_name IS '设备名称';
+COMMENT ON COLUMN v_device_full_info.brand IS '品牌';
+COMMENT ON COLUMN v_device_full_info.model IS '型号';
+COMMENT ON COLUMN v_device_full_info.serial_number IS '出厂序列号';
+COMMENT ON COLUMN v_device_full_info.category_name IS '分类名称';
+COMMENT ON COLUMN v_device_full_info.manufacturer_name IS '生产厂商';
+COMMENT ON COLUMN v_device_full_info.supplier_name IS '供应商';
+COMMENT ON COLUMN v_device_full_info.original_value IS '原值';
+COMMENT ON COLUMN v_device_full_info.net_value IS '净值';
+COMMENT ON COLUMN v_device_full_info.campus_name IS '院区名称';
+COMMENT ON COLUMN v_device_full_info.building_name IS '建筑物名称';
+COMMENT ON COLUMN v_device_full_info.dept_name IS '科室名称';
+COMMENT ON COLUMN v_device_full_info.location_detail IS '位置详情';
+COMMENT ON COLUMN v_device_full_info.enable_date IS '启用日期';
+COMMENT ON COLUMN v_device_full_info.warranty_end_date IS '保修截止日期';
+COMMENT ON COLUMN v_device_full_info.device_status IS '设备状态';
+COMMENT ON COLUMN v_device_full_info.risk_level IS '风险等级';
+COMMENT ON COLUMN v_device_full_info.is_life_support IS '是否生命支持设备';
+COMMENT ON COLUMN v_device_full_info.is_emergency IS '是否应急设备';
+COMMENT ON COLUMN v_device_full_info.created_at IS '创建时间';
+COMMENT ON COLUMN v_device_benefit.device_code IS '设备编码';
+COMMENT ON COLUMN v_device_benefit.device_name IS '设备名称';
+COMMENT ON COLUMN v_device_benefit.dept_id IS '所属科室';
+COMMENT ON COLUMN v_device_benefit.dept_name IS '科室名称';
+COMMENT ON COLUMN v_device_benefit.summary_year IS '汇总年度';
+COMMENT ON COLUMN v_device_benefit.summary_month IS '汇总月份';
+COMMENT ON COLUMN v_device_benefit.total_revenue IS '总收入';
+COMMENT ON COLUMN v_device_benefit.total_cost IS '总成本';
+COMMENT ON COLUMN v_device_benefit.net_profit IS '净利润';
+COMMENT ON COLUMN v_device_benefit.profit_rate IS '利润率';
+COMMENT ON COLUMN v_device_benefit.utilization_rate IS '使用率';
+COMMENT ON COLUMN v_device_benefit.benefit_level IS '效益等级';
 COMMENT ON TABLE notification_message IS '设备效益分析视图';
 COMMENT ON COLUMN notification_message.id IS '主键';
 COMMENT ON COLUMN notification_message.title IS '标题';
@@ -1077,3 +1115,45 @@ COMMENT ON TABLE import_profile_binding IS '导入方案绑定';
 COMMENT ON COLUMN import_profile_binding.business_type IS '业务类型标识';
 COMMENT ON COLUMN import_profile_binding.profile_code IS '导入方案编码';
 COMMENT ON COLUMN import_profile_binding.updated_at IS '更新时间';
+COMMENT ON INDEX idx_op_log_user IS '索引：操作日志.关联用户';
+COMMENT ON INDEX idx_op_log_time IS '索引：操作日志.创建时间';
+COMMENT ON INDEX idx_category_parent IS '索引：医疗器械分类.上级分类编码';
+COMMENT ON INDEX idx_device_dept IS '索引：医疗设备台账.所属科室';
+COMMENT ON INDEX idx_device_status IS '索引：医疗设备台账.设备运行状态';
+COMMENT ON INDEX idx_device_category IS '索引：医疗设备台账.设备分类';
+COMMENT ON INDEX idx_device_enable_date IS '索引：医疗设备台账.启用日期';
+COMMENT ON INDEX idx_check_item_device IS '索引：资产盘点明细.关联设备';
+COMMENT ON INDEX idx_wo_device IS '索引：维修工单.关联设备';
+COMMENT ON INDEX idx_wo_status IS '索引：维修工单.状态';
+COMMENT ON INDEX idx_wo_report_time IS '索引：维修工单.报修时间';
+COMMENT ON INDEX idx_wo_engineer IS '索引：维修工单.指派工程师';
+COMMENT ON INDEX idx_maint_plan_device IS '索引：保养计划.关联设备';
+COMMENT ON INDEX idx_maint_plan_due IS '索引：保养计划.下次到期日';
+COMMENT ON INDEX idx_maint_record_device IS '索引：保养执行记录.关联设备';
+COMMENT ON INDEX idx_maint_record_time IS '索引：保养执行记录.执行开始时间';
+COMMENT ON INDEX idx_adverse_event_device IS '索引：adverse event.关联设备';
+COMMENT ON INDEX idx_adverse_event_time IS '索引：adverse event.报修时间';
+COMMENT ON INDEX idx_metrology_device IS '索引：metrology record.关联设备';
+COMMENT ON INDEX idx_metrology_due IS '索引：metrology record.下次到期日';
+COMMENT ON INDEX idx_perf_test_device IS '索引：performance test.关联设备';
+COMMENT ON INDEX idx_usage_device IS '索引：device usage record.关联设备';
+COMMENT ON INDEX idx_usage_date IS '索引：device usage record.usage日期';
+COMMENT ON INDEX idx_cost_device IS '索引：device cost record.关联设备';
+COMMENT ON INDEX idx_cost_date IS '索引：device cost record.cost日期';
+COMMENT ON INDEX idx_cost_type IS '索引：device cost record.cost type';
+COMMENT ON INDEX idx_benefit_device IS '索引：device benefit summary.关联设备';
+COMMENT ON INDEX idx_benefit_period IS '索引：device benefit summary.summary year';
+COMMENT ON INDEX idx_dict_type IS '索引：sys dict.dict type';
+COMMENT ON INDEX idx_notification_user IS '索引：sys notification.通知目标用户列表';
+COMMENT ON INDEX idx_notification_created IS '索引：sys notification.创建时间';
+COMMENT ON INDEX idx_purchase_acceptance_status IS '索引：安装验收.安装验收状态';
+COMMENT ON INDEX idx_acceptance_member_acc IS '索引：purchase acceptance member.安装验收单';
+COMMENT ON INDEX idx_bidder_project IS '索引：purchase bidder.采购项目';
+COMMENT ON INDEX idx_complaint_project IS '索引：purchase complaint.采购项目';
+COMMENT ON INDEX idx_project_event IS '索引：purchase project event.采购项目';
+COMMENT ON INDEX idx_purchase_alert_type IS '索引：purchase alert snapshot.alert type';
+COMMENT ON INDEX idx_supplier_pinyin_code IS '索引：供应商.拼音简码（检索）';
+COMMENT ON INDEX idx_manufacturer_pinyin_code IS '索引：生产厂商.拼音简码（检索）';
+COMMENT ON INDEX idx_device_next_calibration IS '索引：医疗设备台账.下次检定日期';
+COMMENT ON INDEX idx_device_service_expiry IS '索引：医疗设备台账.使用年限到期日';
+

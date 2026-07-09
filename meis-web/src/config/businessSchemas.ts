@@ -278,6 +278,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'created_at', label: '制单时间', type: 'datetime', list: true, readonly: true },
     { prop: 'approved_by', label: '审核人', linkTable: 'sys_user', list: true, readonly: true },
     { prop: 'approved_at', label: '审核时间', type: 'datetime', list: true, readonly: true },
+    { prop: 'audit_status', label: '审核状态', dictType: 'audit_status', list: true, readonly: true },
     { prop: 'total_count', label: '应盘数量', type: 'number', list: true, readonly: true },
     { prop: 'checked_count', label: '已盘数量', type: 'number', list: true, readonly: true },
     { prop: 'matched_count', label: '账实相符', type: 'number', list: true, readonly: true },

@@ -2,6 +2,8 @@ package com.meis.saas.asset.controller;
 
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.page.PageQuery;
+import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +18,31 @@ import java.util.*;
 @RequiredArgsConstructor
 public class InventoryCheckController {
     private final JdbcTemplate jdbc;
+
+    @GetMapping("/page")
+    public Result<PageResult<Map<String, Object>>> page(PageQuery query,
+            @RequestParam(required = false) String audit_status) {
+        StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        List<Object> args = new ArrayList<>();
+        if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
+            where.append(" AND (check_no ILIKE ? OR check_name ILIKE ?) ");
+            String kw = "%" + query.getKeyword() + "%";
+            args.add(kw);
+            args.add(kw);
+        }
+        if (audit_status != null && !audit_status.isBlank()) {
+            where.append(" AND audit_status = ? ");
+            args.add(audit_status);
+        }
+        Long total = jdbc.queryForObject("SELECT COUNT(*) FROM inventory_check" + where, Long.class, args.toArray());
+        List<Object> pageArgs = new ArrayList<>(args);
+        pageArgs.add(query.limit());
+        pageArgs.add(query.offset());
+        var rows = jdbc.queryForList(
+                "SELECT * FROM inventory_check" + where + " ORDER BY created_at DESC NULLS LAST LIMIT ? OFFSET ?",
+                pageArgs.toArray());
+        return Result.ok(PageResult.of(rows, total != null ? total : 0, query.getPage(), query.getSize()));
+    }
 
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
@@ -80,6 +107,7 @@ public class InventoryCheckController {
         List<Map<String, Object>> items = (List<Map<String, Object>>) body.getOrDefault("items", List.of());
 
         if (exists) {
+            assertMutable(id);
             jdbc.update("""
                 UPDATE inventory_check SET check_name=?, check_year=?, check_type=?, campus_id=?::uuid, dept_id=?::uuid,
                 start_date=?, end_date=?, checker_id=?::uuid, supervisor_id=?::uuid, remark=?, total_count=?, updated_at=NOW()
@@ -90,12 +118,13 @@ public class InventoryCheckController {
         } else {
             jdbc.update("""
                 INSERT INTO inventory_check (id, check_no, check_name, check_year, check_type, campus_id, dept_id,
-                start_date, end_date, checker_id, supervisor_id, status, total_count, created_by)
-                VALUES (?::uuid,?,?,?,?,?::uuid,?::uuid,?,?,?::uuid,?::uuid,?,?,?::uuid)
+                start_date, end_date, checker_id, supervisor_id, status, audit_status, total_count, created_by)
+                VALUES (?::uuid,?,?,?,?,?::uuid,?::uuid,?,?,?::uuid,?::uuid,?,?,?,?::uuid)
                 """, id, body.getOrDefault("check_no", "IC" + System.currentTimeMillis()), body.get("check_name"),
                     body.get("check_year"), body.getOrDefault("check_type", "annual"), body.get("campus_id"),
                     body.get("dept_id"), body.get("start_date"), body.get("end_date"), body.get("checker_id"),
-                    body.get("supervisor_id"), body.getOrDefault("status", "planning"), items.size(),
+                    body.get("supervisor_id"), body.getOrDefault("status", "planning"),
+                    body.getOrDefault("audit_status", "pending"), items.size(),
                     userId != null ? UUID.fromString(userId) : null);
         }
 
@@ -117,10 +146,30 @@ public class InventoryCheckController {
     @Transactional
     @OperationLog(module = "asset", description = "删除盘点任务")
     public Result<Void> delete(@PathVariable UUID id) {
+        assertMutable(id);
         jdbc.update("DELETE FROM inventory_check_item WHERE check_id = ?::uuid", id);
         int n = jdbc.update("DELETE FROM inventory_check WHERE id = ?::uuid", id);
         if (n == 0) throw new BizException(404, "not found");
         return Result.ok();
+    }
+
+    @PostMapping("/{id}/approve")
+    @Transactional
+    @OperationLog(module = "asset", description = "审核盘点任务")
+    public Result<Map<String, Object>> approve(@PathVariable UUID id) {
+        var rows = jdbc.queryForList("SELECT audit_status FROM inventory_check WHERE id = ?::uuid", id);
+        if (rows.isEmpty()) throw new BizException(404, "not found");
+        if ("approved".equals(String.valueOf(rows.get(0).get("audit_status")))) {
+            throw new BizException(400, "盘点单已审核");
+        }
+        String userId = TenantContext.getUserId();
+        UUID approver = userId != null ? UUID.fromString(userId) : null;
+        jdbc.update("""
+                UPDATE inventory_check
+                SET audit_status = 'approved', approved_by = ?::uuid, approved_at = NOW(), updated_at = NOW()
+                WHERE id = ?::uuid
+                """, approver, id);
+        return get(id);
     }
 
     @PostMapping("/{id}/start")
@@ -146,14 +195,19 @@ public class InventoryCheckController {
     @PostMapping("/{id}/complete")
     @OperationLog(module = "asset", description = "完成盘点")
     public Result<Map<String, Object>> complete(@PathVariable UUID id) {
-        String userId = TenantContext.getUserId();
-        UUID approver = userId != null ? UUID.fromString(userId) : null;
         jdbc.update("""
                 UPDATE inventory_check
-                SET status = 'completed', actual_end_at = NOW(), approved_by = ?::uuid, approved_at = NOW(), updated_at = NOW()
+                SET status = 'completed', actual_end_at = NOW(), updated_at = NOW()
                 WHERE id = ?::uuid
-                """, approver, id);
+                """, id);
         return get(id);
+    }
+
+    private void assertMutable(UUID id) {
+        var rows = jdbc.queryForList("SELECT audit_status FROM inventory_check WHERE id = ?::uuid", id);
+        if (!rows.isEmpty() && "approved".equals(String.valueOf(rows.get(0).get("audit_status")))) {
+            throw new BizException(400, "已审核的盘点单不可修改或删除");
+        }
     }
 
     private static Object blankToNull(Object value) {

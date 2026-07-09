@@ -818,6 +818,7 @@ CREATE TABLE inventory_check (
     mismatch_count INTEGER DEFAULT 0,
     missing_count INTEGER DEFAULT 0,
     status VARCHAR(20) DEFAULT 'planning',
+    audit_status VARCHAR(20) DEFAULT 'pending',
     report_url VARCHAR(500),
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -846,6 +847,7 @@ COMMENT ON COLUMN inventory_check.matched_count IS '盘实相符数量';
 COMMENT ON COLUMN inventory_check.mismatch_count IS '盘实不符数量';
 COMMENT ON COLUMN inventory_check.missing_count IS '盘亏数量';
 COMMENT ON COLUMN inventory_check.status IS '状态';
+COMMENT ON COLUMN inventory_check.audit_status IS '审核状态';
 COMMENT ON COLUMN inventory_check.report_url IS '报告附件URL';
 COMMENT ON COLUMN inventory_check.remark IS '备注';
 COMMENT ON COLUMN inventory_check.created_at IS '创建时间';
@@ -1889,10 +1891,15 @@ COMMENT ON TABLE sys_notification IS 'sys notification';
 COMMENT ON COLUMN sys_notification.id IS '主键';
 COMMENT ON COLUMN sys_notification.title IS '标题';
 COMMENT ON COLUMN sys_notification.content IS '内容';
-COMMENT ON COLUMN sys_notification.message_type IS '消息类型';
+COMMENT ON COLUMN sys_notification.notification_type IS '通知类型';
+COMMENT ON COLUMN sys_notification.target_users IS '通知目标用户列表';
+COMMENT ON COLUMN sys_notification.target_roles IS '通知目标角色列表';
+COMMENT ON COLUMN sys_notification.target_depts IS '通知目标科室列表';
 COMMENT ON COLUMN sys_notification.priority IS '优先级';
 COMMENT ON COLUMN sys_notification.is_read IS '是否已读';
-COMMENT ON COLUMN sys_notification.user_id IS '关联用户';
+COMMENT ON COLUMN sys_notification.read_at IS '已读时间';
+COMMENT ON COLUMN sys_notification.related_entity_type IS '关联业务类型';
+COMMENT ON COLUMN sys_notification.related_entity_id IS '关联业务主键';
 COMMENT ON COLUMN sys_notification.created_at IS '创建时间';
 
 -- ================================================================================
@@ -1930,6 +1937,31 @@ LEFT JOIN supplier s ON d.supplier_id = s.id
 LEFT JOIN campus c ON d.campus_id = c.id
 LEFT JOIN building b ON d.building_id = b.id
 LEFT JOIN department dept ON d.dept_id = dept.id;
+
+COMMENT ON VIEW v_device_full_info IS '设备完整信息视图';
+COMMENT ON COLUMN v_device_full_info.id IS '设备主键';
+COMMENT ON COLUMN v_device_full_info.device_code IS '设备编码';
+COMMENT ON COLUMN v_device_full_info.device_name IS '设备名称';
+COMMENT ON COLUMN v_device_full_info.brand IS '品牌';
+COMMENT ON COLUMN v_device_full_info.model IS '型号';
+COMMENT ON COLUMN v_device_full_info.serial_number IS '出厂序列号';
+COMMENT ON COLUMN v_device_full_info.category_name IS '分类名称';
+COMMENT ON COLUMN v_device_full_info.manufacturer_name IS '生产厂商';
+COMMENT ON COLUMN v_device_full_info.supplier_name IS '供应商';
+COMMENT ON COLUMN v_device_full_info.original_value IS '原值';
+COMMENT ON COLUMN v_device_full_info.net_value IS '净值';
+COMMENT ON COLUMN v_device_full_info.campus_name IS '院区名称';
+COMMENT ON COLUMN v_device_full_info.building_name IS '建筑物名称';
+COMMENT ON COLUMN v_device_full_info.dept_name IS '科室名称';
+COMMENT ON COLUMN v_device_full_info.location_detail IS '位置详情';
+COMMENT ON COLUMN v_device_full_info.enable_date IS '启用日期';
+COMMENT ON COLUMN v_device_full_info.warranty_end_date IS '保修截止日期';
+COMMENT ON COLUMN v_device_full_info.device_status IS '设备状态';
+COMMENT ON COLUMN v_device_full_info.risk_level IS '风险等级';
+COMMENT ON COLUMN v_device_full_info.is_life_support IS '是否生命支持设备';
+COMMENT ON COLUMN v_device_full_info.is_emergency IS '是否应急设备';
+COMMENT ON COLUMN v_device_full_info.created_at IS '创建时间';
+
 -- 12.2 设备效益分析视图
 CREATE VIEW v_device_benefit AS
 SELECT
@@ -1948,6 +1980,21 @@ SELECT
 FROM device_benefit_summary bs
 JOIN medical_device d ON bs.device_id = d.id
 LEFT JOIN department dept ON d.dept_id = dept.id;
+
+COMMENT ON VIEW v_device_benefit IS '设备效益分析视图';
+COMMENT ON COLUMN v_device_benefit.device_code IS '设备编码';
+COMMENT ON COLUMN v_device_benefit.device_name IS '设备名称';
+COMMENT ON COLUMN v_device_benefit.dept_id IS '所属科室';
+COMMENT ON COLUMN v_device_benefit.dept_name IS '科室名称';
+COMMENT ON COLUMN v_device_benefit.summary_year IS '汇总年度';
+COMMENT ON COLUMN v_device_benefit.summary_month IS '汇总月份';
+COMMENT ON COLUMN v_device_benefit.total_revenue IS '总收入';
+COMMENT ON COLUMN v_device_benefit.total_cost IS '总成本';
+COMMENT ON COLUMN v_device_benefit.net_profit IS '净利润';
+COMMENT ON COLUMN v_device_benefit.profit_rate IS '利润率';
+COMMENT ON COLUMN v_device_benefit.utilization_rate IS '使用率';
+COMMENT ON COLUMN v_device_benefit.benefit_level IS '效益等级';
+
 -- notification table for tenant schema
 CREATE TABLE IF NOT EXISTS notification_message (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -2218,10 +2265,15 @@ COMMENT ON TABLE sys_notification IS 'sys notification';
 COMMENT ON COLUMN sys_notification.id IS '主键';
 COMMENT ON COLUMN sys_notification.title IS '标题';
 COMMENT ON COLUMN sys_notification.content IS '内容';
-COMMENT ON COLUMN sys_notification.message_type IS '消息类型';
+COMMENT ON COLUMN sys_notification.notification_type IS '通知类型';
+COMMENT ON COLUMN sys_notification.target_users IS '通知目标用户列表';
+COMMENT ON COLUMN sys_notification.target_roles IS '通知目标角色列表';
+COMMENT ON COLUMN sys_notification.target_depts IS '通知目标科室列表';
 COMMENT ON COLUMN sys_notification.priority IS '优先级';
 COMMENT ON COLUMN sys_notification.is_read IS '是否已读';
-COMMENT ON COLUMN sys_notification.user_id IS '关联用户';
+COMMENT ON COLUMN sys_notification.read_at IS '已读时间';
+COMMENT ON COLUMN sys_notification.related_entity_type IS '关联业务类型';
+COMMENT ON COLUMN sys_notification.related_entity_id IS '关联业务主键';
 COMMENT ON COLUMN sys_notification.created_at IS '创建时间';
 
 -- System RBAC: warehouse, user permissions snapshot, button permission dict

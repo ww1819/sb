@@ -52,6 +52,7 @@ public class TenantSchemaMigrator {
                 .defaultSchema(schemaName)
                 .locations(tenantLocations)
                 .baselineOnMigrate(true)
+                .ignoreMigrationPatterns("*:missing")
                 .load();
         if (isDevProfile()) {
             log.info("dev profile: Flyway repair + migrate (tenant schema {})", schemaName);

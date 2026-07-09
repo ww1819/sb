@@ -86,7 +86,16 @@ export const pageRegistry: Record<string, PageConfig> = {
   },
   '/asset/outbound': { title: '设备出库', apiBase: '/asset', table: 'device_outbound', masterDetail: true, detailTable: 'device_outbound_item', foreignKey: 'outbound_id' },
   '/asset/transfer': { title: '资产流转', apiBase: '/asset', table: 'asset_transfer' },
-  '/asset/inventory': { title: '资产盘点', apiBase: '/asset', table: 'inventory_check', masterDetail: true, detailTable: 'inventory_check_item', foreignKey: 'check_id' },
+  '/asset/inventory': {
+    title: '资产盘点',
+    apiBase: '/asset',
+    table: 'inventory_check',
+    masterDetail: true,
+    detailTable: 'inventory_check_item',
+    foreignKey: 'check_id',
+    listPageUrl: '/asset/inventory/page',
+    listFilters: [{ key: 'audit_status', label: '审核状态', dictType: 'audit_status' }]
+  },
   '/asset/scrap': { title: '设备报废', apiBase: '/asset', table: 'device_scrap' },
   '/asset/inspection': { title: '设备巡检', apiBase: '/asset', table: 'inspection_plan' },
   '/repair/workorder': { title: '维修工单', apiBase: '/repair', table: 'repair_workorder' },

@@ -1,0 +1,67 @@
+﻿=== SCHEMA COMPARE: tenant_demo ===
+
+-- DB has tables, script missing (2) --
+v_device_benefit
+v_device_full_info
+
+-- Script has tables, DB missing (0) --
+
+-- DB has columns, script missing (26) --
+adverse_event.handler_id
+adverse_event.reported_to_authority
+adverse_event.reviewer_id
+inspection_record_item.check_result
+inventory_check.check_name
+inventory_check.check_no
+inventory_check.check_type
+inventory_check.check_year
+inventory_check.checked_count
+inventory_check.checker_id
+inventory_check_item.check_date
+inventory_check_item.check_id
+inventory_check_item.checker_id
+medical_device.campus_id
+medical_device.device_code
+medical_device.device_name
+medical_device.device_status
+medical_device.manual_files
+medical_device.manufacturer_id
+medical_device.original_value
+medical_device.purchase_date
+medical_device.qr_code_url
+medical_device.remark
+purchase_acceptance_item.check_result
+purchase_acceptance_item.check_standard
+purchase_acceptance_item.checker_id
+
+-- Script has columns, DB missing (30) --
+contract_payment.2)
+device_accessory.2)
+device_benefit_summary.2)
+device_benefit_summary.4)
+device_benefit_summary.summary_month)
+device_cost_record.2)
+device_entry_item.2)
+device_scrap.2)
+device_usage_record.2)
+engineer.2)
+import_template_field.field_key)
+inventory_check.audit_status
+leased_device.2)
+maintenance_contract.2)
+maintenance_contract_payment.2)
+medical_device.2)
+metrology_record.2)
+purchase_bidder.2)
+purchase_contract.2)
+purchase_plan.2)
+purchase_plan_item.2)
+purchase_project.2)
+repair_workorder.2)
+spare_part.2)
+spare_part_transaction.2)
+spare_part_usage.2)
+sys_approval_node.2)
+sys_dict.dict_code)
+sys_notification.message_type
+sys_notification.user_id

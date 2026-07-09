@@ -75,11 +75,27 @@
           <TableCellValue :field="f" :value="row[f.prop]" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="160" fixed="right">
+      <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
           <div class="table-actions">
-            <el-button link type="primary" @click="onEdit(row)">编辑</el-button>
-            <el-button link type="danger" @click="remove(row)">删除</el-button>
+            <el-button
+              v-if="canEditRow(row)"
+              link
+              type="primary"
+              @click="onEdit(row)"
+            >
+              编辑
+            </el-button>
+            <el-button
+              v-else-if="detailMode"
+              link
+              type="primary"
+              @click="onEdit(row)"
+            >
+              查看
+            </el-button>
+            <el-button v-if="canDeleteRow(row)" link type="danger" @click="remove(row)">删除</el-button>
+            <slot name="row-actions" :row="row" />
           </div>
         </template>
       </el-table-column>
@@ -133,6 +149,8 @@ const props = defineProps<{
   detailMode?: boolean
   hideAdd?: boolean
   deleteUrl?: string
+  canEdit?: (row: Record<string, unknown>) => boolean
+  canDelete?: (row: Record<string, unknown>) => boolean
 }>()
 const emit = defineEmits<{ detail: [row: Record<string, unknown>]; add: []; deleted: [row: Record<string, unknown>] }>()
 const { loadDict } = useDict()
@@ -174,6 +192,14 @@ const importUrl = computed(() => props.config.importUrl ?? `${props.config.apiBa
 const importTemplateUrl = computed(() => props.config.importTemplateUrl ?? `${props.config.apiBase}/${props.config.table}/import/template`)
 const exportUrl = computed(() => props.config.exportUrl ?? `${props.config.apiBase}/${props.config.table}/export`)
 const pinyinCodeUrl = computed(() => props.config.pinyinCodeUrl ?? `${props.config.apiBase}/${props.config.table}/generate-pinyin`)
+
+function canEditRow(row: Record<string, unknown>) {
+  return props.canEdit ? props.canEdit(row) : true
+}
+
+function canDeleteRow(row: Record<string, unknown>) {
+  return props.canDelete ? props.canDelete(row) : true
+}
 
 async function loadRefLabels() {
   const linkTables = listFields.value.filter((f) => f.linkTable).map((f) => f.linkTable!)

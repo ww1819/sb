@@ -85,6 +85,11 @@ UPDATE device_scrap SET approval_status = status WHERE approval_status IS NULL;
 -- [V5__v2_deepening.sql]
 UPDATE asset_transfer SET approval_status = status WHERE approval_status IS NULL;
 
+-- [inventory_check audit] 依赖 V2 已添加 audit_status 列
+UPDATE inventory_check
+SET audit_status = 'approved'
+WHERE approved_by IS NOT NULL AND COALESCE(audit_status, 'pending') = 'pending';
+
 -- [V5__v2_deepening.sql]
 -- migrate notification_message -> sys_notification (V1 schema uses notification_type)
 INSERT INTO sys_notification (title, content, notification_type, is_read, created_at)
@@ -226,6 +231,8 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('check_status', 'planning', '计划中', 'planning', 1),
 ('check_status', 'in_progress', '盘点中', 'in_progress', 2),
 ('check_status', 'completed', '已完成', 'completed', 3),
+('audit_status', 'pending', '待审核', 'pending', 1),
+('audit_status', 'approved', '已审核', 'approved', 2),
 ('condition_status', 'good', '良好', 'good', 1),
 ('condition_status', 'fair', '一般', 'fair', 2),
 ('condition_status', 'poor', '较差', 'poor', 3),

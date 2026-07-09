@@ -80,6 +80,7 @@ public abstract class GenericTableController {
     @PutMapping("/{table}/{id}")
     public Result<Void> update(@PathVariable String table, @PathVariable String id, @RequestBody Map<String, Object> body) {
         check(table);
+        guardInventoryCheckMutable(table, id);
         body.remove("id");
         if ("medical_device".equals(table)) {
             MedicalDeviceFieldHelper.applyDerivedFields(body);
@@ -157,6 +158,7 @@ public abstract class GenericTableController {
     @DeleteMapping("/{table}/{id}")
     public Result<Void> delete(@PathVariable String table, @PathVariable String id) {
         check(table);
+        guardInventoryCheckMutable(table, id);
         jdbc().update("DELETE FROM " + table + " WHERE id = ?::uuid", id);
         return Result.ok();
     }
@@ -173,6 +175,7 @@ public abstract class GenericTableController {
             case "inventory_check" -> {
                 if (isBlank(body.get("check_no"))) body.put("check_no", "IC" + ts);
                 if (isBlank(body.get("status"))) body.put("status", "planning");
+                if (isBlank(body.get("audit_status"))) body.put("audit_status", "pending");
             }
             case "device_entry" -> {
                 if (isBlank(body.get("entry_no"))) body.put("entry_no", "EN" + ts);
@@ -210,6 +213,15 @@ public abstract class GenericTableController {
 
     private static boolean isBlank(Object v) {
         return v == null || (v instanceof String s && s.isBlank());
+    }
+
+    private void guardInventoryCheckMutable(String table, String id) {
+        if (!"inventory_check".equals(table)) return;
+        List<Map<String, Object>> rows = jdbc().queryForList(
+                "SELECT audit_status FROM inventory_check WHERE id = ?::uuid", id);
+        if (!rows.isEmpty() && "approved".equals(String.valueOf(rows.get(0).get("audit_status")))) {
+            throw new BizException(400, "已审核的盘点单不可修改或删除");
+        }
     }
 
     private static String importBusinessType(String table) {

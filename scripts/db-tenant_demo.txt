@@ -1,0 +1,1114 @@
+﻿SCHEMA=tenant_demo
+TABLE_COUNT=72
+TABLE:adverse_event
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:event_no|varchar NOT NULL
+  COL:device_id|uuid
+  COL:device_code|varchar
+  COL:device_name|varchar
+  COL:reporter_id|uuid
+  COL:report_time|timestamptz NOT NULL
+  COL:event_type|varchar
+  COL:severity_level|varchar
+  COL:event_description|text NOT NULL
+  COL:cause_analysis|text
+  COL:impact_description|text
+  COL:photos|jsonb
+  COL:handler_id|uuid
+  COL:handle_measures|text
+  COL:handle_time|timestamptz
+  COL:reported_to_authority|bool DEFAULT false
+  COL:report_date|date
+  COL:authority_feedback|text
+  COL:reviewer_id|uuid
+  COL:review_time|timestamptz
+  COL:review_comment|text
+  COL:status|varchar DEFAULT 'reported'::character varying
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:asset_transfer
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:transfer_no|varchar NOT NULL
+  COL:transfer_type|varchar NOT NULL
+  COL:device_id|uuid
+  COL:from_dept_id|uuid
+  COL:to_dept_id|uuid
+  COL:from_campus_id|uuid
+  COL:to_campus_id|uuid
+  COL:applicant_id|uuid
+  COL:approver_id|uuid
+  COL:approved_at|timestamptz
+  COL:transfer_date|date
+  COL:reason|text
+  COL:status|varchar DEFAULT 'pending'::character varying
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:approval_status|varchar
+TABLE:building
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:campus_id|uuid
+  COL:building_code|varchar NOT NULL
+  COL:building_name|varchar NOT NULL
+  COL:floor_count|int4
+  COL:is_active|bool DEFAULT true
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:campus
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:campus_code|varchar NOT NULL
+  COL:campus_name|varchar NOT NULL
+  COL:address|varchar
+  COL:contact_phone|varchar
+  COL:is_active|bool DEFAULT true
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:contract_payment
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:contract_id|uuid
+  COL:payment_no|varchar NOT NULL
+  COL:payment_stage|varchar
+  COL:payment_amount|numeric
+  COL:payment_date|date
+  COL:invoice_no|varchar
+  COL:invoice_url|varchar
+  COL:payee_account|varchar
+  COL:status|varchar DEFAULT 'pending'::character varying
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:approval_status|varchar DEFAULT 'draft'::character varying
+  COL:finance_auditor_id|uuid
+  COL:finance_audit_date|date
+  COL:invoice_type|varchar
+  COL:tax_amount|numeric
+  COL:voucher_no|varchar
+TABLE:department
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:dept_code|varchar NOT NULL
+  COL:dept_name|varchar NOT NULL
+  COL:parent_id|uuid
+  COL:campus_id|uuid
+  COL:building_id|uuid
+  COL:floor_number|int4
+  COL:room_number|varchar
+  COL:manager_id|uuid
+  COL:contact_phone|varchar
+  COL:is_clinical|bool DEFAULT false
+  COL:sort_order|int4 DEFAULT 0
+  COL:is_active|bool DEFAULT true
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:pinyin_code|varchar
+TABLE:device_accessory
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:device_id|uuid
+  COL:accessory_name|varchar NOT NULL
+  COL:accessory_code|varchar
+  COL:quantity|int4 DEFAULT 1
+  COL:unit_price|numeric
+  COL:purchase_date|date
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:device_benefit_summary
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:device_id|uuid
+  COL:device_code|varchar
+  COL:device_name|varchar
+  COL:summary_year|int4 NOT NULL
+  COL:summary_month|int4 NOT NULL
+  COL:total_revenue|numeric DEFAULT 0
+  COL:total_cost|numeric DEFAULT 0
+  COL:net_profit|numeric DEFAULT 0
+  COL:profit_rate|numeric
+  COL:usage_hours|numeric
+  COL:patient_count|int4
+  COL:utilization_rate|numeric
+  COL:maintenance_cost|numeric
+  COL:repair_cost|numeric
+  COL:depreciation_cost|numeric
+  COL:benefit_level|varchar
+  COL:benefit_score|numeric
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:device_cost_record
+  COL:id|int8 NOT NULL DEFAULT nextval('device_cost_record_id_seq'::regclass)
+  COL:device_id|uuid
+  COL:device_code|varchar
+  COL:device_name|varchar
+  COL:cost_date|date NOT NULL
+  COL:cost_type|varchar NOT NULL
+  COL:cost_amount|numeric NOT NULL
+  COL:description|text
+  COL:invoice_no|varchar
+  COL:data_source|varchar DEFAULT 'manual'::character varying
+  COL:source_record_id|varchar
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:device_entry
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:entry_no|varchar NOT NULL
+  COL:contract_id|uuid
+  COL:entry_date|date NOT NULL
+  COL:entry_type|varchar DEFAULT 'purchase'::character varying
+  COL:operator_id|uuid
+  COL:quality_check_passed|bool
+  COL:quality_checker_id|uuid
+  COL:quality_check_date|date
+  COL:quality_check_report_url|varchar
+  COL:installation_completed|bool
+  COL:installer_id|uuid
+  COL:installation_date|date
+  COL:installation_report_url|varchar
+  COL:status|varchar DEFAULT 'pending'::character varying
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:supplier_id|uuid
+  COL:acceptance_id|uuid
+  COL:project_id|uuid
+  COL:plan_id|uuid
+  COL:trace_no|varchar
+  COL:business_chain_no|varchar
+TABLE:device_entry_item
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:entry_id|uuid
+  COL:device_id|uuid
+  COL:device_name|varchar NOT NULL
+  COL:brand|varchar
+  COL:model|varchar
+  COL:serial_number|varchar
+  COL:quantity|int4 DEFAULT 1
+  COL:unit_price|numeric
+  COL:total_price|numeric
+  COL:is_accepted|bool DEFAULT false
+  COL:accepted_device_id|uuid
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:device_outbound
+  COL:id|uuid NOT NULL DEFAULT gen_random_uuid()
+  COL:outbound_no|varchar NOT NULL
+  COL:outbound_type|varchar DEFAULT 'requisition'::character varying
+  COL:dept_id|uuid
+  COL:receiver_id|uuid
+  COL:outbound_date|date
+  COL:purpose|text
+  COL:is_urgent|bool DEFAULT false
+  COL:doc_status|varchar DEFAULT 'draft'::character varying
+  COL:operator_id|uuid
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:device_outbound_item
+  COL:id|uuid NOT NULL DEFAULT gen_random_uuid()
+  COL:outbound_id|uuid NOT NULL
+  COL:device_id|uuid
+  COL:device_code|varchar
+  COL:device_name|varchar
+  COL:quantity|int4 DEFAULT 1
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:device_scrap
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:scrap_no|varchar NOT NULL
+  COL:device_id|uuid
+  COL:device_code|varchar
+  COL:device_name|varchar
+  COL:scrap_reason|text NOT NULL
+  COL:scrap_type|varchar
+  COL:applicant_id|uuid
+  COL:application_date|date
+  COL:evaluator_id|uuid
+  COL:evaluation_result|text
+  COL:residual_value|numeric
+  COL:approver_id|uuid
+  COL:approved_at|timestamptz
+  COL:scrap_date|date
+  COL:disposal_method|varchar
+  COL:disposal_date|date
+  COL:status|varchar DEFAULT 'pending'::character varying
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:approval_status|varchar
+TABLE:device_usage_record
+  COL:id|int8 NOT NULL DEFAULT nextval('device_usage_record_id_seq'::regclass)
+  COL:device_id|uuid
+  COL:device_code|varchar
+  COL:device_name|varchar
+  COL:usage_date|date NOT NULL
+  COL:usage_hours|numeric
+  COL:patient_count|int4 DEFAULT 0
+  COL:examination_count|int4 DEFAULT 0
+  COL:revenue|numeric DEFAULT 0
+  COL:data_source|varchar
+  COL:source_record_id|varchar
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:emergency_device_allocation
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:allocation_no|varchar NOT NULL
+  COL:device_id|uuid
+  COL:from_pool_id|uuid
+  COL:to_dept_id|uuid
+  COL:applicant_id|uuid
+  COL:application_time|timestamptz NOT NULL
+  COL:reason|text NOT NULL
+  COL:urgency_level|varchar
+  COL:approved_by|uuid
+  COL:approved_at|timestamptz
+  COL:allocation_time|timestamptz
+  COL:return_time|timestamptz
+  COL:status|varchar DEFAULT 'pending'::character varying
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:emergency_device_pool
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:pool_name|varchar NOT NULL
+  COL:campus_id|uuid
+  COL:location|varchar
+  COL:manager_id|uuid
+  COL:contact_phone|varchar
+  COL:devices|jsonb
+  COL:is_available|bool DEFAULT true
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:engineer
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:user_id|uuid
+  COL:engineer_no|varchar NOT NULL
+  COL:real_name|varchar NOT NULL
+  COL:specialty|varchar
+  COL:skill_levels|jsonb
+  COL:phone|varchar
+  COL:email|varchar
+  COL:is_on_duty|bool DEFAULT true
+  COL:workload_score|numeric DEFAULT 0
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:fault_type_dict
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:fault_code|varchar NOT NULL
+  COL:fault_name|varchar NOT NULL
+  COL:parent_id|uuid
+  COL:level|int4
+  COL:is_active|bool DEFAULT true
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:import_profile_binding
+  COL:business_type|varchar NOT NULL
+  COL:profile_code|varchar NOT NULL DEFAULT 'default'::character varying
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:import_template_field
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:business_type|varchar NOT NULL
+  COL:profile_code|varchar NOT NULL DEFAULT 'default'::character varying
+  COL:field_key|varchar NOT NULL
+  COL:field_label|varchar NOT NULL
+  COL:field_type|varchar NOT NULL DEFAULT 'string'::character varying
+  COL:target_column|varchar
+  COL:required|bool DEFAULT false
+  COL:sort_order|int4 DEFAULT 100
+  COL:is_extension|bool DEFAULT false
+  COL:is_active|bool DEFAULT true
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:inspection_plan
+  COL:id|uuid NOT NULL DEFAULT gen_random_uuid()
+  COL:plan_name|varchar NOT NULL
+  COL:device_id|uuid
+  COL:inspection_type|varchar
+  COL:plan_date|date
+  COL:status|varchar DEFAULT 'pending'::character varying
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:plan_code|varchar
+  COL:dept_id|uuid
+  COL:start_date|date
+  COL:end_date|date
+  COL:frequency|varchar
+TABLE:inspection_record
+  COL:id|uuid NOT NULL DEFAULT gen_random_uuid()
+  COL:plan_id|uuid
+  COL:device_id|uuid
+  COL:inspector_id|uuid
+  COL:inspection_date|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:result|varchar
+  COL:remark|text
+  COL:status|varchar DEFAULT 'completed'::character varying
+  COL:record_no|varchar
+  COL:result_summary|text
+  COL:inspect_date|date
+TABLE:inspection_record_item
+  COL:id|uuid NOT NULL DEFAULT gen_random_uuid()
+  COL:record_id|uuid NOT NULL
+  COL:item_name|varchar
+  COL:check_result|varchar
+  COL:remark|text
+TABLE:integration_sync_task
+  COL:id|uuid NOT NULL DEFAULT gen_random_uuid()
+  COL:system_code|varchar NOT NULL
+  COL:task_type|varchar
+  COL:status|varchar DEFAULT 'pending'::character varying
+  COL:payload|jsonb
+  COL:result|jsonb
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:finished_at|timestamptz
+TABLE:inventory_check
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:check_no|varchar NOT NULL
+  COL:check_name|varchar
+  COL:check_year|int4
+  COL:check_type|varchar DEFAULT 'annual'::character varying
+  COL:campus_id|uuid
+  COL:dept_id|uuid
+  COL:start_date|date
+  COL:end_date|date
+  COL:actual_start_at|timestamptz
+  COL:actual_end_at|timestamptz
+  COL:checker_id|uuid
+  COL:supervisor_id|uuid
+  COL:total_count|int4
+  COL:checked_count|int4 DEFAULT 0
+  COL:matched_count|int4 DEFAULT 0
+  COL:mismatch_count|int4 DEFAULT 0
+  COL:missing_count|int4 DEFAULT 0
+  COL:status|varchar DEFAULT 'planning'::character varying
+  COL:report_url|varchar
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:created_by|uuid
+  COL:approved_by|uuid
+  COL:approved_at|timestamptz
+TABLE:inventory_check_item
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:check_id|uuid
+  COL:device_id|uuid
+  COL:device_code|varchar
+  COL:device_name|varchar
+  COL:expected_location|varchar
+  COL:actual_location|varchar
+  COL:is_found|bool
+  COL:is_matched|bool
+  COL:condition_status|varchar
+  COL:check_date|timestamptz
+  COL:checker_id|uuid
+  COL:photos|jsonb
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:leased_device
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:device_id|uuid
+  COL:device_code|varchar
+  COL:device_name|varchar
+  COL:lessor_id|uuid
+  COL:lease_start_date|date
+  COL:lease_end_date|date
+  COL:monthly_rent|numeric
+  COL:contract_no|varchar
+  COL:contract_url|varchar
+  COL:auto_renewal|bool DEFAULT false
+  COL:renewal_notice_days|int4 DEFAULT 30
+  COL:status|varchar DEFAULT 'active'::character varying
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:life_support_device
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:device_id|uuid
+  COL:device_code|varchar
+  COL:device_name|varchar
+  COL:criticality_level|varchar
+  COL:backup_required|bool DEFAULT true
+  COL:standby_status|varchar DEFAULT 'ready'::character varying
+  COL:last_test_date|date
+  COL:next_test_date|date
+  COL:emergency_protocol|text
+  COL:responsible_person_id|uuid
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:maintenance_contract
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:contract_code|varchar NOT NULL
+  COL:contract_name|varchar
+  COL:supplier_id|uuid
+  COL:start_date|date
+  COL:end_date|date
+  COL:contract_amount|numeric
+  COL:coverage_type|varchar
+  COL:covered_devices|jsonb
+  COL:response_time_hours|int4
+  COL:preventive_visits_per_year|int4
+  COL:contract_file_url|varchar
+  COL:status|varchar DEFAULT 'active'::character varying
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:maintenance_contract_fulfillment
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:contract_id|uuid
+  COL:fulfillment_type|varchar
+  COL:scheduled_date|date
+  COL:actual_date|date
+  COL:engineer_id|uuid
+  COL:service_content|text
+  COL:result_description|text
+  COL:photos|jsonb
+  COL:signature_url|varchar
+  COL:evaluation_rating|int4
+  COL:evaluation_comment|text
+  COL:status|varchar DEFAULT 'completed'::character varying
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:maintenance_contract_payment
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:contract_id|uuid
+  COL:payment_no|varchar NOT NULL
+  COL:payment_stage|varchar
+  COL:payment_amount|numeric
+  COL:payment_date|date
+  COL:invoice_no|varchar
+  COL:invoice_url|varchar
+  COL:status|varchar DEFAULT 'pending'::character varying
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:maintenance_plan
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:plan_name|varchar
+  COL:device_id|uuid
+  COL:template_id|uuid
+  COL:maintenance_level|varchar NOT NULL
+  COL:cycle_type|varchar NOT NULL
+  COL:cycle_value|int4
+  COL:next_due_date|date NOT NULL
+  COL:reminder_days_before|int4 DEFAULT 7
+  COL:assigned_engineer_id|uuid
+  COL:status|varchar DEFAULT 'active'::character varying
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:plan_code|varchar
+  COL:last_maintained_at|date
+  COL:dept_id|uuid
+TABLE:maintenance_record
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:record_no|varchar NOT NULL
+  COL:plan_id|uuid
+  COL:device_id|uuid
+  COL:device_code|varchar
+  COL:device_name|varchar
+  COL:maintenance_level|varchar NOT NULL
+  COL:template_id|uuid
+  COL:executor_id|uuid
+  COL:execute_start_time|timestamptz
+  COL:execute_end_time|timestamptz
+  COL:duration_minutes|int4
+  COL:items_result|jsonb
+  COL:overall_result|varchar
+  COL:issues_found|text
+  COL:photos|jsonb
+  COL:signature_url|varchar
+  COL:reviewer_id|uuid
+  COL:review_time|timestamptz
+  COL:review_comment|text
+  COL:status|varchar DEFAULT 'pending'::character varying
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:maintenance_template
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:template_name|varchar NOT NULL
+  COL:maintenance_level|varchar NOT NULL
+  COL:category_id|uuid
+  COL:items|jsonb NOT NULL
+  COL:estimated_duration|int4
+  COL:is_active|bool DEFAULT true
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:manufacturer
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:manufacturer_code|varchar NOT NULL
+  COL:manufacturer_name|varchar NOT NULL
+  COL:country|varchar
+  COL:is_domestic|bool
+  COL:contact_phone|varchar
+  COL:website|varchar
+  COL:is_active|bool DEFAULT true
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:pinyin_code|varchar
+TABLE:medical_device
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:device_code|varchar NOT NULL
+  COL:device_name|varchar NOT NULL
+  COL:brand|varchar
+  COL:model|varchar
+  COL:serial_number|varchar
+  COL:category_id|uuid
+  COL:manufacturer_id|uuid
+  COL:supplier_id|uuid
+  COL:country_of_origin|varchar
+  COL:is_imported|bool
+  COL:original_value|numeric
+  COL:net_value|numeric
+  COL:depreciation_years|int4
+  COL:monthly_depreciation|numeric
+  COL:accumulated_depreciation|numeric DEFAULT 0
+  COL:financial_code|varchar
+  COL:campus_id|uuid
+  COL:building_id|uuid
+  COL:dept_id|uuid
+  COL:location_detail|varchar
+  COL:purchase_date|date
+  COL:acceptance_date|date
+  COL:enable_date|date
+  COL:warranty_end_date|date
+  COL:device_status|varchar DEFAULT 'normal'::character varying
+  COL:risk_level|varchar
+  COL:is_life_support|bool DEFAULT false
+  COL:is_emergency|bool DEFAULT false
+  COL:qr_code_url|varchar
+  COL:label_printed|bool DEFAULT false
+  COL:manual_files|jsonb
+  COL:certificate_files|jsonb
+  COL:remark|text
+  COL:is_active|bool DEFAULT true
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:created_by|uuid
+  COL:updated_by|uuid
+  COL:contract_id|uuid
+  COL:extension_data|jsonb NOT NULL DEFAULT '{}'::jsonb
+  COL:specification|varchar
+  COL:registration_no|varchar
+  COL:production_date|date
+  COL:service_life_years|int4
+  COL:calibration_period_days|int4
+  COL:last_calibration_date|date
+  COL:next_calibration_date|date
+  COL:service_expiry_date|date
+TABLE:medical_device_category
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:category_code|varchar NOT NULL
+  COL:category_name|varchar NOT NULL
+  COL:parent_code|varchar
+  COL:level|int4 NOT NULL
+  COL:full_path|varchar
+  COL:sort_order|int4 DEFAULT 0
+  COL:is_active|bool DEFAULT true
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:metrology_record
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:metrology_no|varchar NOT NULL
+  COL:device_id|uuid
+  COL:device_code|varchar
+  COL:device_name|varchar
+  COL:metrology_type|varchar
+  COL:metrology_org|varchar
+  COL:scheduled_date|date
+  COL:actual_date|date
+  COL:next_due_date|date
+  COL:certificate_no|varchar
+  COL:certificate_url|varchar
+  COL:result|varchar
+  COL:measurement_data|jsonb
+  COL:inspector_id|uuid
+  COL:cost|numeric
+  COL:status|varchar DEFAULT 'pending'::character varying
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:notification_message
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:title|varchar NOT NULL
+  COL:content|text
+  COL:message_type|varchar DEFAULT 'system'::character varying
+  COL:is_read|bool DEFAULT false
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:performance_test
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:test_no|varchar NOT NULL
+  COL:device_id|uuid
+  COL:device_code|varchar
+  COL:device_name|varchar
+  COL:test_type|varchar
+  COL:test_standard|varchar
+  COL:tester_id|uuid
+  COL:test_date|date
+  COL:test_items|jsonb
+  COL:overall_result|varchar
+  COL:test_report_url|varchar
+  COL:status|varchar DEFAULT 'completed'::character varying
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:purchase_acceptance
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:acceptance_no|varchar NOT NULL
+  COL:contract_id|uuid
+  COL:project_id|uuid
+  COL:supplier_id|uuid
+  COL:acceptance_date|date
+  COL:acceptance_status|varchar DEFAULT 'pending'::character varying
+  COL:quality_check_passed|bool
+  COL:quality_checker_id|uuid
+  COL:quality_check_date|date
+  COL:quality_check_report_url|varchar
+  COL:installation_completed|bool
+  COL:installer_id|uuid
+  COL:installation_date|date
+  COL:installation_report_url|varchar
+  COL:clinical_checker_id|uuid
+  COL:argument_summary|text
+  COL:report_url|varchar
+  COL:remark|text
+  COL:entry_id|uuid
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:approval_status|varchar DEFAULT 'draft'::character varying
+  COL:business_chain_no|varchar
+TABLE:purchase_acceptance_item
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:acceptance_id|uuid NOT NULL
+  COL:item_name|varchar NOT NULL
+  COL:check_standard|varchar
+  COL:check_result|varchar DEFAULT 'pending'::character varying
+  COL:is_passed|bool
+  COL:checker_id|uuid
+  COL:remark|text
+  COL:sort_order|int4 DEFAULT 0
+TABLE:purchase_acceptance_member
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:acceptance_id|uuid NOT NULL
+  COL:member_role|varchar NOT NULL
+  COL:user_id|uuid
+  COL:member_name|varchar
+  COL:signed_at|timestamptz
+  COL:signature_url|varchar
+  COL:remark|text
+TABLE:purchase_alert_snapshot
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:alert_key|varchar NOT NULL
+  COL:alert_type|varchar NOT NULL
+  COL:title|varchar NOT NULL
+  COL:message|text
+  COL:level|varchar DEFAULT 'warning'::character varying
+  COL:ref_code|varchar
+  COL:notified_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:resolved_at|timestamptz
+TABLE:purchase_bidder
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:project_id|uuid NOT NULL
+  COL:bidder_name|varchar NOT NULL
+  COL:bid_amount|numeric
+  COL:contact_person|varchar
+  COL:contact_phone|varchar
+  COL:is_winner|bool DEFAULT false
+  COL:bid_doc_url|varchar
+  COL:remark|text
+  COL:sort_order|int4 DEFAULT 0
+TABLE:purchase_complaint
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:project_id|uuid NOT NULL
+  COL:complaint_date|date
+  COL:complaint_type|varchar DEFAULT 'query'::character varying
+  COL:complainant|varchar
+  COL:content|text
+  COL:resolution|text
+  COL:resolved_at|date
+  COL:status|varchar DEFAULT 'open'::character varying
+  COL:attachment_url|varchar
+TABLE:purchase_contract
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:contract_code|varchar NOT NULL
+  COL:contract_name|varchar
+  COL:project_id|uuid
+  COL:supplier_id|uuid
+  COL:sign_date|date
+  COL:start_date|date
+  COL:end_date|date
+  COL:contract_amount|numeric
+  COL:warranty_period|int4
+  COL:contract_file_url|varchar
+  COL:payment_terms|text
+  COL:status|varchar DEFAULT 'active'::character varying
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:approval_status|varchar DEFAULT 'draft'::character varying
+  COL:acceptance_status|varchar DEFAULT 'pending'::character varying
+  COL:invoice_summary|text
+  COL:delivery_deadline|date
+  COL:acceptance_report_url|varchar
+  COL:paid_amount|numeric DEFAULT 0
+  COL:payment_progress|numeric DEFAULT 0
+  COL:business_chain_no|varchar
+  COL:contract_type|varchar DEFAULT 'purchase'::character varying
+  COL:performance_bond|numeric
+  COL:registration_cert_url|varchar
+  COL:version|int4 DEFAULT 1
+TABLE:purchase_plan
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:plan_code|varchar NOT NULL
+  COL:plan_year|int4 NOT NULL
+  COL:dept_id|uuid
+  COL:applicant_id|uuid
+  COL:total_budget|numeric
+  COL:justification|text
+  COL:approval_status|varchar DEFAULT 'draft'::character varying
+  COL:approved_by|uuid
+  COL:approved_at|timestamptz
+  COL:remark|text
+  COL:is_active|bool DEFAULT true
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:plan_type|varchar DEFAULT 'annual'::character varying
+  COL:fund_source|varchar
+  COL:business_chain_no|varchar
+  COL:is_large_equipment|bool DEFAULT false
+  COL:large_equipment_class|varchar
+  COL:benefit_analysis_url|varchar
+  COL:dept_argument_url|varchar
+  COL:version|int4 DEFAULT 1
+TABLE:purchase_plan_item
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:plan_id|uuid
+  COL:device_name|varchar NOT NULL
+  COL:category_id|uuid
+  COL:quantity|int4 NOT NULL
+  COL:estimated_price|numeric
+  COL:total_price|numeric
+  COL:specification|text
+  COL:justification|text
+  COL:priority|int4 DEFAULT 1
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:use_dept_id|uuid
+  COL:is_imported|bool DEFAULT false
+  COL:registration_no|varchar
+  COL:unit|varchar
+  COL:brand_intent|varchar
+  COL:is_metrology|bool DEFAULT false
+  COL:udi_code|varchar
+TABLE:purchase_project
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:project_code|varchar NOT NULL
+  COL:project_name|varchar NOT NULL
+  COL:plan_id|uuid
+  COL:purchase_method|varchar
+  COL:supplier_id|uuid
+  COL:total_amount|numeric
+  COL:bid_open_date|date
+  COL:award_date|date
+  COL:status|varchar DEFAULT 'planning'::character varying
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:bid_sections|text
+  COL:bid_evaluation|text
+  COL:argument_report_url|varchar
+  COL:budget_amount|numeric
+  COL:approval_status|varchar DEFAULT 'draft'::character varying
+  COL:business_chain_no|varchar
+  COL:bid_agency|varchar
+  COL:notice_date|date
+  COL:control_price|numeric
+  COL:version|int4 DEFAULT 1
+TABLE:purchase_project_event
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:project_id|uuid NOT NULL
+  COL:event_type|varchar NOT NULL
+  COL:event_date|date
+  COL:event_title|varchar
+  COL:event_desc|text
+  COL:attachment_url|varchar
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:repair_workorder
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:wo_no|varchar NOT NULL
+  COL:device_id|uuid
+  COL:device_code|varchar
+  COL:device_name|varchar
+  COL:reporter_id|uuid
+  COL:report_dept_id|uuid
+  COL:report_method|varchar
+  COL:report_time|timestamptz NOT NULL
+  COL:fault_description|text NOT NULL
+  COL:fault_photos|jsonb
+  COL:urgency_level|varchar DEFAULT 'normal'::character varying
+  COL:fault_type_id|uuid
+  COL:fault_category|varchar
+  COL:assigned_engineer_id|uuid
+  COL:assigned_at|timestamptz
+  COL:assigner_id|uuid
+  COL:response_time|timestamptz
+  COL:arrival_time|timestamptz
+  COL:repair_type|varchar
+  COL:repair_start_time|timestamptz
+  COL:repair_end_time|timestamptz
+  COL:repair_duration_hours|numeric
+  COL:downtime_hours|numeric
+  COL:solution_description|text
+  COL:spare_parts_used|jsonb
+  COL:labor_cost|numeric DEFAULT 0
+  COL:parts_cost|numeric DEFAULT 0
+  COL:total_cost|numeric DEFAULT 0
+  COL:invoice_no|varchar
+  COL:invoice_url|varchar
+  COL:verifier_id|uuid
+  COL:verify_time|timestamptz
+  COL:verify_result|varchar
+  COL:verify_comment|text
+  COL:satisfaction_rating|int4
+  COL:satisfaction_comment|text
+  COL:status|varchar DEFAULT 'reported'::character varying
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:risk_assessment
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:assessment_no|varchar NOT NULL
+  COL:device_id|uuid
+  COL:device_code|varchar
+  COL:device_name|varchar
+  COL:assessor_id|uuid
+  COL:assessment_date|date
+  COL:risk_level|varchar
+  COL:risk_factors|jsonb
+  COL:assessment_result|text
+  COL:recommendations|text
+  COL:report_url|varchar
+  COL:status|varchar DEFAULT 'completed'::character varying
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:spare_part
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:part_code|varchar NOT NULL
+  COL:part_name|varchar NOT NULL
+  COL:category|varchar
+  COL:specification|text
+  COL:applicable_devices|jsonb
+  COL:supplier_id|uuid
+  COL:unit_price|numeric
+  COL:stock_quantity|int4 DEFAULT 0
+  COL:min_stock|int4
+  COL:max_stock|int4
+  COL:storage_location|varchar
+  COL:remark|text
+  COL:is_active|bool DEFAULT true
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:spare_part_transaction
+  COL:id|uuid NOT NULL DEFAULT gen_random_uuid()
+  COL:spare_part_id|uuid
+  COL:txn_type|varchar NOT NULL
+  COL:quantity|int4 NOT NULL
+  COL:unit_price|numeric
+  COL:workorder_id|uuid
+  COL:operator_id|uuid
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:spare_part_usage
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:workorder_id|uuid
+  COL:part_id|uuid
+  COL:quantity|int4 NOT NULL
+  COL:unit_price|numeric
+  COL:total_price|numeric
+  COL:used_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:operator_id|uuid
+TABLE:special_device
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:device_id|uuid
+  COL:device_code|varchar
+  COL:device_name|varchar
+  COL:special_type|varchar
+  COL:license_no|varchar
+  COL:license_expiry_date|date
+  COL:operator_cert_required|bool DEFAULT true
+  COL:certified_operators|_uuid
+  COL:safety_measures|text
+  COL:last_inspection_date|date
+  COL:next_inspection_date|date
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:supplier
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:supplier_code|varchar NOT NULL
+  COL:supplier_name|varchar NOT NULL
+  COL:unified_social_credit_code|varchar
+  COL:legal_representative|varchar
+  COL:contact_person|varchar
+  COL:contact_phone|varchar
+  COL:address|text
+  COL:bank_account|varchar
+  COL:bank_name|varchar
+  COL:qualification_files|jsonb
+  COL:rating|int4
+  COL:is_authorized|bool DEFAULT false
+  COL:is_active|bool DEFAULT true
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:pinyin_code|varchar
+TABLE:sys_approval_flow
+  COL:id|uuid NOT NULL DEFAULT gen_random_uuid()
+  COL:flow_code|varchar NOT NULL
+  COL:flow_name|varchar NOT NULL
+  COL:business_type|varchar NOT NULL
+  COL:is_active|bool DEFAULT true
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:sys_approval_instance
+  COL:id|uuid NOT NULL DEFAULT gen_random_uuid()
+  COL:flow_id|uuid
+  COL:business_type|varchar NOT NULL
+  COL:business_id|uuid NOT NULL
+  COL:business_no|varchar
+  COL:title|varchar
+  COL:applicant_id|uuid
+  COL:status|varchar DEFAULT 'pending'::character varying
+  COL:current_node_order|int4 DEFAULT 1
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:sys_approval_node
+  COL:id|uuid NOT NULL DEFAULT gen_random_uuid()
+  COL:flow_id|uuid NOT NULL
+  COL:node_order|int4 NOT NULL
+  COL:node_name|varchar NOT NULL
+  COL:approver_role|varchar
+  COL:amount_threshold|numeric
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:sys_approval_record
+  COL:id|uuid NOT NULL DEFAULT gen_random_uuid()
+  COL:instance_id|uuid NOT NULL
+  COL:node_order|int4 NOT NULL
+  COL:approver_id|uuid
+  COL:action|varchar NOT NULL
+  COL:comment|text
+  COL:acted_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:sys_config
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:config_key|varchar NOT NULL
+  COL:config_value|text
+  COL:config_type|varchar
+  COL:description|text
+  COL:is_system|bool DEFAULT false
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:sys_dict
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:dict_type|varchar NOT NULL
+  COL:dict_code|varchar NOT NULL
+  COL:dict_label|varchar NOT NULL
+  COL:dict_value|varchar
+  COL:sort_order|int4 DEFAULT 0
+  COL:is_active|bool DEFAULT true
+  COL:remark|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:sys_notification
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:title|varchar NOT NULL
+  COL:content|text
+  COL:notification_type|varchar
+  COL:target_users|_uuid
+  COL:target_roles|_uuid
+  COL:target_depts|_uuid
+  COL:priority|varchar DEFAULT 'normal'::character varying
+  COL:is_read|bool DEFAULT false
+  COL:read_at|timestamptz
+  COL:related_entity_type|varchar
+  COL:related_entity_id|uuid
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:sys_operation_log
+  COL:id|int8 NOT NULL DEFAULT nextval('sys_operation_log_id_seq'::regclass)
+  COL:user_id|uuid
+  COL:operation_type|varchar NOT NULL
+  COL:module_name|varchar
+  COL:operation_desc|text
+  COL:request_method|varchar
+  COL:request_url|varchar
+  COL:request_params|jsonb
+  COL:response_result|jsonb
+  COL:ip_address|varchar
+  COL:user_agent|text
+  COL:execution_time|int4
+  COL:status|varchar
+  COL:error_msg|text
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:sys_role
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:role_code|varchar NOT NULL
+  COL:role_name|varchar NOT NULL
+  COL:description|text
+  COL:permissions|jsonb
+  COL:sort_order|int4 DEFAULT 0
+  COL:is_active|bool DEFAULT true
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+TABLE:sys_user
+  COL:id|uuid NOT NULL DEFAULT public.uuid_generate_v4()
+  COL:username|varchar NOT NULL
+  COL:password_hash|varchar NOT NULL
+  COL:real_name|varchar NOT NULL
+  COL:employee_no|varchar
+  COL:phone|varchar
+  COL:email|varchar
+  COL:dept_id|uuid
+  COL:role_ids|_uuid
+  COL:avatar_url|varchar
+  COL:last_login_at|timestamptz
+  COL:last_login_ip|varchar
+  COL:is_locked|bool DEFAULT false
+  COL:is_active|bool DEFAULT true
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:permissions|jsonb
+  COL:permission_mode|varchar DEFAULT 'synced'::character varying
+TABLE:v_device_benefit
+  COL:device_code|varchar
+  COL:device_name|varchar
+  COL:dept_id|uuid
+  COL:dept_name|varchar
+  COL:summary_year|int4
+  COL:summary_month|int4
+  COL:total_revenue|numeric
+  COL:total_cost|numeric
+  COL:net_profit|numeric
+  COL:profit_rate|numeric
+  COL:utilization_rate|numeric
+  COL:benefit_level|varchar
+TABLE:v_device_full_info
+  COL:id|uuid
+  COL:device_code|varchar
+  COL:device_name|varchar
+  COL:brand|varchar
+  COL:model|varchar
+  COL:serial_number|varchar
+  COL:category_name|varchar
+  COL:manufacturer_name|varchar
+  COL:supplier_name|varchar
+  COL:original_value|numeric
+  COL:net_value|numeric
+  COL:campus_name|varchar
+  COL:building_name|varchar
+  COL:dept_name|varchar
+  COL:location_detail|varchar
+  COL:enable_date|date
+  COL:warranty_end_date|date
+  COL:device_status|varchar
+  COL:risk_level|varchar
+  COL:is_life_support|bool
+  COL:is_emergency|bool
+  COL:created_at|timestamptz
+TABLE:warehouse
+  COL:id|uuid NOT NULL DEFAULT gen_random_uuid()
+  COL:warehouse_code|varchar NOT NULL
+  COL:warehouse_name|varchar NOT NULL
+  COL:campus_id|uuid
+  COL:dept_id|uuid
+  COL:address|varchar
+  COL:manager_id|uuid
+  COL:is_active|bool DEFAULT true
+  COL:sort_order|int4 DEFAULT 0
+  COL:created_at|timestamptz DEFAULT CURRENT_TIMESTAMP
+  COL:updated_at|timestamptz DEFAULT CURRENT_TIMESTAMP
