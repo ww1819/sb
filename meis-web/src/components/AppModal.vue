@@ -6,7 +6,8 @@
     align-center
     destroy-on-close
     :close-on-click-modal="closeOnClickModal"
-    :append-to="`#${LAYOUT_CONTENT_ROOT_ID}`"
+    :append-to="appendTarget"
+    modal-class="layout-content-modal"
     class="app-modal"
     :class="`app-modal--${size}`"
     @update:model-value="$emit('update:modelValue', $event)"
@@ -21,8 +22,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, shallowRef } from 'vue'
 import { LAYOUT_CONTENT_ROOT_ID } from '@/config/app'
+
+const appendTarget = shallowRef<string | HTMLElement>(`#${LAYOUT_CONTENT_ROOT_ID}`)
+
+onMounted(() => {
+  const root = document.getElementById(LAYOUT_CONTENT_ROOT_ID)
+  if (root) appendTarget.value = root
+})
 
 const props = withDefaults(
   defineProps<{

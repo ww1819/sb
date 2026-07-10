@@ -76,6 +76,7 @@ onUnmounted(() => document.removeEventListener('click', hideContextMenu))
 <style scoped>
 .tab-bar {
   position: relative;
+  z-index: 10;
   display: flex;
   align-items: flex-end;
   gap: 4px;

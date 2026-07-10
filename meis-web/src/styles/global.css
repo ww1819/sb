@@ -41,19 +41,59 @@ body {
   }
 }
 
+#layout-content-root .layout-content-modal {
+  position: absolute !important;
+  top: -8px;
+  right: -16px;
+  bottom: 0;
+  left: -16px;
+  height: auto !important;
+  z-index: 100;
+}
+
+.layout--top #layout-content-root .layout-content-modal {
+  top: -4px;
+}
+
+#layout-content-root .layout-content-modal .el-overlay-dialog {
+  position: absolute !important;
+  inset: 0 !important;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  overflow: hidden;
+  padding: 6px 12px 0;
+}
+
+#layout-content-root .layout-content-modal .app-modal--lg.el-dialog,
+#layout-content-root .layout-content-modal .app-modal--xl.el-dialog {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  border-radius: var(--el-dialog-border-radius, 8px);
+}
+
+#layout-content-root .layout-content-modal .app-modal.el-dialog {
+  margin: 0 !important;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+#layout-content-root .layout-content-modal .app-modal.el-dialog .el-dialog__body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#layout-content-root .layout-content-modal .app-modal.el-dialog .el-dialog__footer {
+  flex-shrink: 0;
+}
+
 .app-modal .el-dialog__body {
   padding: 8px 20px 4px;
   max-height: calc(85vh - 112px);
   overflow: hidden;
-}
-
-#layout-content-root > .el-overlay {
-  position: absolute !important;
-  inset: 0;
-}
-
-#layout-content-root .app-modal .el-dialog__body {
-  max-height: calc(100dvh - var(--meis-header-height) - var(--meis-tabbar-height) - 140px);
 }
 
 .app-modal__body {
@@ -62,8 +102,25 @@ body {
   padding: 4px 2px 12px;
 }
 
+#layout-content-root .app-modal .el-dialog__body {
+  max-height: none;
+}
+
 #layout-content-root .app-modal__body {
-  max-height: calc(100dvh - var(--meis-header-height) - var(--meis-tabbar-height) - 156px);
+  max-height: none;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+#layout-content-root .layout-content-modal .app-modal--sm.el-dialog,
+#layout-content-root .layout-content-modal .app-modal--md.el-dialog {
+  width: auto !important;
+  height: auto !important;
+  max-height: calc(100% - 32px);
+  align-self: center;
+  margin: 16px auto !important;
+  border-radius: var(--el-dialog-border-radius, 8px);
 }
 
 .app-modal--xl .el-dialog__body,
@@ -71,19 +128,9 @@ body {
   max-height: calc(88vh - 112px);
 }
 
-#layout-content-root .app-modal--xl .el-dialog__body,
-#layout-content-root .app-modal--lg .el-dialog__body {
-  max-height: calc(100dvh - var(--meis-header-height) - var(--meis-tabbar-height) - 120px);
-}
-
 .app-modal--xl .app-modal__body,
 .app-modal--lg .app-modal__body {
   max-height: calc(88vh - 128px);
-}
-
-#layout-content-root .app-modal--xl .app-modal__body,
-#layout-content-root .app-modal--lg .app-modal__body {
-  max-height: calc(100dvh - var(--meis-header-height) - var(--meis-tabbar-height) - 136px);
 }
 
 .master-detail-page,
