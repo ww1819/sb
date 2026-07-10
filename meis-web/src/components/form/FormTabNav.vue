@@ -64,7 +64,7 @@ defineEmits<{ 'update:modelValue': [value: string] }>()
 }
 
 .form-tab-nav__item.is-active {
-  color: #52c41a;
+  color: var(--el-color-primary);
   font-weight: 500;
 }
 
@@ -75,7 +75,7 @@ defineEmits<{ 'update:modelValue': [value: string] }>()
   right: 0;
   bottom: 0;
   height: 2px;
-  background: #52c41a;
+  background: var(--el-color-primary);
   border-radius: 2px 2px 0 0;
 }
 </style>

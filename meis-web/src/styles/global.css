@@ -189,9 +189,10 @@ body {
 
 #layout-content-root .app-modal__body:has(.device-ledger-form) .form-tab-nav {
   margin: 0 -20px 16px;
-  padding: 10px 24px 0;
+  padding: 10px 20px 0;
   background: #fff;
   border-bottom: 1px solid var(--meis-border-light);
+  gap: 20px;
 }
 
 #layout-content-root .layout-content-modal .app-modal--sm.el-dialog,

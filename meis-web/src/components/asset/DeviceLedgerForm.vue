@@ -1,5 +1,5 @@
 <template>
-  <el-form label-width="120px" class="device-ledger-form">
+  <el-form label-width="96px" class="device-ledger-form">
     <FormTabNav v-model="activeTab" :tabs="tabs" />
 
     <div class="device-ledger-form__panel">
@@ -8,11 +8,52 @@
         table="medical_device"
         :model="model"
         :fields="basicFields"
+        :group-span="{ basic: 6, finance: 6 }"
       />
 
       <div v-show="activeTab === 'card'" class="device-ledger-form__card-pane">
         <DeviceAssetCard :model="model" />
       </div>
+
+      <DeviceArchivePanel v-show="activeTab === 'archive'" />
+      <DeviceImagePanel v-show="activeTab === 'images'" />
+
+      <DeviceRecordTablePanel
+        v-show="activeTab === 'repair'"
+        :columns="repairColumns"
+        empty-text="暂无维修记录"
+        filter-placeholder="工单号 / 故障描述"
+      />
+      <DeviceRecordTablePanel
+        v-show="activeTab === 'maintain'"
+        :columns="maintainColumns"
+        empty-text="暂无保养记录"
+        filter-placeholder="记录号 / 计划名称"
+      />
+      <DeviceRecordTablePanel
+        v-show="activeTab === 'inspection'"
+        :columns="inspectionColumns"
+        empty-text="暂无巡检记录"
+        filter-placeholder="巡检单号"
+      />
+      <DeviceRecordTablePanel
+        v-show="activeTab === 'metrology'"
+        :columns="metrologyColumns"
+        empty-text="暂无计量记录"
+        filter-placeholder="计量编号"
+      />
+      <DeviceRecordTablePanel
+        v-show="activeTab === 'inventory'"
+        :columns="inventoryColumns"
+        empty-text="暂无盘点记录"
+        filter-placeholder="盘点单号"
+      />
+      <DeviceRecordTablePanel
+        v-show="activeTab === 'adverse'"
+        :columns="adverseColumns"
+        empty-text="暂无不良事件"
+        filter-placeholder="事件编号"
+      />
     </div>
   </el-form>
 </template>
@@ -22,6 +63,10 @@ import { computed, ref } from 'vue'
 import FormTabNav from '@/components/form/FormTabNav.vue'
 import GroupedFormFields from '@/components/form/GroupedFormFields.vue'
 import DeviceAssetCard from '@/components/asset/DeviceAssetCard.vue'
+import DeviceArchivePanel from '@/components/asset/tabs/DeviceArchivePanel.vue'
+import DeviceImagePanel from '@/components/asset/tabs/DeviceImagePanel.vue'
+import DeviceRecordTablePanel from '@/components/asset/tabs/DeviceRecordTablePanel.vue'
+import type { RecordColumn } from '@/components/asset/tabs/DeviceRecordTablePanel.vue'
 import type { FieldSchema } from '@/config/pageSchemas'
 
 const props = defineProps<{
@@ -33,7 +78,15 @@ const activeTab = ref('basic')
 
 const tabs = [
   { key: 'basic', label: '基本信息' },
-  { key: 'card', label: '资产卡片' }
+  { key: 'card', label: '资产卡片' },
+  { key: 'archive', label: '设备档案' },
+  { key: 'images', label: '设备图片' },
+  { key: 'repair', label: '维修记录' },
+  { key: 'maintain', label: '保养记录' },
+  { key: 'inspection', label: '巡检记录' },
+  { key: 'metrology', label: '计量记录' },
+  { key: 'inventory', label: '盘点记录' },
+  { key: 'adverse', label: '不良事件' }
 ]
 
 const basicGroupKeys = new Set(['basic', 'finance', 'location', 'time', 'status', 'attachment', 'remark', 'other'])
@@ -41,6 +94,54 @@ const basicGroupKeys = new Set(['basic', 'finance', 'location', 'time', 'status'
 const basicFields = computed(() =>
   props.fields.filter((f) => basicGroupKeys.has(f.group ?? 'other'))
 )
+
+const repairColumns: RecordColumn[] = [
+  { prop: 'wo_no', label: '工单号', minWidth: 140 },
+  { prop: 'fault_desc', label: '故障描述', minWidth: 180 },
+  { prop: 'status', label: '状态', minWidth: 100 },
+  { prop: 'engineer_name', label: '工程师', minWidth: 120 },
+  { prop: 'report_time', label: '报修时间', minWidth: 160 }
+]
+
+const maintainColumns: RecordColumn[] = [
+  { prop: 'record_no', label: '记录号', minWidth: 140 },
+  { prop: 'plan_name', label: '计划名称', minWidth: 160 },
+  { prop: 'status', label: '状态', minWidth: 100 },
+  { prop: 'maintain_date', label: '保养日期', minWidth: 140 },
+  { prop: 'engineer_name', label: '执行人', minWidth: 120 }
+]
+
+const inspectionColumns: RecordColumn[] = [
+  { prop: 'inspection_no', label: '巡检单号', minWidth: 140 },
+  { prop: 'inspection_type', label: '巡检类型', minWidth: 120 },
+  { prop: 'status', label: '状态', minWidth: 100 },
+  { prop: 'inspector_name', label: '巡检人', minWidth: 120 },
+  { prop: 'inspection_date', label: '巡检日期', minWidth: 140 }
+]
+
+const metrologyColumns: RecordColumn[] = [
+  { prop: 'metrology_no', label: '计量编号', minWidth: 140 },
+  { prop: 'metrology_type', label: '计量类型', minWidth: 120 },
+  { prop: 'result', label: '计量结果', minWidth: 120 },
+  { prop: 'org_name', label: '计量机构', minWidth: 140 },
+  { prop: 'metrology_date', label: '计量日期', minWidth: 140 }
+]
+
+const inventoryColumns: RecordColumn[] = [
+  { prop: 'check_no', label: '盘点单号', minWidth: 140 },
+  { prop: 'check_type', label: '盘点类型', minWidth: 120 },
+  { prop: 'status', label: '状态', minWidth: 100 },
+  { prop: 'dept_name', label: '盘点科室', minWidth: 140 },
+  { prop: 'check_date', label: '盘点日期', minWidth: 140 }
+]
+
+const adverseColumns: RecordColumn[] = [
+  { prop: 'event_no', label: '事件编号', minWidth: 140 },
+  { prop: 'event_level', label: '事件等级', minWidth: 120 },
+  { prop: 'event_type', label: '事件类型', minWidth: 120 },
+  { prop: 'status', label: '处理状态', minWidth: 100 },
+  { prop: 'report_time', label: '上报时间', minWidth: 160 }
+]
 </script>
 
 <style scoped>
