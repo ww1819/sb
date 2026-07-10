@@ -1,6 +1,6 @@
 # Run MEIS Flutter app on Windows desktop
 param(
-    [string]$FlutterRoot = "E:\flutter"
+    [string]$FlutterRoot = ""
 )
 
 $ErrorActionPreference = "Stop"

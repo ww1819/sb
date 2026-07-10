@@ -1,10 +1,11 @@
 # MEIS Flutter 移动端 - 首次初始化（生成 android/windows 等平台工程）
 param(
-    [string]$FlutterRoot = "E:\flutter"
+    [string]$FlutterRoot = ""
 )
 
 $ErrorActionPreference = "Stop"
 . "$PSScriptRoot\mobile-env.ps1" -FlutterRoot $FlutterRoot
+. "$PSScriptRoot\ensure-developer-mode.ps1"
 $FlutterBin = $script:FlutterBat
 $MobileDir = Join-Path $PSScriptRoot "..\meis-mobile"
 
@@ -27,6 +28,10 @@ try {
     } else {
         Write-Host "Platform folders already exist, skip flutter create"
     }
+
+    Write-Host ""
+    Write-Host "=== Check symlink / Developer Mode ==="
+    Ensure-DeveloperMode
 
     Write-Host ""
     Write-Host "=== pub get ==="
