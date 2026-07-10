@@ -1,6 +1,10 @@
 <template>
   <div class="device-list-page">
-    <CrudPage v-if="!selectedDevice" :config="config" @detail="openDevice" />
+    <CrudPage v-if="!selectedDevice" :config="config" @detail="openDevice">
+      <template #form="{ form, fields }">
+        <DeviceLedgerForm :model="form" :fields="fields" />
+      </template>
+    </CrudPage>
     <template v-else>
       <el-button @click="selectedDevice = null">返回列表</el-button>
       <DeviceDetailTabs :device="selectedDevice" />
@@ -13,6 +17,7 @@ import { ref } from 'vue'
 import http from '@/api/http'
 import CrudPage from '@/components/CrudPage.vue'
 import DeviceDetailTabs from '@/components/DeviceDetailTabs.vue'
+import DeviceLedgerForm from '@/components/asset/DeviceLedgerForm.vue'
 import { getPageConfig } from '@/config/pageRegistry'
 
 const config = getPageConfig('/asset/device')!

@@ -105,9 +105,11 @@
     </el-table>
 
     <FormDrawer v-if="!detailMode" v-model="formVisible" :title="formTitle" size="lg" @save="save">
-      <el-form label-width="120px">
-        <GroupedFormFields :table="config.table" :model="form" :fields="formFields" />
-      </el-form>
+      <slot name="form" :form="form" :fields="formFields">
+        <el-form label-width="120px">
+          <GroupedFormFields :table="config.table" :model="form" :fields="formFields" />
+        </el-form>
+      </slot>
     </FormDrawer>
 
     <ImportDialog
