@@ -50,7 +50,7 @@ public class ReportController {
         todos.addAll(jdbc.queryForList(
                 "SELECT id, title, business_type, created_at, 'approval' AS todo_type FROM sys_approval_instance WHERE status = 'pending' ORDER BY created_at DESC LIMIT 20"));
         todos.addAll(jdbc.queryForList(
-                "SELECT id, wo_no AS title, 'repair' AS business_type, created_at, 'workorder' AS todo_type FROM repair_workorder WHERE status IN ('reported','dispatched','in_progress') ORDER BY created_at DESC LIMIT 20"));
+                "SELECT id, wo_no AS title, 'repair' AS business_type, created_at, 'workorder' AS todo_type FROM repair_workorder WHERE status IN ('reported','dispatching','pending_accept','accepted','repairing','pending_verify','suspended') ORDER BY created_at DESC LIMIT 20"));
         return Result.ok(todos);
     }
 

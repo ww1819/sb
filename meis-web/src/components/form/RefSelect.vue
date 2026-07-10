@@ -3,6 +3,7 @@
     v-model="model"
     filterable
     clearable
+    :disabled="disabled"
     :placeholder="placeholder"
     :loading="loading"
     style="width: 100%"
@@ -21,6 +22,7 @@ const props = defineProps<{
   modelValue: unknown
   linkTable: string
   placeholder?: string
+  disabled?: boolean
 }>()
 const emit = defineEmits<{ 'update:modelValue': [v: unknown] }>()
 

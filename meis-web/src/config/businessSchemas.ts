@@ -335,7 +335,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'device_id', label: '设备', widget: 'repairDevicePicker', list: true, group: 'basic' },
     { prop: 'device_code', label: '设备编码', list: true, group: 'basic', readonly: true },
     { prop: 'device_name', label: '设备名称', list: true, group: 'basic', readonly: true },
-    { prop: 'reporter_id', label: '报修人', linkTable: 'sys_user', group: 'basic' },
+    { prop: 'reporter_id', label: '报修人', linkTable: 'sys_user', group: 'basic', readonly: true },
     { prop: 'report_dept_id', label: '报修科室', linkTable: 'department', group: 'basic', readonly: true },
     { prop: 'report_method', label: '报修渠道', dictType: 'report_method', group: 'basic' },
     { prop: 'report_time', label: '报修时间', type: 'datetime', list: true, group: 'basic' },
@@ -358,6 +358,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'verify_comment', label: '验收意见', type: 'textarea', group: 'workflow' },
     { prop: 'satisfaction_rating', label: '满意度', type: 'number', group: 'workflow' },
     { prop: 'status', label: '状态', dictType: 'wo_status', list: true, group: 'workflow', readonly: true },
+    { prop: 'repair_sub_status', label: '维修子状态', dictType: 'repair_sub_status', group: 'workflow' },
     { prop: 'remark', label: '备注', type: 'textarea', group: 'remark' }
   ],
   engineer: [

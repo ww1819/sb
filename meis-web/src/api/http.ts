@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import router from '@/router'
 import { useTabsStore } from '@/stores/tabs'
 
@@ -39,9 +39,15 @@ http.interceptors.response.use(
         localStorage.removeItem('meis_token')
         localStorage.removeItem('meis_user')
         useTabsStore().reset()
-        ElMessage.warning(message || '登录已过期，请重新登录')
-        router.push('/login').finally(() => {
+        ElMessageBox.alert(message || '登录已过期，请重新登录', '提示', {
+          confirmButtonText: '确定',
+          type: 'warning',
+          showClose: false,
+          closeOnClickModal: false,
+          closeOnPressEscape: false
+        }).finally(() => {
           handling401 = false
+          router.push('/login')
         })
       }
       return Promise.reject(error)

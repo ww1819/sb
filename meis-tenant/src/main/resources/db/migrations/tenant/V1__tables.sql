@@ -1031,6 +1031,10 @@ CREATE TABLE repair_workorder (
     satisfaction_rating INTEGER,
     satisfaction_comment TEXT,
     status VARCHAR(20) DEFAULT 'reported',
+    repair_sub_status VARCHAR(30),
+    dispatch_started_at TIMESTAMP WITH TIME ZONE,
+    accepted_at TIMESTAMP WITH TIME ZONE,
+    closed_at TIMESTAMP WITH TIME ZONE,
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -1074,9 +1078,46 @@ COMMENT ON COLUMN repair_workorder.verify_comment IS 'verify comment';
 COMMENT ON COLUMN repair_workorder.satisfaction_rating IS 'satisfaction rating';
 COMMENT ON COLUMN repair_workorder.satisfaction_comment IS 'satisfaction comment';
 COMMENT ON COLUMN repair_workorder.status IS '状态';
+COMMENT ON COLUMN repair_workorder.repair_sub_status IS '维修子状态（仅 repairing 时有效）';
+COMMENT ON COLUMN repair_workorder.dispatch_started_at IS '开始派单时间';
+COMMENT ON COLUMN repair_workorder.accepted_at IS '工程师接单时间';
+COMMENT ON COLUMN repair_workorder.closed_at IS '工单关闭时间';
 COMMENT ON COLUMN repair_workorder.remark IS '备注';
 COMMENT ON COLUMN repair_workorder.created_at IS '创建时间';
 COMMENT ON COLUMN repair_workorder.updated_at IS '更新时间';
+
+-- 5.3.1 维修工单事件流水（时间轴）
+CREATE TABLE repair_workorder_event (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workorder_id UUID NOT NULL REFERENCES repair_workorder(id) ON DELETE CASCADE,
+    event_type VARCHAR(40) NOT NULL,
+    from_status VARCHAR(30),
+    to_status VARCHAR(30),
+    from_sub_status VARCHAR(30),
+    to_sub_status VARCHAR(30),
+    operator_id UUID,
+    engineer_id UUID,
+    from_engineer_id UUID,
+    to_engineer_id UUID,
+    remark TEXT,
+    extra_json JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE repair_workorder_event IS '维修工单事件流水（时间轴）';
+COMMENT ON COLUMN repair_workorder_event.id IS '主键';
+COMMENT ON COLUMN repair_workorder_event.workorder_id IS '关联维修工单';
+COMMENT ON COLUMN repair_workorder_event.event_type IS '事件类型';
+COMMENT ON COLUMN repair_workorder_event.from_status IS '变更前主状态';
+COMMENT ON COLUMN repair_workorder_event.to_status IS '变更后主状态';
+COMMENT ON COLUMN repair_workorder_event.from_sub_status IS '变更前子状态';
+COMMENT ON COLUMN repair_workorder_event.to_sub_status IS '变更后子状态';
+COMMENT ON COLUMN repair_workorder_event.operator_id IS '操作人';
+COMMENT ON COLUMN repair_workorder_event.engineer_id IS '相关工程师';
+COMMENT ON COLUMN repair_workorder_event.from_engineer_id IS '转派前工程师';
+COMMENT ON COLUMN repair_workorder_event.to_engineer_id IS '转派后工程师';
+COMMENT ON COLUMN repair_workorder_event.remark IS '备注';
+COMMENT ON COLUMN repair_workorder_event.extra_json IS '扩展JSON';
+COMMENT ON COLUMN repair_workorder_event.created_at IS '事件时间';
 
 -- 5.4 备件库表
 CREATE TABLE spare_part (

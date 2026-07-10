@@ -1,15 +1,13 @@
-# 补字段脚本
+# 补列脚本（老租户兜底）
 
-| `tenant_column_patches.sql` | 字段扩展（`ADD COLUMN IF NOT EXISTS`） |
-| `tenant_comment_backfill.sql` | **全量注释补全**（从 V1/V2/V4/V17 + 视图注释提取，1152 条） |
-| `tenant_view_comments.sql` | 视图注释（已合并进 `tenant_comment_backfill.sql`，可单独执行） |
+| 文件 | 说明 |
+|------|------|
+| `tenant_column_patches.sql` | 与 `R__tenant_schema_sync.sql` 同步：**每条语句只 ADD 一个字段** |
+
+**建表**：不在本文件。老租户缺表由运行时 `SchemaTableEnsuring` 幂等执行 V1（`CREATE TABLE IF NOT EXISTS`）。
+
+**注释**：不在本文件。由 `SchemaCommentFiller` 仅补空注释。
 
 ```powershell
-# 补字段
 powershell -File scripts/apply-tenant-patches.ps1 -Schema tenant_demo
-
-# 补注释（幂等）
-powershell -File scripts/apply-tenant-comments.ps1 -Schema tenant_demo
 ```
-
-与 Flyway `V18__comment_backfill.sql` 内容一致；存量租户若未跑到 V18，可手工执行上述脚本。
