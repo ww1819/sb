@@ -18,6 +18,9 @@
   --meis-space-lg: 24px;
   --meis-surface-muted: #fafbfc;
   --meis-surface-header: #fafafa;
+  --meis-modal-header-bg: #e8ecf1;
+  --meis-modal-footer-bg: #f5f7fa;
+  --meis-modal-border: #d0d7e2;
   --meis-shadow-sm: 0 1px 4px rgba(0, 21, 41, 0.06);
   --meis-shadow-md: 0 4px 12px rgba(0, 21, 41, 0.08);
   --meis-shadow-lg: 0 8px 24px rgba(0, 21, 41, 0.12);

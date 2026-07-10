@@ -49,13 +49,20 @@ const basicFields = computed(() =>
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  overflow: hidden;
+}
+
+.device-ledger-form :deep(.form-tab-nav) {
+  flex-shrink: 0;
 }
 
 .device-ledger-form__panel {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 4px;
+  padding-bottom: 8px;
 }
 
 .device-ledger-form__card-pane {

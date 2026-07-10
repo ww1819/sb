@@ -5,6 +5,7 @@
     :width="dialogWidth"
     align-center
     destroy-on-close
+    :show-close="false"
     :close-on-click-modal="closeOnClickModal"
     :append-to="appendTarget"
     modal-class="layout-content-modal"
@@ -12,6 +13,12 @@
     :class="`app-modal--${size}`"
     @update:model-value="$emit('update:modelValue', $event)"
   >
+    <template #header="{ close, titleId, titleClass }">
+      <div class="app-modal__header">
+        <span :id="titleId" :class="titleClass">{{ title }}</span>
+        <el-button plain @click="close">关闭</el-button>
+      </div>
+    </template>
     <div class="app-modal__body">
       <slot />
     </div>
