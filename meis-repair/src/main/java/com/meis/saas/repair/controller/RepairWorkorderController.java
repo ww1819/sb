@@ -91,7 +91,7 @@ public class RepairWorkorderController {
         jdbc.update("""
             INSERT INTO repair_workorder (id, wo_no, device_id, device_code, device_name, reporter_id, report_dept_id,
                 report_method, report_time, fault_description, urgency_level, status)
-            VALUES (?::uuid,?,?::uuid,?,?,?::uuid,?::uuid,?,?,?,?)
+            VALUES (?::uuid,?,?::uuid,?,?,?::uuid,?::uuid,?,?::timestamptz,?,?,?)
             """,
                 id, woNo, body.get("device_id"), body.get("device_code"), body.get("device_name"),
                 body.get("reporter_id"), body.get("report_dept_id"),

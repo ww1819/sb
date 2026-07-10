@@ -116,6 +116,10 @@ async function save() {
     return
   }
   const { data } = await http.post('/repair/workorder', wo.value)
+  if (data.code !== 0 && data.code !== 200) {
+    ElMessage.error(data.message || '保存失败')
+    return
+  }
   wo.value = data.data
   visible.value = false
   ElMessage.success('保存成功')
