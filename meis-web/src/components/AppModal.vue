@@ -6,7 +6,7 @@
     align-center
     destroy-on-close
     :close-on-click-modal="closeOnClickModal"
-    append-to-body
+    :append-to="`#${LAYOUT_CONTENT_ROOT_ID}`"
     class="app-modal"
     :class="`app-modal--${size}`"
     @update:model-value="$emit('update:modelValue', $event)"
@@ -22,6 +22,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { LAYOUT_CONTENT_ROOT_ID } from '@/config/app'
 
 const props = withDefaults(
   defineProps<{

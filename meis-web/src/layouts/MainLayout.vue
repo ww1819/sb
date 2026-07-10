@@ -164,7 +164,7 @@
 
 
 
-      <el-main class="main-content">
+      <el-main id="layout-content-root" class="main-content">
 
         <div v-if="layoutStore.contentFullscreen" class="fullscreen-bar">
 
@@ -212,9 +212,6 @@
 
         </div>
 
-
-
-        <AppFooter v-if="!layoutStore.contentFullscreen && !layoutStore.isMobile" />
 
       </el-main>
 
@@ -310,8 +307,6 @@ import HeaderToolbar from '@/components/layout/HeaderToolbar.vue'
 
 import MenuSearchDialog from '@/components/layout/MenuSearchDialog.vue'
 
-import AppFooter from '@/components/layout/AppFooter.vue'
-
 import LayoutPreferencesDrawer from '@/components/layout/LayoutPreferencesDrawer.vue'
 
 import MobileNavDrawer from '@/components/layout/MobileNavDrawer.vue'
@@ -354,7 +349,7 @@ const homePath = computed(() => (auth.isPlatformAdmin ? '/tenant/list' : '/dashb
 
 const homeTitle = computed(() => (auth.isPlatformAdmin ? '租户列表' : '工作台'))
 
-const brandTitle = computed(() => (auth.isPlatformAdmin ? '平台管理' : '医院设备管理'))
+const brandTitle = computed(() => (auth.isPlatformAdmin ? '平台管理' : 'MEIS'))
 
 const userLabel = computed(() =>
 
@@ -888,6 +883,8 @@ async function logout() {
 
 
 .main-content {
+
+  position: relative;
 
   flex: 1;
 

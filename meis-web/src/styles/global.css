@@ -47,10 +47,23 @@ body {
   overflow: hidden;
 }
 
+#layout-content-root > .el-overlay {
+  position: absolute !important;
+  inset: 0;
+}
+
+#layout-content-root .app-modal .el-dialog__body {
+  max-height: calc(100dvh - var(--meis-header-height) - var(--meis-tabbar-height) - 140px);
+}
+
 .app-modal__body {
   max-height: calc(85vh - 128px);
   overflow-y: auto;
   padding: 4px 2px 12px;
+}
+
+#layout-content-root .app-modal__body {
+  max-height: calc(100dvh - var(--meis-header-height) - var(--meis-tabbar-height) - 156px);
 }
 
 .app-modal--xl .el-dialog__body,
@@ -58,9 +71,19 @@ body {
   max-height: calc(88vh - 112px);
 }
 
+#layout-content-root .app-modal--xl .el-dialog__body,
+#layout-content-root .app-modal--lg .el-dialog__body {
+  max-height: calc(100dvh - var(--meis-header-height) - var(--meis-tabbar-height) - 120px);
+}
+
 .app-modal--xl .app-modal__body,
 .app-modal--lg .app-modal__body {
   max-height: calc(88vh - 128px);
+}
+
+#layout-content-root .app-modal--xl .app-modal__body,
+#layout-content-root .app-modal--lg .app-modal__body {
+  max-height: calc(100dvh - var(--meis-header-height) - var(--meis-tabbar-height) - 136px);
 }
 
 .master-detail-page,
