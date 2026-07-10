@@ -358,6 +358,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'verify_comment', label: '验收意见', type: 'textarea', group: 'workflow' },
     { prop: 'satisfaction_rating', label: '满意度', type: 'number', group: 'workflow' },
     { prop: 'status', label: '状态', dictType: 'wo_status', list: true, group: 'workflow', readonly: true },
+    { prop: 'repair_sub_status', label: '维修子状态', dictType: 'repair_sub_status', group: 'workflow' },
     { prop: 'remark', label: '备注', type: 'textarea', group: 'remark' }
   ],
   engineer: [

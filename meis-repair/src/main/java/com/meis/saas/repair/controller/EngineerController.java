@@ -17,10 +17,10 @@ public class EngineerController {
     @GetMapping("/workload")
     public Result<List<Map<String, Object>>> workload() {
         return Result.ok(jdbc.queryForList("""
-            SELECT e.id, e.engineer_name, COUNT(w.id) AS workorder_count,
+            SELECT e.id, e.real_name AS engineer_name, COUNT(w.id) AS workorder_count,
             COALESCE(SUM(w.total_cost),0) AS total_cost
             FROM engineer e LEFT JOIN repair_workorder w ON w.assigned_engineer_id = e.id
-            GROUP BY e.id, e.engineer_name ORDER BY workorder_count DESC
+            GROUP BY e.id, e.real_name ORDER BY workorder_count DESC
             """));
     }
 }

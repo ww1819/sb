@@ -98,7 +98,12 @@ export const pageRegistry: Record<string, PageConfig> = {
   },
   '/asset/scrap': { title: '设备报废', apiBase: '/asset', table: 'device_scrap' },
   '/asset/inspection': { title: '设备巡检', apiBase: '/asset', table: 'inspection_plan' },
-  '/repair/workorder': { title: '维修工单', apiBase: '/repair', table: 'repair_workorder' },
+  '/repair/workorder': {
+    title: '维修工单',
+    apiBase: '/repair',
+    table: 'repair_workorder',
+    listFilters: [{ key: 'status', label: '状态', dictType: 'wo_status' }]
+  },
   '/repair/engineer': { title: '工程师', apiBase: '/repair', table: 'engineer' },
   '/repair/spare': { title: '备件管理', apiBase: '/repair', table: 'spare_part' },
   '/repair/fault': { title: '故障库', apiBase: '/repair', table: 'fault_type_dict' },
