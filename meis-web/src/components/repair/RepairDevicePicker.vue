@@ -57,6 +57,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import http from '@/api/http'
 import AppModal from '@/components/AppModal.vue'
 
@@ -93,6 +94,11 @@ async function load() {
       if (v) params[k] = v
     }
     const { data } = await http.get('/repair/workorder/devices/candidates', { params })
+    if (data.code !== 0 && data.code !== 200) {
+      ElMessage.error(data.message || '加载设备列表失败')
+      rows.value = []
+      return
+    }
     rows.value = (data.data ?? []) as Record<string, unknown>[]
   } finally {
     loading.value = false

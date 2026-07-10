@@ -6,7 +6,7 @@
     @update:model-value="onRepairDeviceModel"
   />
   <RefSelect
-    v-if="field.linkTable"
+    v-else-if="field.linkTable"
     v-model="model"
     :link-table="field.linkTable"
     :placeholder="'请选择' + field.label"

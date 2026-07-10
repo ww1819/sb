@@ -1,11 +1,31 @@
 # MEIS local dev control panel - http://localhost:5099
 param(
     [int]$Port = 5099,
-    [switch]$NoBrowser
+    [switch]$NoBrowser,
+    [ValidateSet('', 'chrome', 'default')]
+    [string]$Browser = ''
 )
 
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\meis-services.ps1"
+
+function Start-PanelBrowser {
+    param([string]$Url)
+    if ($Browser -eq 'chrome') {
+        $chromePaths = @(
+            "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
+            ${env:ProgramFiles(x86)} + '\Google\Chrome\Application\chrome.exe',
+            "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe"
+        )
+        $chrome = $chromePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+        if ($chrome) {
+            Start-Process $chrome $Url
+            return
+        }
+        Write-Host 'Chrome not found, opening default browser.' -ForegroundColor Yellow
+    }
+    Start-Process $Url
+}
 
 $panelDir = Join-Path $PSScriptRoot 'dev-panel'
 $htmlPath = Join-Path $panelDir 'index.html'
@@ -546,7 +566,7 @@ function Test-DevPanelRunning {
 
 if (Test-DevPanelRunning) {
     Write-Host "MEIS Dev Panel already running: $prefix" -ForegroundColor Yellow
-    if (-not $NoBrowser) { Start-Process $prefix }
+    if (-not $NoBrowser) { Start-PanelBrowser $prefix }
     exit 0
 }
 
@@ -563,7 +583,7 @@ try {
 } catch {
     if (Test-DevPanelRunning) {
         Write-Host "MEIS Dev Panel already running: $prefix" -ForegroundColor Yellow
-        if (-not $NoBrowser) { Start-Process $prefix }
+        if (-not $NoBrowser) { Start-PanelBrowser $prefix }
         exit 0
     }
     Write-Host "Port $Port bind failed, retrying after cleanup ..." -ForegroundColor Yellow
@@ -585,7 +605,7 @@ Write-Host 'Press Ctrl+C to stop the panel server.' -ForegroundColor DarkGray
 Write-Host 'Or run: powershell -File scripts\stop-dev-panel.ps1' -ForegroundColor DarkGray
 
 if (-not $NoBrowser) {
-    Start-Process $prefix
+    Start-PanelBrowser $prefix
 }
 
 try {
