@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import router from '@/router'
 import { createHomeTab, getHomePath, isHomePath } from '@/utils/home'
-import { clearPersistedTabs, loadPersistedTabs, savePersistedTabs } from '@/utils/tabStorage'
+import { clearPersistedTabs } from '@/utils/tabStorage'
 
 export interface TabItem {
   path: string
@@ -10,13 +10,6 @@ export interface TabItem {
 }
 
 function createInitialState() {
-  const persisted = loadPersistedTabs()
-  if (persisted) {
-    return {
-      tabs: persisted.tabs,
-      activePath: persisted.activePath
-    }
-  }
   const home = createHomeTab()
   return {
     tabs: [home] as TabItem[],
@@ -28,7 +21,7 @@ export const useTabsStore = defineStore('tabs', {
   state: () => createInitialState(),
   actions: {
     persist() {
-      savePersistedTabs(this.tabs, this.activePath)
+      // 页面刷新后统一回到首页，不再恢复上次标签页
     },
     open(path: string, title: string) {
       const exists = this.tabs.find((t) => t.path === path)

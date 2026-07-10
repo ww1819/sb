@@ -315,7 +315,7 @@ import HelpDrawer from '@/components/layout/HelpDrawer.vue'
 
 import { getPageConfig } from '@/config/pageRegistry'
 
-import { resolveBreadcrumb, type NavModule } from '@/utils/menuNav'
+import { resolveBreadcrumb, normalizeNavModules, type NavModule } from '@/utils/menuNav'
 
 
 
@@ -506,7 +506,7 @@ async function loadMenus() {
 
       if (data.code === 0) {
 
-        modules.value = data.data ?? []
+        modules.value = normalizeNavModules(data.data ?? [])
 
         titleMap.value = buildTitleMap(modules.value)
 
@@ -544,7 +544,7 @@ async function loadMenus() {
 
     if (data.code === 0) {
 
-      modules.value = data.data ?? []
+      modules.value = normalizeNavModules(data.data ?? [])
 
       titleMap.value = buildTitleMap(modules.value)
 
@@ -581,16 +581,6 @@ onMounted(async () => {
   layoutStore.initBreakpoint()
 
   tabsStore.ensureHomeTab()
-
-
-
-  if (route.path !== tabsStore.activePath && route.path !== '/login') {
-
-    router.replace(tabsStore.activePath)
-
-  }
-
-
 
   await loadMenus()
 

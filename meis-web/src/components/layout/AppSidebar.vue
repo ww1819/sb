@@ -18,6 +18,8 @@
         v-else
         ref="menuRef"
         :default-active="activePath"
+        :default-openeds="openedModules"
+        :unique-opened="true"
         :collapse="collapsed"
         :collapse-transition="false"
         class="sidebar-menu"
@@ -103,10 +105,30 @@ const emit = defineEmits<{
 
 const menuRef = ref<MenuInstance>()
 
+function findModuleIdByPath(path: string): string | null {
+  for (const mod of props.modules) {
+    if (mod.path === path) return null
+    for (const group of mod.groups ?? []) {
+      if (group.items.some((item) => item.path === path)) {
+        return mod.id
+      }
+    }
+  }
+  return null
+}
+
+const openedModules = computed(() => {
+  const modId = findModuleIdByPath(props.activePath)
+  return modId ? [modId] : []
+})
+
 watch(
   () => props.activePath,
   (path) => {
-    if (path) menuRef.value?.updateActiveIndex(path)
+    if (!path) return
+    menuRef.value?.updateActiveIndex(path)
+    const modId = findModuleIdByPath(path)
+    if (modId) menuRef.value?.open(modId)
   }
 )
 

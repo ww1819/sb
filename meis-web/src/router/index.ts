@@ -3,8 +3,11 @@ import { useAuthStore } from '@/stores/auth'
 import { useRouteProgressStore } from '@/stores/routeProgress'
 import { useTabsStore } from '@/stores/tabs'
 import { getHomePath } from '@/utils/home'
+import { clearPersistedTabs } from '@/utils/tabStorage'
 
 const PLATFORM_PATHS = ['/tenant/list', '/platform/tenant-menu', '/platform/package']
+
+let isFirstAuthenticatedNav = true
 
 const router = createRouter({
   history: createWebHistory(),
@@ -17,14 +20,7 @@ const router = createRouter({
       children: [
         {
           path: '',
-          redirect: () => {
-            const tabs = useTabsStore()
-            const active = tabs.activePath
-            if (active && active !== '/' && active !== '/login') {
-              return active
-            }
-            return getHomePath()
-          }
+          redirect: () => getHomePath()
         },
         { path: 'dashboard', component: () => import('@/views/Dashboard.vue') },
         { path: 'tenant/list', component: () => import('@/views/TenantList.vue') },
@@ -48,6 +44,16 @@ router.beforeEach((to, from) => {
   const auth = useAuthStore()
   auth.restore()
   if (to.meta.requiresAuth && !auth.isLoggedIn) return '/login'
+  if (to.meta.requiresAuth && auth.isLoggedIn && isFirstAuthenticatedNav) {
+    isFirstAuthenticatedNav = false
+    const tabs = useTabsStore()
+    tabs.reset()
+    clearPersistedTabs()
+    const home = getHomePath()
+    if (to.path !== home) {
+      return home
+    }
+  }
   if (to.path === '/login' && auth.isLoggedIn) {
     return getHomePath()
   }

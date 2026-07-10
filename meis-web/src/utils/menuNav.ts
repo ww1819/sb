@@ -30,6 +30,29 @@ export interface BreadcrumbItem {
   label: string
 }
 
+export function normalizeNavModules(modules: NavModule[]): NavModule[] {
+  return modules.map((mod) => {
+    const items = (mod.groups ?? []).flatMap((group) => group.items)
+    if (items.length !== 1) return mod
+
+    const only = items[0]
+    const samePath = !!mod.path && mod.path === only.path
+    const dashboardLeaf =
+      mod.id === 'dashboard' && only.path === '/dashboard'
+
+    if (samePath || dashboardLeaf) {
+      return {
+        id: mod.id,
+        title: mod.title,
+        path: only.path,
+        groups: []
+      }
+    }
+
+    return mod
+  })
+}
+
 export function flattenMenus(modules: NavModule[]): FlatMenuItem[] {
   const list: FlatMenuItem[] = []
   for (const mod of modules) {

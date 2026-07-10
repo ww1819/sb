@@ -19,6 +19,7 @@
     <el-menu
       v-else
       :default-active="activePath"
+      :unique-opened="true"
       class="mobile-menu"
       @select="onSelect"
     >
