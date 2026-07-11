@@ -625,7 +625,7 @@
 
     function formatHotReloadSteps(steps) {
       if (!Array.isArray(steps) || !steps.length) return ''
-      const labels = { compile: '编译', sync: '写JAR', restart: '重启', health: '健康检查' }
+      const labels = { compile: '编译', stop: '停止', sync: '写JAR', restart: '重启', health: '健康检查' }
       return steps.map(st => {
         const label = labels[st.step] || st.step
         const mark = st.ok ? '✓' : '✗'
@@ -667,7 +667,7 @@
         const flashCls = flash === 'ok' ? ' ok-flash' : (flash === 'fail' ? ' fail-flash' : '')
         const btnLabel = reloadBusy ? '加载中…' : '热加载'
         const disabled = reloadBusy ? ' disabled' : ''
-        html += `<button class="hot-reload${flashCls}${reloadBusy ? ' loading' : ''}"${disabled} onclick="serviceReloadClasses('${name}')" title="compile → 写入 JAR → 重启服务；完成后显示 ✓/✗ 与时间">${btnLabel}</button>`
+        html += `<button class="hot-reload${flashCls}${reloadBusy ? ' loading' : ''}"${disabled} onclick="serviceReloadClasses('${name}')" title="compile -> stop -> write JAR -> restart (brief downtime)">热加载</button>`
         html += renderHotReloadStatus(s)
       }
       html += `<button onclick="serviceAct('${name}','restart')">重启</button>`

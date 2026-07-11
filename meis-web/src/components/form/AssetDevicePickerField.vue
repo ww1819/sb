@@ -37,9 +37,7 @@ function onPicked(device: Record<string, unknown>) {
     model: device.model,
     serial_number: device.serial_number,
     manufacturer_name: device.manufacturer_name,
-    dept_name: device.dept_name,
-    standby_current_max_ma: device.standby_current_max_ma,
-    standby_current_min_ma: device.standby_current_min_ma
+    dept_name: device.dept_name
   })
 }
 </script>

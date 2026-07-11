@@ -161,22 +161,29 @@ public class PowerTagController {
                     body.get("device_code"), body.get("device_name"), body.get("rated_power"), body.get("install_date"),
                     body.getOrDefault("is_active", true), body.get("remark"));
         }
-        syncDeviceStandbyLimits(body, newDeviceId);
         syncBindLog(id, oldDeviceId, newDeviceId, body);
         return get(id);
     }
 
-    private void syncDeviceStandbyLimits(Map<String, Object> body, UUID deviceId) {
-        if (deviceId == null) {
-            return;
+    @PutMapping("/{id}/standby-limits")
+    @Transactional
+    @OperationLog(module = "power", description = "维护关联设备待机电流上下限")
+    public Result<Map<String, Object>> updateStandbyLimits(@PathVariable UUID id,
+            @RequestBody Map<String, Object> body) {
+        ensureTag(id);
+        var tagRows = jdbc.queryForList("SELECT device_id FROM power_tag WHERE id = ?::uuid", id);
+        if (tagRows.isEmpty()) {
+            throw new BizException(404, "not found");
         }
-        if (!body.containsKey("standby_current_max_ma") && !body.containsKey("standby_current_min_ma")) {
-            return;
+        UUID deviceId = (UUID) tagRows.get(0).get("device_id");
+        if (deviceId == null) {
+            throw new BizException(400, "tag has no linked device");
         }
         jdbc.update("""
                 UPDATE medical_device SET standby_current_max_ma=?, standby_current_min_ma=?, updated_at=NOW()
                 WHERE id=?::uuid
                 """, body.get("standby_current_max_ma"), body.get("standby_current_min_ma"), deviceId);
+        return get(id);
     }
 
     private void syncBindLog(UUID tagId, UUID oldDeviceId, UUID newDeviceId, Map<String, Object> body) {
@@ -198,21 +205,25 @@ public class PowerTagController {
     }
 
     private void fillDeviceInfo(Map<String, Object> body) {
-        if (body.get("device_id") == null) {
+        Object deviceIdRaw = body.get("device_id");
+        if (deviceIdRaw == null || deviceIdRaw.toString().isBlank()) {
+            body.put("device_id", null);
             body.put("device_code", null);
             body.put("device_name", null);
             return;
         }
+        UUID deviceId = UUID.fromString(deviceIdRaw.toString());
         var rows = jdbc.queryForList("""
-                SELECT device_code, device_name, standby_current_max_ma, standby_current_min_ma
+                SELECT device_code, device_name
                 FROM medical_device WHERE id = ?::uuid
-                """, UUID.fromString(body.get("device_id").toString()));
+                """, deviceId);
         if (!rows.isEmpty()) {
             var d = rows.get(0);
-            body.putIfAbsent("device_code", d.get("device_code"));
-            body.putIfAbsent("device_name", d.get("device_name"));
-            body.putIfAbsent("standby_current_max_ma", d.get("standby_current_max_ma"));
-            body.putIfAbsent("standby_current_min_ma", d.get("standby_current_min_ma"));
+            body.put("device_code", d.get("device_code"));
+            body.put("device_name", d.get("device_name"));
+        } else {
+            body.put("device_code", null);
+            body.put("device_name", null);
         }
     }
 

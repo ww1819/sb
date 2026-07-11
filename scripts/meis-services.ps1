@@ -561,6 +561,18 @@ function Test-MeisServiceJarHealthy {
     return @{ ok = $true; message = 'ok' }
 }
 
+function Wait-MeisServicePortReleased {
+    param(
+        [Parameter(Mandatory = $true)][int]$Port,
+        [int]$TimeoutSec = 25
+    )
+    for ($i = 0; $i -lt $TimeoutSec; $i++) {
+        if (-not (Test-MeisPortListening -Port $Port)) { return $true }
+        Start-Sleep -Seconds 1
+    }
+    return $false
+}
+
 function Sync-MeisServiceClassesToJar {
     param([Parameter(Mandatory = $true)][string]$ServiceName)
 
@@ -569,31 +581,16 @@ function Sync-MeisServiceClassesToJar {
 
     $env:JAVA_HOME = Resolve-MeisJavaHome
     $jarExe = Join-Path $env:JAVA_HOME 'bin\jar.exe'
-    if (-not (Test-Path $jarExe)) { throw "jar.exe not found under JAVA_HOME" }
+    if (-not (Test-Path $jarExe)) { throw 'jar.exe not found under JAVA_HOME' }
 
     $root = $script:MeisRoot
     $jar = Join-Path $root "$ServiceName\target\$ServiceName-1.0.0-SNAPSHOT.jar"
     $sources = Get-MeisServiceClassSourceModules $ServiceName
-    $workDir = Join-Path $env:TEMP "meis-jar-sync-$ServiceName-$(Get-Random)"
-    New-Item -ItemType Directory -Path $workDir -Force | Out-Null
-    $jarNew = "$jar.new"
-    $jarBackup = "$jar.bak"
+    $updateRoot = Join-Path $env:TEMP "meis-jar-update-$ServiceName-$(Get-Random)"
+    $bootClasses = Join-Path $updateRoot 'BOOT-INF\classes'
+    New-Item -ItemType Directory -Path $bootClasses -Force | Out-Null
 
     try {
-        Push-Location $workDir
-        & $jarExe xf $jar
-        if ($LASTEXITCODE -ne 0) { throw "无法解压 JAR: $ServiceName" }
-
-        $manifest = Join-Path $workDir 'META-INF\MANIFEST.MF'
-        if (-not (Test-Path $manifest)) {
-            throw 'JAR missing MANIFEST.MF. Run full package build first.'
-        }
-
-        $bootClasses = Join-Path $workDir 'BOOT-INF\classes'
-        if (-not (Test-Path $bootClasses)) {
-            New-Item -ItemType Directory -Path $bootClasses -Force | Out-Null
-        }
-
         $fileCount = 0
         foreach ($mod in $sources) {
             $cls = Join-Path $root "$mod\target\classes"
@@ -609,28 +606,27 @@ function Sync-MeisServiceClassesToJar {
         }
 
         if ($fileCount -eq 0) {
-            throw "未找到可同步的 class/resource，请先执行 compile"
+            throw 'no compiled classes found; run mvn compile first'
         }
 
-        if (Test-Path $jarNew) { Remove-Item $jarNew -Force }
-        & $jarExe cfm $jarNew 'META-INF/MANIFEST.MF' .
-        if ($LASTEXITCODE -ne 0) { throw "JAR 重新打包失败: $ServiceName" }
-        Pop-Location
-
-        Copy-Item $jar $jarBackup -Force
+        Push-Location $updateRoot
         try {
-            Move-Item $jarNew $jar -Force
-            Remove-Item $jarBackup -Force -ErrorAction SilentlyContinue
-        } catch {
-            if (Test-Path $jarBackup) { Move-Item $jarBackup $jar -Force }
-            throw "JAR 替换失败: $ServiceName"
+            & $jarExe uf $jar 'BOOT-INF/classes'
+            if ($LASTEXITCODE -ne 0) {
+                throw ('jar uf failed for ' + $ServiceName)
+            }
+        } finally {
+            Pop-Location
         }
 
-        return @{ ok = $true; message = ($ServiceName + ": 已加载 $fileCount 个类/资源到 JAR"); fileCount = $fileCount }
+        $verify = Test-MeisServiceJarHealthy $ServiceName
+        if (-not $verify.ok) {
+            throw ('JAR unhealthy after update: ' + $verify.message)
+        }
+
+        return @{ ok = $true; message = ($ServiceName + ': updated ' + $fileCount + ' classes/resources in JAR'); fileCount = $fileCount }
     } finally {
-        Pop-Location -ErrorAction SilentlyContinue
-        Remove-Item $workDir -Recurse -Force -ErrorAction SilentlyContinue
-        if (Test-Path $jarNew) { Remove-Item $jarNew -Force -ErrorAction SilentlyContinue }
+        Remove-Item $updateRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -641,6 +637,8 @@ function Invoke-MeisServiceHotReload {
     $svc = Get-MeisServiceDefinition $ServiceName
     $wasRunning = Test-MeisPortListening -Port $svc.port
     $useJdwp = $wasRunning -and $svc.debugPort -and (Test-MeisPortListening -Port $svc.debugPort)
+    $fileCount = 0
+    $stoppedForSync = $false
 
     try {
         $health = Test-MeisServiceJarHealthy $ServiceName
@@ -648,15 +646,36 @@ function Invoke-MeisServiceHotReload {
             Invoke-MeisMavenModule -Module $ServiceName -Package | Out-Null
         }
         Invoke-MeisMavenModule -Module $ServiceName -Compile | Out-Null
-        [void]$steps.Add(@{ step = 'compile'; ok = $true; message = 'mvn compile 成功' })
+        [void]$steps.Add(@{ step = 'compile'; ok = $true; message = 'mvn compile OK' })
     } catch {
         [void]$steps.Add(@{ step = 'compile'; ok = $false; message = $_.Exception.Message })
         return @{
             ok      = $false
-            message = ($ServiceName + ' 热加载失败：编译阶段')
+            message = ($ServiceName + ' hot-reload failed at compile')
             steps   = @($steps)
-            httpUp  = $false
-            debugUp = $false
+            httpUp  = Test-MeisPortListening -Port $svc.port
+            debugUp = $useJdwp -and (Test-MeisPortListening -Port $svc.debugPort)
+        }
+    }
+
+    if ($wasRunning) {
+        try {
+            Stop-MeisServiceByName $ServiceName | Out-Null
+            $released = Wait-MeisServicePortReleased -Port $svc.port
+            if (-not $released) {
+                throw ('port :' + $svc.port + ' still listening after stop')
+            }
+            $stoppedForSync = $true
+            [void]$steps.Add(@{ step = 'stop'; ok = $true; message = 'stopped before JAR sync' })
+        } catch {
+            [void]$steps.Add(@{ step = 'stop'; ok = $false; message = $_.Exception.Message })
+            return @{
+                ok      = $false
+                message = ($ServiceName + ' hot-reload failed at stop')
+                steps   = @($steps)
+                httpUp  = Test-MeisPortListening -Port $svc.port
+                debugUp = $useJdwp -and (Test-MeisPortListening -Port $svc.debugPort)
+            }
         }
     }
 
@@ -664,49 +683,56 @@ function Invoke-MeisServiceHotReload {
         $sync = Sync-MeisServiceClassesToJar -ServiceName $ServiceName
         $fileCount = if ($null -ne $sync.fileCount) { [int]$sync.fileCount } else { 0 }
         [void]$steps.Add(@{
-            step    = 'sync'
-            ok      = $true
-            message = ($sync.message + $(if ($fileCount -gt 0) { '' } else { '' }))
+            step      = 'sync'
+            ok        = $true
+            message   = [string]$sync.message
             fileCount = $fileCount
         })
     } catch {
         [void]$steps.Add(@{ step = 'sync'; ok = $false; message = $_.Exception.Message })
+        if ($stoppedForSync) {
+            try {
+                Start-MeisServiceByName -ServiceName $ServiceName -Profile 'dev' -EnableJdwp:$useJdwp | Out-Null
+                [void]$steps.Add(@{ step = 'restart'; ok = $true; message = 'restarted with previous JAR after sync failure' })
+            } catch {
+                [void]$steps.Add(@{ step = 'restart'; ok = $false; message = $_.Exception.Message })
+            }
+        }
         return @{
-            ok      = $false
-            message = ($ServiceName + ' 热加载失败：写入 JAR 阶段')
-            steps   = @($steps)
-            httpUp  = Test-MeisPortListening -Port $svc.port
-            debugUp = $useJdwp -and (Test-MeisPortListening -Port $svc.debugPort)
+            ok        = $false
+            message   = ($ServiceName + ' hot-reload failed at JAR sync')
+            steps     = @($steps)
+            httpUp    = Test-MeisPortListening -Port $svc.port
+            debugUp   = $useJdwp -and (Test-MeisPortListening -Port $svc.debugPort)
+            fileCount = $fileCount
         }
     }
 
     if (-not $wasRunning) {
-        [void]$steps.Add(@{ step = 'restart'; ok = $true; message = '服务未运行，已跳过重启' })
-        [void]$steps.Add(@{ step = 'health'; ok = $true; message = '下次启动将加载新类' })
+        [void]$steps.Add(@{ step = 'restart'; ok = $true; message = 'service not running, restart skipped' })
+        [void]$steps.Add(@{ step = 'health'; ok = $true; message = 'new classes will load on next start' })
         return @{
-            ok      = $true
-            message = ($ServiceName + ' 已编译并写入 JAR（服务未运行，请手动启动）')
-            steps   = @($steps)
-            httpUp  = $false
-            debugUp = $false
+            ok        = $true
+            message   = ($ServiceName + ' compiled and synced to JAR (service not running)')
+            steps     = @($steps)
+            httpUp    = $false
+            debugUp   = $false
             fileCount = $fileCount
         }
     }
 
     try {
-        Stop-MeisServiceByName $ServiceName | Out-Null
-        Start-Sleep -Seconds 1
         $start = Start-MeisServiceByName -ServiceName $ServiceName -Profile 'dev' -EnableJdwp:$useJdwp
         [void]$steps.Add(@{ step = 'restart'; ok = $true; message = $start.message })
     } catch {
         [void]$steps.Add(@{ step = 'restart'; ok = $false; message = $_.Exception.Message })
-        [void]$steps.Add(@{ step = 'health'; ok = $false; message = '服务未能重新监听端口' })
+        [void]$steps.Add(@{ step = 'health'; ok = $false; message = 'service port not listening after restart' })
         return @{
-            ok      = $false
-            message = ($ServiceName + ' 热加载失败：重启阶段')
-            steps   = @($steps)
-            httpUp  = Test-MeisPortListening -Port $svc.port
-            debugUp = $useJdwp -and (Test-MeisPortListening -Port $svc.debugPort)
+            ok        = $false
+            message   = ($ServiceName + ' hot-reload failed at restart')
+            steps     = @($steps)
+            httpUp    = Test-MeisPortListening -Port $svc.port
+            debugUp   = $useJdwp -and (Test-MeisPortListening -Port $svc.debugPort)
             fileCount = $fileCount
         }
     }
@@ -714,22 +740,25 @@ function Invoke-MeisServiceHotReload {
     $httpUp = Test-MeisPortListening -Port $svc.port
     $debugUp = (-not $useJdwp) -or (Test-MeisPortListening -Port $svc.debugPort)
     $healthOk = $httpUp -and $debugUp
-    $healthMsg = if ($healthOk) {
-        'HTTP :' + $svc.port + ' 就绪' + $(if ($useJdwp) { '，JDWP :' + $svc.debugPort } else { '' })
+    if ($healthOk) {
+        $healthMsg = 'HTTP :' + $svc.port + ' ready'
+        if ($useJdwp) { $healthMsg += ', JDWP :' + $svc.debugPort }
     } else {
-        '端口未就绪（请查看日志）'
+        $healthMsg = 'port not ready, check logs'
     }
     [void]$steps.Add(@{ step = 'health'; ok = $healthOk; message = $healthMsg })
 
     $failed = @($steps | Where-Object { -not $_.ok })
     $allOk = $failed.Count -eq 0
+    if ($allOk) {
+        $summary = $ServiceName + ' hot-reload OK (' + $fileCount + ' classes/resources, service restarted)'
+    } else {
+        $failedSteps = ($failed | ForEach-Object { $_.step }) -join ', '
+        $summary = $ServiceName + ' hot-reload incomplete: ' + $failedSteps
+    }
     return @{
         ok        = $allOk
-        message   = if ($allOk) {
-            ($ServiceName + ' 热加载成功（' + $fileCount + ' 个类/资源，服务已重启）')
-        } else {
-            ($ServiceName + ' 热加载未完全成功：' + ($failed | ForEach-Object { $_.step }) -join ', ')
-        }
+        message   = $summary
         steps     = @($steps)
         httpUp    = $httpUp
         debugUp   = $debugUp
