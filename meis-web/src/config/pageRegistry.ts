@@ -25,6 +25,8 @@ export interface PageConfig {
   listMode?: string
   /** 列表分页固定查询参数 */
   listParams?: Record<string, string | number | boolean>
+  /** 保存接口（POST，支持新增/编辑合一） */
+  saveUrl?: string
 }
 
 export const pageRegistry: Record<string, PageConfig> = {
@@ -36,6 +38,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     detailTable: 'purchase_plan_item',
     foreignKey: 'plan_id',
     listPageUrl: '/purchase/plan/page',
+    saveUrl: '/purchase/plan',
     listFilters: [
       { key: 'approval_status', label: '审批状态', dictType: 'approval_status' },
       { key: 'plan_year', label: '计划年度', type: 'number' }
@@ -49,6 +52,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     detailTable: 'purchase_plan_item',
     foreignKey: 'plan_id',
     listPageUrl: '/purchase/plan/page',
+    saveUrl: '/purchase/plan',
     listFilters: [
       { key: 'approval_status', label: '审批状态', dictType: 'approval_status' },
       { key: 'plan_year', label: '计划年度', type: 'number' }
@@ -65,6 +69,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/purchase',
     table: 'purchase_project',
     listPageUrl: '/purchase/project/page',
+    saveUrl: '/purchase/project',
     listFilters: [{ key: 'status', label: '项目状态', dictType: 'project_status' }]
   },
   '/purchase/contract': {
@@ -72,6 +77,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/purchase',
     table: 'purchase_contract',
     listPageUrl: '/purchase/contract/page',
+    saveUrl: '/purchase/contract',
     listFilters: [
       { key: 'approval_status', label: '审批状态', dictType: 'approval_status' },
       { key: 'acceptance_status', label: '验收状态', dictType: 'acceptance_status' }
@@ -119,6 +125,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     detailTable: 'device_entry_item',
     foreignKey: 'entry_id',
     listPageUrl: '/asset/entry/page',
+    saveUrl: '/asset/entry',
     listFilters: [{ key: 'status', label: '状态', dictType: 'entry_status' }]
   },
   '/asset/outbound': {
@@ -129,9 +136,10 @@ export const pageRegistry: Record<string, PageConfig> = {
     detailTable: 'device_outbound_item',
     foreignKey: 'outbound_id',
     listPageUrl: '/asset/outbound/page',
+    saveUrl: '/asset/outbound',
     listFilters: [{ key: 'doc_status', label: '审批状态', dictType: 'approval_status' }]
   },
-  '/asset/transfer': { title: '资产流转', apiBase: '/asset', table: 'asset_transfer' },
+  '/asset/transfer': { title: '资产流转', apiBase: '/asset', table: 'asset_transfer', saveUrl: '/asset/transfer' },
   '/asset/inventory': {
     title: '资产盘点',
     apiBase: '/asset',
@@ -140,9 +148,10 @@ export const pageRegistry: Record<string, PageConfig> = {
     detailTable: 'inventory_check_item',
     foreignKey: 'check_id',
     listPageUrl: '/asset/inventory/page',
+    saveUrl: '/asset/inventory',
     listFilters: [{ key: 'audit_status', label: '审核状态', dictType: 'audit_status' }]
   },
-  '/asset/scrap': { title: '设备报废', apiBase: '/asset', table: 'device_scrap' },
+  '/asset/scrap': { title: '设备报废', apiBase: '/asset', table: 'device_scrap', saveUrl: '/asset/scrap' },
   '/warehouse/setting': { title: '库房维护', apiBase: '/system', table: 'warehouse' },
   '/warehouse/entry': {
     title: '设备入库',
@@ -152,6 +161,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     detailTable: 'device_entry_item',
     foreignKey: 'entry_id',
     listPageUrl: '/asset/entry/page',
+    saveUrl: '/asset/entry',
     listFilters: [{ key: 'status', label: '状态', dictType: 'entry_status' }]
   },
   '/warehouse/outbound': {
@@ -162,6 +172,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     detailTable: 'device_outbound_item',
     foreignKey: 'outbound_id',
     listPageUrl: '/asset/outbound/page',
+    saveUrl: '/asset/outbound',
     listFilters: [{ key: 'doc_status', label: '审批状态', dictType: 'approval_status' }]
   },
   '/warehouse/return': {
@@ -172,9 +183,10 @@ export const pageRegistry: Record<string, PageConfig> = {
     detailTable: 'device_return_item',
     foreignKey: 'return_id',
     listPageUrl: '/asset/return/page',
+    saveUrl: '/asset/return',
     listFilters: [{ key: 'status', label: '状态', dictType: 'return_status' }]
   },
-  '/warehouse/transfer': { title: '库房调拨', apiBase: '/asset', table: 'asset_transfer' },
+  '/warehouse/transfer': { title: '库房调拨', apiBase: '/asset', table: 'asset_transfer', saveUrl: '/asset/transfer' },
   '/warehouse/inventory': {
     title: '库存盘点',
     apiBase: '/asset',
@@ -183,9 +195,10 @@ export const pageRegistry: Record<string, PageConfig> = {
     detailTable: 'inventory_check_item',
     foreignKey: 'check_id',
     listPageUrl: '/asset/inventory/page',
+    saveUrl: '/asset/inventory',
     listFilters: [{ key: 'audit_status', label: '审核状态', dictType: 'audit_status' }]
   },
-  '/warehouse/scrap': { title: '设备报废', apiBase: '/asset', table: 'device_scrap' },
+  '/warehouse/scrap': { title: '设备报废', apiBase: '/asset', table: 'device_scrap', saveUrl: '/asset/scrap' },
   '/asset/inspection': { title: '设备巡检', apiBase: '/asset', table: 'inspection_plan' },
   '/repair/apply': {
     title: '报修申请',
@@ -213,13 +226,14 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/repair',
     table: 'repair_workorder',
     listPageUrl: '/repair/workorder/page',
+    saveUrl: '/repair/workorder',
     listFilters: [{ key: 'status', label: '状态', dictType: 'wo_status' }]
   },
   '/repair/engineer': { title: '工程师', apiBase: '/repair', table: 'engineer' },
   '/repair/spare-archive': { title: '配件档案管理', apiBase: '/repair', table: 'spare_part' },
   '/repair/fault': { title: '故障库', apiBase: '/repair', table: 'fault_type_dict' },
   '/maintain/param': { title: '保养参数设置', apiBase: '/maintain', table: 'maintenance_level' },
-  '/maintain/plan': { title: '保养计划', apiBase: '/maintain', table: 'maintenance_plan' },
+  '/maintain/plan': { title: '保养计划', apiBase: '/maintain', table: 'maintenance_plan', saveUrl: '/maintain/plan' },
   '/maintain/execution': {
     title: '保养执行',
     apiBase: '/maintain',
@@ -238,10 +252,10 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'medical_device',
     listPageUrl: '/maintain/device/page'
   },
-  '/maintain/template': { title: '保养模板', apiBase: '/maintain', table: 'maintenance_template' },
-  '/maintain/record': { title: '保养记录', apiBase: '/maintain', table: 'maintenance_record' },
+  '/maintain/template': { title: '保养模板', apiBase: '/maintain', table: 'maintenance_template', saveUrl: '/maintain/template' },
+  '/maintain/record': { title: '保养记录', apiBase: '/maintain', table: 'maintenance_record', saveUrl: '/maintain/record' },
   '/inspect/param': { title: '巡检参数设置', apiBase: '/inspect', table: 'inspection_type' },
-  '/inspect/plan': { title: '巡检计划', apiBase: '/inspect', table: 'inspection_plan' },
+  '/inspect/plan': { title: '巡检计划', apiBase: '/inspect', table: 'inspection_plan', saveUrl: '/inspect/plan' },
   '/inspect/execution': {
     title: '巡检执行',
     apiBase: '/inspect',
@@ -261,7 +275,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/inspect/device/page'
   },
   '/metrology/param': { title: '计量参数设置', apiBase: '/metrology', table: 'metrology_category' },
-  '/metrology/plan': { title: '计量计划', apiBase: '/metrology', table: 'metrology_plan' },
+  '/metrology/plan': { title: '计量计划', apiBase: '/metrology', table: 'metrology_plan', saveUrl: '/metrology/plan' },
   '/metrology/execution': {
     title: '计量执行',
     apiBase: '/metrology',
@@ -287,6 +301,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/qc',
     table: 'adverse_event',
     listPageUrl: '/qc/adverse/page',
+    saveUrl: '/qc/adverse',
     listParams: { openOnly: true },
     listFilters: [
       { key: 'status', label: '状态', dictType: 'adverse_status' },
@@ -312,13 +327,15 @@ export const pageRegistry: Record<string, PageConfig> = {
     title: '生命支持设备',
     apiBase: '/special',
     table: 'life_support_device',
-    listPageUrl: '/special/life/page'
+    listPageUrl: '/special/life/page',
+    saveUrl: '/special/life'
   },
   '/special/radiation': {
     title: '特种设备登记',
     apiBase: '/special',
     table: 'special_device',
     listPageUrl: '/special/radiation/page',
+    saveUrl: '/special/radiation',
     listFilters: [
       { key: 'specialType', label: '特种类型', dictType: 'special_type' }
     ]
@@ -341,13 +358,15 @@ export const pageRegistry: Record<string, PageConfig> = {
     title: '公用设备管理',
     apiBase: '/shared',
     table: 'shared_device',
-    listPageUrl: '/shared/device/page'
+    listPageUrl: '/shared/device/page',
+    saveUrl: '/shared/device'
   },
   '/shared/loan': {
     title: '借调申请',
     apiBase: '/shared',
     table: 'shared_device_loan',
-    listPageUrl: '/shared/loan/page'
+    listPageUrl: '/shared/loan/page',
+    saveUrl: '/shared/loan'
   },
   '/shared/loan-approve': {
     title: '借调审批',
@@ -360,7 +379,8 @@ export const pageRegistry: Record<string, PageConfig> = {
     title: '归还申请',
     apiBase: '/shared',
     table: 'shared_device_return',
-    listPageUrl: '/shared/return/page'
+    listPageUrl: '/shared/return/page',
+    saveUrl: '/shared/return'
   },
   '/shared/return-approve': {
     title: '归还审批',
@@ -374,6 +394,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/shared',
     table: 'shared_device_fee',
     listPageUrl: '/shared/fee/page',
+    saveUrl: '/shared/fee',
     listFilters: [{ key: 'paidStatus', label: '收费状态', dictType: 'paid_status' }]
   },
   '/shared/record': {
@@ -384,7 +405,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     listFilters: [{ key: 'status', label: '状态', dictType: 'loan_status' }]
   },
   '/pm/param': { title: '预防性维护参数', apiBase: '/pm', table: 'pm_type' },
-  '/pm/plan': { title: '预防性维护计划', apiBase: '/pm', table: 'pm_plan' },
+  '/pm/plan': { title: '预防性维护计划', apiBase: '/pm', table: 'pm_plan', saveUrl: '/pm/plan' },
   '/pm/execution': {
     title: '预防性维护执行',
     apiBase: '/pm',
@@ -397,7 +418,8 @@ export const pageRegistry: Record<string, PageConfig> = {
     title: '对照管理',
     apiBase: '/analytics',
     table: 'benefit_mapping',
-    listPageUrl: '/analytics/mapping/page'
+    listPageUrl: '/analytics/mapping/page',
+    saveUrl: '/analytics/mapping'
   },
   '/analytics/sync': { title: '数据抓取', apiBase: '/analytics', table: 'integration_sync_task' },
   '/analytics/summary': {
@@ -412,6 +434,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/analytics',
     table: 'device_cost_record',
     listPageUrl: '/analytics/cost/page',
+    saveUrl: '/analytics/cost',
     listFilters: [{ key: 'costType', label: '成本类型', dictType: 'cost_type' }]
   },
   '/analytics/device': { title: '单机效益分析', apiBase: '/analytics', table: 'medical_device', listPageUrl: '/analytics/benefit/device/page' },
@@ -419,13 +442,15 @@ export const pageRegistry: Record<string, PageConfig> = {
     title: '基站维护',
     apiBase: '/power',
     table: 'power_base_station',
-    listPageUrl: '/power/station/page'
+    listPageUrl: '/power/station/page',
+    saveUrl: '/power/station'
   },
   '/power/tag': {
     title: '标签维护',
     apiBase: '/power',
     table: 'power_tag',
-    listPageUrl: '/power/tag/page'
+    listPageUrl: '/power/tag/page',
+    saveUrl: '/power/tag'
   },
   '/power/status': { title: '设备运行状态', apiBase: '/power', table: 'power_device_status', listPageUrl: '/power/status/page' },
   '/power/stats': { title: '设备运行统计', apiBase: '/power', table: 'power_monitor_record' },

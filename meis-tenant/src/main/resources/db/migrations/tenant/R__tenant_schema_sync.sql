@@ -268,6 +268,10 @@ ON CONFLICT (flow_code) DO NOTHING;
 
 -- ---------- 预防性维护模块 ----------
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_pm_device BOOLEAN DEFAULT FALSE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS standby_current_max_ma DECIMAL(10,2);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS standby_current_min_ma DECIMAL(10,2);
+ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS device_code VARCHAR(20);
+ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
 
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('pm_risk_level', 'low', '低', 'low', 1),
@@ -276,24 +280,7 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('pm_risk_level', 'critical', '极高', 'critical', 4)
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
 
--- ---------- 效益分析模块 ----------
-CREATE TABLE IF NOT EXISTS benefit_mapping (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    device_id UUID NOT NULL REFERENCES medical_device(id),
-    device_code VARCHAR(20),
-    device_name VARCHAR(200),
-    his_item_code VARCHAR(50),
-    his_item_name VARCHAR(200),
-    pacs_modality VARCHAR(50),
-    charge_code VARCHAR(50),
-    charge_name VARCHAR(200),
-    unit_price DECIMAL(12,2) DEFAULT 0,
-    is_active BOOLEAN DEFAULT TRUE,
-    remark TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
+-- ---------- 效益分析模块（字典种子） ----------
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('benefit_level', 'excellent', '优秀', 'excellent', 1),
 ('benefit_level', 'good', '良好', 'good', 2),

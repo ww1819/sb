@@ -1,9 +1,21 @@
 <template>
   <RepairDevicePickerField
     v-if="field.widget === 'repairDevicePicker'"
-    :model-value="model ?? {}"
+    :model-value="props.model ?? {}"
     :disabled="field.readonly"
-    @update:model-value="onRepairDeviceModel"
+    @update:model-value="onPickerModel"
+  />
+  <AssetDevicePickerField
+    v-else-if="field.widget === 'devicePicker'"
+    :model-value="props.model ?? {}"
+    :disabled="field.readonly"
+    @update:model-value="onPickerModel"
+  />
+  <PowerStationPickerField
+    v-else-if="field.widget === 'stationPicker'"
+    :model-value="props.model ?? {}"
+    :disabled="field.readonly"
+    @update:model-value="onPickerModel"
   />
   <RefSelect
     v-else-if="field.linkTable"
@@ -37,6 +49,8 @@ import { useDict } from '@/composables/useDict'
 import RefSelect from '@/components/form/RefSelect.vue'
 import FileUploadField from '@/components/form/FileUploadField.vue'
 import RepairDevicePickerField from '@/components/repair/RepairDevicePickerField.vue'
+import AssetDevicePickerField from '@/components/form/AssetDevicePickerField.vue'
+import PowerStationPickerField from '@/components/form/PowerStationPickerField.vue'
 
 const props = defineProps<{ field: FieldSchema; modelValue: unknown; model?: Record<string, unknown> }>()
 const emit = defineEmits<{ 'update:modelValue': [v: unknown] }>()
@@ -48,7 +62,7 @@ const model = computed({
   set: (v) => emit('update:modelValue', v)
 })
 
-function onRepairDeviceModel(v: Record<string, unknown>) {
+function onPickerModel(v: Record<string, unknown>) {
   if (!props.model) return
   Object.assign(props.model, v)
 }

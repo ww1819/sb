@@ -1,22 +1,46 @@
 package com.meis.saas.analytics.controller;
 
+import com.meis.saas.analytics.service.PowerReadingQueryService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.result.Result;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @RestController
 @RequestMapping("/api/power/tag")
 @RequiredArgsConstructor
 public class PowerTagController {
+    private static final String TAG_SELECT = """
+            SELECT t.id, t.tag_code, t.tag_name, t.device_id, t.station_id,
+                   t.rated_power, t.install_date, t.is_active, t.remark, t.created_at, t.updated_at,
+                   COALESCE(t.device_code, d.device_code) AS device_code,
+                   COALESCE(t.device_name, d.device_name) AS device_name,
+                   s.station_name, s.station_code,
+                   d.specification, d.model, d.serial_number,
+                   m.manufacturer_name, dept.dept_name,
+                   d.standby_current_max_ma, d.standby_current_min_ma
+            FROM power_tag t
+            LEFT JOIN power_base_station s ON s.id = t.station_id
+            LEFT JOIN medical_device d ON d.id = t.device_id
+            LEFT JOIN manufacturer m ON m.id = d.manufacturer_id
+            LEFT JOIN department dept ON dept.id = d.dept_id
+            """;
+
     private final JdbcTemplate jdbc;
+    private final PowerReadingQueryService readingQuery;
 
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(PageQuery query,
@@ -33,30 +57,78 @@ public class PowerTagController {
         }
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
             String kw = "%" + query.getKeyword().trim() + "%";
-            where.append(" AND (t.tag_code ILIKE ? OR t.tag_name ILIKE ? OR t.device_code ILIKE ?) ");
-            args.add(kw);
-            args.add(kw);
-            args.add(kw);
+            where.append("""
+                     AND (t.tag_code ILIKE ? OR t.tag_name ILIKE ? OR t.device_code ILIKE ?
+                     OR d.device_name ILIKE ? OR d.specification ILIKE ? OR d.model ILIKE ?)
+                    """);
+            for (int i = 0; i < 6; i++) {
+                args.add(kw);
+            }
         }
-        long total = jdbc.queryForObject("SELECT COUNT(*) FROM power_tag t" + where, Long.class, args.toArray());
+        long total = jdbc.queryForObject("SELECT COUNT(*) FROM power_tag t"
+                + " LEFT JOIN medical_device d ON d.id = t.device_id" + where, Long.class, args.toArray());
         int offset = (query.getPage() - 1) * query.getSize();
         args.add(query.getSize());
         args.add(offset);
-        var rows = jdbc.queryForList("""
-                SELECT t.*, s.station_name, d.device_name AS linked_device_name, dept.dept_name
-                FROM power_tag t
-                LEFT JOIN power_base_station s ON s.id = t.station_id
-                LEFT JOIN medical_device d ON d.id = t.device_id
-                LEFT JOIN department dept ON dept.id = d.dept_id
-                """ + where + " ORDER BY t.tag_code LIMIT ? OFFSET ?", args.toArray());
+        var rows = jdbc.queryForList(TAG_SELECT + where + " ORDER BY t.tag_code LIMIT ? OFFSET ?", args.toArray());
         return Result.ok(new PageResult<>(rows, total, query.getPage(), query.getSize()));
     }
 
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
-        var rows = jdbc.queryForList("SELECT * FROM power_tag WHERE id = ?::uuid", id);
-        if (rows.isEmpty()) throw new BizException(404, "not found");
+        var rows = jdbc.queryForList(TAG_SELECT + " WHERE t.id = ?::uuid", id);
+        if (rows.isEmpty()) {
+            throw new BizException(404, "not found");
+        }
         return Result.ok(rows.get(0));
+    }
+
+    @GetMapping("/{id}/readings/page")
+    public Result<PageResult<Map<String, Object>>> readingsPage(@PathVariable UUID id, PageQuery query,
+            @RequestParam(required = false) LocalDateTime readAtFrom,
+            @RequestParam(required = false) LocalDateTime readAtTo,
+            @RequestParam(required = false, defaultValue = "desc") String sortOrder) {
+        ensureTag(id);
+        return Result.ok(readingQuery.pageByTag(id, query, readAtFrom, readAtTo, sortOrder));
+    }
+
+    @GetMapping("/{id}/readings/export")
+    public void exportReadings(@PathVariable UUID id, HttpServletResponse response,
+            @RequestParam(required = false) LocalDateTime readAtFrom,
+            @RequestParam(required = false) LocalDateTime readAtTo,
+            @RequestParam(required = false, defaultValue = "desc") String sortOrder) throws IOException {
+        ensureTag(id);
+        var rows = readingQuery.listByTagForExport(id, readAtFrom, readAtTo, sortOrder);
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setContentType("text/csv; charset=UTF-8");
+        response.setHeader("Content-Disposition", "attachment; filename=tag_readings_" + id + ".csv");
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        try (PrintWriter w = response.getWriter()) {
+            w.write('\ufeff');
+            w.println("标签编码,基站编码,设备ID,设备编码,电流(mA),读取时间,插入时间");
+            for (Map<String, Object> row : rows) {
+                w.printf("%s,%s,%s,%s,%s,%s,%s%n",
+                        csv(row.get("tag_code")),
+                        csv(row.get("station_code")),
+                        csv(row.get("device_id")),
+                        csv(row.get("device_code")),
+                        csv(row.get("current_ma")),
+                        formatTime(row.get("read_at"), fmt),
+                        formatTime(row.get("created_at"), fmt));
+            }
+        }
+    }
+
+    @GetMapping("/{id}/bind-log")
+    public Result<List<Map<String, Object>>> bindLog(@PathVariable UUID id) {
+        ensureTag(id);
+        var rows = jdbc.queryForList("""
+                SELECT id, tag_id, device_id, device_code, device_name, bound_at, unbound_at, operator_id, remark
+                FROM power_tag_bind_log
+                WHERE tag_id = ?::uuid
+                ORDER BY bound_at DESC
+                """, id);
+        return Result.ok(rows);
     }
 
     @PostMapping
@@ -65,32 +137,119 @@ public class PowerTagController {
     public Result<Map<String, Object>> save(@RequestBody Map<String, Object> body) {
         UUID id = body.containsKey("id") ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
         fillDeviceInfo(body);
+        UUID newDeviceId = parseUuid(body.get("device_id"));
         boolean exists = !jdbc.queryForList("SELECT 1 FROM power_tag WHERE id = ?::uuid", id).isEmpty();
+        UUID oldDeviceId = null;
         if (exists) {
+            var oldRows = jdbc.queryForList("SELECT device_id FROM power_tag WHERE id = ?::uuid", id);
+            if (!oldRows.isEmpty()) {
+                oldDeviceId = (UUID) oldRows.get(0).get("device_id");
+            }
             jdbc.update("""
                     UPDATE power_tag SET tag_code=?, tag_name=?, device_id=?::uuid, station_id=?::uuid,
-                    rated_power=?, install_date=?, is_active=?, remark=?, updated_at=NOW()
+                    device_code=?, device_name=?, rated_power=?, install_date=?, is_active=?, remark=?, updated_at=NOW()
                     WHERE id=?::uuid
                     """, body.get("tag_code"), body.get("tag_name"), body.get("device_id"), body.get("station_id"),
-                    body.get("rated_power"), body.get("install_date"), body.getOrDefault("is_active", true),
-                    body.get("remark"), id);
+                    body.get("device_code"), body.get("device_name"), body.get("rated_power"), body.get("install_date"),
+                    body.getOrDefault("is_active", true), body.get("remark"), id);
         } else {
             jdbc.update("""
-                    INSERT INTO power_tag (id, tag_code, tag_name, device_id, station_id, rated_power, install_date, is_active, remark)
-                    VALUES (?::uuid,?,?,?::uuid,?::uuid,?,?,?,?)
+                    INSERT INTO power_tag (id, tag_code, tag_name, device_id, station_id, device_code, device_name,
+                    rated_power, install_date, is_active, remark)
+                    VALUES (?::uuid,?,?,?::uuid,?::uuid,?,?,?,?,?,?)
                     """, id, body.get("tag_code"), body.get("tag_name"), body.get("device_id"), body.get("station_id"),
-                    body.get("rated_power"), body.get("install_date"), body.getOrDefault("is_active", true), body.get("remark"));
+                    body.get("device_code"), body.get("device_name"), body.get("rated_power"), body.get("install_date"),
+                    body.getOrDefault("is_active", true), body.get("remark"));
         }
+        syncDeviceStandbyLimits(body, newDeviceId);
+        syncBindLog(id, oldDeviceId, newDeviceId, body);
         return get(id);
     }
 
-    private void fillDeviceInfo(Map<String, Object> body) {
-        if (body.get("device_id") == null) return;
-        var rows = jdbc.queryForList("SELECT device_code, device_name FROM medical_device WHERE id = ?::uuid",
-                UUID.fromString(body.get("device_id").toString()));
-        if (!rows.isEmpty()) {
-            body.putIfAbsent("device_code", rows.get(0).get("device_code"));
-            body.putIfAbsent("device_name", rows.get(0).get("device_name"));
+    private void syncDeviceStandbyLimits(Map<String, Object> body, UUID deviceId) {
+        if (deviceId == null) {
+            return;
         }
+        if (!body.containsKey("standby_current_max_ma") && !body.containsKey("standby_current_min_ma")) {
+            return;
+        }
+        jdbc.update("""
+                UPDATE medical_device SET standby_current_max_ma=?, standby_current_min_ma=?, updated_at=NOW()
+                WHERE id=?::uuid
+                """, body.get("standby_current_max_ma"), body.get("standby_current_min_ma"), deviceId);
+    }
+
+    private void syncBindLog(UUID tagId, UUID oldDeviceId, UUID newDeviceId, Map<String, Object> body) {
+        if (Objects.equals(oldDeviceId, newDeviceId)) {
+            return;
+        }
+        if (oldDeviceId != null) {
+            jdbc.update("""
+                    UPDATE power_tag_bind_log SET unbound_at = NOW()
+                    WHERE tag_id = ?::uuid AND device_id = ?::uuid AND unbound_at IS NULL
+                    """, tagId, oldDeviceId);
+        }
+        if (newDeviceId != null) {
+            jdbc.update("""
+                    INSERT INTO power_tag_bind_log (tag_id, device_id, device_code, device_name, remark)
+                    VALUES (?::uuid, ?::uuid, ?, ?, ?)
+                    """, tagId, newDeviceId, body.get("device_code"), body.get("device_name"), body.get("bind_remark"));
+        }
+    }
+
+    private void fillDeviceInfo(Map<String, Object> body) {
+        if (body.get("device_id") == null) {
+            body.put("device_code", null);
+            body.put("device_name", null);
+            return;
+        }
+        var rows = jdbc.queryForList("""
+                SELECT device_code, device_name, standby_current_max_ma, standby_current_min_ma
+                FROM medical_device WHERE id = ?::uuid
+                """, UUID.fromString(body.get("device_id").toString()));
+        if (!rows.isEmpty()) {
+            var d = rows.get(0);
+            body.putIfAbsent("device_code", d.get("device_code"));
+            body.putIfAbsent("device_name", d.get("device_name"));
+            body.putIfAbsent("standby_current_max_ma", d.get("standby_current_max_ma"));
+            body.putIfAbsent("standby_current_min_ma", d.get("standby_current_min_ma"));
+        }
+    }
+
+    private void ensureTag(UUID id) {
+        if (jdbc.queryForObject("SELECT COUNT(*) FROM power_tag WHERE id = ?::uuid", Long.class, id) == 0) {
+            throw new BizException(404, "not found");
+        }
+    }
+
+    private static UUID parseUuid(Object v) {
+        if (v == null || v.toString().isBlank()) {
+            return null;
+        }
+        return UUID.fromString(v.toString());
+    }
+
+    private static String csv(Object v) {
+        if (v == null) {
+            return "";
+        }
+        String s = v.toString();
+        if (s.contains(",") || s.contains("\"")) {
+            return "\"" + s.replace("\"", "\"\"") + "\"";
+        }
+        return s;
+    }
+
+    private static String formatTime(Object v, DateTimeFormatter fmt) {
+        if (v == null) {
+            return "";
+        }
+        if (v instanceof java.sql.Timestamp ts) {
+            return ts.toLocalDateTime().format(fmt);
+        }
+        if (v instanceof LocalDateTime ldt) {
+            return ldt.format(fmt);
+        }
+        return v.toString();
     }
 }

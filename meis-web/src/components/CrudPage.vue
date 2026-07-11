@@ -259,7 +259,9 @@ function openForm(row?: Record<string, unknown>) {
 
 async function save() {
   const id = form.value.id
-  if (id) {
+  if (props.config.saveUrl) {
+    await http.post(props.config.saveUrl, form.value)
+  } else if (id) {
     await http.put(`${props.config.apiBase}/${props.config.table}/${id}`, form.value)
   } else {
     await http.post(`${props.config.apiBase}/${props.config.table}`, form.value)

@@ -135,3 +135,11 @@ ALTER TABLE device_outbound ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20)
 ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS from_warehouse_id UUID;
 ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS to_warehouse_id UUID;
 ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS warehouse_id UUID;
+
+-- ---------- 电流监测 / 设备台账：补列 ----------
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_shared_device BOOLEAN DEFAULT FALSE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_pm_device BOOLEAN DEFAULT FALSE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS standby_current_max_ma DECIMAL(10,2);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS standby_current_min_ma DECIMAL(10,2);
+ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS device_code VARCHAR(20);
+ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);

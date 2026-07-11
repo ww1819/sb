@@ -31,6 +31,23 @@ $panelDir = Join-Path $PSScriptRoot 'dev-panel'
 $htmlPath = Join-Path $panelDir 'index.html'
 if (-not (Test-Path $htmlPath)) { throw "Missing panel UI: $htmlPath" }
 $script:PanelBuildPending = @{}
+$script:PanelHotReloadResults = @{}
+
+function Set-PanelHotReloadResult {
+    param(
+        [Parameter(Mandatory = $true)][string]$ServiceName,
+        [Parameter(Mandatory = $true)][hashtable]$Result
+    )
+    $script:PanelHotReloadResults[$ServiceName] = [ordered]@{
+        at        = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+        ok        = [bool]$Result.ok
+        message   = [string]$Result.message
+        steps     = @($Result.steps)
+        httpUp    = [bool]$Result.httpUp
+        debugUp   = [bool]$Result.debugUp
+        fileCount = if ($null -ne $Result.fileCount) { [int]$Result.fileCount } else { 0 }
+    }
+}
 
 function Test-PanelClientDisconnectError {
     param([System.Exception]$Ex)
@@ -192,7 +209,7 @@ function Start-PanelServiceBackgroundJob {
                     }
                 }
                 'reload-classes' {
-                    Build-MeisServiceModule -ServiceName $Name -LoadClasses | Out-Null
+                    Invoke-MeisServiceHotReload -ServiceName $Name | Out-Null
                 }
             }
         } catch {
@@ -317,6 +334,9 @@ function Get-PanelServiceStatusList {
             }
         }
         $item.buildInProgress = $building
+        if ($script:PanelHotReloadResults.ContainsKey($name)) {
+            $item.hotReload = $script:PanelHotReloadResults[$name]
+        }
     }
     return $list
 }
@@ -512,8 +532,11 @@ function Handle-PanelRequest {
                     Start-PanelServiceBackgroundJob -ServiceName $name -Action 'build' -BuildMode $modeLabel
                 }
                 'reload-classes' {
-                    Add-MeisPanelEvent ('RELOAD-CLASSES ' + $name + ' (background)')
-                    Start-PanelServiceBackgroundJob -ServiceName $name -Action 'reload-classes'
+                    Invoke-PanelAction {
+                        $r = Invoke-MeisServiceHotReload -ServiceName $name
+                        Set-PanelHotReloadResult -ServiceName $name -Result $r
+                        $r
+                    } -EventMessage $eventLabel
                 }
             }
             Write-JsonResponse -Response $res -Data $r

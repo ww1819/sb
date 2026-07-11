@@ -674,7 +674,11 @@ CREATE TABLE medical_device (
     calibration_period_days INTEGER,
     last_calibration_date DATE,
     next_calibration_date DATE,
-    service_expiry_date DATE
+    service_expiry_date DATE,
+    is_shared_device BOOLEAN DEFAULT FALSE,
+    is_pm_device BOOLEAN DEFAULT FALSE,
+    standby_current_max_ma DECIMAL(10,2),
+    standby_current_min_ma DECIMAL(10,2)
 );
 COMMENT ON TABLE medical_device IS '设备档案主表';
 COMMENT ON COLUMN medical_device.id IS '主键';
@@ -726,6 +730,10 @@ COMMENT ON COLUMN medical_device.calibration_period_days IS '计量检定周期�
 COMMENT ON COLUMN medical_device.last_calibration_date IS '上次检定日期';
 COMMENT ON COLUMN medical_device.next_calibration_date IS '下次检定日期';
 COMMENT ON COLUMN medical_device.service_expiry_date IS '使用年限到期日';
+COMMENT ON COLUMN medical_device.is_shared_device IS '是否公用设备';
+COMMENT ON COLUMN medical_device.is_pm_device IS '是否预防性维护设备';
+COMMENT ON COLUMN medical_device.standby_current_max_ma IS '待机电流上限(mA)';
+COMMENT ON COLUMN medical_device.standby_current_min_ma IS '待机电流下限(mA)';
 
 -- 4.2 设备附属低值品表
 CREATE TABLE device_accessory (
@@ -2425,6 +2433,8 @@ CREATE TABLE power_tag (
     tag_code VARCHAR(50) NOT NULL UNIQUE,
     tag_name VARCHAR(200) NOT NULL,
     device_id UUID REFERENCES medical_device(id),
+    device_code VARCHAR(20),
+    device_name VARCHAR(200),
     station_id UUID REFERENCES power_base_station(id),
     rated_power DECIMAL(10,2),
     install_date DATE,
@@ -2434,6 +2444,8 @@ CREATE TABLE power_tag (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 COMMENT ON TABLE power_tag IS '电流监测标签表';
+COMMENT ON COLUMN power_tag.device_code IS '关联设备编码（冗余）';
+COMMENT ON COLUMN power_tag.device_name IS '关联设备名称（冗余）';
 
 CREATE TABLE power_device_status (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -2467,6 +2479,39 @@ CREATE TABLE power_monitor_record (
     UNIQUE(device_id, record_date)
 );
 COMMENT ON TABLE power_monitor_record IS '电流监测日记录表';
+
+CREATE TABLE power_current_reading (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tag_id UUID REFERENCES power_tag(id),
+    tag_code VARCHAR(50),
+    station_id UUID REFERENCES power_base_station(id),
+    station_code VARCHAR(50),
+    device_id UUID REFERENCES medical_device(id),
+    device_code VARCHAR(20),
+    current_ma DECIMAL(12,3) NOT NULL,
+    read_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE power_current_reading IS '电流原始读数表';
+COMMENT ON COLUMN power_current_reading.tag_code IS '标签编码（冗余）';
+COMMENT ON COLUMN power_current_reading.station_code IS '基站编码（冗余）';
+COMMENT ON COLUMN power_current_reading.current_ma IS '电流读数(mA)';
+COMMENT ON COLUMN power_current_reading.read_at IS '读取时间';
+COMMENT ON COLUMN power_current_reading.created_at IS '入库时间';
+
+CREATE TABLE power_tag_bind_log (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tag_id UUID NOT NULL REFERENCES power_tag(id),
+    device_id UUID REFERENCES medical_device(id),
+    device_code VARCHAR(20),
+    device_name VARCHAR(200),
+    bound_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    unbound_at TIMESTAMP WITH TIME ZONE,
+    operator_id UUID,
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE power_tag_bind_log IS '电流标签设备绑定历史';
 
 -- ================================================================================
 -- 11. 系统配置与字典表

@@ -42,7 +42,9 @@ public class SchemaTableEnsuring {
     public void ensureFromMigrations(String schemaName) {
         validateSchema(schemaName);
         List<String> statements = new ArrayList<>();
+        // 1) V1 全量建表（CREATE TABLE → IF NOT EXISTS）
         statements.addAll(loadIdempotentStatements("classpath:db/migrations/tenant/V1__tables.sql"));
+        // 2) V2 索引
         statements.addAll(loadIdempotentStatements("classpath:db/migrations/tenant/V2__extensions.sql"));
         if (statements.isEmpty()) {
             log.warn("Schema {}: no structure statements loaded from V1/V2", schemaName);
@@ -57,16 +59,16 @@ public class SchemaTableEnsuring {
                     jdbc.execute(sql);
                     ok++;
                 } catch (Exception e) {
-                    // 已存在对象、依赖顺序等：记录后继续，保证尽量创建缺失表
                     skip++;
-                    log.debug("Schema {} skip statement: {} ({})", schemaName,
+                    log.warn("Schema {} skip statement: {} ({})", schemaName,
                             abbreviate(sql), e.getMessage());
                 }
             }
         } finally {
             jdbc.execute("SET search_path TO public");
         }
-        log.info("Schema {}: ensured structure from V1/V2 (applied={}, skipped={})", schemaName, ok, skip);
+        log.info("Schema {}: ensured tables/indexes before column sync (applied={}, skipped={})",
+                schemaName, ok, skip);
     }
 
     private List<String> loadIdempotentStatements(String classpath) {

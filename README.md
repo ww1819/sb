@@ -20,6 +20,7 @@ Schema 多租户医院设备全生命周期管理平台。
 | [docs/local-dev-deploy.md](docs/local-dev-deploy.md) | **本地开发**部署与启动（Windows 原生） |
 | [docs/production-deploy.md](docs/production-deploy.md) | **生产环境**部署与启动（Docker/K8s） |
 | [docs/architecture.md](docs/architecture.md) | 架构说明 |
+| [docs/meis-requirements.md](docs/meis-requirements.md) | **全系统需求与问题跟踪** |
 | [docs/user-manual.md](docs/user-manual.md) | 用户手册骨架 |
 
 ## 快速开始（本地）

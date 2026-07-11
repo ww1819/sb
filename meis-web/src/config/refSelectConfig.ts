@@ -29,5 +29,6 @@ export const refSelectConfig: Record<string, RefSelectMeta> = {
   inspection_type: { url: '/inspect/inspection_type/list', labelKey: 'type_name' },
   metrology_category: { url: '/metrology/metrology_category/list', labelKey: 'category_name' },
   metrology_org: { url: '/metrology/metrology_org/list', labelKey: 'org_name' },
-  metrology_template: { url: '/metrology/metrology_template/list', labelKey: 'template_name' }
+  metrology_template: { url: '/metrology/metrology_template/list', labelKey: 'template_name' },
+  power_base_station: { url: '/power/power_base_station/list', labelKey: 'station_name' }
 }

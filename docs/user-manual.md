@@ -9,6 +9,7 @@
 - 采购管理：计划、项目、合同
 - 资产管理：台账、入库、流转、盘点、报废
 - 维修管理：工单、工程师、备件 — 详见 [repair-workorder.md](repair-workorder.md)
+- 全系统需求编写与问题跟踪 — 详见 [meis-requirements.md](meis-requirements.md)
 - 保养管理：模板、计划、记录
 - 质控管理：风险评估、不良事件、计量、性能检测
 - 维保合同：合同与履约

@@ -1,6 +1,6 @@
 <template>
   <div class="workflow-crud">
-    <CrudPage ref="crudRef" :config="config" @detail="openDetail">
+    <CrudPage ref="crudRef" :config="config" hide-add @detail="openDetail">
       <template #toolbar-extra>
         <el-button v-if="acceptance?.id" type="primary" @click="submitApproval">提交验收审批</el-button>
         <el-button

@@ -1,5 +1,6 @@
 package com.meis.saas.analytics.service;
 
+import com.meis.saas.analytics.power.PowerWorkStateResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -20,30 +21,86 @@ public class PowerMonitorService {
     @Transactional
     public int collectSnapshot() {
         var tags = jdbc.queryForList("""
-                SELECT t.*, d.device_code, d.device_name
+                SELECT t.*, d.device_code, d.device_name,
+                       d.standby_current_max_ma, d.standby_current_min_ma,
+                       s.station_code
                 FROM power_tag t
                 LEFT JOIN medical_device d ON d.id = t.device_id
-                WHERE t.is_active = true AND t.device_id IS NOT NULL
+                LEFT JOIN power_base_station s ON s.id = t.station_id
+                WHERE t.is_active = true
                 """);
         int count = 0;
         for (Map<String, Object> tag : tags) {
             UUID tagId = (UUID) tag.get("id");
             UUID deviceId = (UUID) tag.get("device_id");
-            if (deviceId == null) continue;
-            double roll = Math.random();
-            String workState = roll > 0.75 ? "running" : roll > 0.45 ? "idle" : roll > 0.15 ? "offline" : "alarm";
-            BigDecimal current = "running".equals(workState)
-                    ? BigDecimal.valueOf(2 + Math.random() * 8).setScale(3, RoundingMode.HALF_UP)
-                    : "idle".equals(workState)
-                    ? BigDecimal.valueOf(0.2 + Math.random() * 0.8).setScale(3, RoundingMode.HALF_UP)
-                    : BigDecimal.ZERO;
+            UUID stationId = (UUID) tag.get("station_id");
+            BigDecimal maxMa = toDecimal(tag.get("standby_current_max_ma"));
+            BigDecimal minMa = toDecimal(tag.get("standby_current_min_ma"));
+            BigDecimal currentMa = mockCurrentMa(maxMa, minMa);
+            String workState = PowerWorkStateResolver.resolve(currentMa, maxMa, minMa);
+            BigDecimal currentAmp = currentMa.divide(BigDecimal.valueOf(1000), 6, RoundingMode.HALF_UP);
             BigDecimal voltage = BigDecimal.valueOf(218 + Math.random() * 10).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal powerWatt = current.multiply(voltage).setScale(2, RoundingMode.HALF_UP);
-            upsertStatus(tagId, deviceId, tag, current, voltage, powerWatt, workState);
-            upsertDailyRecord(tagId, deviceId, tag, current, workState);
+            BigDecimal powerWatt = currentAmp.multiply(voltage).setScale(2, RoundingMode.HALF_UP);
+
+            insertReading(tag, tagId, stationId, deviceId, currentMa);
+            if (deviceId != null) {
+                upsertStatus(tagId, deviceId, tag, currentAmp, voltage, powerWatt, workState);
+                upsertDailyRecord(tagId, deviceId, tag, currentAmp, workState);
+            }
             count++;
         }
         return count;
+    }
+
+    private BigDecimal mockCurrentMa(BigDecimal maxMa, BigDecimal minMa) {
+        boolean hasMax = maxMa != null;
+        boolean hasMin = minMa != null;
+        double roll = Math.random();
+        if (hasMax && hasMin) {
+            double max = maxMa.doubleValue();
+            double min = minMa.doubleValue();
+            if (roll > 0.6) {
+                return BigDecimal.valueOf(max + 10 + Math.random() * max).setScale(3, RoundingMode.HALF_UP);
+            }
+            if (roll > 0.25) {
+                return BigDecimal.valueOf(min + Math.random() * Math.max(max - min, 1)).setScale(3, RoundingMode.HALF_UP);
+            }
+            return roll > 0.1
+                    ? BigDecimal.valueOf(Math.random() * Math.max(min * 0.8, 1)).setScale(3, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+        }
+        if (!hasMax && !hasMin) {
+            return roll > 0.2
+                    ? BigDecimal.valueOf(5 + Math.random() * 80).setScale(3, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+        }
+        if (hasMax) {
+            double max = maxMa.doubleValue();
+            if (roll > 0.65) {
+                return BigDecimal.valueOf(max + 5 + Math.random() * max).setScale(3, RoundingMode.HALF_UP);
+            }
+            return roll > 0.15
+                    ? BigDecimal.valueOf(1 + Math.random() * max).setScale(3, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+        }
+        double min = minMa.doubleValue();
+        return roll > 0.15
+                ? BigDecimal.valueOf(min + Math.random() * 120).setScale(3, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+    }
+
+    private void insertReading(Map<String, Object> tag, UUID tagId, UUID stationId, UUID deviceId, BigDecimal currentMa) {
+        jdbc.update("""
+                INSERT INTO power_current_reading (tag_id, tag_code, station_id, station_code, device_id, device_code, current_ma, read_at)
+                VALUES (?::uuid, ?, ?::uuid, ?, ?::uuid, ?, ?, NOW())
+                """,
+                tagId,
+                tag.get("tag_code"),
+                stationId,
+                tag.get("station_code"),
+                deviceId,
+                tag.get("device_code"),
+                currentMa);
     }
 
     private void upsertStatus(UUID tagId, UUID deviceId, Map<String, Object> tag,
@@ -80,9 +137,9 @@ public class PowerMonitorService {
             jdbc.update("""
                     UPDATE power_monitor_record SET run_hours = run_hours + ?, idle_hours = idle_hours + ?,
                     offline_hours = offline_hours + ?, avg_current = ?, peak_current = GREATEST(COALESCE(peak_current,0), ?),
-                    energy_kwh = energy_kwh + ?
+                    energy_kwh = energy_kwh + ?, tag_id = ?::uuid
                     WHERE device_id = ?::uuid AND record_date = ?
-                    """, runInc, idleInc, offlineInc, current, current, energyInc, deviceId, today);
+                    """, runInc, idleInc, offlineInc, current, current, energyInc, tagId, deviceId, today);
         } else {
             jdbc.update("""
                     INSERT INTO power_monitor_record (device_id, tag_id, device_code, device_name, record_date,
@@ -95,6 +152,16 @@ public class PowerMonitorService {
 
     private double powerKw(BigDecimal currentAmp) {
         return currentAmp.doubleValue() * 220 / 1000.0;
+    }
+
+    private static BigDecimal toDecimal(Object v) {
+        if (v == null) {
+            return null;
+        }
+        if (v instanceof BigDecimal bd) {
+            return bd;
+        }
+        return new BigDecimal(v.toString());
     }
 
     public Map<String, Object> statsSummary() {

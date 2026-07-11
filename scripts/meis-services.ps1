@@ -626,11 +626,114 @@ function Sync-MeisServiceClassesToJar {
             throw "JAR 替换失败: $ServiceName"
         }
 
-        return @{ ok = $true; message = ($ServiceName + ": 已加载 $fileCount 个类/资源到 JAR") }
+        return @{ ok = $true; message = ($ServiceName + ": 已加载 $fileCount 个类/资源到 JAR"); fileCount = $fileCount }
     } finally {
         Pop-Location -ErrorAction SilentlyContinue
         Remove-Item $workDir -Recurse -Force -ErrorAction SilentlyContinue
         if (Test-Path $jarNew) { Remove-Item $jarNew -Force -ErrorAction SilentlyContinue }
+    }
+}
+
+function Invoke-MeisServiceHotReload {
+    param([Parameter(Mandatory = $true)][string]$ServiceName)
+
+    $steps = [System.Collections.ArrayList]@()
+    $svc = Get-MeisServiceDefinition $ServiceName
+    $wasRunning = Test-MeisPortListening -Port $svc.port
+    $useJdwp = $wasRunning -and $svc.debugPort -and (Test-MeisPortListening -Port $svc.debugPort)
+
+    try {
+        $health = Test-MeisServiceJarHealthy $ServiceName
+        if (-not $health.ok) {
+            Invoke-MeisMavenModule -Module $ServiceName -Package | Out-Null
+        }
+        Invoke-MeisMavenModule -Module $ServiceName -Compile | Out-Null
+        [void]$steps.Add(@{ step = 'compile'; ok = $true; message = 'mvn compile 成功' })
+    } catch {
+        [void]$steps.Add(@{ step = 'compile'; ok = $false; message = $_.Exception.Message })
+        return @{
+            ok      = $false
+            message = ($ServiceName + ' 热加载失败：编译阶段')
+            steps   = @($steps)
+            httpUp  = $false
+            debugUp = $false
+        }
+    }
+
+    try {
+        $sync = Sync-MeisServiceClassesToJar -ServiceName $ServiceName
+        $fileCount = if ($null -ne $sync.fileCount) { [int]$sync.fileCount } else { 0 }
+        [void]$steps.Add(@{
+            step    = 'sync'
+            ok      = $true
+            message = ($sync.message + $(if ($fileCount -gt 0) { '' } else { '' }))
+            fileCount = $fileCount
+        })
+    } catch {
+        [void]$steps.Add(@{ step = 'sync'; ok = $false; message = $_.Exception.Message })
+        return @{
+            ok      = $false
+            message = ($ServiceName + ' 热加载失败：写入 JAR 阶段')
+            steps   = @($steps)
+            httpUp  = Test-MeisPortListening -Port $svc.port
+            debugUp = $useJdwp -and (Test-MeisPortListening -Port $svc.debugPort)
+        }
+    }
+
+    if (-not $wasRunning) {
+        [void]$steps.Add(@{ step = 'restart'; ok = $true; message = '服务未运行，已跳过重启' })
+        [void]$steps.Add(@{ step = 'health'; ok = $true; message = '下次启动将加载新类' })
+        return @{
+            ok      = $true
+            message = ($ServiceName + ' 已编译并写入 JAR（服务未运行，请手动启动）')
+            steps   = @($steps)
+            httpUp  = $false
+            debugUp = $false
+            fileCount = $fileCount
+        }
+    }
+
+    try {
+        Stop-MeisServiceByName $ServiceName | Out-Null
+        Start-Sleep -Seconds 1
+        $start = Start-MeisServiceByName -ServiceName $ServiceName -Profile 'dev' -EnableJdwp:$useJdwp
+        [void]$steps.Add(@{ step = 'restart'; ok = $true; message = $start.message })
+    } catch {
+        [void]$steps.Add(@{ step = 'restart'; ok = $false; message = $_.Exception.Message })
+        [void]$steps.Add(@{ step = 'health'; ok = $false; message = '服务未能重新监听端口' })
+        return @{
+            ok      = $false
+            message = ($ServiceName + ' 热加载失败：重启阶段')
+            steps   = @($steps)
+            httpUp  = Test-MeisPortListening -Port $svc.port
+            debugUp = $useJdwp -and (Test-MeisPortListening -Port $svc.debugPort)
+            fileCount = $fileCount
+        }
+    }
+
+    $httpUp = Test-MeisPortListening -Port $svc.port
+    $debugUp = (-not $useJdwp) -or (Test-MeisPortListening -Port $svc.debugPort)
+    $healthOk = $httpUp -and $debugUp
+    $healthMsg = if ($healthOk) {
+        'HTTP :' + $svc.port + ' 就绪' + $(if ($useJdwp) { '，JDWP :' + $svc.debugPort } else { '' })
+    } else {
+        '端口未就绪（请查看日志）'
+    }
+    [void]$steps.Add(@{ step = 'health'; ok = $healthOk; message = $healthMsg })
+
+    $failed = @($steps | Where-Object { -not $_.ok })
+    $allOk = $failed.Count -eq 0
+    return @{
+        ok        = $allOk
+        message   = if ($allOk) {
+            ($ServiceName + ' 热加载成功（' + $fileCount + ' 个类/资源，服务已重启）')
+        } else {
+            ($ServiceName + ' 热加载未完全成功：' + ($failed | ForEach-Object { $_.step }) -join ', ')
+        }
+        steps     = @($steps)
+        httpUp    = $httpUp
+        debugUp   = $debugUp
+        fileCount = $fileCount
     }
 }
 

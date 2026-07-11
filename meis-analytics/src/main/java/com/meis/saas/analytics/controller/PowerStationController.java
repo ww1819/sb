@@ -1,5 +1,6 @@
 package com.meis.saas.analytics.controller;
 
+import com.meis.saas.analytics.service.PowerReadingQueryService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
@@ -10,6 +11,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.*;
 
 @RestController
@@ -17,6 +19,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class PowerStationController {
     private final JdbcTemplate jdbc;
+    private final PowerReadingQueryService readingQuery;
 
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(PageQuery query,
@@ -46,10 +49,35 @@ public class PowerStationController {
         return Result.ok(new PageResult<>(rows, total, query.getPage(), query.getSize()));
     }
 
+    @GetMapping("/{id}/tags")
+    public Result<List<Map<String, Object>>> tags(@PathVariable UUID id) {
+        ensureStation(id);
+        var rows = jdbc.queryForList("""
+                SELECT t.id, t.tag_code, t.tag_name, t.device_code, t.device_name, t.is_active, t.install_date,
+                       d.specification, d.model
+                FROM power_tag t
+                LEFT JOIN medical_device d ON d.id = t.device_id
+                WHERE t.station_id = ?::uuid
+                ORDER BY t.tag_code
+                """, id);
+        return Result.ok(rows);
+    }
+
+    @GetMapping("/{id}/readings/page")
+    public Result<PageResult<Map<String, Object>>> readingsPage(@PathVariable UUID id, PageQuery query,
+            @RequestParam(required = false) LocalDateTime readAtFrom,
+            @RequestParam(required = false) LocalDateTime readAtTo,
+            @RequestParam(required = false, defaultValue = "desc") String sortOrder) {
+        ensureStation(id);
+        return Result.ok(readingQuery.pageByStation(id, query, readAtFrom, readAtTo, sortOrder));
+    }
+
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
         var rows = jdbc.queryForList("SELECT * FROM power_base_station WHERE id = ?::uuid", id);
-        if (rows.isEmpty()) throw new BizException(404, "not found");
+        if (rows.isEmpty()) {
+            throw new BizException(404, "not found");
+        }
         return Result.ok(rows.get(0));
     }
 
@@ -78,5 +106,11 @@ public class PowerStationController {
                     body.getOrDefault("status", "online"), body.getOrDefault("is_active", true), body.get("remark"));
         }
         return get(id);
+    }
+
+    private void ensureStation(UUID id) {
+        if (jdbc.queryForObject("SELECT COUNT(*) FROM power_base_station WHERE id = ?::uuid", Long.class, id) == 0) {
+            throw new BizException(404, "not found");
+        }
     }
 }
