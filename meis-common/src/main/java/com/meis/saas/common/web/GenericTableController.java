@@ -95,7 +95,7 @@ public abstract class GenericTableController {
     public Result<Void> update(@PathVariable String table, @PathVariable String id, @RequestBody Map<String, Object> body) {
         check(table);
         guardInventoryCheckMutable(table, id);
-        body.remove("id");
+        SoftDeleteSupport.stripClientUpdateFields(body);
         if ("medical_device".equals(table)) {
             MedicalDeviceFieldHelper.applyDerivedFields(body);
         }
@@ -214,7 +214,9 @@ public abstract class GenericTableController {
     }
 
     private static boolean isUuidColumn(String column) {
-        return "id".equals(column) || column.endsWith("_id");
+        return "id".equals(column)
+                || column.endsWith("_id")
+                || column.endsWith("_by");
     }
 
     private static String placeholder(String column) {
@@ -225,15 +227,18 @@ public abstract class GenericTableController {
         return v == null || (v instanceof String s && s.isBlank());
     }
 
+    /** 由 SoftDeleteSupport.appendUpdateAuditSets 统一写入，禁止进入 SET 以免列重复。 */
     private void executeUpdate(String table, String id, Map<String, Object> body) {
         var cols = TableColumnCache.columns(jdbc(), table);
         List<String> sets = new ArrayList<>();
         List<Object> args = new ArrayList<>();
         body.forEach((k, v) -> {
+            if (!cols.contains(k) || SoftDeleteSupport.isUpdateSkipColumn(k)) return;
             sets.add(k + " = " + placeholder(k));
             args.add(v);
         });
         SoftDeleteSupport.appendUpdateAuditSets(cols, sets, args);
+        if (sets.isEmpty()) return;
         args.add(id);
         jdbc().update("UPDATE " + table + " SET " + String.join(",", sets) + " WHERE id = ?::uuid", args.toArray());
     }

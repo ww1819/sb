@@ -5,6 +5,7 @@ import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -25,6 +26,7 @@ public class PowerStationController {
     public Result<PageResult<Map<String, Object>>> page(PageQuery query,
             @RequestParam(required = false) Boolean activeOnly) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "power_base_station", "s"));
         List<Object> args = new ArrayList<>();
         if (Boolean.TRUE.equals(activeOnly)) {
             where.append(" AND s.is_active = true ");
@@ -58,6 +60,7 @@ public class PowerStationController {
                 FROM power_tag t
                 LEFT JOIN medical_device d ON d.id = t.device_id
                 WHERE t.station_id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "power_tag", "t") + """
                 ORDER BY t.tag_code
                 """, id);
         return Result.ok(rows);
@@ -74,7 +77,9 @@ public class PowerStationController {
 
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
-        var rows = jdbc.queryForList("SELECT * FROM power_base_station WHERE id = ?::uuid", id);
+        var rows = jdbc.queryForList(
+                "SELECT * FROM power_base_station WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "power_base_station", null), id);
         if (rows.isEmpty()) {
             throw new BizException(404, "not found");
         }
@@ -85,31 +90,54 @@ public class PowerStationController {
     @Transactional
     @OperationLog(module = "power", description = "保存监测基站")
     public Result<Map<String, Object>> save(@RequestBody Map<String, Object> body) {
-        UUID id = body.containsKey("id") ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
-        boolean exists = !jdbc.queryForList("SELECT 1 FROM power_base_station WHERE id = ?::uuid", id).isEmpty();
+        boolean hasId = body.containsKey("id") && body.get("id") != null;
+        UUID id = hasId ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
+        boolean exists = hasId && !jdbc.queryForList(
+                "SELECT 1 FROM power_base_station WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "power_base_station", null), id).isEmpty();
         if (exists) {
             jdbc.update("""
                     UPDATE power_base_station SET station_code=?, station_name=?, campus_id=?::uuid, location=?,
-                    ip_address=?, protocol_type=?, status=?, is_active=?, remark=?, updated_at=NOW()
+                    ip_address=?, protocol_type=?, status=?, is_active=?, remark=?,
+                    updated_at=NOW(), updated_by=?::uuid
                     WHERE id=?::uuid
                     """, body.get("station_code"), body.get("station_name"), body.get("campus_id"),
                     body.get("location"), body.get("ip_address"), body.getOrDefault("protocol_type", "mqtt"),
                     body.getOrDefault("status", "online"), body.getOrDefault("is_active", true),
-                    body.get("remark"), id);
-        } else {
-            jdbc.update("""
-                    INSERT INTO power_base_station (id, station_code, station_name, campus_id, location, ip_address,
-                    protocol_type, status, is_active, remark)
-                    VALUES (?::uuid,?,?,?::uuid,?,?,?,?,?,?)
-                    """, id, body.get("station_code"), body.get("station_name"), body.get("campus_id"),
-                    body.get("location"), body.get("ip_address"), body.getOrDefault("protocol_type", "mqtt"),
-                    body.getOrDefault("status", "online"), body.getOrDefault("is_active", true), body.get("remark"));
+                    body.get("remark"), SoftDeleteSupport.currentUserId(), id);
+            return get(id);
         }
+        SoftDeleteSupport.applyInsertAudit(jdbc, "power_base_station", body);
+        var softDeletedId = SoftDeleteSupport.findSoftDeletedId(jdbc, "power_base_station", body);
+        if (softDeletedId.isPresent()) {
+            id = UUID.fromString(softDeletedId.get());
+            jdbc.update("""
+                    UPDATE power_base_station SET station_code=?, station_name=?, campus_id=?::uuid, location=?,
+                    ip_address=?, protocol_type=?, status=?, is_active=?, remark=?,
+                    is_deleted=0, deleted_at=NULL, deleted_by=NULL, updated_at=NOW(), updated_by=?::uuid
+                    WHERE id=?::uuid
+                    """, body.get("station_code"), body.get("station_name"), body.get("campus_id"),
+                    body.get("location"), body.get("ip_address"), body.getOrDefault("protocol_type", "mqtt"),
+                    body.getOrDefault("status", "online"), body.getOrDefault("is_active", true),
+                    body.get("remark"), SoftDeleteSupport.currentUserId(), id);
+            return get(id);
+        }
+        jdbc.update("""
+                INSERT INTO power_base_station (id, station_code, station_name, campus_id, location, ip_address,
+                protocol_type, status, is_active, remark, created_by, is_deleted)
+                VALUES (?::uuid,?,?,?::uuid,?,?,?,?,?,?,?::uuid,?)
+                """, id, body.get("station_code"), body.get("station_name"), body.get("campus_id"),
+                body.get("location"), body.get("ip_address"), body.getOrDefault("protocol_type", "mqtt"),
+                body.getOrDefault("status", "online"), body.getOrDefault("is_active", true), body.get("remark"),
+                SoftDeleteSupport.currentUserId(), 0);
         return get(id);
     }
 
     private void ensureStation(UUID id) {
-        if (jdbc.queryForObject("SELECT COUNT(*) FROM power_base_station WHERE id = ?::uuid", Long.class, id) == 0) {
+        if (jdbc.queryForObject(
+                "SELECT COUNT(*) FROM power_base_station WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "power_base_station", null),
+                Long.class, id) == 0) {
             throw new BizException(404, "not found");
         }
     }

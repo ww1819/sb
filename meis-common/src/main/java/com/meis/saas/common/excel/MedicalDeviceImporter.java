@@ -2,6 +2,7 @@ package com.meis.saas.common.excel;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -165,7 +166,15 @@ public final class MedicalDeviceImporter {
                     row.put("extension_data", toJson(extension));
                 }
 
-                insertRow(jdbc, dbColumns, row);
+                SoftDeleteSupport.applyInsertAudit(jdbc, "medical_device", row);
+                var softDeletedId = SoftDeleteSupport.findSoftDeletedId(jdbc, "medical_device", row);
+                if (softDeletedId.isPresent()) {
+                    String existingId = softDeletedId.get();
+                    SoftDeleteSupport.prepareRestore(row, dbColumns);
+                    updateRow(jdbc, existingId, row, dbColumns);
+                } else {
+                    insertRow(jdbc, dbColumns, row);
+                }
                 result.addSuccess();
             } catch (DataIntegrityViolationException e) {
                 result.addError(rowNum, "设备编码重复或数据约束冲突");
@@ -202,6 +211,20 @@ public final class MedicalDeviceImporter {
         String colSql = String.join(",", cols);
         String valSql = String.join(",", cols.stream().map(MedicalDeviceImporter::placeholder).toList());
         jdbc.update("INSERT INTO medical_device (" + colSql + ") VALUES (" + valSql + ")", args.toArray());
+    }
+
+    private static void updateRow(JdbcTemplate jdbc, String id, Map<String, Object> body, Set<String> dbColumns) {
+        List<String> sets = new ArrayList<>();
+        List<Object> args = new ArrayList<>();
+        body.forEach((k, v) -> {
+            if (!dbColumns.contains(k) || SoftDeleteSupport.isUpdateSkipColumn(k)) return;
+            sets.add(k + " = " + placeholder(k));
+            args.add(v);
+        });
+        SoftDeleteSupport.appendUpdateAuditSets(dbColumns, sets, args);
+        if (sets.isEmpty()) return;
+        args.add(UUID.fromString(id));
+        jdbc.update("UPDATE medical_device SET " + String.join(",", sets) + " WHERE id = ?::uuid", args.toArray());
     }
 
     private static String placeholder(String col) {

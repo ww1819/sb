@@ -523,7 +523,7 @@ function Invoke-MeisMavenModule {
 # 全量 reactor 构建（根 pom，编译/打包/安装全部模块）
 function Invoke-MeisMavenReactor {
     param(
-        [Parameter(Mandatory = $true)][ValidateSet('compile', 'package', 'install')]
+        [Parameter(Mandatory = $true)][ValidateSet('clean', 'compile', 'package', 'install')]
         [string]$Goal,
         [switch]$Quiet
     )
@@ -531,7 +531,8 @@ function Invoke-MeisMavenReactor {
     $env:JAVA_HOME = Resolve-MeisJavaHome
     $mvnArgs = @()
     if ($Quiet) { $mvnArgs += '-q' }
-    $mvnArgs += $Goal, '-DskipTests'
+    $mvnArgs += $Goal
+    if ($Goal -ne 'clean') { $mvnArgs += '-DskipTests' }
     Push-Location $script:MeisRoot
     try {
         & $mvn @mvnArgs
@@ -1030,19 +1031,23 @@ function Get-MeisServiceStatusList {
         $debugUp = $false
         if ($s.debugPort) { $debugUp = Test-MeisPortListening -Port $s.debugPort }
         $jar = Join-Path $script:MeisRoot "$($s.name)\target\$($s.name)-1.0.0-SNAPSHOT.jar"
+        $classesDir = Join-Path $script:MeisRoot "$($s.name)\target\classes"
+        $classesExists = Test-Path $classesDir
         $jarExists = Test-Path $jar
         $jarSizeKb = if ($jarExists) { [math]::Round((Get-Item $jar).Length / 1KB) } else { 0 }
         $jarHealthy = $jarExists -and $jarSizeKb -ge 1024
         $meta = Get-MeisServiceMetaEntry $s.name
         $list += [ordered]@{
-            name       = $s.name
-            labelZh    = $meta.labelZh
-            descZh     = $meta.descZh
-            port       = $s.port
-            debugPort  = $s.debugPort
-            httpUp     = $httpUp
-            debugUp    = $debugUp
-            jarExists  = $jarExists
+            name          = $s.name
+            labelZh       = $meta.labelZh
+            descZh        = $meta.descZh
+            port          = $s.port
+            debugPort     = $s.debugPort
+            httpUp        = $httpUp
+            debugUp       = $debugUp
+            classesExists = $classesExists
+            classesMtime  = if ($classesExists) { (Get-Item $classesDir).LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
+            jarExists     = $jarExists
             jarSizeKb  = $jarSizeKb
             jarHealthy = $jarHealthy
             jarMtime   = if ($jarExists) { (Get-Item $jar).LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }

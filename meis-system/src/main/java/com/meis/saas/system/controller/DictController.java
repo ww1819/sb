@@ -57,20 +57,22 @@ public class DictController {
             UUID existingId = UUID.fromString(softDeletedId.get());
             jdbc.update("""
                     UPDATE sys_dict SET dict_type=?, dict_code=?, dict_label=?, dict_value=?, sort_order=?, is_active=?, remark=?,
-                    is_deleted=0, deleted_at=NULL, deleted_by=NULL, updated_at=NOW()
+                    is_deleted=0, deleted_at=NULL, deleted_by=NULL, updated_at=NOW(), updated_by=?::uuid
                     WHERE id=?::uuid
                     """, body.get("dict_type"), body.get("dict_code"), body.get("dict_label"),
                     body.get("dict_value"), body.getOrDefault("sort_order", 0),
-                    body.getOrDefault("is_active", true), body.get("remark"), existingId);
+                    body.getOrDefault("is_active", true), body.get("remark"),
+                    TenantContext.getUserId(), existingId);
             cacheEviction.evictDictType(schema(), dictType);
             return Result.ok(jdbc.queryForList("SELECT * FROM sys_dict WHERE id = ?::uuid", existingId).get(0));
         }
         UUID id = UUID.randomUUID();
         jdbc.update(
-                "INSERT INTO sys_dict (id, dict_type, dict_code, dict_label, dict_value, sort_order, is_active, remark) VALUES (?::uuid,?,?,?,?,?,?,?)",
+                "INSERT INTO sys_dict (id, dict_type, dict_code, dict_label, dict_value, sort_order, is_active, remark, created_by, is_deleted) VALUES (?::uuid,?,?,?,?,?,?,?,?::uuid,?)",
                 id, body.get("dict_type"), body.get("dict_code"), body.get("dict_label"),
                 body.get("dict_value"), body.getOrDefault("sort_order", 0),
-                body.getOrDefault("is_active", true), body.get("remark"));
+                body.getOrDefault("is_active", true), body.get("remark"),
+                SoftDeleteSupport.currentUserId(), 0);
         cacheEviction.evictDictType(schema(), dictType);
         return Result.ok(jdbc.queryForList("SELECT * FROM sys_dict WHERE id = ?::uuid", id).get(0));
     }
@@ -79,10 +81,11 @@ public class DictController {
     @OperationLog(module = "system", description = "更新字典项")
     public Result<Map<String, Object>> update(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
         jdbc.update(
-                "UPDATE sys_dict SET dict_type=?, dict_code=?, dict_label=?, dict_value=?, sort_order=?, is_active=?, remark=? WHERE id=?::uuid",
+                "UPDATE sys_dict SET dict_type=?, dict_code=?, dict_label=?, dict_value=?, sort_order=?, is_active=?, remark=?, updated_at=NOW(), updated_by=?::uuid WHERE id=?::uuid",
                 body.get("dict_type"), body.get("dict_code"), body.get("dict_label"),
                 body.get("dict_value"), body.getOrDefault("sort_order", 0),
-                body.getOrDefault("is_active", true), body.get("remark"), id);
+                body.getOrDefault("is_active", true), body.get("remark"),
+                SoftDeleteSupport.currentUserId(), id);
         cacheEviction.evictDictType(schema(), String.valueOf(body.get("dict_type")));
         return Result.ok(jdbc.queryForList("SELECT * FROM sys_dict WHERE id = ?::uuid", id).get(0));
     }

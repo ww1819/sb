@@ -165,7 +165,7 @@ function Sync-PanelBackgroundJobs {
 function Start-PanelBackgroundJob {
     param(
         [Parameter(Mandatory = $true)][string]$Label,
-        [Parameter(Mandatory = $true)][ValidateSet('start-all', 'start-core', 'start-debug-all', 'start-debug-core', 'restart-all', 'stop-all', 'build-backend', 'build-install', 'build-compile')]
+        [Parameter(Mandatory = $true)][ValidateSet('start-all', 'start-core', 'start-debug-all', 'start-debug-core', 'restart-all', 'stop-all', 'build-backend', 'build-install', 'build-compile', 'build-clean')]
         [string]$Action
     )
     $scriptsDir = $PSScriptRoot
@@ -185,6 +185,9 @@ function Start-PanelBackgroundJob {
                 Start-MeisServices -Profile 'dev'
             }
             'stop-all' { Stop-MeisServices | Out-Null }
+            'build-clean' {
+                Invoke-MeisMavenReactor -Goal clean -Quiet | Out-Null
+            }
             'build-compile' {
                 Invoke-MeisMavenReactor -Goal compile -Quiet | Out-Null
             }
@@ -360,6 +363,25 @@ function Get-PanelFrontendStatus {
     return $fe
 }
 
+function Test-MeisClassesUpdatedSince {
+    param(
+        [Parameter(Mandatory = $true)][string]$ModuleName,
+        [Parameter(Mandatory = $true)][datetime]$Since
+    )
+    $classesDir = Join-Path $script:MeisRoot "$ModuleName\target\classes"
+    if (-not (Test-Path $classesDir)) { return $false }
+    $recent = Get-ChildItem $classesDir -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTime -ge $Since } |
+        Select-Object -First 1
+    return $null -ne $recent
+}
+
+function Clear-PanelBuildPending {
+    foreach ($key in @($script:PanelBuildPending.Keys)) {
+        $script:PanelBuildPending.Remove($key) | Out-Null
+    }
+}
+
 function Get-PanelServiceStatusList {
     $list = @(Get-MeisServiceStatusList)
     $now = Get-Date
@@ -370,7 +392,8 @@ function Get-PanelServiceStatusList {
             $started = $script:PanelBuildPending[$name]
             $elapsed = ($now - $started).TotalSeconds
             $jar = Join-Path $script:MeisRoot "$name\target\$name-1.0.0-SNAPSHOT.jar"
-            if ($elapsed -lt 300 -and -not (Test-Path $jar)) {
+            $classesReady = Test-MeisClassesUpdatedSince -ModuleName $name -Since $started
+            if ($elapsed -lt 300 -and -not (Test-Path $jar) -and -not $classesReady) {
                 $building = $true
             } else {
                 $script:PanelBuildPending.Remove($name) | Out-Null
@@ -392,9 +415,8 @@ function Get-PanelLibraryStatusList {
         $building = $false
         if ($script:PanelBuildPending.ContainsKey($name)) {
             $started = $script:PanelBuildPending[$name]
-            $classesDir = Join-Path $script:MeisRoot "$name\target\classes"
-            $classesUpdated = (Test-Path $classesDir) -and ((Get-Item $classesDir).LastWriteTime -ge $started)
-            if ($classesUpdated -or (($now - $started).TotalSeconds -ge 300)) {
+            $classesReady = Test-MeisClassesUpdatedSince -ModuleName $name -Since $started
+            if ($classesReady -or (($now - $started).TotalSeconds -ge 300)) {
                 $script:PanelBuildPending.Remove($name) | Out-Null
             } else {
                 $building = $true
@@ -549,14 +571,16 @@ function Handle-PanelRequest {
             Write-JsonResponse -Response $res -Data $r
             return
         }
-        if ($path -eq '/api/build/compile') {
-            Add-MeisPanelEvent 'MAVEN COMPILE ALL (background)'
-            $r = Start-PanelBackgroundJob -Label 'reactor-compile' -Action 'build-compile'
+        if ($path -eq '/api/build/clean') {
+            Add-MeisPanelEvent 'MAVEN CLEAN ALL (background)'
+            Clear-PanelBuildPending
+            $r = Start-PanelBackgroundJob -Label 'reactor-clean' -Action 'build-clean'
             Write-JsonResponse -Response $res -Data $r
             return
         }
         if ($path -eq '/api/build/backend') {
             Add-MeisPanelEvent 'BUILD backend (background)'
+            Clear-PanelBuildPending
             $r = Start-PanelBackgroundJob -Label 'build-backend' -Action 'build-backend'
             Write-JsonResponse -Response $res -Data $r
             return

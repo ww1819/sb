@@ -7,6 +7,7 @@ import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
+import com.meis.saas.common.tenant.TenantContext;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -153,11 +154,11 @@ public class PowerTagController {
             int updated = jdbc.update("""
                     UPDATE power_tag SET tag_code=?, tag_name=?, device_id=?::uuid, station_id=?::uuid,
                     device_code=?, device_name=?, rated_power=?, install_date=?, is_active=?, remark=?,
-                    is_deleted=0, deleted_at=NULL, deleted_by=NULL, updated_at=NOW()
+                    is_deleted=0, deleted_at=NULL, deleted_by=NULL, updated_at=NOW(), updated_by=?::uuid
                     WHERE id=?::uuid
                     """, body.get("tag_code"), body.get("tag_name"), body.get("device_id"), body.get("station_id"),
                     body.get("device_code"), body.get("device_name"), body.get("rated_power"), body.get("install_date"),
-                    body.getOrDefault("is_active", true), body.get("remark"), id);
+                    body.getOrDefault("is_active", true), body.get("remark"), TenantContext.getUserId(), id);
             if (updated == 0) {
                 throw new BizException(404, "tag not found");
             }

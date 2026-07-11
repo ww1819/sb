@@ -1,33 +1,25 @@
--- =============================================================================
--- 租户 schema 补列（可重复迁移 R__）—— 老租户缺列兜底
--- =============================================================================
--- 约定（务必遵守）：
---   1. 新建表 / 完整字段定义 → 只改 V1__tables.sql
---      （老租户更新时由 SchemaTableEnsuring 幂等执行 V1：没有的表会创建）
---   2. 本文件只做「已有表补列」：每条语句只 ADD 一个字段（ADD COLUMN IF NOT EXISTS）
---      禁止一条 ALTER 写多个列，避免老库漏列
---   3. 不要在本文件 CREATE TABLE（建表归 V1）
---   4. 不要在本文件 COMMENT ON（空注释由 SchemaCommentFiller 补，避免覆盖租户自定义）
---   5. 手工镜像：db/source/patches/tenant_column_patches.sql（与本文件保持同步）
+﻿-- =============================================================================
+-- 租户 schema 业务补列手工镜像（与 R__tenant_schema_sync.sql 同步）
+-- 标准七列（created_at/updated_at/created_by/updated_by/is_deleted/deleted_at/deleted_by）
+-- 由 R__audit_columns.sql 维护，勿在此文件重复散落。详见 docs 附录 G.0。
 -- =============================================================================
 
--- ---------- inventory_check ----------
 ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS audit_status VARCHAR(20) DEFAULT 'pending';
 
--- ---------- repair_workorder（每列一条） ----------
+-- ---------- repair_workorder锛堟瘡鍒椾竴鏉★級 ----------
 ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS repair_sub_status VARCHAR(30);
 ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS dispatch_started_at TIMESTAMP WITH TIME ZONE;
 ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMP WITH TIME ZONE;
 ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS closed_at TIMESTAMP WITH TIME ZONE;
 
--- ---------- 数据修正与字典（非 DDL，可重复） ----------
+-- ---------- 鏁版嵁淇涓庡瓧鍏革紙闈?DDL锛屽彲閲嶅锛?----------
 UPDATE inventory_check
 SET audit_status = 'approved'
 WHERE approved_by IS NOT NULL AND COALESCE(audit_status, 'pending') = 'pending';
 
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
-('audit_status', 'pending', '待审核', 'pending', 1),
-('audit_status', 'approved', '已审核', 'approved', 2)
+('audit_status', 'pending', '寰呭鏍?, 'pending', 1),
+('audit_status', 'approved', '宸插鏍?, 'approved', 2)
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
 
 UPDATE repair_workorder SET status = 'pending_accept' WHERE status = 'dispatched';
@@ -37,7 +29,7 @@ UPDATE repair_workorder SET status = 'verified'
 WHERE status = 'accepted' AND verify_time IS NOT NULL;
 
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order)
-SELECT 'device_status', 'pending_verify', '已维修待验收', 'pending_verify', 5
+SELECT 'device_status', 'pending_verify', '宸茬淮淇緟楠屾敹', 'pending_verify', 5
 WHERE NOT EXISTS (
     SELECT 1 FROM sys_dict WHERE dict_type = 'device_status' AND dict_code = 'pending_verify'
 );
@@ -51,28 +43,28 @@ WHERE w.device_id = d.id
 
 DELETE FROM sys_dict WHERE dict_type = 'wo_status';
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
-('wo_status', 'reported', '报修中', 'reported', 1),
-('wo_status', 'dispatching', '派单中', 'dispatching', 2),
-('wo_status', 'pending_accept', '待接单', 'pending_accept', 3),
-('wo_status', 'accepted', '已接单', 'accepted', 4),
-('wo_status', 'repairing', '维修中', 'repairing', 5),
-('wo_status', 'pending_verify', '已维修待验收', 'pending_verify', 6),
-('wo_status', 'verified', '已验收', 'verified', 7),
-('wo_status', 'closed', '已关闭', 'closed', 8),
-('wo_status', 'cancelled', '已取消', 'cancelled', 9),
-('wo_status', 'suspended', '已挂起', 'suspended', 10);
+('wo_status', 'reported', '鎶ヤ慨涓?, 'reported', 1),
+('wo_status', 'dispatching', '娲惧崟涓?, 'dispatching', 2),
+('wo_status', 'pending_accept', '寰呮帴鍗?, 'pending_accept', 3),
+('wo_status', 'accepted', '宸叉帴鍗?, 'accepted', 4),
+('wo_status', 'repairing', '缁翠慨涓?, 'repairing', 5),
+('wo_status', 'pending_verify', '宸茬淮淇緟楠屾敹', 'pending_verify', 6),
+('wo_status', 'verified', '宸查獙鏀?, 'verified', 7),
+('wo_status', 'closed', '宸插叧闂?, 'closed', 8),
+('wo_status', 'cancelled', '宸插彇娑?, 'cancelled', 9),
+('wo_status', 'suspended', '宸叉寕璧?, 'suspended', 10);
 
 DELETE FROM sys_dict WHERE dict_type = 'repair_sub_status';
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
-('repair_sub_status', 'internal', '院内维修', 'internal', 1),
-('repair_sub_status', 'external', '院外维修', 'external', 2),
-('repair_sub_status', 'waiting_parts', '等待配件', 'waiting_parts', 3),
-('repair_sub_status', 'waiting_approval', '待审批', 'waiting_approval', 4),
-('repair_sub_status', 'on_site', '已到场', 'on_site', 5),
-('repair_sub_status', 'diagnosing', '诊断中', 'diagnosing', 6),
-('repair_sub_status', 'testing', '调试中', 'testing', 7);
+('repair_sub_status', 'internal', '闄㈠唴缁翠慨', 'internal', 1),
+('repair_sub_status', 'external', '闄㈠缁翠慨', 'external', 2),
+('repair_sub_status', 'waiting_parts', '绛夊緟閰嶄欢', 'waiting_parts', 3),
+('repair_sub_status', 'waiting_approval', '寰呭鎵?, 'waiting_approval', 4),
+('repair_sub_status', 'on_site', '宸插埌鍦?, 'on_site', 5),
+('repair_sub_status', 'diagnosing', '璇婃柇涓?, 'diagnosing', 6),
+('repair_sub_status', 'testing', '璋冭瘯涓?, 'testing', 7);
 
--- ---------- 基础字典模块：补列 ----------
+-- ---------- 鍩虹瀛楀吀妯″潡锛氳ˉ鍒?----------
 ALTER TABLE supplier ADD COLUMN IF NOT EXISTS pinyin_code VARCHAR(50);
 ALTER TABLE manufacturer ADD COLUMN IF NOT EXISTS pinyin_code VARCHAR(50);
 ALTER TABLE department ADD COLUMN IF NOT EXISTS pinyin_code VARCHAR(50);
@@ -99,27 +91,27 @@ BEGIN
 END $finance_cat_fix$;
 
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
-('warehouse_type', 'device', '设备库', 'device', 1),
-('warehouse_type', 'spare', '备件库', 'spare', 2),
-('warehouse_type', 'consumable', '耗材库', 'consumable', 3),
-('unit_type', 'quantity', '数量', 'quantity', 1),
-('unit_type', 'weight', '重量', 'weight', 2),
-('unit_type', 'volume', '体积', 'volume', 3)
+('warehouse_type', 'device', '璁惧搴?, 'device', 1),
+('warehouse_type', 'spare', '澶囦欢搴?, 'spare', 2),
+('warehouse_type', 'consumable', '鑰楁潗搴?, 'consumable', 3),
+('unit_type', 'quantity', '鏁伴噺', 'quantity', 1),
+('unit_type', 'weight', '閲嶉噺', 'weight', 2),
+('unit_type', 'volume', '浣撶Н', 'volume', 3)
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
 
 INSERT INTO unit_dict (unit_code, unit_name, unit_type, sort_order) VALUES
-('pcs', '个', 'quantity', 1),
-('set', '套', 'quantity', 2),
-('box', '盒', 'quantity', 3),
-('piece', '件', 'quantity', 4),
-('unit', '台', 'quantity', 5),
-('kg', '千克', 'weight', 10),
-('g', '克', 'weight', 11),
-('l', '升', 'volume', 20),
-('ml', '毫升', 'volume', 21)
+('pcs', '涓?, 'quantity', 1),
+('set', '濂?, 'quantity', 2),
+('box', '鐩?, 'quantity', 3),
+('piece', '浠?, 'quantity', 4),
+('unit', '鍙?, 'quantity', 5),
+('kg', '鍗冨厠', 'weight', 10),
+('g', '鍏?, 'weight', 11),
+('l', '鍗?, 'volume', 20),
+('ml', '姣崌', 'volume', 21)
 ON CONFLICT (unit_code) DO NOTHING;
 
--- ---------- 维修管理模块：配件档案补列 ----------
+-- ---------- 缁翠慨绠＄悊妯″潡锛氶厤浠舵。妗堣ˉ鍒?----------
 ALTER TABLE spare_part ADD COLUMN IF NOT EXISTS model VARCHAR(100);
 ALTER TABLE spare_part ADD COLUMN IF NOT EXISTS unit_id UUID;
 ALTER TABLE spare_part ADD COLUMN IF NOT EXISTS manufacturer_id UUID;
@@ -127,7 +119,7 @@ ALTER TABLE spare_part ADD COLUMN IF NOT EXISTS warehouse_id UUID;
 ALTER TABLE spare_part_transaction ADD COLUMN IF NOT EXISTS ref_no VARCHAR(50);
 ALTER TABLE spare_part_transaction ADD COLUMN IF NOT EXISTS remark TEXT;
 
--- ---------- 资产台账模块：设备档案补列 ----------
+-- ---------- 璧勪骇鍙拌处妯″潡锛氳澶囨。妗堣ˉ鍒?----------
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS specification VARCHAR(200);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS registration_no VARCHAR(100);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS production_date DATE;
@@ -145,7 +137,7 @@ ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS pinyin_code VARCHAR(50);
 
 UPDATE medical_device SET extension_data = '{}'::jsonb WHERE extension_data IS NULL;
 
--- ---------- 库房管理模块：补列 ----------
+-- ---------- 搴撴埧绠＄悊妯″潡锛氳ˉ鍒?----------
 ALTER TABLE device_entry ADD COLUMN IF NOT EXISTS warehouse_id UUID;
 ALTER TABLE device_outbound ADD COLUMN IF NOT EXISTS warehouse_id UUID;
 ALTER TABLE device_outbound ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'draft';
@@ -154,7 +146,7 @@ ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS from_warehouse_id UUID;
 ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS to_warehouse_id UUID;
 ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS warehouse_id UUID;
 
--- ---------- 电流监测 / 设备台账：补列 ----------
+-- ---------- 鐢垫祦鐩戞祴 / 璁惧鍙拌处锛氳ˉ鍒?----------
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_shared_device BOOLEAN DEFAULT FALSE;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_pm_device BOOLEAN DEFAULT FALSE;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS standby_current_max_ma DECIMAL(10,2);
@@ -162,4 +154,4 @@ ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS standby_current_min_ma DECIM
 ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS device_code VARCHAR(20);
 ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
 
--- 软删除与审计字段补列见 tenant/R__audit_columns.sql（非事务逐表 ALTER）
+-- 杞垹闄や笌瀹¤瀛楁琛ュ垪瑙?tenant/R__audit_columns.sql锛堥潪浜嬪姟閫愯〃 ALTER锛?

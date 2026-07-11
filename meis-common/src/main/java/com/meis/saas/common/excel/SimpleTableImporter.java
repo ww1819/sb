@@ -57,15 +57,16 @@ public final class SimpleTableImporter {
     }
 
     private static void updateRow(JdbcTemplate jdbc, String table, String id, Map<String, Object> body, Set<String> dbColumns) {
-        body.remove("id");
+        // body 已由 prepareRestore 写入 is_deleted/deleted_*，且剔除了 updated_*；此处跳过审计列避免 SET 重复
         List<String> sets = new ArrayList<>();
         List<Object> args = new ArrayList<>();
         body.forEach((k, v) -> {
-            if (!dbColumns.contains(k)) return;
+            if (!dbColumns.contains(k) || SoftDeleteSupport.isUpdateSkipColumn(k)) return;
             sets.add(k + " = " + placeholder(k, v));
             args.add(v);
         });
         SoftDeleteSupport.appendUpdateAuditSets(dbColumns, sets, args);
+        if (sets.isEmpty()) return;
         args.add(UUID.fromString(id));
         jdbc.update("UPDATE " + table + " SET " + String.join(",", sets) + " WHERE id = ?::uuid", args.toArray());
     }
@@ -79,6 +80,7 @@ public final class SimpleTableImporter {
 
     private static String placeholder(String col, Object value) {
         if (value instanceof UUID) return "?::uuid";
+        if ("id".equals(col) || col.endsWith("_id") || col.endsWith("_by")) return "?::uuid";
         if (value instanceof Boolean) return "?";
         return "?";
     }

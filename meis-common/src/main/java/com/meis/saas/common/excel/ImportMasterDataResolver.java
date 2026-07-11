@@ -1,14 +1,14 @@
 package com.meis.saas.common.excel;
 
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.util.PinyinCodeUtil;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * 导入时主数据解析：编码优先，编码为空则按名称匹配，匹配不到则自动新增。
+ * 查找仅命中未删除行；自动新增时若唯一键命中软删行则恢复。
  */
 public final class ImportMasterDataResolver {
     private final JdbcTemplate jdbc;
@@ -67,8 +67,13 @@ public final class ImportMasterDataResolver {
     public UUID resolveManufacturer(String code, String name) {
         if (code != null && !code.isBlank()) {
             UUID id = manufacturerByCode.get(code.trim());
-            if (id == null) throw new IllegalArgumentException("生产厂商编码不存在: " + code);
-            return id;
+            if (id != null) return id;
+            id = restoreSoftDeleted("manufacturer", "manufacturer_code", code.trim());
+            if (id != null) {
+                cacheManufacturer(id, code.trim(), null);
+                return id;
+            }
+            throw new IllegalArgumentException("生产厂商编码不存在: " + code);
         }
         return resolveOrCreateManufacturer(name);
     }
@@ -76,8 +81,13 @@ public final class ImportMasterDataResolver {
     public UUID resolveSupplier(String code, String name) {
         if (code != null && !code.isBlank()) {
             UUID id = supplierByCode.get(code.trim());
-            if (id == null) throw new IllegalArgumentException("供应商编码不存在: " + code);
-            return id;
+            if (id != null) return id;
+            id = restoreSoftDeleted("supplier", "supplier_code", code.trim());
+            if (id != null) {
+                cacheSupplier(id, code.trim(), null);
+                return id;
+            }
+            throw new IllegalArgumentException("供应商编码不存在: " + code);
         }
         return resolveOrCreateSupplier(name);
     }
@@ -85,8 +95,13 @@ public final class ImportMasterDataResolver {
     public UUID resolveDepartment(String code, String name) {
         if (code != null && !code.isBlank()) {
             UUID id = deptByCode.get(code.trim());
-            if (id == null) throw new IllegalArgumentException("使用科室编码不存在: " + code);
-            return id;
+            if (id != null) return id;
+            id = restoreSoftDeleted("department", "dept_code", code.trim());
+            if (id != null) {
+                cacheDepartment(id, code.trim(), null);
+                return id;
+            }
+            throw new IllegalArgumentException("使用科室编码不存在: " + code);
         }
         return resolveOrCreateDepartment(name);
     }
@@ -97,15 +112,36 @@ public final class ImportMasterDataResolver {
         UUID existing = manufacturerByName.get(n);
         if (existing != null) return existing;
 
-        UUID id = UUID.randomUUID();
+        UUID restored = restoreSoftDeleted("manufacturer", "manufacturer_name", n);
+        if (restored != null) {
+            cacheManufacturer(restored, null, n);
+            return restored;
+        }
+
         String pinyin = PinyinCodeUtil.toShortCode(n);
         String code = uniqueCode("manufacturer", "manufacturer_code", pinyin, 20);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("manufacturer_code", code);
+        body.put("manufacturer_name", n);
+        body.put("pinyin_code", pinyin);
+        body.put("is_active", true);
+        var softId = SoftDeleteSupport.prepareCreate(jdbc, "manufacturer", body);
+        if (softId.isPresent()) {
+            UUID id = UUID.fromString(softId.get());
+            jdbc.update("""
+                    UPDATE manufacturer SET manufacturer_code=?, manufacturer_name=?, pinyin_code=?, is_active=TRUE,
+                    is_deleted=0, deleted_at=NULL, deleted_by=NULL, updated_at=NOW(), updated_by=?::uuid
+                    WHERE id=?::uuid
+                    """, code, n, pinyin, SoftDeleteSupport.currentUserId(), id);
+            cacheManufacturer(id, code, n);
+            return id;
+        }
+        UUID id = UUID.randomUUID();
         jdbc.update("""
-                INSERT INTO manufacturer (id, manufacturer_code, manufacturer_name, pinyin_code, is_active)
-                VALUES (?::uuid, ?, ?, ?, TRUE)
-                """, id, code, n, pinyin);
-        manufacturerByCode.put(code, id);
-        manufacturerByName.put(n, id);
+                INSERT INTO manufacturer (id, manufacturer_code, manufacturer_name, pinyin_code, is_active, created_by, is_deleted)
+                VALUES (?::uuid, ?, ?, ?, TRUE, ?::uuid, 0)
+                """, id, code, n, pinyin, SoftDeleteSupport.currentUserId());
+        cacheManufacturer(id, code, n);
         return id;
     }
 
@@ -115,15 +151,36 @@ public final class ImportMasterDataResolver {
         UUID existing = supplierByName.get(n);
         if (existing != null) return existing;
 
-        UUID id = UUID.randomUUID();
+        UUID restored = restoreSoftDeleted("supplier", "supplier_name", n);
+        if (restored != null) {
+            cacheSupplier(restored, null, n);
+            return restored;
+        }
+
         String pinyin = PinyinCodeUtil.toShortCode(n);
         String code = uniqueCode("supplier", "supplier_code", pinyin, 20);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("supplier_code", code);
+        body.put("supplier_name", n);
+        body.put("pinyin_code", pinyin);
+        body.put("is_active", true);
+        var softId = SoftDeleteSupport.prepareCreate(jdbc, "supplier", body);
+        if (softId.isPresent()) {
+            UUID id = UUID.fromString(softId.get());
+            jdbc.update("""
+                    UPDATE supplier SET supplier_code=?, supplier_name=?, pinyin_code=?, is_active=TRUE,
+                    is_deleted=0, deleted_at=NULL, deleted_by=NULL, updated_at=NOW(), updated_by=?::uuid
+                    WHERE id=?::uuid
+                    """, code, n, pinyin, SoftDeleteSupport.currentUserId(), id);
+            cacheSupplier(id, code, n);
+            return id;
+        }
+        UUID id = UUID.randomUUID();
         jdbc.update("""
-                INSERT INTO supplier (id, supplier_code, supplier_name, pinyin_code, is_active)
-                VALUES (?::uuid, ?, ?, ?, TRUE)
-                """, id, code, n, pinyin);
-        supplierByCode.put(code, id);
-        supplierByName.put(n, id);
+                INSERT INTO supplier (id, supplier_code, supplier_name, pinyin_code, is_active, created_by, is_deleted)
+                VALUES (?::uuid, ?, ?, ?, TRUE, ?::uuid, 0)
+                """, id, code, n, pinyin, SoftDeleteSupport.currentUserId());
+        cacheSupplier(id, code, n);
         return id;
     }
 
@@ -133,15 +190,89 @@ public final class ImportMasterDataResolver {
         UUID existing = deptByName.get(n);
         if (existing != null) return existing;
 
-        UUID id = UUID.randomUUID();
+        UUID restored = restoreSoftDeleted("department", "dept_name", n);
+        if (restored != null) {
+            cacheDepartment(restored, null, n);
+            return restored;
+        }
+
         String pinyin = PinyinCodeUtil.toShortCode(n);
         String code = nextDeptCode();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("dept_code", code);
+        body.put("dept_name", n);
+        body.put("pinyin_code", pinyin);
+        body.put("is_active", true);
+        var softId = SoftDeleteSupport.prepareCreate(jdbc, "department", body);
+        if (softId.isPresent()) {
+            UUID id = UUID.fromString(softId.get());
+            jdbc.update("""
+                    UPDATE department SET dept_code=?, dept_name=?, pinyin_code=?, is_active=TRUE,
+                    is_deleted=0, deleted_at=NULL, deleted_by=NULL, updated_at=NOW(), updated_by=?::uuid
+                    WHERE id=?::uuid
+                    """, code, n, pinyin, SoftDeleteSupport.currentUserId(), id);
+            cacheDepartment(id, code, n);
+            return id;
+        }
+        UUID id = UUID.randomUUID();
         jdbc.update("""
-                INSERT INTO department (id, dept_code, dept_name, pinyin_code, is_active)
-                VALUES (?::uuid, ?, ?, ?, TRUE)
-                """, id, code, n, pinyin);
-        deptByCode.put(code, id);
-        deptByName.put(n, id);
+                INSERT INTO department (id, dept_code, dept_name, pinyin_code, is_active, created_by, is_deleted)
+                VALUES (?::uuid, ?, ?, ?, TRUE, ?::uuid, 0)
+                """, id, code, n, pinyin, SoftDeleteSupport.currentUserId());
+        cacheDepartment(id, code, n);
+        return id;
+    }
+
+    private void cacheManufacturer(UUID id, String code, String name) {
+        if (code != null) manufacturerByCode.put(code, id);
+        if (name != null) manufacturerByName.put(name, id);
+        if (code == null || name == null) {
+            var rows = jdbc.queryForList("SELECT manufacturer_code, manufacturer_name FROM manufacturer WHERE id = ?::uuid", id);
+            if (!rows.isEmpty()) {
+                manufacturerByCode.put(String.valueOf(rows.get(0).get("manufacturer_code")), id);
+                Object n = rows.get(0).get("manufacturer_name");
+                if (n != null) manufacturerByName.put(n.toString().trim(), id);
+            }
+        }
+    }
+
+    private void cacheSupplier(UUID id, String code, String name) {
+        if (code != null) supplierByCode.put(code, id);
+        if (name != null) supplierByName.put(name, id);
+        if (code == null || name == null) {
+            var rows = jdbc.queryForList("SELECT supplier_code, supplier_name FROM supplier WHERE id = ?::uuid", id);
+            if (!rows.isEmpty()) {
+                supplierByCode.put(String.valueOf(rows.get(0).get("supplier_code")), id);
+                Object n = rows.get(0).get("supplier_name");
+                if (n != null) supplierByName.put(n.toString().trim(), id);
+            }
+        }
+    }
+
+    private void cacheDepartment(UUID id, String code, String name) {
+        if (code != null) deptByCode.put(code, id);
+        if (name != null) deptByName.put(name, id);
+        if (code == null || name == null) {
+            var rows = jdbc.queryForList("SELECT dept_code, dept_name FROM department WHERE id = ?::uuid", id);
+            if (!rows.isEmpty()) {
+                deptByCode.put(String.valueOf(rows.get(0).get("dept_code")), id);
+                Object n = rows.get(0).get("dept_name");
+                if (n != null) deptByName.put(n.toString().trim(), id);
+            }
+        }
+    }
+
+    /** 按非唯一列（如名称）恢复软删行。 */
+    private UUID restoreSoftDeleted(String table, String column, String value) {
+        if (!SoftDeleteSupport.supportsSoftDelete(jdbc, table)) return null;
+        String deletedWhere = SoftDeleteSupport.hasIsDeleted(jdbc, table) ? "is_deleted = 1" : "deleted_at IS NOT NULL";
+        var rows = jdbc.queryForList(
+                "SELECT id FROM " + table + " WHERE " + column + " = ? AND " + deletedWhere + " LIMIT 1", value);
+        if (rows.isEmpty()) return null;
+        UUID id = (UUID) rows.get(0).get("id");
+        jdbc.update("UPDATE " + table + " SET is_deleted=0, deleted_at=NULL, deleted_by=NULL, is_active=TRUE, "
+                        + "updated_at=NOW(), updated_by=?::uuid WHERE id=?::uuid",
+                SoftDeleteSupport.currentUserId(), id);
         return id;
     }
 
@@ -195,21 +326,20 @@ public final class ImportMasterDataResolver {
         loadByName("department", "dept_name", deptByName);
     }
 
-    private void loadByColumn(JdbcTemplate jdbc, String table, String column, Map<String, UUID> target) {
-        jdbc.queryForList("SELECT id, " + column + " FROM " + table).forEach(r ->
-                target.put(String.valueOf(r.get(column)), (UUID) r.get("id")));
-    }
-
     private void loadByColumn(String table, String column, Map<String, UUID> target) {
-        loadByColumn(jdbc, table, column, target);
+        jdbc.queryForList("SELECT id, " + column + " FROM " + table + " WHERE 1=1"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, table, null))
+                .forEach(r -> target.put(String.valueOf(r.get(column)), (UUID) r.get("id")));
     }
 
     private void loadByName(String table, String nameColumn, Map<String, UUID> target) {
-        jdbc.queryForList("SELECT id, " + nameColumn + " FROM " + table).forEach(r -> {
-            Object name = r.get(nameColumn);
-            if (name != null && !name.toString().isBlank()) {
-                target.put(name.toString().trim(), (UUID) r.get("id"));
-            }
-        });
+        jdbc.queryForList("SELECT id, " + nameColumn + " FROM " + table + " WHERE 1=1"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, table, null))
+                .forEach(r -> {
+                    Object name = r.get(nameColumn);
+                    if (name != null && !name.toString().isBlank()) {
+                        target.put(name.toString().trim(), (UUID) r.get("id"));
+                    }
+                });
     }
 }

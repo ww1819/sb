@@ -9,6 +9,9 @@
 --   3. 不要在本文件 CREATE TABLE（建表归 V1）
 --   4. 不要在本文件 COMMENT ON（空注释由 SchemaCommentFiller 补，避免覆盖租户自定义）
 --   5. 手工镜像：db/source/patches/tenant_column_patches.sql（与本文件保持同步）
+--   6. 【标准七列】created_at/updated_at/created_by/updated_by/is_deleted/deleted_at/deleted_by
+--      由 R__audit_columns.sql（含 is_deleted）与 R__is_deleted_columns.sql 幂等保证；
+--      业务补列写本文件，勿把标准七列散落在本文件各处。
 -- =============================================================================
 
 -- ---------- inventory_check ----------

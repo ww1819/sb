@@ -24,14 +24,18 @@ public class RoleController {
     @GetMapping
     public Result<List<Map<String, Object>>> list() {
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, role_code, role_name, description, permissions, sort_order, is_active, created_at FROM sys_role ORDER BY sort_order, role_code");
+                "SELECT id, role_code, role_name, description, permissions, sort_order, is_active, created_at FROM sys_role WHERE 1=1 "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "sys_role", null)
+                        + " ORDER BY sort_order, role_code");
         rows.forEach(this::normalizePermissions);
         return Result.ok(rows);
     }
 
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
-        List<Map<String, Object>> rows = jdbc.queryForList("SELECT * FROM sys_role WHERE id = ?::uuid", id);
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT * FROM sys_role WHERE id = ?::uuid " + SoftDeleteSupport.notDeletedClause(jdbc, "sys_role", null),
+                id);
         if (rows.isEmpty()) throw new BizException(404, "role not found");
         normalizePermissions(rows.get(0));
         return Result.ok(rows.get(0));
@@ -44,26 +48,44 @@ public class RoleController {
     @PostMapping
     @OperationLog(module = "system", description = "创建角色")
     public Result<Map<String, Object>> create(@RequestBody Map<String, Object> body) {
-        UUID id = UUID.randomUUID();
         String code = body.get("role_code").toString();
-        jdbc.update(
-                "INSERT INTO sys_role (id, role_code, role_name, description, permissions, sort_order, is_active) VALUES (?::uuid,?,?,?::jsonb,?,?,?)",
-                id, code, body.get("role_name"), body.get("description"),
-                permissionService.toJson(permissionService.emptyPermissions()),
-                body.getOrDefault("sort_order", 0), body.getOrDefault("is_active", true));
+        body.putIfAbsent("role_code", code);
+        var softDeletedId = SoftDeleteSupport.prepareCreate(jdbc, "sys_role", body);
+        String emptyPerms = permissionService.toJson(permissionService.emptyPermissions());
+        if (softDeletedId.isPresent()) {
+            UUID existingId = UUID.fromString(softDeletedId.get());
+            jdbc.update("""
+                    UPDATE sys_role SET role_code=?, role_name=?, description=?, permissions=?::jsonb,
+                    sort_order=?, is_active=?,
+                    is_deleted=0, deleted_at=NULL, deleted_by=NULL, updated_at=NOW(), updated_by=?::uuid
+                    WHERE id=?::uuid
+                    """, code, body.get("role_name"), body.get("description"), emptyPerms,
+                    body.getOrDefault("sort_order", 0), body.getOrDefault("is_active", true),
+                    SoftDeleteSupport.currentUserId(), existingId);
+            return get(existingId);
+        }
+        UUID id = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO sys_role (id, role_code, role_name, description, permissions, sort_order, is_active, created_by, is_deleted)
+                VALUES (?::uuid,?,?,?,?::jsonb,?,?,?::uuid,?)
+                """, id, code, body.get("role_name"), body.get("description"), emptyPerms,
+                body.getOrDefault("sort_order", 0), body.getOrDefault("is_active", true),
+                SoftDeleteSupport.currentUserId(), 0);
         return get(id);
     }
 
     @PutMapping("/{id}")
     @OperationLog(module = "system", description = "更新角色")
     public Result<Map<String, Object>> update(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
-        if (jdbc.queryForList("SELECT 1 FROM sys_role WHERE id = ?::uuid", id).isEmpty()) {
+        if (jdbc.queryForList("SELECT 1 FROM sys_role WHERE id = ?::uuid "
+                + SoftDeleteSupport.notDeletedClause(jdbc, "sys_role", null), id).isEmpty()) {
             throw new BizException(404, "role not found");
         }
-        jdbc.update(
-                "UPDATE sys_role SET role_name=?, description=?, sort_order=?, is_active=?, updated_at=NOW() WHERE id=?::uuid",
-                body.get("role_name"), body.get("description"), body.getOrDefault("sort_order", 0),
-                body.getOrDefault("is_active", true), id);
+        jdbc.update("""
+                UPDATE sys_role SET role_name=?, description=?, sort_order=?, is_active=?,
+                updated_at=NOW(), updated_by=?::uuid WHERE id=?::uuid
+                """, body.get("role_name"), body.get("description"), body.getOrDefault("sort_order", 0),
+                body.getOrDefault("is_active", true), SoftDeleteSupport.currentUserId(), id);
         return get(id);
     }
 
@@ -74,8 +96,8 @@ public class RoleController {
                                           @RequestBody Map<String, Object> permissions) {
         if (tenantId == null) tenantId = TenantContext.getTenantId();
         permissionService.validatePermissions(tenantId, TenantContext.getSchemaName(), permissions);
-        jdbc.update("UPDATE sys_role SET permissions = ?::jsonb, updated_at = NOW() WHERE id = ?::uuid",
-                permissionService.toJson(permissions), id);
+        jdbc.update("UPDATE sys_role SET permissions = ?::jsonb, updated_at = NOW(), updated_by = ?::uuid WHERE id = ?::uuid",
+                permissionService.toJson(permissions), SoftDeleteSupport.currentUserId(), id);
         cacheEviction.evictTenantPermissions(tenantId);
         return Result.ok();
     }
@@ -90,8 +112,8 @@ public class RoleController {
         String permsJson = permissionService.toJson(
                 permissionService.parsePermissions(roles.get(0).get("permissions")));
         int updated = jdbc.update(
-                "UPDATE sys_user SET permissions = ?::jsonb, permission_mode = 'synced', updated_at = NOW() WHERE role_ids IS NOT NULL AND ?::uuid = ANY(role_ids)",
-                permsJson, id);
+                "UPDATE sys_user SET permissions = ?::jsonb, permission_mode = 'synced', updated_at = NOW(), updated_by = ?::uuid WHERE role_ids IS NOT NULL AND ?::uuid = ANY(role_ids)",
+                permsJson, SoftDeleteSupport.currentUserId(), id);
         cacheEviction.evictTenantPermissions(tenantId);
         return Result.ok(Map.of("updatedCount", updated));
     }

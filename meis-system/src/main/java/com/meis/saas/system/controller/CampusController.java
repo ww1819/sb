@@ -43,18 +43,20 @@ public class CampusController {
             UUID existingId = UUID.fromString(softDeletedId.get());
             jdbc.update("""
                     UPDATE campus SET campus_code=?, campus_name=?, address=?, contact_phone=?, is_active=?,
-                    is_deleted=0, deleted_at=NULL, deleted_by=NULL, updated_at=NOW()
+                    is_deleted=0, deleted_at=NULL, deleted_by=NULL, updated_at=NOW(), updated_by=?::uuid
                     WHERE id=?::uuid
                     """, body.get("campus_code"), body.get("campus_name"), body.get("address"),
-                    body.get("contact_phone"), body.getOrDefault("is_active", true), existingId);
+                    body.get("contact_phone"), body.getOrDefault("is_active", true),
+                    TenantContext.getUserId(), existingId);
             cacheEviction.evictSchemaOrg(schema());
             return Result.ok(jdbc.queryForList("SELECT * FROM campus WHERE id = ?::uuid", existingId).get(0));
         }
         UUID id = UUID.randomUUID();
         jdbc.update(
-                "INSERT INTO campus (id, campus_code, campus_name, address, contact_phone, is_active) VALUES (?::uuid,?,?,?,?,?)",
+                "INSERT INTO campus (id, campus_code, campus_name, address, contact_phone, is_active, created_by, is_deleted) VALUES (?::uuid,?,?,?,?,?,?::uuid,?)",
                 id, body.get("campus_code"), body.get("campus_name"), body.get("address"),
-                body.get("contact_phone"), body.getOrDefault("is_active", true));
+                body.get("contact_phone"), body.getOrDefault("is_active", true),
+                SoftDeleteSupport.currentUserId(), 0);
         cacheEviction.evictSchemaOrg(schema());
         return Result.ok(jdbc.queryForList("SELECT * FROM campus WHERE id = ?::uuid", id).get(0));
     }
@@ -63,9 +65,10 @@ public class CampusController {
     @OperationLog(module = "system", description = "更新院区")
     public Result<Map<String, Object>> update(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
         jdbc.update(
-                "UPDATE campus SET campus_code=?, campus_name=?, address=?, contact_phone=?, is_active=?, updated_at=NOW() WHERE id=?::uuid",
+                "UPDATE campus SET campus_code=?, campus_name=?, address=?, contact_phone=?, is_active=?, updated_at=NOW(), updated_by=?::uuid WHERE id=?::uuid",
                 body.get("campus_code"), body.get("campus_name"), body.get("address"),
-                body.get("contact_phone"), body.getOrDefault("is_active", true), id);
+                body.get("contact_phone"), body.getOrDefault("is_active", true),
+                SoftDeleteSupport.currentUserId(), id);
         cacheEviction.evictSchemaOrg(schema());
         return Result.ok(jdbc.queryForList("SELECT * FROM campus WHERE id = ?::uuid", id).get(0));
     }

@@ -2,6 +2,7 @@ package com.meis.saas.qc.controller;
 
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -18,7 +19,9 @@ public class InspectionTypeController {
 
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
-        var rows = jdbc.queryForList("SELECT * FROM inspection_type WHERE id = ?::uuid", id);
+        var rows = jdbc.queryForList(
+                "SELECT * FROM inspection_type WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "inspection_type", null), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         return Result.ok(rows.get(0));
     }
@@ -27,21 +30,39 @@ public class InspectionTypeController {
     @Transactional
     @OperationLog(module = "inspect", description = "保存巡检类型")
     public Result<Map<String, Object>> save(@RequestBody Map<String, Object> body) {
-        UUID id = body.containsKey("id") ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
-        boolean exists = !jdbc.queryForList("SELECT 1 FROM inspection_type WHERE id = ?::uuid", id).isEmpty();
+        boolean hasId = body.containsKey("id") && body.get("id") != null;
+        UUID id = hasId ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
+        boolean exists = hasId && !jdbc.queryForList(
+                "SELECT 1 FROM inspection_type WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "inspection_type", null), id).isEmpty();
         if (exists) {
             jdbc.update("""
-                UPDATE inspection_type SET type_code=?, type_name=?, sort_order=?, description=?, is_active=?, updated_at=NOW()
+                UPDATE inspection_type SET type_code=?, type_name=?, sort_order=?, description=?, is_active=?,
+                updated_at=NOW(), updated_by=?::uuid WHERE id=?::uuid
+                """, body.get("type_code"), body.get("type_name"), body.getOrDefault("sort_order", 0),
+                    body.get("description"), body.getOrDefault("is_active", true),
+                    SoftDeleteSupport.currentUserId(), id);
+            return get(id);
+        }
+        SoftDeleteSupport.applyInsertAudit(jdbc, "inspection_type", body);
+        var softDeletedId = SoftDeleteSupport.findSoftDeletedId(jdbc, "inspection_type", body);
+        if (softDeletedId.isPresent()) {
+            id = UUID.fromString(softDeletedId.get());
+            jdbc.update("""
+                UPDATE inspection_type SET type_code=?, type_name=?, sort_order=?, description=?, is_active=?,
+                is_deleted=0, deleted_at=NULL, deleted_by=NULL, updated_at=NOW(), updated_by=?::uuid
                 WHERE id=?::uuid
                 """, body.get("type_code"), body.get("type_name"), body.getOrDefault("sort_order", 0),
-                    body.get("description"), body.getOrDefault("is_active", true), id);
-        } else {
-            jdbc.update("""
-                INSERT INTO inspection_type (id, type_code, type_name, sort_order, description, is_active)
-                VALUES (?::uuid,?,?,?,?,?)
-                """, id, body.get("type_code"), body.get("type_name"), body.getOrDefault("sort_order", 0),
-                    body.get("description"), body.getOrDefault("is_active", true));
+                    body.get("description"), body.getOrDefault("is_active", true),
+                    SoftDeleteSupport.currentUserId(), id);
+            return get(id);
         }
+        jdbc.update("""
+            INSERT INTO inspection_type (id, type_code, type_name, sort_order, description, is_active, created_by, is_deleted)
+            VALUES (?::uuid,?,?,?,?,?,?::uuid,?)
+            """, id, body.get("type_code"), body.get("type_name"), body.getOrDefault("sort_order", 0),
+                body.get("description"), body.getOrDefault("is_active", true),
+                SoftDeleteSupport.currentUserId(), 0);
         return get(id);
     }
 }

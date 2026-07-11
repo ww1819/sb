@@ -7,14 +7,39 @@ import java.util.*;
 
 /**
  * 软删除与审计字段填充。
+ * <p>标准七列（强制）：{@code created_at, updated_at, created_by, updated_by, is_deleted, deleted_at, deleted_by}</p>
  * <ul>
  *   <li>删除：写 is_deleted=1、deleted_at / deleted_by，有 is_active 时同步置 false</li>
  *   <li>查询：默认 is_deleted=0（兼容仅有 deleted_at 的旧表）</li>
  *   <li>新建：若命中已软删行的唯一键，恢复为未删除并走 UPDATE</li>
+ *   <li>UPDATE：id / created_* / updated_* 禁止进入业务 SET，updated_* 仅由 appendUpdateAuditSets 写入</li>
  * </ul>
  */
 public final class SoftDeleteSupport {
     private SoftDeleteSupport() {}
+
+    /**
+     * 通用 UPDATE 禁止写入的列（避免与 appendUpdateAuditSets 重复，或篡改主键/创建人）。
+     * 软删恢复字段 is_deleted / deleted_* 允许在 prepareRestore 后写入。
+     */
+    public static final Set<String> UPDATE_SKIP_COLUMNS = Set.of(
+            "id", "created_at", "created_by", "updated_at", "updated_by");
+
+    /** 普通 PUT 时从请求体剔除，防止客户端伪造软删状态或审计字段。 */
+    public static final Set<String> CLIENT_UPDATE_STRIP = Set.of(
+            "id", "created_at", "created_by", "updated_at", "updated_by",
+            "deleted_at", "deleted_by", "is_deleted");
+
+    public static boolean isUpdateSkipColumn(String column) {
+        return column != null && UPDATE_SKIP_COLUMNS.contains(column);
+    }
+
+    public static void stripClientUpdateFields(Map<String, Object> body) {
+        if (body == null) return;
+        for (String col : CLIENT_UPDATE_STRIP) {
+            body.remove(col);
+        }
+    }
 
     public static boolean supportsSoftDelete(JdbcTemplate jdbc, String table) {
         return hasIsDeleted(jdbc, table) || TableColumnCache.hasColumn(jdbc, table, "deleted_at");
@@ -72,9 +97,7 @@ public final class SoftDeleteSupport {
         if (cols.contains("created_by") && !body.containsKey("created_by") && userId != null) {
             body.put("created_by", userId);
         }
-        if (cols.contains("updated_by") && !body.containsKey("updated_by") && userId != null) {
-            body.put("updated_by", userId);
-        }
+        // updated_by / updated_at 不在 INSERT body 中预填：INSERT 可省略；UPDATE 恢复由 appendUpdateAuditSets 写入，避免 SET 列重复
         if (cols.contains("is_deleted") && !body.containsKey("is_deleted")) {
             body.put("is_deleted", 0);
         }
@@ -89,7 +112,33 @@ public final class SoftDeleteSupport {
         }
     }
 
-    /** 向 UPDATE 的 SET 列表追加 updated_at / updated_by。 */
+    /**
+     * 新建入口：填充插入审计，并查找可恢复的软删行。
+     * @return 软删行 id（应 UPDATE 恢复）；empty 表示应 INSERT
+     */
+    public static Optional<String> prepareCreate(JdbcTemplate jdbc, String table, Map<String, Object> body) {
+        applyInsertAudit(jdbc, table, body);
+        return findSoftDeletedId(jdbc, table, body);
+    }
+
+    public static String currentUserId() {
+        return TenantContext.getUserId();
+    }
+
+    /** UPDATE SET 片段：updated_at=NOW()[, updated_by=?::uuid]；有 updated_by 时调用方需追加 userId 参数。 */
+    public static String updatedAuditSetSql(JdbcTemplate jdbc, String table) {
+        Set<String> cols = TableColumnCache.columns(jdbc, table);
+        List<String> parts = new ArrayList<>();
+        if (cols.contains("updated_at")) {
+            parts.add("updated_at = NOW()");
+        }
+        if (cols.contains("updated_by") && TenantContext.getUserId() != null) {
+            parts.add("updated_by = ?::uuid");
+        }
+        return String.join(", ", parts);
+    }
+
+    /** 向 UPDATE 的 SET 列表追加 updated_at / updated_by。调用方勿再把这两列放入 sets。 */
     public static void appendUpdateAuditSets(Set<String> cols, List<String> sets, List<Object> args) {
         if (cols.contains("updated_at")) {
             sets.add("updated_at = NOW()");
@@ -101,7 +150,20 @@ public final class SoftDeleteSupport {
         }
     }
 
-    /** 恢复软删行时追加到 UPDATE SET 的列。 */
+    /** 手工 SQL 恢复软删行时追加的 SET 片段（不含尾逗号）；updated_by 需另绑参。 */
+    public static String restoreSetSql(Set<String> cols, boolean includeUpdatedByPlaceholder) {
+        List<String> parts = new ArrayList<>();
+        if (cols.contains("is_deleted")) parts.add("is_deleted = 0");
+        if (cols.contains("deleted_at")) parts.add("deleted_at = NULL");
+        if (cols.contains("deleted_by")) parts.add("deleted_by = NULL");
+        if (cols.contains("updated_at")) parts.add("updated_at = NOW()");
+        if (includeUpdatedByPlaceholder && cols.contains("updated_by")) {
+            parts.add("updated_by = ?::uuid");
+        }
+        return String.join(", ", parts);
+    }
+
+    /** 恢复软删行时追加到 UPDATE SET 的列（无占位参数）。 */
     public static void appendRestoreSets(Set<String> cols, List<String> sets) {
         if (cols.contains("is_deleted")) {
             sets.add("is_deleted = 0");
@@ -114,7 +176,15 @@ public final class SoftDeleteSupport {
         }
     }
 
+    /**
+     * 软删恢复前写入恢复标记，并剔除会导致 SET 重复的审计字段。
+     */
     public static void prepareRestore(Map<String, Object> body, Set<String> cols) {
+        body.remove("id");
+        body.remove("created_at");
+        body.remove("created_by");
+        body.remove("updated_at");
+        body.remove("updated_by");
         if (cols.contains("is_deleted")) {
             body.put("is_deleted", 0);
         }
@@ -165,7 +235,7 @@ public final class SoftDeleteSupport {
     }
 
     static String bindPlaceholder(String column, Object value) {
-        if (column.equals("id") || column.endsWith("_id")) return "?::uuid";
+        if (column.equals("id") || column.endsWith("_id") || column.endsWith("_by")) return "?::uuid";
         if (value instanceof UUID) return "?::uuid";
         return "?";
     }

@@ -4,6 +4,7 @@ import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -23,6 +24,7 @@ public class SharedDeviceController {
             @RequestParam(required = false) String availabilityStatus,
             @RequestParam(required = false) Boolean activeOnly) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "shared_device", "s"));
         List<Object> args = new ArrayList<>();
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
             where.append(" AND (s.device_code ILIKE ? OR s.device_name ILIKE ?) ");
@@ -51,7 +53,9 @@ public class SharedDeviceController {
 
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
-        var rows = jdbc.queryForList("SELECT * FROM shared_device WHERE id = ?::uuid", id);
+        var rows = jdbc.queryForList(
+                "SELECT * FROM shared_device WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "shared_device", null), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         return Result.ok(rows.get(0));
     }
@@ -60,29 +64,49 @@ public class SharedDeviceController {
     @Transactional
     @OperationLog(module = "shared", description = "登记公用设备")
     public Result<Map<String, Object>> save(@RequestBody Map<String, Object> body) {
-        UUID id = body.containsKey("id") && body.get("id") != null
-                ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
+        boolean hasId = body.containsKey("id") && body.get("id") != null;
+        UUID id = hasId ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
         fillDeviceSnapshot(body);
-        boolean exists = !jdbc.queryForList("SELECT 1 FROM shared_device WHERE id = ?::uuid", id).isEmpty();
-        if (!exists) {
+        boolean exists = hasId && !jdbc.queryForList(
+                "SELECT 1 FROM shared_device WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "shared_device", null), id).isEmpty();
+        if (exists) {
+            jdbc.update("""
+                UPDATE shared_device SET owner_dept_id=?::uuid, location=?, fee_standard=?, availability_status=?,
+                is_active=?, remark=?, updated_at=NOW(), updated_by=?::uuid WHERE id=?::uuid
+                """, body.get("owner_dept_id"), body.get("location"), body.get("fee_standard"),
+                    body.get("availability_status"), body.get("is_active"), body.get("remark"),
+                    SoftDeleteSupport.currentUserId(), id);
+            return get(id);
+        }
+        SoftDeleteSupport.applyInsertAudit(jdbc, "shared_device", body);
+        var softDeletedId = SoftDeleteSupport.findSoftDeletedId(jdbc, "shared_device", body);
+        if (softDeletedId.isPresent()) {
+            id = UUID.fromString(softDeletedId.get());
+            jdbc.update("""
+                UPDATE shared_device SET device_id=?::uuid, device_code=?, device_name=?, owner_dept_id=?::uuid,
+                location=?, fee_standard=?, availability_status=?, is_active=?, remark=?,
+                is_deleted=0, deleted_at=NULL, deleted_by=NULL, updated_at=NOW(), updated_by=?::uuid
+                WHERE id=?::uuid
+                """, body.get("device_id"), body.get("device_code"), body.get("device_name"),
+                    body.get("owner_dept_id"), body.get("location"),
+                    body.getOrDefault("fee_standard", 0), body.getOrDefault("availability_status", "available"),
+                    body.getOrDefault("is_active", true), body.get("remark"),
+                    SoftDeleteSupport.currentUserId(), id);
+        } else {
             jdbc.update("""
                 INSERT INTO shared_device (id, device_id, device_code, device_name, owner_dept_id, location,
-                fee_standard, availability_status, is_active, remark)
-                VALUES (?::uuid,?::uuid,?,?,?::uuid,?,?,?,?,?)
+                fee_standard, availability_status, is_active, remark, created_by, is_deleted)
+                VALUES (?::uuid,?::uuid,?,?,?::uuid,?,?,?,?,?,?::uuid,?)
                 """, id, body.get("device_id"), body.get("device_code"), body.get("device_name"),
                     body.get("owner_dept_id"), body.get("location"),
                     body.getOrDefault("fee_standard", 0), body.getOrDefault("availability_status", "available"),
-                    body.getOrDefault("is_active", true), body.get("remark"));
-            if (body.get("device_id") != null) {
-                jdbc.update("UPDATE medical_device SET is_shared_device = true, updated_at = NOW() WHERE id = ?::uuid",
-                        body.get("device_id"));
-            }
-        } else {
-            jdbc.update("""
-                UPDATE shared_device SET owner_dept_id=?::uuid, location=?, fee_standard=?, availability_status=?,
-                is_active=?, remark=?, updated_at=NOW() WHERE id=?::uuid
-                """, body.get("owner_dept_id"), body.get("location"), body.get("fee_standard"),
-                    body.get("availability_status"), body.get("is_active"), body.get("remark"), id);
+                    body.getOrDefault("is_active", true), body.get("remark"),
+                    SoftDeleteSupport.currentUserId(), 0);
+        }
+        if (body.get("device_id") != null) {
+            jdbc.update("UPDATE medical_device SET is_shared_device = true, updated_at = NOW(), updated_by = ?::uuid WHERE id = ?::uuid",
+                    SoftDeleteSupport.currentUserId(), body.get("device_id"));
         }
         return get(id);
     }

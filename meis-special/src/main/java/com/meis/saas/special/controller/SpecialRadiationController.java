@@ -4,6 +4,7 @@ import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -23,6 +24,7 @@ public class SpecialRadiationController {
             @RequestParam(required = false) String specialType,
             @RequestParam(required = false) Boolean expiringOnly) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "special_device", "s"));
         List<Object> args = new ArrayList<>();
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
             where.append(" AND (s.device_code ILIKE ? OR s.device_name ILIKE ? OR s.license_no ILIKE ?) ");
@@ -53,7 +55,9 @@ public class SpecialRadiationController {
 
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
-        var rows = jdbc.queryForList("SELECT * FROM special_device WHERE id = ?::uuid", id);
+        var rows = jdbc.queryForList(
+                "SELECT * FROM special_device WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "special_device", null), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         return Result.ok(rows.get(0));
     }
@@ -62,30 +66,51 @@ public class SpecialRadiationController {
     @Transactional
     @OperationLog(module = "special", description = "登记特种设备")
     public Result<Map<String, Object>> save(@RequestBody Map<String, Object> body) {
-        UUID id = body.containsKey("id") && body.get("id") != null
-                ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
+        boolean hasId = body.containsKey("id") && body.get("id") != null;
+        UUID id = hasId ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
         fillDeviceSnapshot(body);
-        boolean exists = !jdbc.queryForList("SELECT 1 FROM special_device WHERE id = ?::uuid", id).isEmpty();
-        if (!exists) {
+        boolean exists = hasId && !jdbc.queryForList(
+                "SELECT 1 FROM special_device WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "special_device", null), id).isEmpty();
+        if (exists) {
+            jdbc.update("""
+                UPDATE special_device SET special_type=?, license_no=?, license_expiry_date=?,
+                operator_cert_required=?, safety_measures=?, last_inspection_date=?, next_inspection_date=?,
+                remark=?, updated_at=NOW(), updated_by=?::uuid WHERE id=?::uuid
+                """, body.get("special_type"), body.get("license_no"), body.get("license_expiry_date"),
+                    body.get("operator_cert_required"), body.get("safety_measures"),
+                    body.get("last_inspection_date"), body.get("next_inspection_date"),
+                    body.get("remark"), SoftDeleteSupport.currentUserId(), id);
+            return get(id);
+        }
+        SoftDeleteSupport.applyInsertAudit(jdbc, "special_device", body);
+        var softDeletedId = SoftDeleteSupport.findSoftDeletedId(jdbc, "special_device", body);
+        if (softDeletedId.isPresent()) {
+            id = UUID.fromString(softDeletedId.get());
+            jdbc.update("""
+                UPDATE special_device SET device_id=?::uuid, device_code=?, device_name=?, special_type=?, license_no=?,
+                license_expiry_date=?, operator_cert_required=?, safety_measures=?, last_inspection_date=?,
+                next_inspection_date=?, remark=?,
+                is_deleted=0, deleted_at=NULL, deleted_by=NULL, updated_at=NOW(), updated_by=?::uuid
+                WHERE id=?::uuid
+                """, body.get("device_id"), body.get("device_code"), body.get("device_name"),
+                    body.getOrDefault("special_type", "radiation"), body.get("license_no"),
+                    body.get("license_expiry_date"), body.getOrDefault("operator_cert_required", true),
+                    body.get("safety_measures"), body.get("last_inspection_date"),
+                    body.get("next_inspection_date"), body.get("remark"),
+                    SoftDeleteSupport.currentUserId(), id);
+        } else {
             jdbc.update("""
                 INSERT INTO special_device (id, device_id, device_code, device_name, special_type, license_no,
                 license_expiry_date, operator_cert_required, safety_measures, last_inspection_date,
-                next_inspection_date, remark)
-                VALUES (?::uuid,?::uuid,?,?,?,?,?,?,?,?,?,?)
+                next_inspection_date, remark, created_by, is_deleted)
+                VALUES (?::uuid,?::uuid,?,?,?,?,?,?,?,?,?,?,?::uuid,?)
                 """, id, body.get("device_id"), body.get("device_code"), body.get("device_name"),
                     body.getOrDefault("special_type", "radiation"), body.get("license_no"),
                     body.get("license_expiry_date"), body.getOrDefault("operator_cert_required", true),
                     body.get("safety_measures"), body.get("last_inspection_date"),
-                    body.get("next_inspection_date"), body.get("remark"));
-        } else {
-            jdbc.update("""
-                UPDATE special_device SET special_type=?, license_no=?, license_expiry_date=?,
-                operator_cert_required=?, safety_measures=?, last_inspection_date=?, next_inspection_date=?,
-                remark=?, updated_at=NOW() WHERE id=?::uuid
-                """, body.get("special_type"), body.get("license_no"), body.get("license_expiry_date"),
-                    body.get("operator_cert_required"), body.get("safety_measures"),
-                    body.get("last_inspection_date"), body.get("next_inspection_date"),
-                    body.get("remark"), id);
+                    body.get("next_inspection_date"), body.get("remark"),
+                    SoftDeleteSupport.currentUserId(), 0);
         }
         return get(id);
     }

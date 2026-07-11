@@ -7,6 +7,18 @@
 -- 日期: 2026-06-23
 -- 数据库: PostgreSQL 15+
 -- ================================================================================
+-- 【标准审计/软删字段 — 强制约定】
+-- 每张业务表（含新建表）必须包含以下七列，缺一不可：
+--   created_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP  -- 创建时间
+--   updated_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP  -- 更新时间
+--   created_by  UUID                                   -- 创建者
+--   updated_by  UUID                                   -- 更新者
+--   is_deleted  SMALLINT NOT NULL DEFAULT 0            -- 删除标志：0未删除 / 1已删除
+--   deleted_at  TIMESTAMPTZ                            -- 删除时间
+--   deleted_by  UUID                                   -- 删除者
+-- 老租户缺列由 R__audit_columns.sql / R__is_deleted_columns.sql 幂等补全。
+-- 详见 docs/meis-requirements.md 附录 G.0。
+-- ================================================================================
 -- 启用扩展
 -- UUID 生成扩展
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

@@ -1,5 +1,6 @@
 ﻿-- flyway:executeInTransaction=false
--- 删除状态：0=未删除，1=已删除；与 deleted_at 软删除同步
+-- is_deleted 已并入 R__audit_columns.sql；本文件保留幂等补列，兼容已执行过的环境
+-- =============================================================================
 ALTER TABLE adverse_event ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
 UPDATE adverse_event SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
 ALTER TABLE asset_category ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;

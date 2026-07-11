@@ -78,22 +78,22 @@ public class DepartmentController {
             jdbc.update("""
                     UPDATE department SET dept_code=?, dept_name=?, pinyin_code=?, parent_id=?::uuid, campus_id=?::uuid,
                     floor_number=?, room_number=?, is_clinical=?, sort_order=?, is_active=?,
-                    is_deleted=0, deleted_at=NULL, deleted_by=NULL, updated_at=NOW()
+                    is_deleted=0, deleted_at=NULL, deleted_by=NULL, updated_at=NOW(), updated_by=?::uuid
                     WHERE id=?::uuid
                     """, body.get("dept_code"), body.get("dept_name"), pinyin, body.get("parent_id"),
                     body.get("campus_id"), body.get("floor_number"), body.get("room_number"),
                     body.getOrDefault("is_clinical", false), body.getOrDefault("sort_order", 0),
-                    body.getOrDefault("is_active", true), existingId);
+                    body.getOrDefault("is_active", true), TenantContext.getUserId(), existingId);
             cacheEviction.evictSchemaOrg(schema());
             return Result.ok(jdbc.queryForList("SELECT * FROM department WHERE id = ?::uuid", existingId).get(0));
         }
         UUID id = UUID.randomUUID();
         jdbc.update(
-                "INSERT INTO department (id, dept_code, dept_name, pinyin_code, parent_id, campus_id, floor_number, room_number, is_clinical, sort_order, is_active) VALUES (?::uuid,?,?,?,?::uuid,?::uuid,?,?,?,?,?)",
+                "INSERT INTO department (id, dept_code, dept_name, pinyin_code, parent_id, campus_id, floor_number, room_number, is_clinical, sort_order, is_active, created_by, is_deleted) VALUES (?::uuid,?,?,?,?::uuid,?::uuid,?,?,?,?,?,?::uuid,?)",
                 id, body.get("dept_code"), body.get("dept_name"), pinyin, body.get("parent_id"),
                 body.get("campus_id"), body.get("floor_number"), body.get("room_number"),
                 body.getOrDefault("is_clinical", false), body.getOrDefault("sort_order", 0),
-                body.getOrDefault("is_active", true));
+                body.getOrDefault("is_active", true), SoftDeleteSupport.currentUserId(), 0);
         cacheEviction.evictSchemaOrg(schema());
         return Result.ok(jdbc.queryForList("SELECT * FROM department WHERE id = ?::uuid", id).get(0));
     }
@@ -103,11 +103,11 @@ public class DepartmentController {
     public Result<Map<String, Object>> update(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
         String pinyin = resolvePinyin(body);
         jdbc.update(
-                "UPDATE department SET dept_code=?, dept_name=?, pinyin_code=?, parent_id=?::uuid, campus_id=?::uuid, floor_number=?, room_number=?, is_clinical=?, sort_order=?, is_active=?, updated_at=NOW() WHERE id=?::uuid",
+                "UPDATE department SET dept_code=?, dept_name=?, pinyin_code=?, parent_id=?::uuid, campus_id=?::uuid, floor_number=?, room_number=?, is_clinical=?, sort_order=?, is_active=?, updated_at=NOW(), updated_by=?::uuid WHERE id=?::uuid",
                 body.get("dept_code"), body.get("dept_name"), pinyin, body.get("parent_id"),
                 body.get("campus_id"), body.get("floor_number"), body.get("room_number"),
                 body.getOrDefault("is_clinical", false), body.getOrDefault("sort_order", 0),
-                body.getOrDefault("is_active", true), id);
+                body.getOrDefault("is_active", true), SoftDeleteSupport.currentUserId(), id);
         cacheEviction.evictSchemaOrg(schema());
         return Result.ok(jdbc.queryForList("SELECT * FROM department WHERE id = ?::uuid", id).get(0));
     }
@@ -166,7 +166,6 @@ public class DepartmentController {
             try {
                 String code = ImportValueParser.require(raw.get("dept_code"), "科室编码");
                 String name = ImportValueParser.require(raw.get("dept_name"), "科室名称");
-                UUID id = UUID.randomUUID();
                 String parentCode = raw.get("parent_dept_code");
                 UUID parentId = parentCode == null || parentCode.isBlank() ? null : deptByCode.get(parentCode.trim());
                 if (parentCode != null && !parentCode.isBlank() && parentId == null) {
@@ -185,10 +184,35 @@ public class DepartmentController {
                         ? ImportValueParser.parseBoolean(raw.get("is_active")) : true;
                 String pinyin = raw.containsKey("pinyin_code") && !raw.get("pinyin_code").isBlank()
                         ? raw.get("pinyin_code").trim() : PinyinCodeUtil.toShortCode(name);
-                jdbc.update(
-                        "INSERT INTO department (id, dept_code, dept_name, pinyin_code, parent_id, campus_id, is_clinical, sort_order, is_active) VALUES (?::uuid,?,?,?,?::uuid,?::uuid,?,?,?)",
-                        id, code, name, pinyin, parentId, campusId, clinical, sortOrder, active);
-                deptByCode.put(code, id);
+                Map<String, Object> body = new LinkedHashMap<>();
+                body.put("dept_code", code);
+                body.put("dept_name", name);
+                body.put("pinyin_code", pinyin);
+                body.put("parent_id", parentId);
+                body.put("campus_id", campusId);
+                body.put("is_clinical", clinical);
+                body.put("sort_order", sortOrder);
+                body.put("is_active", active);
+                SoftDeleteSupport.applyInsertAudit(jdbc, "department", body);
+                var softDeletedId = SoftDeleteSupport.findSoftDeletedId(jdbc, "department", body);
+                if (softDeletedId.isPresent()) {
+                    UUID existingId = UUID.fromString(softDeletedId.get());
+                    jdbc.update("""
+                            UPDATE department SET dept_code=?, dept_name=?, pinyin_code=?, parent_id=?::uuid, campus_id=?::uuid,
+                            is_clinical=?, sort_order=?, is_active=?,
+                            is_deleted=0, deleted_at=NULL, deleted_by=NULL, updated_at=NOW(), updated_by=?::uuid
+                            WHERE id=?::uuid
+                            """, code, name, pinyin, parentId, campusId, clinical, sortOrder, active,
+                            SoftDeleteSupport.currentUserId(), existingId);
+                    deptByCode.put(code, existingId);
+                } else {
+                    UUID id = UUID.randomUUID();
+                    jdbc.update(
+                            "INSERT INTO department (id, dept_code, dept_name, pinyin_code, parent_id, campus_id, is_clinical, sort_order, is_active, created_by, is_deleted) VALUES (?::uuid,?,?,?,?::uuid,?::uuid,?,?,?,?::uuid,?)",
+                            id, code, name, pinyin, parentId, campusId, clinical, sortOrder, active,
+                            SoftDeleteSupport.currentUserId(), 0);
+                    deptByCode.put(code, id);
+                }
                 result.addSuccess();
             } catch (Exception e) {
                 result.addError(rowNum, e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
@@ -200,15 +224,17 @@ public class DepartmentController {
 
     private Map<String, UUID> loadCampusByName() {
         Map<String, UUID> map = new HashMap<>();
-        jdbc.queryForList("SELECT id, campus_name FROM campus").forEach(r ->
-                map.put(String.valueOf(r.get("campus_name")), (UUID) r.get("id")));
+        jdbc.queryForList("SELECT id, campus_name FROM campus WHERE 1=1 "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "campus", null))
+                .forEach(r -> map.put(String.valueOf(r.get("campus_name")), (UUID) r.get("id")));
         return map;
     }
 
     private Map<String, UUID> loadDeptByCode() {
         Map<String, UUID> map = new HashMap<>();
-        jdbc.queryForList("SELECT id, dept_code FROM department").forEach(r ->
-                map.put(String.valueOf(r.get("dept_code")), (UUID) r.get("id")));
+        jdbc.queryForList("SELECT id, dept_code FROM department WHERE 1=1 "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "department", null))
+                .forEach(r -> map.put(String.valueOf(r.get("dept_code")), (UUID) r.get("id")));
         return map;
     }
 

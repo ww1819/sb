@@ -463,9 +463,9 @@
       <button class="warn" onclick="act('backend/start-debug-core')" title="核心后端以 JDWP 调试模式启动，已运行的自动跳过">调试核心后端</button>
       <button class="danger" onclick="act('backend/stop-all')">停止全部后端</button>
       <button class="warn" onclick="act('backend/restart-all')">重启全部后端</button>
-      <button class="primary" onclick="act('build/compile')" title="mvn compile -DskipTests，编译全部模块（公共库 + 15 个微服务），不打包">整体编译</button>
+      <button class="danger" onclick="confirmClean()" title="mvn clean，清除全部模块 target（classes/JAR），之后需重新打包">整体 Clean</button>
+      <button class="primary" onclick="act('build/backend')" title="mvn package -DskipTests，打包全部微服务 JAR">打包后端</button>
       <button onclick="act('build/install')" title="mvn install -DskipTests，安装到本地仓库">Maven Install</button>
-      <button onclick="act('build/backend')" title="mvn package -DskipTests，打包全部微服务 JAR">打包后端</button>
       <button onclick="refresh()">刷新状态</button>
       <button class="danger" onclick="shutdownPanel()" title="关闭面板进程并释放 5099 端口，不影响已启动的前后端服务">关闭面板</button>
     </div>
@@ -866,7 +866,12 @@
           : ('<span style="color:var(--err)" title="JAR 异常，请点完整打包">' + s.jarSizeKb + ' KB 异常</span>')
         return size + (s.jarMtime ? '<div class="jar-meta">JAR ' + escapeHtml(s.jarMtime) + '</div>' : '')
       }
-      return '<span style="color:var(--err)">缺失</span>'
+      if (s.classesExists) {
+        return '<span style="color:var(--ok)">classes 就绪</span>'
+          + '<div class="jar-meta" style="color:var(--warn)">JAR 缺失 · 需「完整打包」或「打包后端」</div>'
+          + (s.classesMtime ? '<div class="jar-meta">classes ' + escapeHtml(s.classesMtime) + '</div>' : '')
+      }
+      return '<span style="color:var(--err)">缺失</span><div class="jar-meta">请先「打包后端」或单服务「完整打包」</div>'
     }
 
     function renderFrontendBuildOpts(fe) {
@@ -1270,6 +1275,11 @@
       }
     }
 
+    async function confirmClean() {
+      if (!confirm('整体 Clean 将删除全部模块的 target 目录（含 classes 与 JAR）。\n\n已启动的服务不会自动停止，但 JAR 将变为缺失，需再点「打包后端」。\n\n确认继续？')) return
+      await act('build/clean')
+    }
+
     async function act(path, buildQuery = '') {
       if (!tryAcquireBusy()) return
       try {
@@ -1522,7 +1532,7 @@
       const fe = data.frontend?.httpUp ? 1 : 0
       const bg = data.backgroundJobs || []
       const buildLabels = {
-        'reactor-compile': '整体编译',
+        'reactor-clean': '整体 Clean',
         'maven-install': 'Maven Install',
         'build-backend': '打包后端'
       }
@@ -1601,6 +1611,7 @@
         updateDebugPendingFromStatus(data.services)
         for (const s of (data.services || [])) {
           if (s.jarExists && s.jarHealthy) delete buildPendingUntil[s.name]
+          else if (s.classesExists) delete buildPendingUntil[s.name]
           if (isDebugRunning(s)) clearDebugPending(s.name)
         }
         for (const lib of (data.libraries || [])) {

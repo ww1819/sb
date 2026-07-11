@@ -982,10 +982,11 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 ### D.2 开发检查清单（提交前）
 
 - [ ] `V1__tables.sql` 中 `CREATE TABLE` 已包含全部字段（新租户开箱即用）
-- [ ] `R__tenant_schema_sync.sql` 中每条新增列有对应 `ADD COLUMN IF NOT EXISTS`
+- [ ] **标准七列**已写入新建表：`created_at` / `updated_at` / `created_by` / `updated_by` / `is_deleted` / `deleted_at` / `deleted_by`（见附录 G.0）
+- [ ] `R__tenant_schema_sync.sql` 中每条**业务**新增列有对应 `ADD COLUMN IF NOT EXISTS`（标准七列走 `R__audit_columns.sql`）
 - [ ] R__ 中**无** `CREATE TABLE` / `CREATE INDEX`（建表与索引仅维护 V1/V2）
 - [ ] `V2__extensions.sql` 已补充必要索引
-- [ ] `tenant_column_patches.sql` 已镜像 R__ 补列语句
+- [ ] `tenant_column_patches.sql` 已镜像 R__ 业务补列语句
 - [ ] 未在 R__ 中写 `COMMENT ON`（空注释由 `SchemaCommentFiller` 补全）
 
 ### D.3 本次审计补全记录（2026-07-11）
@@ -1145,6 +1146,30 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 ## 附录 G：软删除与审计字段规范（2026-07-12）
 
+### G.0 标准七列（强制约定）
+
+每张**租户业务表**必须具备以下字段（创建者 / 创建时间 / 更新者 / 更新时间 / 删除标志 / 删除者 / 删除时间）：
+
+| 字段 | 类型 | 默认 | 含义 |
+|------|------|------|------|
+| `created_at` | `TIMESTAMPTZ` | `CURRENT_TIMESTAMP` | 创建时间 |
+| `updated_at` | `TIMESTAMPTZ` | `CURRENT_TIMESTAMP` | 更新时间 |
+| `created_by` | `UUID` | NULL | 创建者（用户 id） |
+| `updated_by` | `UUID` | NULL | 更新者（用户 id） |
+| `is_deleted` | `SMALLINT NOT NULL` | `0` | 删除标志：`0` 未删除，`1` 已删除 |
+| `deleted_at` | `TIMESTAMPTZ` | NULL | 删除时间 |
+| `deleted_by` | `UUID` | NULL | 删除者（用户 id） |
+
+**落地规则**：
+
+| 场景 | 做法 |
+|------|------|
+| **以后新建表** | 在 `tenant/V1__tables.sql` 的 `CREATE TABLE` 中**直接写出上述七列**（文件头已有模板注释） |
+| **以前已有表** | 由 `R__audit_columns.sql`（含七列）+ `R__is_deleted_columns.sql` 幂等 `ADD COLUMN IF NOT EXISTS` 补全；重启 **meis-tenant** 生效 |
+| **禁止** | 在 `R__tenant_schema_sync.sql` 业务补列段零散追加标准七列；勿再拆 `V5+` 脚本 |
+
+应用层读写约定见 G.1；工具类为 `SoftDeleteSupport`。
+
 ### G.1 原则
 
 | 项 | 约定 |
@@ -1152,7 +1177,8 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 删除 | 禁止物理 `DELETE`（明细行「先删后插」除外）；写 `is_deleted=1`、`deleted_at`、`deleted_by`；有 `is_active` 时同步置 `false` |
 | 查询 | 默认 `is_deleted = 0`（兼容旧库仅有 `deleted_at` 时用 `deleted_at IS NULL`） |
 | 唯一键冲突 | 新建命中已软删行的唯一键 → 清空删除标记并 **UPDATE**，不 INSERT |
-| 审计 | 插入填 `created_by`；更新填 `updated_at`、`updated_by`（有列则填） |
+| 审计 | 插入填 `created_by`；更新填 `updated_at`、`updated_by`（**仅**由 `appendUpdateAuditSets` 写入，禁止再进业务 SET） |
+| UPDATE 禁写列 | `id` / `created_at` / `created_by` / `updated_at` / `updated_by`；普通 PUT 另剔除 `is_deleted` / `deleted_*` |
 
 ### G.2 实现位置
 
@@ -1162,7 +1188,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 通用 CRUD | `GenericTableController`（删/建/改/查） |
 | 分页 | `PageableJdbc`、`ExcelExportHelper` |
 | 导入 | `SimpleTableImporter` |
-| 库表补列 | `tenant/R__audit_columns.sql`（审计字段）、`tenant/R__is_deleted_columns.sql`（`is_deleted`） |
+| 库表补列 | `tenant/R__audit_columns.sql`（标准七列）、`tenant/R__is_deleted_columns.sql`（`is_deleted` 兼容补全） |
 
 ### G.3 明细表例外
 
@@ -1174,8 +1200,28 @@ powershell -File scripts/ensure-tenant-tables.ps1
 2. 热加载/重启业务服务（`meis-common` 变更）
 3. 删除供应商/标签 → 再以相同编码新建 → 应恢复成功、无唯一键报错
 4. 列表不展示已删记录
+5. 新建命中已软删编码 → 恢复成功，且无 `updated_by` 重复导致的 bad SQL grammar
 
-### G.5 开发面板：公共库模块
+### G.9 UPDATE SET 列重复（2026-07-12 修复）
+
+**现象**：供应商等通用 CRUD 恢复/更新时报  
+`bad SQL grammar [... updated_by = ?, ..., updated_by = ?::uuid]`
+
+**原因**：
+1. `applyInsertAudit` / 前端整行回传把 `updated_by` 写入 body
+2. `executeUpdate` 把 body 全部拼进 SET
+3. `appendUpdateAuditSets` 再追加一次 `updated_by`
+
+**修复约定**（`SoftDeleteSupport`）：
+
+| API | 作用 |
+|-----|------|
+| `UPDATE_SKIP_COLUMNS` / `isUpdateSkipColumn` | 通用 UPDATE 跳过主键与审计列 |
+| `stripClientUpdateFields` | 普通 PUT 剔除审计 + 软删字段，防伪造 |
+| `prepareRestore` | 恢复前写 `is_deleted=0` 等，并剔除 `updated_*` / `created_*` / `id` |
+| `applyInsertAudit` | **不再**预填 `updated_by`（避免恢复 UPDATE 重复） |
+
+涉及：`GenericTableController`、`SimpleTableImporter`；手工恢复 SQL（院区/科室/字典/电流标签）补 `updated_by`。
 
 `meis-common` / `meis-api` 为 **Maven 公共库**，无 HTTP 端口、不可独立启动，故不在「后端微服务」列表中。
 
@@ -1195,19 +1241,29 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 热加载依赖（15 个服务） | 每个依赖服务约 1–2 分钟（compile + 写 JAR + 重启），**串行**执行 |
 | 微服务「快速更新」 | `mvn compile -pl 服务 -am` 会连带编译 `meis-common` 等上游模块 |
 | Maven Install / 打包后端 | 全量 reactor 构建，首次或 clean 后可达数分钟 |
-| **整体编译**（工具栏） | `mvn compile -DskipTests` 编译全部模块，不打包；比 Install/打包快，改 `meis-common` 后常用 |
+| **打包后端**（工具栏，紧挨整体 Clean） | `mvn package -DskipTests`，编译并生成全部 JAR，clean 后常用 |
 
-### G.8 整体编译（2026-07-12）
+### G.8 整体 Clean 与打包（2026-07-12）
 
-开发面板工具栏 **「整体编译」** 在后台执行根目录 `mvn -q compile -DskipTests`，一次性编译公共库（`meis-common`、`meis-api`）与全部 15 个微服务，**不生成/更新 JAR**。
+工具栏构建区顺序：**整体 Clean** → **打包后端** → Maven Install。
 
 | 按钮 | Maven 命令 | 适用场景 |
 |------|-----------|----------|
-| 整体编译 | `compile -DskipTests` | 批量校验编译、改公共库后同步 classes |
+| 整体 Clean | `clean` | 清除全部 `target`；之后须再点「打包后端」 |
+| 打包后端 | `package -DskipTests` | 编译并生成全部可运行 JAR（推荐日常全量构建） |
 | Maven Install | `install -DskipTests` | 安装到本地 `.m2`，供其他工程依赖 |
-| 打包后端 | `package -DskipTests` | 生成可运行 JAR，首次启动或完整打包 |
 
-状态栏「后台任务」会显示 `整体编译 进行中…`，完成后在面板日志区记录结果。修改公共库后若服务已在调试模式运行，可再对 `meis-common` 点 **热加载依赖** 写入 JAR。
+> 已移除工具栏「整体编译」：`compile` 只生成 classes 不生成 JAR，易误解；全量构建请用「打包后端」。单模块仍可用公共库/微服务行的「快速编译」。
+
+**JAR 列显示约定**：
+
+| 显示 | 含义 |
+|------|------|
+| `classes 就绪` + `JAR 缺失` | 曾仅 compile 或 clean 后未打包；点「打包后端」 |
+| `缺失` | classes 与 JAR 均不存在，需「打包后端」或单服务「完整打包」 |
+| `N KB` | JAR 正常，可启动/热加载 |
+
+状态栏「后台任务」显示 `整体 Clean` / `打包后端` 等进行中状态。执行 **整体 Clean** 或 **打包后端** 会清除面板「编译中」误显示。
 
 ### G.7 迁库锁表（2026-07-12 修复）
 
@@ -1263,13 +1319,58 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 ### I.3 迁库
 
-脚本 `tenant/R__is_deleted_columns.sql`（`flyway:executeInTransaction=false`）：
+脚本 `tenant/R__audit_columns.sql` / `R__is_deleted_columns.sql`（`flyway:executeInTransaction=false`）：
 
-1. 全租户业务表 `ADD COLUMN is_deleted`
+1. 全租户业务表补齐标准七列（含 `is_deleted`）
 2. 将已有 `deleted_at IS NOT NULL` 的行回填为 `is_deleted=1`
 
 部署后重启 **meis-tenant**，并对业务服务热加载 **meis-common**。
 
-## 附录 J：开发面板整体编译（2026-07-12）
+新建表请直接在 `V1__tables.sql` 写入七列，见 **附录 G.0**。
 
-工具栏新增 **整体编译**，对应 Maven Lifecycle 的 `compile`：后台执行 `mvn -q compile -DskipTests`，编译根 reactor 下全部模块。详见附录 G.8。
+## 附录 J：开发面板整体 Clean 与打包（2026-07-12）
+
+工具栏构建区：
+- **整体 Clean**：`mvn -q clean`（需确认）
+- **打包后端**：`mvn -q package -DskipTests`（紧挨 Clean，全量生成 JAR）
+
+已移除 **整体编译** 按钮。详见附录 G.8。
+
+### J.1 排查结论（2026-07-12）
+
+**JAR 路径检测正确**（`{name}/target/{name}-1.0.0-SNAPSHOT.jar`）。此前「JAR 缺失」多因只执行了 `compile` 而未 `package`。
+
+推荐流程：**整体 Clean**（可选）→ **打包后端** → 启动服务。
+### J.2 标准七列约定（2026-07-12）
+
+已落定：业务表统一具备创建/更新/删除审计字段；老表由 R__ 补全，新表写 V1。详见 **附录 G.0**。
+
+## 附录 K：审计字段与软删唯一键修补（2026-07-12）
+
+### K.1 问题
+
+手写 Controller / 导入路径未统一走 `SoftDeleteSupport`，导致：
+
+1. INSERT/UPDATE 缺少 `created_by` / `updated_by` / `is_deleted`
+2. 软删后再新建同唯一键（如 `warehouse_code`、`role_code`、`device_code`、`device_id`）直接撞 UNIQUE
+
+### K.2 约定
+
+| 操作 | 行为 |
+|------|------|
+| 新建 | `prepareCreate` / `applyInsertAudit` + `findSoftDeletedId`；命中软删则 UPDATE 恢复 |
+| 更新 | 写 `updated_at` + `updated_by` |
+| 删除 | `softDelete`（`is_deleted=1` + `deleted_*`） |
+| 列表 | `notDeletedClause` |
+
+通用 CRUD / `SimpleTableImporter` 已覆盖；本轮补齐缺口路径。
+
+### K.3 本轮修补范围
+
+- **system**：Warehouse、Role、Campus、Department（含导入）、Dict、ApprovalFlowConfig
+- **analytics**：PowerStation（`station_code`）
+- **special**：SharedDevice / SpecialLife / SpecialRadiation（`device_id` UNIQUE）
+- **qc / maintain**：InspectionType、PmType、MaintenanceLevel、MetrologyOrg、MetrologyCategory
+- **common**：`MedicalDeviceImporter`、`ImportMasterDataResolver`；`SoftDeleteSupport.prepareCreate`
+
+部署：热加载 **meis-common** 及依赖模块（system / analytics / special / qc / maintain）。
