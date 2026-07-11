@@ -2,21 +2,30 @@
 export interface RefSelectMeta {
   url: string
   labelKey: string
+  codeKey?: string
   valueKey?: string
 }
 
 export const refSelectConfig: Record<string, RefSelectMeta> = {
-  department: { url: '/system/departments', labelKey: 'dept_name' },
-  campus: { url: '/system/campuses', labelKey: 'campus_name' },
-  building: { url: '/system/building/list', labelKey: 'building_name' },
-  sys_user: { url: '/system/users', labelKey: 'real_name' },
-  supplier: { url: '/system/supplier/list', labelKey: 'supplier_name' },
-  manufacturer: { url: '/system/manufacturer/list', labelKey: 'manufacturer_name' },
+  department: { url: '/system/departments', labelKey: 'dept_name', codeKey: 'dept_code' },
+  campus: { url: '/system/campuses', labelKey: 'campus_name', codeKey: 'campus_code' },
+  building: { url: '/system/building/list', labelKey: 'building_name', codeKey: 'building_code' },
+  sys_user: { url: '/system/users', labelKey: 'real_name', codeKey: 'username' },
+  supplier: { url: '/system/supplier/list', labelKey: 'supplier_name', codeKey: 'supplier_code' },
+  manufacturer: { url: '/system/manufacturer/list', labelKey: 'manufacturer_name', codeKey: 'manufacturer_code' },
   medical_device_category: { url: '/system/medical_device_category/list', labelKey: 'category_name' },
   asset_category: { url: '/system/asset_category/list', labelKey: 'category_name' },
   finance_category: { url: '/system/finance_category/list', labelKey: 'finance_name' },
   unit_dict: { url: '/system/unit_dict/list', labelKey: 'unit_name' },
-  medical_device: { url: '/asset/medical_device/list', labelKey: 'device_name' },
+  medical_device: { url: '/asset/medical_device/list', labelKey: 'device_name', codeKey: 'device_code' },
+  device_outbound: { url: '/asset/device_outbound/list', labelKey: 'outbound_no', codeKey: 'outbound_no' },
+  inspection_plan: { url: '/inspect/inspection_plan/list', labelKey: 'plan_name', codeKey: 'plan_code' },
+  maintenance_plan: { url: '/maintain/maintenance_plan/list', labelKey: 'plan_name', codeKey: 'plan_code' },
+  emergency_device_pool: { url: '/special/emergency_device_pool/list', labelKey: 'pool_name' },
+  shared_device: { url: '/special/shared_device/list', labelKey: 'device_name', codeKey: 'device_code' },
+  shared_device_loan: { url: '/special/shared_device_loan/list', labelKey: 'loan_no', codeKey: 'loan_no' },
+  pm_type: { url: '/maintain/pm_type/list', labelKey: 'type_name', codeKey: 'type_code' },
+  pm_template: { url: '/maintain/pm_template/list', labelKey: 'template_name', codeKey: 'template_code' },
   purchase_plan: { url: '/purchase/purchase_plan/list', labelKey: 'plan_code' },
   purchase_project: { url: '/purchase/purchase_project/list', labelKey: 'project_name' },
   purchase_contract: { url: '/purchase/purchase_contract/list', labelKey: 'contract_code' },

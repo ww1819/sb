@@ -454,7 +454,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   ],
   inspection_record: [
     { prop: 'record_no', label: '记录编号', list: true },
-    { prop: 'plan_id', label: '巡检计划', list: true },
+    { prop: 'plan_id', label: '巡检计划', linkTable: 'inspection_plan', list: true },
     { prop: 'inspector_id', label: '巡检人', linkTable: 'sys_user', list: true },
     { prop: 'inspect_date', label: '巡检日期', type: 'date', list: true },
     { prop: 'result_summary', label: '巡检结果', type: 'textarea', list: true },
@@ -638,7 +638,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   ],
   maintenance_record: [
     { prop: 'record_no', label: '记录编号', list: true, readonly: true },
-    { prop: 'plan_id', label: '保养计划', list: true },
+    { prop: 'plan_id', label: '保养计划', linkTable: 'maintenance_plan', list: true },
     { prop: 'device_id', label: '设备', linkTable: 'medical_device', list: true },
     { prop: 'maintainer_id', label: '保养人', linkTable: 'sys_user', list: true },
     { prop: 'maintained_at', label: '保养时间', type: 'datetime', list: true },

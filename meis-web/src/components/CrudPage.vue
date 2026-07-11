@@ -136,7 +136,7 @@ import PageFilterBar from './system/PageFilterBar.vue'
 import TableCellValue from './table/TableCellValue.vue'
 import PageEmpty from './table/PageEmpty.vue'
 import type { PageConfig } from '@/config/pageRegistry'
-import { getListFields, getSchema } from '@/config/pageSchemas'
+import { getListFields, getSchema, collectLinkTables } from '@/config/pageSchemas'
 import GroupedFormFields from './form/GroupedFormFields.vue'
 import ImportDialog from './ImportDialog.vue'
 import { columnAlign } from '@/utils/tableCell'
@@ -204,8 +204,9 @@ function canDeleteRow(row: Record<string, unknown>) {
 }
 
 async function loadRefLabels() {
-  const linkTables = listFields.value.filter((f) => f.linkTable).map((f) => f.linkTable!)
-  await preloadRefLabelMaps(linkTables)
+  const tables = [props.config.table]
+  if (props.config.detailTable) tables.push(props.config.detailTable)
+  await preloadRefLabelMaps(collectLinkTables(...tables))
 }
 
 async function load() {

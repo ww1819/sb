@@ -5,6 +5,7 @@ import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +48,7 @@ public class PowerTagController {
             @RequestParam(required = false) Boolean activeOnly,
             @RequestParam(required = false) UUID stationId) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "power_tag", "t"));
         List<Object> args = new ArrayList<>();
         if (Boolean.TRUE.equals(activeOnly)) {
             where.append(" AND t.is_active = true ");
@@ -150,7 +152,8 @@ public class PowerTagController {
         if (exists) {
             int updated = jdbc.update("""
                     UPDATE power_tag SET tag_code=?, tag_name=?, device_id=?::uuid, station_id=?::uuid,
-                    device_code=?, device_name=?, rated_power=?, install_date=?, is_active=?, remark=?, updated_at=NOW()
+                    device_code=?, device_name=?, rated_power=?, install_date=?, is_active=?, remark=?,
+                    is_deleted=0, deleted_at=NULL, deleted_by=NULL, updated_at=NOW()
                     WHERE id=?::uuid
                     """, body.get("tag_code"), body.get("tag_name"), body.get("device_id"), body.get("station_id"),
                     body.get("device_code"), body.get("device_name"), body.get("rated_power"), body.get("install_date"),
@@ -242,7 +245,8 @@ public class PowerTagController {
         Object code = body.get("tag_code");
         if (code != null && !code.toString().isBlank()) {
             var rows = jdbc.queryForList(
-                    "SELECT id FROM power_tag WHERE tag_code = ?", code.toString().trim());
+                    "SELECT id FROM power_tag WHERE tag_code = ? ORDER BY is_deleted ASC, deleted_at NULLS FIRST LIMIT 1",
+                    code.toString().trim());
             if (!rows.isEmpty()) {
                 UUID existing = parseUuidFromDb(rows.get(0).get("id"));
                 body.put("id", existing.toString());

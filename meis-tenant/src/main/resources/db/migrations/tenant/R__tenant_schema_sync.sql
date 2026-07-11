@@ -79,6 +79,25 @@ ALTER TABLE department ADD COLUMN IF NOT EXISTS pinyin_code VARCHAR(50);
 ALTER TABLE warehouse ADD COLUMN IF NOT EXISTS warehouse_type VARCHAR(30) DEFAULT 'device';
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS asset_category_id UUID;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS finance_category_id UUID;
+ALTER TABLE asset_category ADD COLUMN IF NOT EXISTS depreciation_years INTEGER;
+ALTER TABLE asset_category ADD COLUMN IF NOT EXISTS residual_rate DECIMAL(5,2);
+ALTER TABLE finance_category ADD COLUMN IF NOT EXISTS account_subject VARCHAR(50);
+ALTER TABLE finance_category ADD COLUMN IF NOT EXISTS fund_source VARCHAR(50);
+
+-- 历史库 finance_category 误用 asset 列名 category_code/category_name，纠正为 finance_code/finance_name
+DO $finance_cat_fix$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'finance_category' AND column_name = 'category_code'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'finance_category' AND column_name = 'finance_code'
+    ) THEN
+        ALTER TABLE finance_category RENAME COLUMN category_code TO finance_code;
+        ALTER TABLE finance_category RENAME COLUMN category_name TO finance_name;
+    END IF;
+END $finance_cat_fix$;
 
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('warehouse_type', 'device', '设备库', 'device', 1),

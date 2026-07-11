@@ -1,8 +1,22 @@
+import { ref } from 'vue'
 import http from '@/api/http'
-import { refSelectConfig } from '@/config/refSelectConfig'
+import { refSelectConfig, type RefSelectMeta } from '@/config/refSelectConfig'
 
 const labelCache = new Map<string, Map<string, string>>()
 const loading = new Map<string, Promise<Map<string, string>>>()
+export const labelCacheVersion = ref(0)
+
+function refRowLabel(row: Record<string, unknown>, meta: RefSelectMeta): string {
+  const valueKey = meta.valueKey ?? 'id'
+  const id = row[valueKey] ?? row.id
+  const name = row[meta.labelKey]
+  if (name != null && name !== '') return String(name)
+  if (meta.codeKey) {
+    const code = row[meta.codeKey]
+    if (code != null && code !== '') return String(code)
+  }
+  return String(id ?? '')
+}
 
 export async function ensureRefLabelMap(linkTable: string): Promise<Map<string, string>> {
   if (labelCache.has(linkTable)) return labelCache.get(linkTable)!
@@ -16,19 +30,19 @@ export async function ensureRefLabelMap(linkTable: string): Promise<Map<string, 
       return map
     }
     try {
-      const { data } = await http.get(meta.url, { params: { limit: 5000 } })
+      const { data } = await http.get(meta.url, { params: { limit: 500 } })
       const rows = data.data?.records ?? data.data ?? []
       const valueKey = meta.valueKey ?? 'id'
       for (const row of rows as Record<string, unknown>[]) {
         const id = row[valueKey] ?? row.id
         if (id == null || id === '') continue
-        const label = String(row[meta.labelKey] ?? id)
-        map.set(String(id), label)
+        map.set(String(id), refRowLabel(row, meta))
       }
     } catch {
       // keep empty map
     }
     labelCache.set(linkTable, map)
+    labelCacheVersion.value++
     loading.delete(linkTable)
     return map
   })()

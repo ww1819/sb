@@ -2,6 +2,7 @@ package com.meis.saas.system.controller;
 
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -54,7 +55,7 @@ public class WarehouseController {
     @DeleteMapping("/{id}")
     @OperationLog(module = "system", description = "删除库房")
     public Result<Void> delete(@PathVariable UUID id) {
-        jdbc.update("UPDATE warehouse SET is_active = false, updated_at = NOW() WHERE id = ?::uuid", id);
+        SoftDeleteSupport.softDelete(jdbc, "warehouse", id.toString());
         return Result.ok();
     }
 }

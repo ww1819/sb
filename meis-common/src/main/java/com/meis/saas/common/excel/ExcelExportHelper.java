@@ -1,5 +1,6 @@
 package com.meis.saas.common.excel;
 
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import cn.hutool.core.text.csv.CsvUtil;
 import cn.hutool.core.text.csv.CsvWriter;
 import jakarta.servlet.http.HttpServletResponse;
@@ -14,7 +15,8 @@ public final class ExcelExportHelper {
     private ExcelExportHelper() {}
 
     public static void exportCsv(JdbcTemplate jdbc, String table, HttpServletResponse resp) throws IOException {
-        List<Map<String, Object>> rows = jdbc.queryForList("SELECT * FROM " + table + " LIMIT 5000");
+        String where = " WHERE 1=1 " + SoftDeleteSupport.notDeletedClause(jdbc, table, null);
+        List<Map<String, Object>> rows = jdbc.queryForList("SELECT * FROM " + table + where + " LIMIT 5000");
         if (rows.isEmpty()) {
             resp.setContentType("text/csv;charset=UTF-8");
             resp.getWriter().write("");

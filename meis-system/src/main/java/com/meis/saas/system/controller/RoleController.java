@@ -4,6 +4,7 @@ import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.cache.MeisCacheEviction;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.rbac.PermissionService;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
@@ -101,7 +102,7 @@ public class RoleController {
         List<Map<String, Object>> users = jdbc.queryForList(
                 "SELECT 1 FROM sys_user WHERE role_ids IS NOT NULL AND ?::uuid = ANY(role_ids) LIMIT 1", id);
         if (!users.isEmpty()) throw new BizException(400, "role in use by users");
-        jdbc.update("UPDATE sys_role SET is_active = false, updated_at = NOW() WHERE id = ?::uuid", id);
+        SoftDeleteSupport.softDelete(jdbc, "sys_role", id.toString());
         return Result.ok();
     }
 }

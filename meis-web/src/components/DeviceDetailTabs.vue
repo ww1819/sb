@@ -3,7 +3,8 @@
     <el-tab-pane v-for="g in displayGroups" :key="g.key" :label="g.title" :name="g.key">
       <el-descriptions :column="2" border>
         <el-descriptions-item v-for="f in g.fields" :key="f.prop" :label="f.label">
-          {{ formatValue(f.prop, device[f.prop]) }}
+          <TableCellValue v-if="labelsReady" :field="fieldFor(f.prop)" :value="device[f.prop]" />
+          <span v-else>-</span>
         </el-descriptions-item>
       </el-descriptions>
     </el-tab-pane>
@@ -54,11 +55,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { deviceFieldLabels, deviceFieldGroups, groupTitles } from '@/config/fieldLabels'
+import { collectLinkTables, fieldSchemaByProp } from '@/config/pageSchemas'
+import { preloadRefLabelMaps } from '@/composables/useRefLabelMap'
+import TableCellValue from '@/components/table/TableCellValue.vue'
 
 const props = defineProps<{ device: Record<string, unknown> }>()
 const active = ref('basic')
+const labelsReady = ref(false)
 const skipKeys = new Set(['repairs', 'maintenance', 'transfers', 'qc', 'benefit', 'logs', 'id'])
 
 const displayGroups = computed(() => {
@@ -75,13 +80,20 @@ const displayGroups = computed(() => {
     .map((g) => ({ key: g, title: groupTitles[g] ?? g, fields: grouped.get(g)! }))
 })
 
-function formatValue(prop: string, val: unknown) {
-  if (val === null || val === undefined) return '-'
-  if (typeof val === 'boolean') return val ? '是' : '否'
-  return String(val)
+function fieldFor(prop: string) {
+  const schema = fieldSchemaByProp('medical_device', prop)
+  if (schema.label === prop && deviceFieldLabels[prop]) {
+    return { ...schema, label: deviceFieldLabels[prop] }
+  }
+  return schema
 }
 
 function printLabel() {
   window.print()
 }
+
+onMounted(async () => {
+  await preloadRefLabelMaps(collectLinkTables('medical_device'))
+  labelsReady.value = true
+})
 </script>

@@ -1140,3 +1140,136 @@ powershell -File scripts/ensure-tenant-tables.ps1
 ---
 
 *本文档随项目演进持续更新。模块评审通过后，可将对应章节拆为独立文档并在本章保留链接。*
+
+---
+
+## 附录 G：软删除与审计字段规范（2026-07-12）
+
+### G.1 原则
+
+| 项 | 约定 |
+|----|------|
+| 删除 | 禁止物理 `DELETE`（明细行「先删后插」除外）；写 `is_deleted=1`、`deleted_at`、`deleted_by`；有 `is_active` 时同步置 `false` |
+| 查询 | 默认 `is_deleted = 0`（兼容旧库仅有 `deleted_at` 时用 `deleted_at IS NULL`） |
+| 唯一键冲突 | 新建命中已软删行的唯一键 → 清空删除标记并 **UPDATE**，不 INSERT |
+| 审计 | 插入填 `created_by`；更新填 `updated_at`、`updated_by`（有列则填） |
+
+### G.2 实现位置
+
+| 层级 | 类 / 脚本 |
+|------|-----------|
+| 工具 | `meis-common` → `SoftDeleteSupport`、`TableColumnCache`、`UniqueConstraintCache` |
+| 通用 CRUD | `GenericTableController`（删/建/改/查） |
+| 分页 | `PageableJdbc`、`ExcelExportHelper` |
+| 导入 | `SimpleTableImporter` |
+| 库表补列 | `tenant/R__audit_columns.sql`（审计字段）、`tenant/R__is_deleted_columns.sql`（`is_deleted`） |
+
+### G.3 明细表例外
+
+模板项、单据明细等「保存时先清空再写入」的子表，可保留物理删除子行；主表（含唯一业务编码）必须软删除。
+
+### G.4 验证
+
+1. 重启 **meis-tenant**（R__ 补列生效）
+2. 热加载/重启业务服务（`meis-common` 变更）
+3. 删除供应商/标签 → 再以相同编码新建 → 应恢复成功、无唯一键报错
+4. 列表不展示已删记录
+
+### G.5 开发面板：公共库模块
+
+`meis-common` / `meis-api` 为 **Maven 公共库**，无 HTTP 端口、不可独立启动，故不在「后端微服务」列表中。
+
+开发面板在「前端」与「后端微服务」之间增加 **公共库模块** 区块：
+
+| 操作 | 说明 |
+|------|------|
+| 快速编译 | 仅 `mvn compile -pl <模块>`（约数秒）；面板「编译中」在 classes 更新后自动消失 |
+| 热加载依赖 | 编译本库后，对**调试运行中**的微服务**逐个**热加载（服务多时较慢，见 G.6） |
+
+### G.6 编译为何感觉慢
+
+| 现象 | 原因 |
+|------|------|
+| 公共库一直显示「编译中」 | 已修复：此前后台任务结束后状态未刷新，最长误显示 5 分钟 |
+| `meis-common` 快速编译 | 实际约 **2–5 秒**；仅编译本模块，不编译 15 个微服务 |
+| 热加载依赖（15 个服务） | 每个依赖服务约 1–2 分钟（compile + 写 JAR + 重启），**串行**执行 |
+| 微服务「快速更新」 | `mvn compile -pl 服务 -am` 会连带编译 `meis-common` 等上游模块 |
+| Maven Install / 打包后端 | 全量 reactor 构建，首次或 clean 后可达数分钟 |
+| **整体编译**（工具栏） | `mvn compile -DskipTests` 编译全部模块，不打包；比 Install/打包快，改 `meis-common` 后常用 |
+
+### G.8 整体编译（2026-07-12）
+
+开发面板工具栏 **「整体编译」** 在后台执行根目录 `mvn -q compile -DskipTests`，一次性编译公共库（`meis-common`、`meis-api`）与全部 15 个微服务，**不生成/更新 JAR**。
+
+| 按钮 | Maven 命令 | 适用场景 |
+|------|-----------|----------|
+| 整体编译 | `compile -DskipTests` | 批量校验编译、改公共库后同步 classes |
+| Maven Install | `install -DskipTests` | 安装到本地 `.m2`，供其他工程依赖 |
+| 打包后端 | `package -DskipTests` | 生成可运行 JAR，首次启动或完整打包 |
+
+状态栏「后台任务」会显示 `整体编译 进行中…`，完成后在面板日志区记录结果。修改公共库后若服务已在调试模式运行，可再对 `meis-common` 点 **热加载依赖** 写入 JAR。
+
+### G.7 迁库锁表（2026-07-12 修复）
+
+`R__tenant_schema_sync.sql` 中 **DO 块批量 ALTER 114 表**会在单事务内长时间持锁，导致所有业务查询（含资产管理列表）超时失败。
+
+已拆分为独立脚本 `tenant/R__audit_columns.sql`，并设置 `flyway:executeInTransaction=false`，逐条 `ALTER` 提交释放锁。若再次遇到全站查询挂起，检查 `pg_stat_activity` 是否有未结束的迁库会话。
+
+修改 `meis-common`（如软删除工具类）后，在面板对 `meis-common` 点 **热加载依赖**，或手动对具体微服务点「热加载」。
+
+## 附录 H：外键字段显示名称（2026-07-12）
+
+### H.1 问题
+
+资产台账详情、列表及部分表单中，外键字段（如 `manufacturer_id`、`supplier_id`、`dept_id`）直接显示 UUID，未解析为对象名称或编码。
+
+### H.2 实现约定
+
+| 层级 | 说明 |
+|------|------|
+| `refSelectConfig.ts` | 定义外键表 → API、`labelKey`（名称）、`codeKey`（编码兜底） |
+| `useRefLabelMap.ts` | `preloadRefLabelMaps` 预加载；`resolveRefLabel` 解析显示文本 |
+| `pageSchemas.ts` | `collectLinkTables` 收集 schema 中全部 `linkTable` |
+| `CrudPage` | 挂载时预加载主表 + 明细表全部外键，列表 `TableCellValue` 显示名称 |
+| `DeviceDetailTabs` | 设备详情 Tab 预加载 `medical_device` 外键，复用 `TableCellValue` |
+| `RefDisplay` | 只读外键字段展示组件；`FieldRenderer` 在 `readonly + linkTable` 时使用 |
+| `RefSelect` | 编辑态下拉；名称优先，无名称时回退编码 |
+
+### H.3 验证
+
+1. 资产管理 → 双击设备进入详情 →「基本信息」中生产厂商、供应商应显示名称而非 UUID。
+2. 各 CRUD 列表中外键列（科室、库房、设备等）应显示可读文本。
+3. 只读表单字段（如审批人）应显示姓名而非 ID。
+
+## 附录 I：删除状态字段 is_deleted（2026-07-12）
+
+### I.1 字段约定
+
+| 值 | 含义 |
+|----|------|
+| `0` | 未删除（默认值） |
+| `1` | 已删除 |
+
+列定义：`is_deleted SMALLINT NOT NULL DEFAULT 0`，与 `deleted_at` / `deleted_by` **同步维护**。
+
+### I.2 行为
+
+| 操作 | 写入 |
+|------|------|
+| 软删除 | `is_deleted=1`，`deleted_at=NOW()`，`deleted_by=当前用户` |
+| 恢复（唯一键冲突重建） | `is_deleted=0`，`deleted_at=NULL`，`deleted_by=NULL` |
+| 新建 | `is_deleted=0`（`applyInsertAudit` 默认填充） |
+| 查询过滤 | 优先 `is_deleted = 0`（`SoftDeleteSupport.notDeletedClause`） |
+
+### I.3 迁库
+
+脚本 `tenant/R__is_deleted_columns.sql`（`flyway:executeInTransaction=false`）：
+
+1. 全租户业务表 `ADD COLUMN is_deleted`
+2. 将已有 `deleted_at IS NOT NULL` 的行回填为 `is_deleted=1`
+
+部署后重启 **meis-tenant**，并对业务服务热加载 **meis-common**。
+
+## 附录 J：开发面板整体编译（2026-07-12）
+
+工具栏新增 **整体编译**，对应 Maven Lifecycle 的 `compile`：后台执行 `mvn -q compile -DskipTests`，编译根 reactor 下全部模块。详见附录 G.8。

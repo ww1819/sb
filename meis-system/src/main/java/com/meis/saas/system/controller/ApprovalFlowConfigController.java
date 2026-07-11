@@ -4,6 +4,7 @@ import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -19,7 +20,9 @@ public class ApprovalFlowConfigController {
 
     @GetMapping("/flows")
     public Result<List<Map<String, Object>>> listFlows() {
-        return Result.ok(jdbc.queryForList("SELECT * FROM sys_approval_flow ORDER BY flow_code"));
+        return Result.ok(jdbc.queryForList(
+                "SELECT * FROM sys_approval_flow WHERE 1=1 " + SoftDeleteSupport.notDeletedClause(jdbc, "sys_approval_flow", null)
+                        + " ORDER BY flow_code"));
     }
 
     @GetMapping("/flows/{flowId}")
@@ -27,7 +30,9 @@ public class ApprovalFlowConfigController {
         List<Map<String, Object>> rows = jdbc.queryForList("SELECT * FROM sys_approval_flow WHERE id = ?::uuid", flowId);
         if (rows.isEmpty()) throw new BizException(404, "flow not found");
         Map<String, Object> flow = rows.get(0);
-        flow.put("nodes", jdbc.queryForList("SELECT * FROM sys_approval_node WHERE flow_id = ?::uuid ORDER BY node_order", flowId));
+        flow.put("nodes", jdbc.queryForList(
+                "SELECT * FROM sys_approval_node WHERE flow_id = ?::uuid " + SoftDeleteSupport.notDeletedClause(jdbc, "sys_approval_node", null)
+                        + " ORDER BY node_order", flowId));
         return Result.ok(flow);
     }
 
@@ -49,8 +54,12 @@ public class ApprovalFlowConfigController {
     @DeleteMapping("/flows/{flowId}")
     @OperationLog(module = "system", description = "删除审批流程")
     public Result<Void> deleteFlow(@PathVariable UUID flowId) {
-        jdbc.update("DELETE FROM sys_approval_node WHERE flow_id = ?::uuid", flowId);
-        jdbc.update("DELETE FROM sys_approval_flow WHERE id = ?::uuid", flowId);
+        for (var row : jdbc.queryForList(
+                "SELECT id FROM sys_approval_node WHERE flow_id = ?::uuid " + SoftDeleteSupport.notDeletedClause(jdbc, "sys_approval_node", null),
+                flowId)) {
+            SoftDeleteSupport.softDelete(jdbc, "sys_approval_node", String.valueOf(row.get("id")));
+        }
+        SoftDeleteSupport.softDelete(jdbc, "sys_approval_flow", flowId.toString());
         return Result.ok();
     }
 
@@ -72,7 +81,7 @@ public class ApprovalFlowConfigController {
     @DeleteMapping("/nodes/{nodeId}")
     @OperationLog(module = "system", description = "删除审批节点")
     public Result<Void> deleteNode(@PathVariable UUID nodeId) {
-        jdbc.update("DELETE FROM sys_approval_node WHERE id = ?::uuid", nodeId);
+        SoftDeleteSupport.softDelete(jdbc, "sys_approval_node", nodeId.toString());
         return Result.ok();
     }
 }

@@ -4,6 +4,7 @@ import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
@@ -151,7 +152,7 @@ public class InventoryCheckController {
     public Result<Void> delete(@PathVariable UUID id) {
         assertMutable(id);
         jdbc.update("DELETE FROM inventory_check_item WHERE check_id = ?::uuid", id);
-        int n = jdbc.update("DELETE FROM inventory_check WHERE id = ?::uuid", id);
+        int n = SoftDeleteSupport.softDelete(jdbc, "inventory_check", id.toString());
         if (n == 0) throw new BizException(404, "not found");
         return Result.ok();
     }

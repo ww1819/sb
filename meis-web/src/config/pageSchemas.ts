@@ -89,6 +89,22 @@ export function getSchema(table: string): FieldSchema[] {
   return tableSchemas[table] ?? []
 }
 
+/** 收集表 schema 中所有外键 linkTable，用于预加载显示名称 */
+export function collectLinkTables(...tables: string[]): string[] {
+  const set = new Set<string>()
+  for (const table of tables) {
+    if (!table) continue
+    for (const f of getSchema(table)) {
+      if (f.linkTable) set.add(f.linkTable)
+    }
+  }
+  return [...set]
+}
+
+export function fieldSchemaByProp(table: string, prop: string): FieldSchema {
+  return getSchema(table).find((f) => f.prop === prop) ?? { prop, label: prop }
+}
+
 export function getListFields(table: string): FieldSchema[] {
   const schema = getSchema(table)
   const listed = schema.filter((f) => f.list)

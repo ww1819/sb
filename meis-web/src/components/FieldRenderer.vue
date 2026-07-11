@@ -17,6 +17,11 @@
     :disabled="field.readonly"
     @update:model-value="onPickerModel"
   />
+  <RefDisplay
+    v-else-if="field.linkTable && field.readonly"
+    :link-table="field.linkTable"
+    :value="model"
+  />
   <RefSelect
     v-else-if="field.linkTable"
     v-model="model"
@@ -47,6 +52,7 @@ import { computed, onMounted, ref } from 'vue'
 import type { FieldSchema } from '@/config/pageSchemas'
 import { useDict } from '@/composables/useDict'
 import RefSelect from '@/components/form/RefSelect.vue'
+import RefDisplay from '@/components/form/RefDisplay.vue'
 import FileUploadField from '@/components/form/FileUploadField.vue'
 import RepairDevicePickerField from '@/components/repair/RepairDevicePickerField.vue'
 import AssetDevicePickerField from '@/components/form/AssetDevicePickerField.vue'

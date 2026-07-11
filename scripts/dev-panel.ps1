@@ -32,6 +32,22 @@ $htmlPath = Join-Path $panelDir 'index.html'
 if (-not (Test-Path $htmlPath)) { throw "Missing panel UI: $htmlPath" }
 $script:PanelBuildPending = @{}
 $script:PanelHotReloadResults = @{}
+$script:PanelLibraryReloadResults = @{}
+$script:PanelBackgroundJobs = [ordered]@{}
+
+function Set-PanelLibraryReloadResult {
+    param(
+        [Parameter(Mandatory = $true)][string]$ModuleName,
+        [Parameter(Mandatory = $true)][hashtable]$Result
+    )
+    $script:PanelLibraryReloadResults[$ModuleName] = [ordered]@{
+        at        = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+        ok        = [bool]$Result.ok
+        message   = [string]$Result.message
+        steps     = @($Result.steps)
+        reloaded  = @($Result.reloaded)
+    }
+}
 
 function Set-PanelHotReloadResult {
     param(
@@ -117,15 +133,44 @@ function Write-JsonResponse {
     Write-HttpResponse -Response $Response -StatusCode $StatusCode -ContentType 'application/json; charset=utf-8' -Body $json
 }
 
+function Sync-PanelBackgroundJobs {
+    $running = [System.Collections.ArrayList]@()
+    foreach ($label in @($script:PanelBackgroundJobs.Keys)) {
+        $job = $script:PanelBackgroundJobs[$label]
+        if ($null -eq $job) {
+            $script:PanelBackgroundJobs.Remove($label) | Out-Null
+            continue
+        }
+        $state = $job.State
+        if ($state -eq 'Running') {
+            [void]$running.Add([string]$label)
+            continue
+        }
+        try {
+            $null = Receive-Job $job -ErrorAction SilentlyContinue
+            if ($state -eq 'Failed') {
+                Add-MeisPanelEvent ($label + ' FAILED (background job)')
+            } else {
+                Add-MeisPanelEvent ($label + ' -> done')
+            }
+        } catch {
+            Add-MeisPanelEvent ($label + ' FAILED: ' + $_.Exception.Message)
+        }
+        Remove-Job $job -Force -ErrorAction SilentlyContinue
+        $script:PanelBackgroundJobs.Remove($label) | Out-Null
+    }
+    return @($running)
+}
+
 function Start-PanelBackgroundJob {
     param(
         [Parameter(Mandatory = $true)][string]$Label,
-        [Parameter(Mandatory = $true)][ValidateSet('start-all', 'start-core', 'start-debug-all', 'start-debug-core', 'restart-all', 'stop-all', 'build-backend', 'build-install')]
+        [Parameter(Mandatory = $true)][ValidateSet('start-all', 'start-core', 'start-debug-all', 'start-debug-core', 'restart-all', 'stop-all', 'build-backend', 'build-install', 'build-compile')]
         [string]$Action
     )
     $scriptsDir = $PSScriptRoot
     $root = $script:MeisRoot
-    $null = Start-Job -ScriptBlock {
+    $job = Start-Job -ScriptBlock {
         param($ActionName, $ScriptsDir, $Root)
         Set-Location $Root
         . (Join-Path $ScriptsDir 'meis-services.ps1')
@@ -140,20 +185,18 @@ function Start-PanelBackgroundJob {
                 Start-MeisServices -Profile 'dev'
             }
             'stop-all' { Stop-MeisServices | Out-Null }
+            'build-compile' {
+                Invoke-MeisMavenReactor -Goal compile -Quiet | Out-Null
+            }
             'build-backend' {
-                $mvn = Resolve-MeisMaven
-                $env:JAVA_HOME = Resolve-MeisJavaHome
-                & $mvn -q package -DskipTests
-                if ($LASTEXITCODE -ne 0) { throw 'Maven package failed' }
+                Invoke-MeisMavenReactor -Goal package -Quiet | Out-Null
             }
             'build-install' {
-                $mvn = Resolve-MeisMaven
-                $env:JAVA_HOME = Resolve-MeisJavaHome
-                & $mvn install -DskipTests
-                if ($LASTEXITCODE -ne 0) { throw 'Maven install failed' }
+                Invoke-MeisMavenReactor -Goal install | Out-Null
             }
         }
     } -ArgumentList $Action, $scriptsDir, $root
+    $script:PanelBackgroundJobs[$Label] = $job
     return @{ ok = $true; message = ($Label + ' started in background') }
 }
 
@@ -190,17 +233,17 @@ function Start-PanelServiceBackgroundJob {
                 'build' {
                     switch ($BuildMode) {
                         'clean-package' {
-                            Invoke-MeisMavenModule -Module $Name -Clean -Package | Out-Null
+                            Invoke-MeisMavenModule -Module $Name -Clean -Package -AlsoMake | Out-Null
                         }
                         'package' {
-                            Invoke-MeisMavenModule -Module $Name -Package | Out-Null
+                            Invoke-MeisMavenModule -Module $Name -Package -AlsoMake | Out-Null
                         }
                         'quick' {
                             $health = Test-MeisServiceJarHealthy $Name
                             if (-not $health.ok) {
-                                Invoke-MeisMavenModule -Module $Name -Package | Out-Null
+                                Invoke-MeisMavenModule -Module $Name -Package -AlsoMake | Out-Null
                             }
-                            Invoke-MeisMavenModule -Module $Name -Compile | Out-Null
+                            Invoke-MeisMavenModule -Module $Name -Compile -AlsoMake | Out-Null
                             Sync-MeisServiceClassesToJar -ServiceName $Name | Out-Null
                         }
                         default {
@@ -341,6 +384,30 @@ function Get-PanelServiceStatusList {
     return $list
 }
 
+function Get-PanelLibraryStatusList {
+    $list = @(Get-MeisLibraryModuleStatusList)
+    $now = Get-Date
+    foreach ($item in $list) {
+        $name = [string]$item.name
+        $building = $false
+        if ($script:PanelBuildPending.ContainsKey($name)) {
+            $started = $script:PanelBuildPending[$name]
+            $classesDir = Join-Path $script:MeisRoot "$name\target\classes"
+            $classesUpdated = (Test-Path $classesDir) -and ((Get-Item $classesDir).LastWriteTime -ge $started)
+            if ($classesUpdated -or (($now - $started).TotalSeconds -ge 300)) {
+                $script:PanelBuildPending.Remove($name) | Out-Null
+            } else {
+                $building = $true
+            }
+        }
+        $item.buildInProgress = $building
+        if ($script:PanelLibraryReloadResults.ContainsKey($name)) {
+            $item.hotReload = $script:PanelLibraryReloadResults[$name]
+        }
+    }
+    return $list
+}
+
 function Handle-PanelRequest {
     param([System.Net.HttpListenerContext]$Context)
 
@@ -362,13 +429,16 @@ function Handle-PanelRequest {
     }
 
     if ($method -eq 'GET' -and $path -eq '/api/status') {
+        $backgroundJobs = Sync-PanelBackgroundJobs
         $payload = [ordered]@{
             timestamp = (Get-Date).ToString('o')
             gatewayUrl = 'http://localhost:8080'
             panelPort = $Port
             redisUp = Test-MeisRedisAvailable
+            backgroundJobs = $backgroundJobs
             frontend = Get-PanelFrontendStatus
             coreServices = @($script:MeisCoreServiceNames)
+            libraries = @(Get-PanelLibraryStatusList)
             services = @(Get-PanelServiceStatusList)
         }
         Write-JsonResponse -Response $res -Data $payload
@@ -479,6 +549,12 @@ function Handle-PanelRequest {
             Write-JsonResponse -Response $res -Data $r
             return
         }
+        if ($path -eq '/api/build/compile') {
+            Add-MeisPanelEvent 'MAVEN COMPILE ALL (background)'
+            $r = Start-PanelBackgroundJob -Label 'reactor-compile' -Action 'build-compile'
+            Write-JsonResponse -Response $res -Data $r
+            return
+        }
         if ($path -eq '/api/build/backend') {
             Add-MeisPanelEvent 'BUILD backend (background)'
             $r = Start-PanelBackgroundJob -Label 'build-backend' -Action 'build-backend'
@@ -505,6 +581,32 @@ function Handle-PanelRequest {
                 }
             } catch { }
             return
+        }
+
+        if ($path -match "^/api/library/([a-z0-9-]+)/(compile|reload-dependents)$") {
+            $name = $Matches[1]
+            $action = $Matches[2]
+            if ($action -eq 'compile') {
+                $script:PanelBuildPending[$name] = Get-Date
+                $r = Invoke-PanelAction {
+                    Invoke-MeisMavenModule -Module $name -Compile | Out-Null
+                    @{ ok = $true; message = ($name + ' compile OK') }
+                } -EventMessage ('COMPILE library ' + $name)
+                if (-not $r.ok) {
+                    $script:PanelBuildPending.Remove($name) | Out-Null
+                }
+                Write-JsonResponse -Response $res -Data $r
+                return
+            }
+            if ($action -eq 'reload-dependents') {
+                $r = Invoke-PanelAction {
+                    $result = Invoke-MeisLibraryHotReloadDependents -ModuleName $name
+                    Set-PanelLibraryReloadResult -ModuleName $name -Result $result
+                    $result
+                } -EventMessage ('RELOAD-DEPENDENTS ' + $name)
+                Write-JsonResponse -Response $res -Data $r
+                return
+            }
         }
 
         if ($path -match "^/api/service/([a-z0-9-]+)/(stop|start|restart|start-debug|build|reload-classes)$") {

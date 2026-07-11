@@ -463,8 +463,9 @@
       <button class="warn" onclick="act('backend/start-debug-core')" title="核心后端以 JDWP 调试模式启动，已运行的自动跳过">调试核心后端</button>
       <button class="danger" onclick="act('backend/stop-all')">停止全部后端</button>
       <button class="warn" onclick="act('backend/restart-all')">重启全部后端</button>
-      <button onclick="act('build/install')">Maven Install</button>
-      <button onclick="act('build/backend')">打包后端</button>
+      <button class="primary" onclick="act('build/compile')" title="mvn compile -DskipTests，编译全部模块（公共库 + 15 个微服务），不打包">整体编译</button>
+      <button onclick="act('build/install')" title="mvn install -DskipTests，安装到本地仓库">Maven Install</button>
+      <button onclick="act('build/backend')" title="mvn package -DskipTests，打包全部微服务 JAR">打包后端</button>
       <button onclick="refresh()">刷新状态</button>
       <button class="danger" onclick="shutdownPanel()" title="关闭面板进程并释放 5099 端口，不影响已启动的前后端服务">关闭面板</button>
     </div>
@@ -481,6 +482,16 @@
         </tr>
       </thead>
       <tbody id="frontend-row"></tbody>
+    </table>
+
+    <div class="section-title">公共库模块</div>
+    <table>
+      <thead>
+        <tr>
+          <th>模块</th><th>说明</th><th>产物</th><th>依赖</th><th>构建</th><th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="library-rows"></tbody>
     </table>
 
     <div class="section-title">后端微服务</div>
@@ -571,6 +582,8 @@
     let debugPendingSince = {}
     let hotReloadPending = {}
     let hotReloadFlash = {}
+    let libraryReloadPending = {}
+    let libraryReloadFlash = {}
 
     function isDebugRunning(svc) {
       return !!(svc && svc.debugUp && svc.httpUp)
@@ -645,6 +658,114 @@
       const title = escapeHtml((hr.message || '') + (stepTip ? '\n' + stepTip : ''))
       const icon = hr.ok ? '✓' : '✗'
       return `<span class="hot-reload-status ${cls}" title="${title}">${icon} ${escapeHtml(hr.at || '')}</span>`
+    }
+
+    function renderLibraryArtifact(lib) {
+      if (lib.buildInProgress || isBuildPending(lib.name)) {
+        return '<span style="color:var(--warn)">编译中…</span>'
+      }
+      const parts = []
+      if (lib.classesExists) {
+        parts.push('classes ' + escapeHtml(lib.classesMtime || ''))
+      } else {
+        parts.push('<span style="color:var(--err)">classes 缺失</span>')
+      }
+      if (lib.jarExists) {
+        parts.push('jar ' + lib.jarSizeKb + ' KB')
+      }
+      return parts.join('<div class="jar-meta"></div>')
+    }
+
+    function renderLibraryDependents(lib) {
+      const dbg = lib.debugDependentCount || 0
+      const total = lib.dependentCount || 0
+      const tip = (lib.dependents || []).join(', ')
+      return `<span title="${escapeHtml(tip)}">调试中 ${dbg} / 共 ${total}</span>`
+    }
+
+    function renderLibraryBuildOpts(lib) {
+      return `
+        <div class="build-opts">
+          <span class="build-section-label">仅编译</span>
+          <div class="build-opts-actions">
+            <button onclick="libraryCompile('${lib.name}')" title="仅编译本模块（约数秒），不含下游微服务">快速编译</button>
+          </div>
+        </div>
+      `
+    }
+
+    function renderLibraryHotReloadStatus(lib) {
+      const name = lib.name
+      if (libraryReloadPending[name]) {
+        return '<span class="hot-reload-status running" title="正在编译并热加载依赖服务…">⟳ 加载中</span>'
+      }
+      const hr = lib.hotReload
+      if (!hr) return ''
+      const cls = hr.ok ? 'ok' : 'fail'
+      const icon = hr.ok ? '✓' : '✗'
+      return `<span class="hot-reload-status ${cls}" title="${escapeHtml(hr.message || '')}">${icon} ${escapeHtml(hr.at || '')}</span>`
+    }
+
+    function renderLibraryActions(lib) {
+      const name = lib.name
+      const dbg = lib.debugDependentCount || 0
+      const busy = !!libraryReloadPending[name]
+      const flash = libraryReloadFlash[name]
+      const flashCls = flash === 'ok' ? ' ok-flash' : (flash === 'fail' ? ' fail-flash' : '')
+      const disabled = (dbg === 0 || busy) ? ' disabled' : ''
+      const title = dbg === 0
+        ? '无调试运行中的依赖服务；请先对相关微服务点「调试」'
+        : 'compile 本库 → 对调试中的依赖服务逐个热加载'
+      let html = `<button class="hot-reload${flashCls}${busy ? ' loading' : ''}"${disabled} onclick="libraryReloadDependents('${name}')" title="${escapeHtml(title)}">${busy ? '加载中…' : '热加载依赖'}</button>`
+      html += renderLibraryHotReloadStatus(lib)
+      return html
+    }
+
+    function renderLibraries(list) {
+      document.getElementById('library-rows').innerHTML = (list || []).map(lib => `
+        <tr>
+          <td class="mono">${lib.name}</td>
+          <td>${renderServiceInfo(lib)}</td>
+          <td>${renderLibraryArtifact(lib)}</td>
+          <td>${renderLibraryDependents(lib)}</td>
+          <td>${renderLibraryBuildOpts(lib)}</td>
+          <td class="actions">${renderLibraryActions(lib)}</td>
+        </tr>
+      `).join('')
+    }
+
+    async function libraryCompile(name) {
+      try {
+        markBuildPending(name, 180)
+        showToast(name + ': 编译中…', true)
+        const resp = await api('/api/library/' + name + '/compile', 'POST')
+        showToast(resp.message || (name + ': 编译已提交'), true)
+        pollServiceStatus()
+      } catch (e) {
+        showToast(name + ': 编译失败 — ' + e.message, false)
+      }
+    }
+
+    async function libraryReloadDependents(name) {
+      if (libraryReloadPending[name]) return
+      libraryReloadPending[name] = true
+      refresh()
+      try {
+        showToast(name + ': 正在热加载依赖服务（可能需数分钟）…', true)
+        const resp = await api('/api/library/' + name + '/reload-dependents', 'POST', 600000)
+        const result = resp.data || resp
+        const ok = resp.ok !== false && result.ok !== false
+        libraryReloadFlash[name] = ok ? 'ok' : 'fail'
+        setTimeout(() => { delete libraryReloadFlash[name] }, 4000)
+        showToast(name + ': ' + (resp.message || result.message || (ok ? '完成' : '失败')), ok)
+      } catch (e) {
+        libraryReloadFlash[name] = 'fail'
+        setTimeout(() => { delete libraryReloadFlash[name] }, 4000)
+        showToast(name + ': 热加载失败 — ' + e.message, false)
+      } finally {
+        delete libraryReloadPending[name]
+        refresh()
+      }
     }
 
     function renderServiceActions(s) {
@@ -1399,11 +1520,21 @@
       const up = (data.services || []).filter(s => s.httpUp).length
       const total = (data.services || []).length
       const fe = data.frontend?.httpUp ? 1 : 0
+      const bg = data.backgroundJobs || []
+      const buildLabels = {
+        'reactor-compile': '整体编译',
+        'maven-install': 'Maven Install',
+        'build-backend': '打包后端'
+      }
+      const buildHint = bg.length
+        ? bg.map(j => buildLabels[j] || j).join('、') + ' 进行中…'
+        : ''
       document.getElementById('stats').innerHTML = `
         <div class="stat"><div class="label">后端在线</div><div class="value">${up}/${total}</div></div>
         <div class="stat"><div class="label">前端</div><div class="value">${fe ? '运行' : '停止'}</div></div>
         <div class="stat"><div class="label">Redis</div><div class="value">${data.redisUp ? 'OK' : '—'}</div></div>
         <div class="stat"><div class="label">网关</div><div class="value" style="font-size:0.95rem"><a href="${data.gatewayUrl}" target="_blank">:8080</a></div></div>
+        ${buildHint ? `<div class="stat"><div class="label">后台任务</div><div class="value" style="font-size:0.9rem;color:var(--warn)">${buildHint}</div></div>` : ''}
       `
     }
 
@@ -1456,18 +1587,24 @@
       try {
         const data = await api('/api/status', 'GET', 20000)
         coreServiceNames = data.coreServices || []
-        const names = ['meis-web', 'panel'].concat((data.services || []).map(s => s.name))
+        const names = ['meis-web', 'panel']
+          .concat((data.libraries || []).map(l => l.name))
+          .concat((data.services || []).map(s => s.name))
         loadLogWatch(names)
         loadLogFilter(names)
         loadBuildOpts(names)
         renderStats(data)
         renderFrontend(data.frontend)
         if (data.frontend?.httpUp) clearFrontendPending()
+        renderLibraries(data.libraries)
         renderServices(data.services)
         updateDebugPendingFromStatus(data.services)
         for (const s of (data.services || [])) {
           if (s.jarExists && s.jarHealthy) delete buildPendingUntil[s.name]
           if (isDebugRunning(s)) clearDebugPending(s.name)
+        }
+        for (const lib of (data.libraries || [])) {
+          if (lib.classesExists) delete buildPendingUntil[lib.name]
         }
       } catch (e) {
         // 轮询失败不弹 toast，避免后台标签页刷屏

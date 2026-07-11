@@ -1,5 +1,6 @@
 package com.meis.saas.common.excel;
 
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.util.PinyinCodeUtil;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -27,7 +28,18 @@ public final class SimpleTableImporter {
                 if (dbColumns.contains("is_active") && !body.containsKey("is_active")) {
                     body.put("is_active", true);
                 }
+                SoftDeleteSupport.applyInsertAudit(jdbc, table, body);
                 fillPinyinIfNeeded(table, body, dbColumns);
+
+                var softDeletedId = SoftDeleteSupport.findSoftDeletedId(jdbc, table, body);
+                if (softDeletedId.isPresent()) {
+                    String existingId = softDeletedId.get();
+                    body.put("id", UUID.fromString(existingId));
+                    SoftDeleteSupport.prepareRestore(body, dbColumns);
+                    updateRow(jdbc, table, existingId, body, dbColumns);
+                    result.addSuccess();
+                    continue;
+                }
 
                 List<String> cols = new ArrayList<>(body.keySet());
                 String colSql = String.join(",", cols);
@@ -42,6 +54,20 @@ public final class SimpleTableImporter {
             }
         }
         return result;
+    }
+
+    private static void updateRow(JdbcTemplate jdbc, String table, String id, Map<String, Object> body, Set<String> dbColumns) {
+        body.remove("id");
+        List<String> sets = new ArrayList<>();
+        List<Object> args = new ArrayList<>();
+        body.forEach((k, v) -> {
+            if (!dbColumns.contains(k)) return;
+            sets.add(k + " = " + placeholder(k, v));
+            args.add(v);
+        });
+        SoftDeleteSupport.appendUpdateAuditSets(dbColumns, sets, args);
+        args.add(UUID.fromString(id));
+        jdbc.update("UPDATE " + table + " SET " + String.join(",", sets) + " WHERE id = ?::uuid", args.toArray());
     }
 
     private static Set<String> loadTableColumns(JdbcTemplate jdbc, String table) {

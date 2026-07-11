@@ -12,6 +12,7 @@ import com.meis.saas.common.excel.ImportFieldRegistry;
 import com.meis.saas.common.excel.ImportProfileService;
 import com.meis.saas.common.excel.ImportResult;
 import com.meis.saas.common.excel.ImportValueParser;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.util.PinyinCodeUtil;
 import com.meis.saas.common.web.PinyinCodeBatchUpdater;
@@ -43,7 +44,9 @@ public class DepartmentController {
                 cacheProps.getOrgTtl(),
                 new TypeReference<List<Map<String, Object>>>() {},
                 () -> jdbc.queryForList(
-                        "SELECT d.*, c.campus_name FROM department d LEFT JOIN campus c ON d.campus_id = c.id ORDER BY d.sort_order, d.dept_code")));
+                        "SELECT d.*, c.campus_name FROM department d LEFT JOIN campus c ON d.campus_id = c.id WHERE 1=1 "
+                                + SoftDeleteSupport.notDeletedClause(jdbc, "department", "d")
+                                + " ORDER BY d.sort_order, d.dept_code")));
     }
 
     @GetMapping("/tree")
@@ -58,15 +61,33 @@ public class DepartmentController {
 
     private List<Map<String, Object>> loadDeptTree() {
         List<Map<String, Object>> all = jdbc.queryForList(
-                "SELECT id, dept_code, dept_name, parent_id, campus_id, is_clinical, sort_order, is_active FROM department ORDER BY sort_order, dept_code");
+                "SELECT id, dept_code, dept_name, parent_id, campus_id, is_clinical, sort_order, is_active FROM department WHERE 1=1 "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "department", null)
+                        + " ORDER BY sort_order, dept_code");
         return buildTree(all, null);
     }
 
     @PostMapping
     @OperationLog(module = "system", description = "创建科室")
     public Result<Map<String, Object>> create(@RequestBody Map<String, Object> body) {
-        UUID id = UUID.randomUUID();
+        SoftDeleteSupport.applyInsertAudit(jdbc, "department", body);
+        var softDeletedId = SoftDeleteSupport.findSoftDeletedId(jdbc, "department", body);
         String pinyin = resolvePinyin(body);
+        if (softDeletedId.isPresent()) {
+            UUID existingId = UUID.fromString(softDeletedId.get());
+            jdbc.update("""
+                    UPDATE department SET dept_code=?, dept_name=?, pinyin_code=?, parent_id=?::uuid, campus_id=?::uuid,
+                    floor_number=?, room_number=?, is_clinical=?, sort_order=?, is_active=?,
+                    is_deleted=0, deleted_at=NULL, deleted_by=NULL, updated_at=NOW()
+                    WHERE id=?::uuid
+                    """, body.get("dept_code"), body.get("dept_name"), pinyin, body.get("parent_id"),
+                    body.get("campus_id"), body.get("floor_number"), body.get("room_number"),
+                    body.getOrDefault("is_clinical", false), body.getOrDefault("sort_order", 0),
+                    body.getOrDefault("is_active", true), existingId);
+            cacheEviction.evictSchemaOrg(schema());
+            return Result.ok(jdbc.queryForList("SELECT * FROM department WHERE id = ?::uuid", existingId).get(0));
+        }
+        UUID id = UUID.randomUUID();
         jdbc.update(
                 "INSERT INTO department (id, dept_code, dept_name, pinyin_code, parent_id, campus_id, floor_number, room_number, is_clinical, sort_order, is_active) VALUES (?::uuid,?,?,?,?::uuid,?::uuid,?,?,?,?,?)",
                 id, body.get("dept_code"), body.get("dept_name"), pinyin, body.get("parent_id"),
@@ -94,7 +115,7 @@ public class DepartmentController {
     @DeleteMapping("/{id}")
     @OperationLog(module = "system", description = "删除科室")
     public Result<Void> delete(@PathVariable UUID id) {
-        jdbc.update("UPDATE department SET is_active = false, updated_at = NOW() WHERE id = ?::uuid", id);
+        SoftDeleteSupport.softDelete(jdbc, "department", id.toString());
         cacheEviction.evictSchemaOrg(schema());
         return Result.ok();
     }

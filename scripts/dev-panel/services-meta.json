@@ -7,6 +7,14 @@
     "labelZh": "前端 Web",
     "descZh": "Vue 管理界面，Vite 热更新开发服务"
   },
+  "meis-common": {
+    "labelZh": "公共库",
+    "descZh": "通用 CRUD、软删除、分页、导入导出等；无独立进程，classes 打入各微服务 JAR"
+  },
+  "meis-api": {
+    "labelZh": "API 契约库",
+    "descZh": "Feign 接口与 DTO；被 meis-tenant、meis-auth 等引用"
+  },
   "meis-tenant": {
     "labelZh": "租户服务",
     "descZh": "租户开户；进程内 Flyway 自动补齐库结构（唯一迁库入口）"
