@@ -53,6 +53,8 @@
         :columns="adverseColumns"
         empty-text="暂无不良事件"
         filter-placeholder="事件编号"
+        load-url="/qc/adverse/page"
+        :device-id="String(model.id ?? '')"
       />
     </div>
   </el-form>
@@ -137,7 +139,7 @@ const inventoryColumns: RecordColumn[] = [
 
 const adverseColumns: RecordColumn[] = [
   { prop: 'event_no', label: '事件编号', minWidth: 140 },
-  { prop: 'event_level', label: '事件等级', minWidth: 120 },
+  { prop: 'severity_level', label: '严重等级', minWidth: 120 },
   { prop: 'event_type', label: '事件类型', minWidth: 120 },
   { prop: 'status', label: '处理状态', minWidth: 100 },
   { prop: 'report_time', label: '上报时间', minWidth: 160 }

@@ -28,7 +28,7 @@ import http from '@/api/http'
 import CrudPage from '@/components/CrudPage.vue'
 import type { PageConfig } from '@/config/pageRegistry'
 
-const config: PageConfig = { title: '备件管理', apiBase: '/repair', table: 'spare_part' }
+const config: PageConfig = { title: '配件档案管理', apiBase: '/repair', table: 'spare_part' }
 const tab = ref('stock')
 const loading = ref(false)
 const alerts = ref<Record<string, unknown>[]>([])

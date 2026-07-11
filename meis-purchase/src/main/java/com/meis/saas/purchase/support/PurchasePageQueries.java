@@ -74,9 +74,10 @@ public final class PurchasePageQueries {
             FROM purchase_contract c
             LEFT JOIN purchase_project pj ON pj.id = c.project_id
             LEFT JOIN supplier s ON s.id = c.supplier_id
+            LEFT JOIN purchase_acceptance pa ON pa.contract_id = c.id
             """;
         return page(jdbc, from, where, args, q, "c.created_at DESC NULLS LAST",
-                "c.*, pj.project_name, s.supplier_name");
+                "c.*, pj.project_name, s.supplier_name, pa.acceptance_no, pa.acceptance_status AS acc_status, pa.entry_id");
     }
 
     public static PageResult<Map<String, Object>> acceptancePage(JdbcTemplate jdbc, PageQuery q,
@@ -92,9 +93,10 @@ public final class PurchasePageQueries {
             FROM purchase_acceptance a
             LEFT JOIN purchase_contract c ON c.id = a.contract_id
             LEFT JOIN supplier s ON s.id = a.supplier_id
+            LEFT JOIN device_entry de ON de.id = a.entry_id
             """;
         return page(jdbc, from, where, args, q, "a.created_at DESC NULLS LAST",
-                "a.*, c.contract_code, c.contract_name, s.supplier_name");
+                "a.*, c.contract_code, c.contract_name, s.supplier_name, de.entry_no, de.status AS entry_status");
     }
 
     private static void appendKeyword(StringBuilder where, List<Object> args, String keyword, String... cols) {

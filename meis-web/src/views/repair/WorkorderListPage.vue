@@ -9,7 +9,7 @@
       @add="openCreate"
     >
       <template #toolbar-extra>
-        <el-button type="primary" @click="openCreate">新增</el-button>
+        <el-button v-if="showCreate" type="primary" @click="openCreate">新增报修</el-button>
       </template>
     </CrudPage>
 
@@ -57,17 +57,23 @@
       <template #footer>
         <el-button @click="visible = false">关闭</el-button>
         <template v-if="wo?.id">
-          <el-button v-if="can('dispatch')" @click="openDispatch">派工</el-button>
-          <el-button v-if="can('start')" type="success" plain @click="doStartRepair">开始维修</el-button>
-          <el-button v-if="can('accept')" @click="doAccept">接单</el-button>
-          <el-button v-if="can('transfer')" @click="openTransfer">转派</el-button>
-          <el-button v-if="can('sub')" @click="openSubStatus">子状态</el-button>
-          <el-button v-if="can('complete')" type="warning" @click="openComplete">完工</el-button>
-          <el-button v-if="can('verify')" type="success" @click="doVerify('pass')">验收通过</el-button>
-          <el-button v-if="can('verify')" type="danger" plain @click="doVerify('fail')">验收不通过</el-button>
-          <el-button v-if="can('suspend')" @click="doSuspend">挂起</el-button>
-          <el-button v-if="can('resume')" @click="doResume">恢复</el-button>
-          <el-button v-if="can('cancel')" type="danger" plain @click="doCancel">取消</el-button>
+          <template v-if="pageMode === 'apply'">
+            <el-button v-if="can('cancel')" type="danger" plain @click="doCancel">取消报修</el-button>
+          </template>
+          <template v-else-if="pageMode === 'verify'">
+            <el-button v-if="can('verify')" type="success" @click="openVerify">验收</el-button>
+          </template>
+          <template v-else>
+            <el-button v-if="can('dispatch')" @click="openDispatch">派工</el-button>
+            <el-button v-if="can('start')" type="success" plain @click="doStartRepair">开始维修</el-button>
+            <el-button v-if="can('accept')" @click="doAccept">接单</el-button>
+            <el-button v-if="can('transfer')" @click="openTransfer">转派</el-button>
+            <el-button v-if="can('sub')" @click="openSubStatus">子状态</el-button>
+            <el-button v-if="can('complete')" type="warning" @click="openComplete">完工</el-button>
+            <el-button v-if="can('suspend')" @click="doSuspend">挂起</el-button>
+            <el-button v-if="can('resume')" @click="doResume">恢复</el-button>
+            <el-button v-if="can('cancel')" type="danger" plain @click="doCancel">取消</el-button>
+          </template>
         </template>
         <el-button v-if="editable && !wo?.id" type="primary" @click="save">保存</el-button>
       </template>
@@ -143,11 +149,32 @@
         <el-button type="primary" @click="doSubStatus">确认</el-button>
       </template>
     </AppModal>
+    <AppModal v-model="verifyVisible" title="维修验收" size="md">
+      <el-form label-width="100px">
+        <el-form-item label="验收结果" required>
+          <el-radio-group v-model="actionForm.verifyResult">
+            <el-radio value="pass">通过</el-radio>
+            <el-radio value="fail">不通过</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="验收意见">
+          <el-input v-model="actionForm.verifyComment" type="textarea" :rows="3" />
+        </el-form-item>
+        <el-form-item v-if="actionForm.verifyResult === 'pass'" label="满意度">
+          <el-rate v-model="actionForm.satisfactionRating" :max="5" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="verifyVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitVerify">确认验收</el-button>
+      </template>
+    </AppModal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
@@ -159,12 +186,32 @@ import RefSelect from '@/components/form/RefSelect.vue'
 import type { PageConfig } from '@/config/pageRegistry'
 import { getSchema } from '@/config/pageSchemas'
 
-const config: PageConfig = {
-  title: '维修工单',
+const route = useRoute()
+const pageMode = computed(() => {
+  const path = route.path
+  if (path.endsWith('/apply')) return 'apply'
+  if (path.endsWith('/handle')) return 'handle'
+  if (path.endsWith('/verify')) return 'verify'
+  return 'all'
+})
+
+const modeTitles: Record<string, string> = {
+  apply: '报修申请',
+  handle: '维修处理',
+  verify: '维修验收',
+  all: '维修工单'
+}
+
+const config = computed<PageConfig>(() => ({
+  title: modeTitles[pageMode.value] ?? '维修工单',
   apiBase: '/repair',
   table: 'repair_workorder',
-  listFilters: [{ key: 'status', label: '状态', dictType: 'wo_status' }]
-}
+  listPageUrl: '/repair/workorder/page',
+  listMode: pageMode.value === 'all' ? undefined : pageMode.value,
+  listFilters: pageMode.value === 'all' ? [{ key: 'status', label: '状态', dictType: 'wo_status' }] : undefined
+}))
+
+const showCreate = computed(() => pageMode.value === 'apply' || pageMode.value === 'all')
 const auth = useAuthStore()
 const crudRef = ref<InstanceType<typeof CrudPage> | null>(null)
 const visible = ref(false)
@@ -180,6 +227,7 @@ const dispatchVisible = ref(false)
 const transferVisible = ref(false)
 const completeVisible = ref(false)
 const subVisible = ref(false)
+const verifyVisible = ref(false)
 const actionForm = reactive({
   engineerId: '' as string,
   startRepair: false,
@@ -187,7 +235,10 @@ const actionForm = reactive({
   skipVerify: false,
   solution: '',
   remark: '',
-  subStatus: 'internal'
+  subStatus: 'internal',
+  verifyResult: 'pass' as 'pass' | 'fail',
+  verifyComment: '',
+  satisfactionRating: 5
 })
 
 const subOptions = [
@@ -214,6 +265,14 @@ const formFields = computed(() => {
 
 function can(action: string) {
   const s = status.value
+  const mode = pageMode.value
+  if (mode === 'apply') {
+    return action === 'cancel' && ['reported', 'dispatching'].includes(s)
+  }
+  if (mode === 'verify') {
+    return action === 'verify' && s === 'pending_verify'
+  }
+  if (mode === 'handle' && action === 'verify') return false
   switch (action) {
     case 'dispatch':
       return ['reported', 'dispatching', 'pending_accept', 'accepted', 'repairing'].includes(s)
@@ -435,6 +494,31 @@ async function doComplete() {
   }
   completeVisible.value = false
   ElMessage.success(actionForm.skipVerify ? '已结案' : '已提交验收')
+  await refresh()
+}
+
+function openVerify() {
+  actionForm.verifyResult = 'pass'
+  actionForm.verifyComment = '验收通过'
+  actionForm.satisfactionRating = 5
+  verifyVisible.value = true
+}
+
+async function submitVerify() {
+  if (!wo.value?.id) return
+  const result = actionForm.verifyResult
+  const { data } = await http.post(`/repair/workorder/${wo.value.id}/verify`, {
+    verifier_id: auth.user?.userId ?? wo.value.reporter_id,
+    verify_result: result,
+    verify_comment: actionForm.verifyComment || (result === 'pass' ? '验收通过' : '验收不通过'),
+    satisfaction_rating: result === 'pass' ? actionForm.satisfactionRating : null
+  })
+  if (data.code !== 0 && data.code !== 200) {
+    ElMessage.error(data.message || '验收失败')
+    return
+  }
+  verifyVisible.value = false
+  ElMessage.success(result === 'pass' ? '验收通过' : '已退回维修')
   await refresh()
 }
 

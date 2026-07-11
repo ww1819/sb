@@ -71,3 +71,67 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('repair_sub_status', 'on_site', '已到场', 'on_site', 5),
 ('repair_sub_status', 'diagnosing', '诊断中', 'diagnosing', 6),
 ('repair_sub_status', 'testing', '调试中', 'testing', 7);
+
+-- ---------- 基础字典模块：补列 ----------
+ALTER TABLE supplier ADD COLUMN IF NOT EXISTS pinyin_code VARCHAR(50);
+ALTER TABLE manufacturer ADD COLUMN IF NOT EXISTS pinyin_code VARCHAR(50);
+ALTER TABLE department ADD COLUMN IF NOT EXISTS pinyin_code VARCHAR(50);
+ALTER TABLE warehouse ADD COLUMN IF NOT EXISTS warehouse_type VARCHAR(30) DEFAULT 'device';
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS asset_category_id UUID;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS finance_category_id UUID;
+
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('warehouse_type', 'device', '设备库', 'device', 1),
+('warehouse_type', 'spare', '备件库', 'spare', 2),
+('warehouse_type', 'consumable', '耗材库', 'consumable', 3),
+('unit_type', 'quantity', '数量', 'quantity', 1),
+('unit_type', 'weight', '重量', 'weight', 2),
+('unit_type', 'volume', '体积', 'volume', 3)
+ON CONFLICT (dict_type, dict_code) DO NOTHING;
+
+INSERT INTO unit_dict (unit_code, unit_name, unit_type, sort_order) VALUES
+('pcs', '个', 'quantity', 1),
+('set', '套', 'quantity', 2),
+('box', '盒', 'quantity', 3),
+('piece', '件', 'quantity', 4),
+('unit', '台', 'quantity', 5),
+('kg', '千克', 'weight', 10),
+('g', '克', 'weight', 11),
+('l', '升', 'volume', 20),
+('ml', '毫升', 'volume', 21)
+ON CONFLICT (unit_code) DO NOTHING;
+
+-- ---------- 维修管理模块：配件档案补列 ----------
+ALTER TABLE spare_part ADD COLUMN IF NOT EXISTS model VARCHAR(100);
+ALTER TABLE spare_part ADD COLUMN IF NOT EXISTS unit_id UUID;
+ALTER TABLE spare_part ADD COLUMN IF NOT EXISTS manufacturer_id UUID;
+ALTER TABLE spare_part ADD COLUMN IF NOT EXISTS warehouse_id UUID;
+ALTER TABLE spare_part_transaction ADD COLUMN IF NOT EXISTS ref_no VARCHAR(50);
+ALTER TABLE spare_part_transaction ADD COLUMN IF NOT EXISTS remark TEXT;
+
+-- ---------- 资产台账模块：设备档案补列 ----------
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS specification VARCHAR(200);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS registration_no VARCHAR(100);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS production_date DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS service_life_years INTEGER;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS calibration_period_days INTEGER;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS last_calibration_date DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS next_calibration_date DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS service_expiry_date DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS extension_data JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS warehouse_id UUID;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_metrology BOOLEAN DEFAULT FALSE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_maintain_device BOOLEAN DEFAULT FALSE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_inspection_device BOOLEAN DEFAULT FALSE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS pinyin_code VARCHAR(50);
+
+UPDATE medical_device SET extension_data = '{}'::jsonb WHERE extension_data IS NULL;
+
+-- ---------- 库房管理模块：补列 ----------
+ALTER TABLE device_entry ADD COLUMN IF NOT EXISTS warehouse_id UUID;
+ALTER TABLE device_outbound ADD COLUMN IF NOT EXISTS warehouse_id UUID;
+ALTER TABLE device_outbound ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'draft';
+ALTER TABLE device_outbound ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20) DEFAULT 'draft';
+ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS from_warehouse_id UUID;
+ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS to_warehouse_id UUID;
+ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS warehouse_id UUID;

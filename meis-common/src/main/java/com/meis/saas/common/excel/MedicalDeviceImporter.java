@@ -14,8 +14,8 @@ public final class MedicalDeviceImporter {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private static final Set<String> UUID_COLUMNS = Set.of(
-            "id", "category_id", "manufacturer_id", "supplier_id", "dept_id", "campus_id",
-            "building_id", "contract_id", "created_by", "updated_by"
+            "id", "category_id", "asset_category_id", "finance_category_id", "manufacturer_id", "supplier_id",
+            "dept_id", "campus_id", "building_id", "warehouse_id", "contract_id", "created_by", "updated_by"
     );
     private static final Set<String> DATE_COLUMNS = Set.of(
             "purchase_date", "acceptance_date", "enable_date", "production_date", "warranty_end_date",
@@ -55,6 +55,8 @@ public final class MedicalDeviceImporter {
                 Integer serviceLifeYears = null, calibrationPeriodDays = null;
                 Boolean active = true;
                 UUID categoryId = null, manufacturerId = null, supplierId = null, deptId = null, campusId = null;
+                UUID assetCategoryId = null, financeCategoryId = null, warehouseId = null;
+                Boolean isMetrology = null, isMaintainDevice = null, isInspectionDevice = null;
 
                 for (ImportFieldDef field : fields) {
                     String val = raw.get(field.getFieldKey());
@@ -76,6 +78,9 @@ public final class MedicalDeviceImporter {
                         case "serial_number" -> serialNumber = ImportValueParser.blankToNull(val);
                         case "financial_code" -> financialCode = ImportValueParser.blankToNull(val);
                         case "category_code" -> categoryId = resolver.resolveCategoryByCode(val);
+                        case "asset_category_code" -> assetCategoryId = resolver.resolveAssetCategoryByCode(val);
+                        case "finance_category_code" -> financeCategoryId = resolver.resolveFinanceCategoryByCode(val);
+                        case "warehouse_code" -> warehouseId = resolver.resolveWarehouseByCode(val);
                         case "campus_name" -> campusId = resolver.resolveCampusByName(val);
                         case "original_value" -> originalValue = ImportValueParser.parseDouble(val);
                         case "net_value" -> netValue = ImportValueParser.parseDouble(val);
@@ -90,6 +95,9 @@ public final class MedicalDeviceImporter {
                         case "last_calibration_date" -> lastCalibrationDate = ImportValueParser.blankToNull(val);
                         case "remark" -> remark = ImportValueParser.blankToNull(val);
                         case "is_active" -> active = ImportValueParser.parseBoolean(val);
+                        case "is_metrology" -> isMetrology = ImportValueParser.parseBoolean(val);
+                        case "is_maintain_device" -> isMaintainDevice = ImportValueParser.parseBoolean(val);
+                        case "is_inspection_device" -> isInspectionDevice = ImportValueParser.parseBoolean(val);
                         default -> {
                             String col = field.effectiveColumn();
                             if (col != null && isKnownColumn(col)) {
@@ -128,6 +136,9 @@ public final class MedicalDeviceImporter {
                 putValue(row, extension, dbColumns, "serial_number", serialNumber);
                 putValue(row, extension, dbColumns, "financial_code", financialCode);
                 putValue(row, extension, dbColumns, "category_id", categoryId);
+                putValue(row, extension, dbColumns, "asset_category_id", assetCategoryId);
+                putValue(row, extension, dbColumns, "finance_category_id", financeCategoryId);
+                putValue(row, extension, dbColumns, "warehouse_id", warehouseId);
                 putValue(row, extension, dbColumns, "manufacturer_id", manufacturerId);
                 putValue(row, extension, dbColumns, "supplier_id", supplierId);
                 putValue(row, extension, dbColumns, "dept_id", deptId);
@@ -147,6 +158,9 @@ public final class MedicalDeviceImporter {
                 putValue(row, extension, dbColumns, "service_expiry_date", serviceExpiryDate);
                 putValue(row, extension, dbColumns, "remark", remark);
                 putValue(row, extension, dbColumns, "is_active", active);
+                putValue(row, extension, dbColumns, "is_metrology", isMetrology);
+                putValue(row, extension, dbColumns, "is_maintain_device", isMaintainDevice);
+                putValue(row, extension, dbColumns, "is_inspection_device", isInspectionDevice);
                 if (dbColumns.contains("extension_data")) {
                     row.put("extension_data", toJson(extension));
                 }

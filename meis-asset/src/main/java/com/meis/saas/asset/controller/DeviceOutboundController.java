@@ -2,6 +2,8 @@ package com.meis.saas.asset.controller;
 
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.page.PageQuery;
+import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.workflow.ApprovalInstanceService;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +19,36 @@ import java.util.*;
 public class DeviceOutboundController {
     private final JdbcTemplate jdbc;
     private final ApprovalInstanceService approvalService;
+
+    @GetMapping("/page")
+    public Result<PageResult<Map<String, Object>>> page(PageQuery query,
+            @RequestParam(required = false) String doc_status) {
+        StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        List<Object> args = new ArrayList<>();
+        if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
+            where.append(" AND (o.outbound_no ILIKE ? OR d.dept_name ILIKE ?) ");
+            String kw = "%" + query.getKeyword() + "%";
+            args.add(kw);
+            args.add(kw);
+        }
+        if (doc_status != null && !doc_status.isBlank()) {
+            where.append(" AND o.doc_status = ? ");
+            args.add(doc_status);
+        }
+        String from = """
+            FROM device_outbound o
+            LEFT JOIN department d ON d.id = o.dept_id
+            LEFT JOIN warehouse w ON w.id = o.warehouse_id
+            """;
+        Long total = jdbc.queryForObject("SELECT COUNT(*) " + from + where, Long.class, args.toArray());
+        List<Object> pageArgs = new ArrayList<>(args);
+        pageArgs.add(query.limit());
+        pageArgs.add(query.offset());
+        var rows = jdbc.queryForList("""
+            SELECT o.*, d.dept_name, w.warehouse_name
+            """ + from + where + " ORDER BY o.created_at DESC LIMIT ? OFFSET ?", pageArgs.toArray());
+        return Result.ok(PageResult.of(rows, total != null ? total : 0, query.getPage(), query.getSize()));
+    }
 
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
@@ -34,9 +66,22 @@ public class DeviceOutboundController {
         UUID id = body.containsKey("id") ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
         boolean exists = !jdbc.queryForList("SELECT 1 FROM device_outbound WHERE id = ?::uuid", id).isEmpty();
         if (!exists) {
-            jdbc.update("INSERT INTO device_outbound (id, outbound_no, dept_id, receiver_id, outbound_date, purpose, doc_status) VALUES (?::uuid,?,?,?::uuid,?::uuid,?,?,'draft')",
+            Object receiverId = body.get("receiver_id") != null ? body.get("receiver_id") : body.get("recipient_id");
+            jdbc.update("""
+                INSERT INTO device_outbound (id, outbound_no, dept_id, receiver_id, warehouse_id, outbound_date, purpose, doc_status, status)
+                VALUES (?::uuid,?,?,?::uuid,?::uuid,?,?,'draft','draft')
+                """,
                     id, body.getOrDefault("outbound_no", "OUT" + System.currentTimeMillis()),
-                    body.get("dept_id"), body.get("receiver_id"), body.get("outbound_date"), body.get("purpose"));
+                    body.get("dept_id"), receiverId, body.get("warehouse_id"),
+                    body.get("outbound_date"), body.get("purpose"));
+        } else {
+            Object receiverId = body.get("receiver_id") != null ? body.get("receiver_id") : body.get("recipient_id");
+            jdbc.update("""
+                UPDATE device_outbound SET dept_id=?::uuid, receiver_id=?::uuid, warehouse_id=?::uuid,
+                outbound_date=?, purpose=?, updated_at=NOW() WHERE id=?::uuid
+                """,
+                    body.get("dept_id"), receiverId, body.get("warehouse_id"),
+                    body.get("outbound_date"), body.get("purpose"), id);
         }
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> items = (List<Map<String, Object>>) body.getOrDefault("items", List.of());
@@ -64,10 +109,13 @@ public class DeviceOutboundController {
         var items = jdbc.queryForList("SELECT device_id FROM device_outbound_item WHERE outbound_id = ?::uuid", id);
         for (Map<String, Object> item : items) {
             if (item.get("device_id") != null) {
-                jdbc.update("UPDATE medical_device SET device_status = 'in_use', updated_at = NOW() WHERE id = ?::uuid", item.get("device_id"));
+                jdbc.update("""
+                    UPDATE medical_device SET device_status = 'in_use', warehouse_id = NULL, updated_at = NOW()
+                    WHERE id = ?::uuid
+                    """, item.get("device_id"));
             }
         }
-        jdbc.update("UPDATE device_outbound SET doc_status = 'issued', updated_at = NOW() WHERE id = ?::uuid", id);
+        jdbc.update("UPDATE device_outbound SET doc_status = 'issued', status = 'issued', updated_at = NOW() WHERE id = ?::uuid", id);
         return get(id);
     }
 }

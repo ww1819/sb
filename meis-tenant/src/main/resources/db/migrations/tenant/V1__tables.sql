@@ -287,6 +287,77 @@ COMMENT ON COLUMN manufacturer.created_at IS '创建时间';
 COMMENT ON COLUMN manufacturer.updated_at IS '更新时间';
 COMMENT ON COLUMN manufacturer.pinyin_code IS '拼音简码（检索）';
 
+-- 2.4 资产分类（院内）
+CREATE TABLE IF NOT EXISTS asset_category (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    category_code VARCHAR(50) UNIQUE NOT NULL,
+    category_name VARCHAR(200) NOT NULL,
+    parent_id UUID REFERENCES asset_category(id),
+    depreciation_years INTEGER,
+    residual_rate DECIMAL(5,2),
+    sort_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE asset_category IS '资产分类';
+COMMENT ON COLUMN asset_category.id IS '主键';
+COMMENT ON COLUMN asset_category.category_code IS '资产分类编码';
+COMMENT ON COLUMN asset_category.category_name IS '资产分类名称';
+COMMENT ON COLUMN asset_category.parent_id IS '上级分类';
+COMMENT ON COLUMN asset_category.depreciation_years IS '折旧年限';
+COMMENT ON COLUMN asset_category.residual_rate IS '残值率(%)';
+COMMENT ON COLUMN asset_category.sort_order IS '排序号';
+COMMENT ON COLUMN asset_category.is_active IS '是否启用';
+COMMENT ON COLUMN asset_category.created_at IS '创建时间';
+COMMENT ON COLUMN asset_category.updated_at IS '更新时间';
+
+-- 2.5 财务分类
+CREATE TABLE IF NOT EXISTS finance_category (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    finance_code VARCHAR(50) UNIQUE NOT NULL,
+    finance_name VARCHAR(200) NOT NULL,
+    parent_id UUID REFERENCES finance_category(id),
+    account_subject VARCHAR(50),
+    fund_source VARCHAR(50),
+    sort_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE finance_category IS '财务分类';
+COMMENT ON COLUMN finance_category.id IS '主键';
+COMMENT ON COLUMN finance_category.finance_code IS '财务分类编码';
+COMMENT ON COLUMN finance_category.finance_name IS '财务分类名称';
+COMMENT ON COLUMN finance_category.parent_id IS '上级分类';
+COMMENT ON COLUMN finance_category.account_subject IS '会计科目';
+COMMENT ON COLUMN finance_category.fund_source IS '资金来源';
+COMMENT ON COLUMN finance_category.sort_order IS '排序号';
+COMMENT ON COLUMN finance_category.is_active IS '是否启用';
+COMMENT ON COLUMN finance_category.created_at IS '创建时间';
+COMMENT ON COLUMN finance_category.updated_at IS '更新时间';
+
+-- 2.6 计量单位
+CREATE TABLE IF NOT EXISTS unit_dict (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    unit_code VARCHAR(20) UNIQUE NOT NULL,
+    unit_name VARCHAR(50) NOT NULL,
+    unit_type VARCHAR(20) DEFAULT 'quantity',
+    sort_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE unit_dict IS '计量单位';
+COMMENT ON COLUMN unit_dict.id IS '主键';
+COMMENT ON COLUMN unit_dict.unit_code IS '单位编码';
+COMMENT ON COLUMN unit_dict.unit_name IS '单位名称';
+COMMENT ON COLUMN unit_dict.unit_type IS '单位类型';
+COMMENT ON COLUMN unit_dict.sort_order IS '排序号';
+COMMENT ON COLUMN unit_dict.is_active IS '是否启用';
+COMMENT ON COLUMN unit_dict.created_at IS '创建时间';
+COMMENT ON COLUMN unit_dict.updated_at IS '更新时间';
+
 -- ================================================================================
 -- 3. 采购管理模块
 -- ================================================================================
@@ -547,6 +618,8 @@ CREATE TABLE medical_device (
     model VARCHAR(100),
     serial_number VARCHAR(100),
     category_id UUID REFERENCES medical_device_category(id),
+    asset_category_id UUID REFERENCES asset_category(id),
+    finance_category_id UUID REFERENCES finance_category(id),
     -- 来源信息
     manufacturer_id UUID REFERENCES manufacturer(id),
     supplier_id UUID REFERENCES supplier(id),
@@ -563,6 +636,7 @@ CREATE TABLE medical_device (
     campus_id UUID REFERENCES campus(id),
     building_id UUID REFERENCES building(id),
     dept_id UUID REFERENCES department(id),
+    warehouse_id UUID REFERENCES warehouse(id),
     location_detail VARCHAR(200),
     -- 时间信息
     purchase_date DATE,
@@ -574,6 +648,10 @@ CREATE TABLE medical_device (
     risk_level VARCHAR(20),
     is_life_support BOOLEAN DEFAULT FALSE,
     is_emergency BOOLEAN DEFAULT FALSE,
+    is_metrology BOOLEAN DEFAULT FALSE,
+    is_maintain_device BOOLEAN DEFAULT FALSE,
+    is_inspection_device BOOLEAN DEFAULT FALSE,
+    pinyin_code VARCHAR(50),
     -- 二维码标签
     qr_code_url VARCHAR(500),
     label_printed BOOLEAN DEFAULT FALSE,
@@ -697,7 +775,8 @@ CREATE TABLE device_entry (
     project_id UUID REFERENCES purchase_project(id),
     plan_id UUID REFERENCES purchase_plan(id),
     trace_no VARCHAR(60),
-    business_chain_no VARCHAR(40)
+    business_chain_no VARCHAR(40),
+    warehouse_id UUID REFERENCES warehouse(id)
 );
 COMMENT ON TABLE device_entry IS '设备入库记录表';
 COMMENT ON COLUMN device_entry.id IS '主键';
@@ -766,6 +845,8 @@ CREATE TABLE asset_transfer (
     to_dept_id UUID REFERENCES department(id),
     from_campus_id UUID REFERENCES campus(id),
     to_campus_id UUID REFERENCES campus(id),
+    from_warehouse_id UUID REFERENCES warehouse(id),
+    to_warehouse_id UUID REFERENCES warehouse(id),
     applicant_id UUID REFERENCES sys_user(id),
     approver_id UUID REFERENCES sys_user(id),
     approved_at TIMESTAMP WITH TIME ZONE,
@@ -806,6 +887,7 @@ CREATE TABLE inventory_check (
     check_type VARCHAR(20) DEFAULT 'annual',
     campus_id UUID REFERENCES campus(id),
     dept_id UUID REFERENCES department(id),
+    warehouse_id UUID REFERENCES warehouse(id),
     start_date DATE,
     end_date DATE,
     actual_start_at TIMESTAMP WITH TIME ZONE,
@@ -1128,7 +1210,11 @@ CREATE TABLE spare_part (
     specification TEXT,
     applicable_devices JSONB,
     supplier_id UUID REFERENCES supplier(id),
+    manufacturer_id UUID REFERENCES manufacturer(id),
+    unit_id UUID REFERENCES unit_dict(id),
+    model VARCHAR(100),
     unit_price DECIMAL(10,2),
+    warehouse_id UUID REFERENCES warehouse(id),
     stock_quantity INTEGER DEFAULT 0,
     min_stock INTEGER,
     max_stock INTEGER,
@@ -1180,13 +1266,31 @@ COMMENT ON COLUMN spare_part_usage.operator_id IS '关联操作人';
 -- ================================================================================
 -- 6. 保养管理模块
 -- ================================================================================
+-- 6.0 保养级别表
+CREATE TABLE maintenance_level (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    level_code VARCHAR(30) NOT NULL UNIQUE,
+    level_name VARCHAR(100) NOT NULL,
+    sort_order INTEGER DEFAULT 0,
+    description TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE maintenance_level IS '保养级别表';
+COMMENT ON COLUMN maintenance_level.level_code IS '级别编码';
+COMMENT ON COLUMN maintenance_level.level_name IS '级别名称';
+
 -- 6.1 保养模板表
 CREATE TABLE maintenance_template (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    template_code VARCHAR(30),
     template_name VARCHAR(200) NOT NULL,
     maintenance_level VARCHAR(20) NOT NULL,
+    maintenance_level_id UUID REFERENCES maintenance_level(id),
     category_id UUID REFERENCES medical_device_category(id),
-    items JSONB NOT NULL,
+    items JSONB NOT NULL DEFAULT '[]'::jsonb,
+    description TEXT,
     estimated_duration INTEGER,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -1203,6 +1307,23 @@ COMMENT ON COLUMN maintenance_template.is_active IS '是否启用';
 COMMENT ON COLUMN maintenance_template.created_at IS '创建时间';
 COMMENT ON COLUMN maintenance_template.updated_at IS '更新时间';
 
+-- 6.1.1 保养模板内容项
+CREATE TABLE maintenance_template_item (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    template_id UUID NOT NULL REFERENCES maintenance_template(id) ON DELETE CASCADE,
+    item_code VARCHAR(30),
+    item_name VARCHAR(200) NOT NULL,
+    item_content TEXT,
+    standard_value VARCHAR(200),
+    check_method VARCHAR(200),
+    sort_order INTEGER DEFAULT 0,
+    is_required BOOLEAN DEFAULT TRUE,
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE maintenance_template_item IS '保养模板内容项';
+
 -- 6.2 保养计划表
 CREATE TABLE maintenance_plan (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -1212,10 +1333,15 @@ CREATE TABLE maintenance_plan (
     maintenance_level VARCHAR(20) NOT NULL,
     cycle_type VARCHAR(20) NOT NULL,
     cycle_value INTEGER,
+    cycle_days INTEGER,
     next_due_date DATE NOT NULL,
     reminder_days_before INTEGER DEFAULT 7,
     assigned_engineer_id UUID REFERENCES engineer(id),
     status VARCHAR(20) DEFAULT 'active',
+    approval_status VARCHAR(20) DEFAULT 'draft',
+    created_by UUID REFERENCES sys_user(id),
+    approved_by UUID REFERENCES sys_user(id),
+    approved_at TIMESTAMP WITH TIME ZONE,
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -1294,6 +1420,56 @@ COMMENT ON COLUMN maintenance_record.status IS '状态';
 COMMENT ON COLUMN maintenance_record.remark IS '备注';
 COMMENT ON COLUMN maintenance_record.created_at IS '创建时间';
 COMMENT ON COLUMN maintenance_record.updated_at IS '更新时间';
+
+-- 6.4 保养执行单
+CREATE TABLE maintenance_execution (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    execution_no VARCHAR(30) UNIQUE NOT NULL,
+    plan_id UUID REFERENCES maintenance_plan(id),
+    template_id UUID REFERENCES maintenance_template(id),
+    maintenance_level_id UUID REFERENCES maintenance_level(id),
+    planned_date DATE,
+    assigned_engineer_id UUID REFERENCES engineer(id),
+    executor_id UUID REFERENCES engineer(id),
+    execute_start_time TIMESTAMP WITH TIME ZONE,
+    execute_end_time TIMESTAMP WITH TIME ZONE,
+    status VARCHAR(20) DEFAULT 'pending',
+    created_by UUID REFERENCES sys_user(id),
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE maintenance_execution IS '保养执行单';
+
+CREATE TABLE maintenance_execution_item (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    execution_id UUID NOT NULL REFERENCES maintenance_execution(id) ON DELETE CASCADE,
+    device_id UUID REFERENCES medical_device(id),
+    device_code VARCHAR(20),
+    device_name VARCHAR(200),
+    dept_id UUID REFERENCES department(id),
+    plan_id UUID REFERENCES maintenance_plan(id),
+    status VARCHAR(20) DEFAULT 'pending',
+    overall_result VARCHAR(20),
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE maintenance_execution_item IS '保养执行明细（按设备）';
+
+CREATE TABLE maintenance_execution_result (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    execution_item_id UUID NOT NULL REFERENCES maintenance_execution_item(id) ON DELETE CASCADE,
+    template_item_id UUID REFERENCES maintenance_template_item(id),
+    item_name VARCHAR(200) NOT NULL,
+    item_content TEXT,
+    result_value VARCHAR(500),
+    result_status VARCHAR(20) DEFAULT 'pending',
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE maintenance_execution_result IS '保养执行结果（按内容项）';
 
 -- ================================================================================
 -- 7. 质量控制模块
@@ -1439,6 +1615,143 @@ COMMENT ON COLUMN metrology_record.status IS '状态';
 COMMENT ON COLUMN metrology_record.remark IS '备注';
 COMMENT ON COLUMN metrology_record.created_at IS '创建时间';
 COMMENT ON COLUMN metrology_record.updated_at IS '更新时间';
+
+-- 7.3.1 计量类别
+CREATE TABLE metrology_category (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    category_code VARCHAR(30) NOT NULL UNIQUE,
+    category_name VARCHAR(100) NOT NULL,
+    sort_order INTEGER DEFAULT 0,
+    description TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE metrology_category IS '计量类别表';
+
+-- 7.3.2 检定机构
+CREATE TABLE metrology_org (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    org_code VARCHAR(30) NOT NULL UNIQUE,
+    org_name VARCHAR(200) NOT NULL,
+    qualification_no VARCHAR(100),
+    contact_person VARCHAR(50),
+    contact_phone VARCHAR(30),
+    address VARCHAR(300),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE metrology_org IS '检定机构表';
+
+-- 7.3.3 计量模板
+CREATE TABLE metrology_template (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    template_code VARCHAR(30),
+    template_name VARCHAR(200) NOT NULL,
+    category_id UUID REFERENCES metrology_category(id),
+    description TEXT,
+    estimated_duration INTEGER,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE metrology_template IS '计量模板表';
+
+CREATE TABLE metrology_template_item (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    template_id UUID NOT NULL REFERENCES metrology_template(id) ON DELETE CASCADE,
+    item_code VARCHAR(30),
+    item_name VARCHAR(200) NOT NULL,
+    item_content TEXT,
+    standard_value VARCHAR(200),
+    tolerance_range VARCHAR(100),
+    sort_order INTEGER DEFAULT 0,
+    is_required BOOLEAN DEFAULT TRUE,
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE metrology_template_item IS '计量模板内容项';
+
+-- 7.3.4 计量计划
+CREATE TABLE metrology_plan (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    plan_code VARCHAR(30),
+    plan_name VARCHAR(200) NOT NULL,
+    device_id UUID REFERENCES medical_device(id),
+    template_id UUID REFERENCES metrology_template(id),
+    category_id UUID REFERENCES metrology_category(id),
+    org_id UUID REFERENCES metrology_org(id),
+    cycle_days INTEGER,
+    next_due_date DATE,
+    last_calibrated_at DATE,
+    assigned_inspector_id UUID REFERENCES sys_user(id),
+    approval_status VARCHAR(20) DEFAULT 'draft',
+    created_by UUID REFERENCES sys_user(id),
+    approved_by UUID REFERENCES sys_user(id),
+    approved_at TIMESTAMP WITH TIME ZONE,
+    status VARCHAR(20) DEFAULT 'active',
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE metrology_plan IS '计量计划表';
+
+-- 7.3.5 计量执行
+CREATE TABLE metrology_execution (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    execution_no VARCHAR(30) UNIQUE NOT NULL,
+    plan_id UUID REFERENCES metrology_plan(id),
+    template_id UUID REFERENCES metrology_template(id),
+    category_id UUID REFERENCES metrology_category(id),
+    org_id UUID REFERENCES metrology_org(id),
+    planned_date DATE,
+    assigned_inspector_id UUID REFERENCES sys_user(id),
+    executor_id UUID REFERENCES sys_user(id),
+    execute_start_time TIMESTAMP WITH TIME ZONE,
+    execute_end_time TIMESTAMP WITH TIME ZONE,
+    status VARCHAR(20) DEFAULT 'pending',
+    created_by UUID REFERENCES sys_user(id),
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE metrology_execution IS '计量执行单';
+
+CREATE TABLE metrology_execution_item (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    execution_id UUID NOT NULL REFERENCES metrology_execution(id) ON DELETE CASCADE,
+    device_id UUID REFERENCES medical_device(id),
+    device_code VARCHAR(20),
+    device_name VARCHAR(200),
+    dept_id UUID REFERENCES department(id),
+    plan_id UUID REFERENCES metrology_plan(id),
+    certificate_no VARCHAR(100),
+    certificate_url VARCHAR(500),
+    cost DECIMAL(10,2),
+    measurement_data JSONB DEFAULT '{}'::jsonb,
+    status VARCHAR(20) DEFAULT 'pending',
+    overall_result VARCHAR(20),
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE metrology_execution_item IS '计量执行明细（按设备）';
+
+CREATE TABLE metrology_execution_result (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    execution_item_id UUID NOT NULL REFERENCES metrology_execution_item(id) ON DELETE CASCADE,
+    template_item_id UUID REFERENCES metrology_template_item(id),
+    item_name VARCHAR(200) NOT NULL,
+    item_content TEXT,
+    result_value VARCHAR(500),
+    result_status VARCHAR(20) DEFAULT 'pending',
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE metrology_execution_result IS '计量执行结果（按内容项）';
 
 -- 7.4 性能检测表
 CREATE TABLE performance_test (
@@ -1757,6 +2070,211 @@ COMMENT ON COLUMN leased_device.remark IS '备注';
 COMMENT ON COLUMN leased_device.created_at IS '创建时间';
 COMMENT ON COLUMN leased_device.updated_at IS '更新时间';
 
+-- 9.5 公用设备池
+CREATE TABLE shared_device (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    device_id UUID REFERENCES medical_device(id) UNIQUE,
+    device_code VARCHAR(20),
+    device_name VARCHAR(200),
+    owner_dept_id UUID REFERENCES department(id),
+    location VARCHAR(200),
+    fee_standard DECIMAL(12,2) DEFAULT 0,
+    availability_status VARCHAR(20) DEFAULT 'available',
+    is_active BOOLEAN DEFAULT TRUE,
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE shared_device IS '公用设备池表';
+COMMENT ON COLUMN shared_device.device_id IS '关联设备';
+COMMENT ON COLUMN shared_device.owner_dept_id IS '归属科室';
+COMMENT ON COLUMN shared_device.fee_standard IS '收费标准(元/天)';
+COMMENT ON COLUMN shared_device.availability_status IS '可用状态';
+
+-- 9.6 公用设备借调单
+CREATE TABLE shared_device_loan (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    loan_no VARCHAR(30) UNIQUE NOT NULL,
+    device_id UUID REFERENCES medical_device(id),
+    shared_device_id UUID REFERENCES shared_device(id),
+    device_code VARCHAR(20),
+    device_name VARCHAR(200),
+    from_dept_id UUID REFERENCES department(id),
+    to_dept_id UUID REFERENCES department(id),
+    applicant_id UUID REFERENCES sys_user(id),
+    loan_start DATE,
+    loan_end DATE,
+    fee_standard DECIMAL(12,2),
+    reason TEXT,
+    status VARCHAR(20) DEFAULT 'draft',
+    approval_status VARCHAR(20) DEFAULT 'draft',
+    approved_by UUID REFERENCES sys_user(id),
+    approved_at TIMESTAMP WITH TIME ZONE,
+    loan_time TIMESTAMP WITH TIME ZONE,
+    return_time TIMESTAMP WITH TIME ZONE,
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE shared_device_loan IS '公用设备借调单';
+COMMENT ON COLUMN shared_device_loan.loan_no IS '借调单号';
+COMMENT ON COLUMN shared_device_loan.status IS '单据状态';
+
+-- 9.7 公用设备归还单
+CREATE TABLE shared_device_return (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    return_no VARCHAR(30) UNIQUE NOT NULL,
+    loan_id UUID REFERENCES shared_device_loan(id),
+    device_id UUID REFERENCES medical_device(id),
+    return_date DATE,
+    condition_desc TEXT,
+    applicant_id UUID REFERENCES sys_user(id),
+    status VARCHAR(20) DEFAULT 'pending',
+    approval_status VARCHAR(20) DEFAULT 'pending',
+    approved_by UUID REFERENCES sys_user(id),
+    approved_at TIMESTAMP WITH TIME ZONE,
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE shared_device_return IS '公用设备归还单';
+
+-- 9.8 公用设备借调收费
+CREATE TABLE shared_device_fee (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    fee_no VARCHAR(30) UNIQUE NOT NULL,
+    loan_id UUID REFERENCES shared_device_loan(id),
+    fee_amount DECIMAL(12,2) NOT NULL,
+    fee_date DATE NOT NULL,
+    paid_status VARCHAR(20) DEFAULT 'unpaid',
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE shared_device_fee IS '公用设备借调收费单';
+
+-- 9.9 预防性维护（PM）模块
+CREATE TABLE pm_type (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    type_code VARCHAR(30) NOT NULL UNIQUE,
+    type_name VARCHAR(100) NOT NULL,
+    risk_level VARCHAR(20) DEFAULT 'medium',
+    sort_order INTEGER DEFAULT 0,
+    description TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE pm_type IS '预防性维护类型表';
+
+CREATE TABLE pm_template (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    template_code VARCHAR(30),
+    template_name VARCHAR(200) NOT NULL,
+    pm_type VARCHAR(30),
+    pm_type_id UUID REFERENCES pm_type(id),
+    category_id UUID REFERENCES medical_device_category(id),
+    items JSONB NOT NULL DEFAULT '[]'::jsonb,
+    description TEXT,
+    estimated_duration INTEGER,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE pm_template IS '预防性维护模板表';
+
+CREATE TABLE pm_template_item (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    template_id UUID NOT NULL REFERENCES pm_template(id) ON DELETE CASCADE,
+    item_code VARCHAR(30),
+    item_name VARCHAR(200) NOT NULL,
+    item_content TEXT,
+    standard_value VARCHAR(200),
+    check_method VARCHAR(200),
+    sort_order INTEGER DEFAULT 0,
+    is_required BOOLEAN DEFAULT TRUE,
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE pm_template_item IS '预防性维护模板内容项';
+
+CREATE TABLE pm_plan (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    plan_code VARCHAR(30),
+    plan_name VARCHAR(200),
+    device_id UUID REFERENCES medical_device(id),
+    template_id UUID REFERENCES pm_template(id),
+    pm_type VARCHAR(30),
+    pm_type_id UUID REFERENCES pm_type(id),
+    cycle_type VARCHAR(20) NOT NULL DEFAULT 'month',
+    cycle_value INTEGER,
+    cycle_days INTEGER,
+    next_due_date DATE NOT NULL,
+    last_maintained_at DATE,
+    reminder_days_before INTEGER DEFAULT 7,
+    assigned_engineer_id UUID REFERENCES engineer(id),
+    dept_id UUID REFERENCES department(id),
+    status VARCHAR(20) DEFAULT 'active',
+    approval_status VARCHAR(20) DEFAULT 'draft',
+    created_by UUID REFERENCES sys_user(id),
+    approved_by UUID REFERENCES sys_user(id),
+    approved_at TIMESTAMP WITH TIME ZONE,
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE pm_plan IS '预防性维护计划表';
+
+CREATE TABLE pm_execution (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    execution_no VARCHAR(30) UNIQUE NOT NULL,
+    plan_id UUID REFERENCES pm_plan(id),
+    template_id UUID REFERENCES pm_template(id),
+    pm_type_id UUID REFERENCES pm_type(id),
+    planned_date DATE,
+    assigned_engineer_id UUID REFERENCES engineer(id),
+    executor_id UUID REFERENCES engineer(id),
+    execute_start_time TIMESTAMP WITH TIME ZONE,
+    execute_end_time TIMESTAMP WITH TIME ZONE,
+    status VARCHAR(20) DEFAULT 'pending',
+    created_by UUID REFERENCES sys_user(id),
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE pm_execution IS '预防性维护执行单';
+
+CREATE TABLE pm_execution_item (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    execution_id UUID NOT NULL REFERENCES pm_execution(id) ON DELETE CASCADE,
+    device_id UUID REFERENCES medical_device(id),
+    device_code VARCHAR(20),
+    device_name VARCHAR(200),
+    dept_id UUID REFERENCES department(id),
+    plan_id UUID REFERENCES pm_plan(id),
+    status VARCHAR(20) DEFAULT 'pending',
+    overall_result VARCHAR(20),
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE pm_execution_item IS '预防性维护执行明细';
+
+CREATE TABLE pm_execution_result (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    execution_item_id UUID NOT NULL REFERENCES pm_execution_item(id) ON DELETE CASCADE,
+    template_item_id UUID REFERENCES pm_template_item(id),
+    item_name VARCHAR(200) NOT NULL,
+    item_content TEXT,
+    result_value VARCHAR(500),
+    result_status VARCHAR(20) DEFAULT 'pending',
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE pm_execution_result IS '预防性维护执行结果';
+
 -- ================================================================================
 -- 10. 效益分析模块
 -- ================================================================================
@@ -1863,6 +2381,92 @@ COMMENT ON COLUMN device_benefit_summary.benefit_level IS 'benefit level';
 COMMENT ON COLUMN device_benefit_summary.benefit_score IS 'benefit score';
 COMMENT ON COLUMN device_benefit_summary.created_at IS '创建时间';
 COMMENT ON COLUMN device_benefit_summary.updated_at IS '更新时间';
+
+-- 10.4 HIS收费对照表
+CREATE TABLE benefit_mapping (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    device_id UUID NOT NULL REFERENCES medical_device(id),
+    device_code VARCHAR(20),
+    device_name VARCHAR(200),
+    his_item_code VARCHAR(50),
+    his_item_name VARCHAR(200),
+    pacs_modality VARCHAR(50),
+    charge_code VARCHAR(50),
+    charge_name VARCHAR(200),
+    unit_price DECIMAL(12,2) DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE benefit_mapping IS 'HIS收费项目与设备对照表';
+
+-- ================================================================================
+-- 10.5 电流监测模块
+-- ================================================================================
+CREATE TABLE power_base_station (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    station_code VARCHAR(50) NOT NULL UNIQUE,
+    station_name VARCHAR(200) NOT NULL,
+    campus_id UUID REFERENCES campus(id),
+    location VARCHAR(200),
+    ip_address VARCHAR(50),
+    protocol_type VARCHAR(30) DEFAULT 'mqtt',
+    status VARCHAR(20) DEFAULT 'online',
+    is_active BOOLEAN DEFAULT TRUE,
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE power_base_station IS '电流监测基站表';
+
+CREATE TABLE power_tag (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tag_code VARCHAR(50) NOT NULL UNIQUE,
+    tag_name VARCHAR(200) NOT NULL,
+    device_id UUID REFERENCES medical_device(id),
+    station_id UUID REFERENCES power_base_station(id),
+    rated_power DECIMAL(10,2),
+    install_date DATE,
+    is_active BOOLEAN DEFAULT TRUE,
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE power_tag IS '电流监测标签表';
+
+CREATE TABLE power_device_status (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    device_id UUID REFERENCES medical_device(id),
+    tag_id UUID REFERENCES power_tag(id) UNIQUE,
+    device_code VARCHAR(20),
+    device_name VARCHAR(200),
+    current_amp DECIMAL(10,3),
+    voltage DECIMAL(10,2),
+    power_watt DECIMAL(10,2),
+    work_state VARCHAR(20) DEFAULT 'offline',
+    collected_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE power_device_status IS '设备电流实时状态表';
+
+CREATE TABLE power_monitor_record (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    device_id UUID REFERENCES medical_device(id),
+    tag_id UUID REFERENCES power_tag(id),
+    device_code VARCHAR(20),
+    device_name VARCHAR(200),
+    record_date DATE NOT NULL,
+    run_hours DECIMAL(8,2) DEFAULT 0,
+    idle_hours DECIMAL(8,2) DEFAULT 0,
+    offline_hours DECIMAL(8,2) DEFAULT 0,
+    avg_current DECIMAL(10,3),
+    peak_current DECIMAL(10,3),
+    energy_kwh DECIMAL(12,3) DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(device_id, record_date)
+);
+COMMENT ON TABLE power_monitor_record IS '电流监测日记录表';
 
 -- ================================================================================
 -- 11. 系统配置与字典表
@@ -2061,10 +2665,13 @@ CREATE TABLE IF NOT EXISTS device_outbound (
     outbound_type VARCHAR(30) DEFAULT 'requisition',
     dept_id UUID REFERENCES department(id),
     receiver_id UUID REFERENCES sys_user(id),
+    warehouse_id UUID REFERENCES warehouse(id),
     outbound_date DATE,
     purpose TEXT,
     is_urgent BOOLEAN DEFAULT FALSE,
     doc_status VARCHAR(20) DEFAULT 'draft',
+    status VARCHAR(20) DEFAULT 'draft',
+    approval_status VARCHAR(20) DEFAULT 'draft',
     operator_id UUID REFERENCES sys_user(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -2181,19 +2788,74 @@ COMMENT ON COLUMN sys_approval_record.comment IS 'comment';
 COMMENT ON COLUMN sys_approval_record.acted_at IS 'acted时间';
 
 -- inspection (mobile)
+-- 5.0 巡检类型
+CREATE TABLE IF NOT EXISTS inspection_type (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    type_code VARCHAR(30) NOT NULL UNIQUE,
+    type_name VARCHAR(100) NOT NULL,
+    sort_order INTEGER DEFAULT 0,
+    description TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE inspection_type IS '巡检类型表';
+
+CREATE TABLE IF NOT EXISTS inspection_template (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    template_code VARCHAR(30),
+    template_name VARCHAR(200) NOT NULL,
+    inspection_type_id UUID REFERENCES inspection_type(id),
+    category_id UUID REFERENCES medical_device_category(id),
+    description TEXT,
+    estimated_duration INTEGER,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE inspection_template IS '巡检模板表';
+
+CREATE TABLE IF NOT EXISTS inspection_template_item (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    template_id UUID NOT NULL REFERENCES inspection_template(id) ON DELETE CASCADE,
+    item_code VARCHAR(30),
+    item_name VARCHAR(200) NOT NULL,
+    item_content TEXT,
+    standard_value VARCHAR(200),
+    check_method VARCHAR(200),
+    sort_order INTEGER DEFAULT 0,
+    is_required BOOLEAN DEFAULT TRUE,
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE inspection_template_item IS '巡检模板内容项';
+
 CREATE TABLE IF NOT EXISTS inspection_plan (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     plan_name VARCHAR(200) NOT NULL,
-    device_id UUID REFERENCES medical_device(id),
-    inspection_type VARCHAR(50),
-    plan_date DATE,
-    status VARCHAR(20) DEFAULT 'pending',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     plan_code VARCHAR(30),
+    device_id UUID REFERENCES medical_device(id),
+    template_id UUID REFERENCES inspection_template(id),
+    inspection_type_id UUID REFERENCES inspection_type(id),
+    inspection_type VARCHAR(50),
     dept_id UUID REFERENCES department(id),
+    cycle_days INTEGER,
+    plan_date DATE,
+    next_due_date DATE,
+    last_inspected_at DATE,
     start_date DATE,
     end_date DATE,
-    frequency VARCHAR(30)
+    frequency VARCHAR(30),
+    assigned_inspector_id UUID REFERENCES sys_user(id),
+    approval_status VARCHAR(20) DEFAULT 'draft',
+    created_by UUID REFERENCES sys_user(id),
+    approved_by UUID REFERENCES sys_user(id),
+    approved_at TIMESTAMP WITH TIME ZONE,
+    status VARCHAR(20) DEFAULT 'pending',
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 COMMENT ON TABLE inspection_plan IS '巡检计划';
 COMMENT ON COLUMN inspection_plan.id IS '主键';
@@ -2249,6 +2911,55 @@ COMMENT ON COLUMN inspection_record_item.item_name IS 'item名称';
 COMMENT ON COLUMN inspection_record_item.check_result IS 'check result';
 COMMENT ON COLUMN inspection_record_item.remark IS '备注';
 
+CREATE TABLE IF NOT EXISTS inspection_execution (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    execution_no VARCHAR(30) UNIQUE NOT NULL,
+    plan_id UUID REFERENCES inspection_plan(id),
+    template_id UUID REFERENCES inspection_template(id),
+    inspection_type_id UUID REFERENCES inspection_type(id),
+    planned_date DATE,
+    assigned_inspector_id UUID REFERENCES sys_user(id),
+    executor_id UUID REFERENCES sys_user(id),
+    execute_start_time TIMESTAMP WITH TIME ZONE,
+    execute_end_time TIMESTAMP WITH TIME ZONE,
+    status VARCHAR(20) DEFAULT 'pending',
+    created_by UUID REFERENCES sys_user(id),
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE inspection_execution IS '巡检执行单';
+
+CREATE TABLE IF NOT EXISTS inspection_execution_item (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    execution_id UUID NOT NULL REFERENCES inspection_execution(id) ON DELETE CASCADE,
+    device_id UUID REFERENCES medical_device(id),
+    device_code VARCHAR(20),
+    device_name VARCHAR(200),
+    dept_id UUID REFERENCES department(id),
+    plan_id UUID REFERENCES inspection_plan(id),
+    status VARCHAR(20) DEFAULT 'pending',
+    overall_result VARCHAR(20),
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE inspection_execution_item IS '巡检执行明细（按设备）';
+
+CREATE TABLE IF NOT EXISTS inspection_execution_result (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    execution_item_id UUID NOT NULL REFERENCES inspection_execution_item(id) ON DELETE CASCADE,
+    template_item_id UUID REFERENCES inspection_template_item(id),
+    item_name VARCHAR(200) NOT NULL,
+    item_content TEXT,
+    result_value VARCHAR(500),
+    result_status VARCHAR(20) DEFAULT 'pending',
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE inspection_execution_result IS '巡检执行结果（按内容项）';
+
 -- spare part transactions
 CREATE TABLE IF NOT EXISTS spare_part_transaction (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -2258,6 +2969,8 @@ CREATE TABLE IF NOT EXISTS spare_part_transaction (
     unit_price NUMERIC(18,2),
     workorder_id UUID REFERENCES repair_workorder(id),
     operator_id UUID REFERENCES sys_user(id),
+    ref_no VARCHAR(50),
+    remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 COMMENT ON TABLE spare_part_transaction IS 'spare part transaction';
@@ -2324,6 +3037,7 @@ CREATE TABLE IF NOT EXISTS warehouse (
     warehouse_name VARCHAR(100) NOT NULL,
     campus_id UUID REFERENCES campus(id),
     dept_id UUID REFERENCES department(id),
+    warehouse_type VARCHAR(30) DEFAULT 'device',
     address VARCHAR(500),
     manager_id UUID REFERENCES sys_user(id),
     is_active BOOLEAN DEFAULT TRUE,
@@ -2331,12 +3045,13 @@ CREATE TABLE IF NOT EXISTS warehouse (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-COMMENT ON TABLE warehouse IS 'warehouse';
+COMMENT ON TABLE warehouse IS '库房';
 COMMENT ON COLUMN warehouse.id IS '主键';
 COMMENT ON COLUMN warehouse.warehouse_code IS 'warehouse编码';
 COMMENT ON COLUMN warehouse.warehouse_name IS 'warehouse名称';
 COMMENT ON COLUMN warehouse.campus_id IS '所属院区';
 COMMENT ON COLUMN warehouse.dept_id IS '所属科室';
+COMMENT ON COLUMN warehouse.warehouse_type IS '库房类型';
 COMMENT ON COLUMN warehouse.address IS '地址';
 COMMENT ON COLUMN warehouse.manager_id IS '关联负责人';
 COMMENT ON COLUMN warehouse.is_active IS '是否启用';
@@ -2580,3 +3295,57 @@ COMMENT ON TABLE import_profile_binding IS '导入方案绑定';
 COMMENT ON COLUMN import_profile_binding.business_type IS '业务类型标识';
 COMMENT ON COLUMN import_profile_binding.profile_code IS '导入方案编码';
 COMMENT ON COLUMN import_profile_binding.updated_at IS '更新时间';
+
+-- 模块8：库房管理 — 设备退货
+CREATE TABLE IF NOT EXISTS device_return (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    return_no VARCHAR(30) UNIQUE NOT NULL,
+    outbound_id UUID REFERENCES device_outbound(id),
+    warehouse_id UUID REFERENCES warehouse(id),
+    dept_id UUID REFERENCES department(id),
+    returner_id UUID REFERENCES sys_user(id),
+    return_date DATE,
+    return_type VARCHAR(20) DEFAULT 'unused',
+    reason TEXT,
+    doc_status VARCHAR(20) DEFAULT 'draft',
+    status VARCHAR(20) DEFAULT 'draft',
+    approval_status VARCHAR(20) DEFAULT 'draft',
+    operator_id UUID REFERENCES sys_user(id),
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE device_return IS '设备退货单';
+COMMENT ON COLUMN device_return.id IS '主键';
+COMMENT ON COLUMN device_return.return_no IS '退货单号';
+COMMENT ON COLUMN device_return.outbound_id IS '关联出库单';
+COMMENT ON COLUMN device_return.warehouse_id IS '退回库房';
+COMMENT ON COLUMN device_return.dept_id IS '退货科室';
+COMMENT ON COLUMN device_return.returner_id IS '退货人';
+COMMENT ON COLUMN device_return.return_date IS '退货日期';
+COMMENT ON COLUMN device_return.return_type IS '退货类型';
+COMMENT ON COLUMN device_return.reason IS '退货原因';
+COMMENT ON COLUMN device_return.doc_status IS '单据状态';
+COMMENT ON COLUMN device_return.status IS '退货状态';
+COMMENT ON COLUMN device_return.approval_status IS '审批状态';
+COMMENT ON COLUMN device_return.operator_id IS '经办人';
+COMMENT ON COLUMN device_return.remark IS '备注';
+
+CREATE TABLE IF NOT EXISTS device_return_item (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    return_id UUID NOT NULL REFERENCES device_return(id) ON DELETE CASCADE,
+    device_id UUID REFERENCES medical_device(id),
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
+    quantity INTEGER DEFAULT 1,
+    condition_note TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE device_return_item IS '设备退货明细';
+COMMENT ON COLUMN device_return_item.id IS '主键';
+COMMENT ON COLUMN device_return_item.return_id IS '所属退货单';
+COMMENT ON COLUMN device_return_item.device_id IS '关联设备';
+COMMENT ON COLUMN device_return_item.device_code IS '设备编码';
+COMMENT ON COLUMN device_return_item.device_name IS '设备名称';
+COMMENT ON COLUMN device_return_item.quantity IS '数量';
+COMMENT ON COLUMN device_return_item.condition_note IS '设备状况说明';

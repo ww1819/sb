@@ -28,7 +28,7 @@ const router = createRouter({
         { path: 'platform/package', component: () => import('@/views/platform/PackagePage.vue') },
         { path: 'platform/integration', component: () => import('@/views/platform/IntegrationPage.vue') },
         { path: 'analytics/reports', component: () => import('@/views/Reports.vue') },
-        { path: 'analytics/benefit', component: () => import('@/views/analytics/BenefitPage.vue') },
+        { path: 'analytics/benefit', redirect: '/analytics/summary' },
         { path: ':module/:page', component: () => import('@/views/ModulePage.vue') },
         { path: ':pathMatch(.*)*', name: 'not-found', component: () => import('@/views/NotFound.vue') }
       ]

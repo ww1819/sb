@@ -5,7 +5,7 @@
         <el-button v-if="selectedId" type="warning" @click="saveMaster">保存主从</el-button>
         <el-button v-if="selectedId && showApproval && canSubmit" type="primary" @click="submitApproval">提交审批</el-button>
         <el-button v-if="selectedId && showApproval && canWithdraw" @click="withdrawApproval">撤回审批</el-button>
-        <slot name="toolbar-extra" />
+        <slot name="toolbar-extra" :master="master" :reload="reloadMaster" />
       </template>
     </CrudPage>
 

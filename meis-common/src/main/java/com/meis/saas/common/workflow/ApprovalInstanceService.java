@@ -118,8 +118,23 @@ public class ApprovalInstanceService {
                 if ("approved".equals(status)) autoExecuteTransfer(businessId);
             }
             case "device_outbound" -> {
-                jdbc.update("UPDATE device_outbound SET doc_status = ? WHERE id = ?::uuid", status, businessId);
+                jdbc.update("UPDATE device_outbound SET doc_status = ?, approval_status = ? WHERE id = ?::uuid", status, status, businessId);
                 if ("approved".equals(status)) autoIssueOutbound(businessId);
+            }
+            case "device_return" -> {
+                jdbc.update("UPDATE device_return SET approval_status = ?, doc_status = ? WHERE id = ?::uuid", status, status, businessId);
+                if ("approved".equals(status)) autoCompleteReturn(businessId);
+            }
+            case "shared_device_loan" -> {
+                jdbc.update("""
+                    UPDATE shared_device_loan SET approval_status = ?, status = ? WHERE id = ?::uuid
+                    """, status, "approved".equals(status) ? "approved" : status, businessId);
+            }
+            case "shared_device_return" -> {
+                jdbc.update("""
+                    UPDATE shared_device_return SET approval_status = ?, status = ? WHERE id = ?::uuid
+                    """, status, "approved".equals(status) ? "approved" : status, businessId);
+                if ("approved".equals(status)) autoCompleteSharedReturn(businessId);
             }
             default -> {}
         }
@@ -133,15 +148,55 @@ public class ApprovalInstanceService {
             jdbc.update("UPDATE medical_device SET dept_id = ?::uuid, updated_at = NOW() WHERE id = ?::uuid",
                     t.get("to_dept_id"), t.get("device_id"));
         }
+        if (t.get("to_warehouse_id") != null && t.get("device_id") != null) {
+            jdbc.update("UPDATE medical_device SET warehouse_id = ?::uuid, updated_at = NOW() WHERE id = ?::uuid",
+                    t.get("to_warehouse_id"), t.get("device_id"));
+        }
         jdbc.update("UPDATE asset_transfer SET status = 'completed', updated_at = NOW() WHERE id = ?::uuid", id);
+    }
+
+    private void autoCompleteReturn(UUID id) {
+        var row = jdbc.queryForList("SELECT warehouse_id FROM device_return WHERE id = ?::uuid", id);
+        if (row.isEmpty()) return;
+        Object warehouseId = row.get(0).get("warehouse_id");
+        var items = jdbc.queryForList("SELECT device_id FROM device_return_item WHERE return_id = ?::uuid", id);
+        for (Map<String, Object> item : items) {
+            if (item.get("device_id") != null) {
+                jdbc.update("""
+                    UPDATE medical_device SET device_status = 'normal', warehouse_id = ?::uuid, updated_at = NOW()
+                    WHERE id = ?::uuid
+                    """, warehouseId, item.get("device_id"));
+            }
+        }
+        jdbc.update("UPDATE device_return SET status = 'returned', doc_status = 'returned', updated_at = NOW() WHERE id = ?::uuid", id);
+    }
+
+    private void autoCompleteSharedReturn(UUID returnId) {
+        var ret = jdbc.queryForList("SELECT loan_id FROM shared_device_return WHERE id = ?::uuid", returnId);
+        if (ret.isEmpty()) return;
+        var loans = jdbc.queryForList("SELECT * FROM shared_device_loan WHERE id = ?::uuid", ret.get(0).get("loan_id"));
+        if (loans.isEmpty()) return;
+        Map<String, Object> loan = loans.get(0);
+        jdbc.update("UPDATE shared_device_loan SET status='returned', return_time=NOW(), updated_at=NOW() WHERE id=?::uuid",
+                loan.get("id"));
+        if (loan.get("device_id") != null && loan.get("from_dept_id") != null) {
+            jdbc.update("UPDATE medical_device SET dept_id = ?::uuid, updated_at = NOW() WHERE id = ?::uuid",
+                    loan.get("from_dept_id"), loan.get("device_id"));
+        }
+        if (loan.get("shared_device_id") != null) {
+            jdbc.update("UPDATE shared_device SET availability_status='available', updated_at=NOW() WHERE id=?::uuid",
+                    loan.get("shared_device_id"));
+        }
     }
 
     private void autoIssueOutbound(UUID id) {
         var items = jdbc.queryForList("SELECT device_id FROM device_outbound_item WHERE outbound_id = ?::uuid", id);
         for (Map<String, Object> item : items) {
             if (item.get("device_id") != null) {
-                jdbc.update("UPDATE medical_device SET device_status = 'in_use', updated_at = NOW() WHERE id = ?::uuid",
-                        item.get("device_id"));
+                jdbc.update("""
+                    UPDATE medical_device SET device_status = 'in_use', warehouse_id = NULL, updated_at = NOW()
+                    WHERE id = ?::uuid
+                    """, item.get("device_id"));
             }
         }
         jdbc.update("UPDATE device_outbound SET status = 'issued', doc_status = 'approved', updated_at = NOW() WHERE id = ?::uuid", id);

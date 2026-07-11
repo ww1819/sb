@@ -10,7 +10,7 @@ public class ApplySql {
             System.exit(1);
         }
         String url = "jdbc:postgresql://" + args[0] + ":" + args[1] + "/" + args[2];
-        String sql = stripComments(Files.readString(Path.of(args[6])));
+        String sql = stripComments(new String(Files.readAllBytes(Paths.get(args[6])), "UTF-8"));
         try (Connection conn = DriverManager.getConnection(url, args[3], args[4])) {
             conn.setAutoCommit(true);
             try (Statement st = conn.createStatement()) {

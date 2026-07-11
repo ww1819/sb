@@ -53,6 +53,8 @@ export const tableSchemas: Record<string, FieldSchema[]> = {
     { prop: 'dept_code', label: '科室编码', list: true, required: true },
     { prop: 'dept_name', label: '科室名称', list: true, required: true },
     { prop: 'pinyin_code', label: '拼音简码', list: true },
+    { prop: 'campus_id', label: '院区', linkTable: 'campus' },
+    { prop: 'building_id', label: '建筑物', linkTable: 'building' },
     { prop: 'is_clinical', label: '临床科室', list: true },
     { prop: 'sort_order', label: '排序', type: 'number', list: true },
     { prop: 'is_active', label: '启用', list: true }
@@ -60,7 +62,12 @@ export const tableSchemas: Record<string, FieldSchema[]> = {
   warehouse: [
     { prop: 'warehouse_code', label: '库房编码', list: true, required: true },
     { prop: 'warehouse_name', label: '库房名称', list: true, required: true },
+    { prop: 'warehouse_type', label: '库房类型', dictType: 'warehouse_type', list: true },
+    { prop: 'campus_id', label: '院区', linkTable: 'campus', list: true },
+    { prop: 'dept_id', label: '归属科室', linkTable: 'department', list: true },
+    { prop: 'manager_id', label: '管理员', linkTable: 'sys_user' },
     { prop: 'address', label: '地址', list: true },
+    { prop: 'sort_order', label: '排序', type: 'number', list: true },
     { prop: 'is_active', label: '启用', list: true }
   ],
   sys_dict: [

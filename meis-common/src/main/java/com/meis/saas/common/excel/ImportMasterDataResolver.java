@@ -19,6 +19,9 @@ public final class ImportMasterDataResolver {
     private final Map<String, UUID> deptByCode = new HashMap<>();
     private final Map<String, UUID> deptByName = new HashMap<>();
     private final Map<String, UUID> categoryByCode = new HashMap<>();
+    private final Map<String, UUID> assetCategoryByCode = new HashMap<>();
+    private final Map<String, UUID> financeCategoryByCode = new HashMap<>();
+    private final Map<String, UUID> warehouseByCode = new HashMap<>();
     private final Map<String, UUID> campusByName = new HashMap<>();
 
     public ImportMasterDataResolver(JdbcTemplate jdbc) {
@@ -30,6 +33,27 @@ public final class ImportMasterDataResolver {
         if (code == null || code.isBlank()) return null;
         UUID id = categoryByCode.get(code.trim());
         if (id == null) throw new IllegalArgumentException("分类编码不存在: " + code);
+        return id;
+    }
+
+    public UUID resolveAssetCategoryByCode(String code) {
+        if (code == null || code.isBlank()) return null;
+        UUID id = assetCategoryByCode.get(code.trim());
+        if (id == null) throw new IllegalArgumentException("资产分类编码不存在: " + code);
+        return id;
+    }
+
+    public UUID resolveFinanceCategoryByCode(String code) {
+        if (code == null || code.isBlank()) return null;
+        UUID id = financeCategoryByCode.get(code.trim());
+        if (id == null) throw new IllegalArgumentException("财务分类编码不存在: " + code);
+        return id;
+    }
+
+    public UUID resolveWarehouseByCode(String code) {
+        if (code == null || code.isBlank()) return null;
+        UUID id = warehouseByCode.get(code.trim());
+        if (id == null) throw new IllegalArgumentException("库房编码不存在: " + code);
         return id;
     }
 
@@ -159,6 +183,9 @@ public final class ImportMasterDataResolver {
 
     private void loadLookups() {
         loadByColumn("medical_device_category", "category_code", categoryByCode);
+        loadByColumn("asset_category", "category_code", assetCategoryByCode);
+        loadByColumn("finance_category", "finance_code", financeCategoryByCode);
+        loadByColumn("warehouse", "warehouse_code", warehouseByCode);
         loadByColumn("manufacturer", "manufacturer_code", manufacturerByCode);
         loadByColumn("supplier", "supplier_code", supplierByCode);
         loadByColumn("department", "dept_code", deptByCode);

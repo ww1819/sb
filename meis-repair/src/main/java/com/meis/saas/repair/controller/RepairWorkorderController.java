@@ -2,6 +2,8 @@ package com.meis.saas.repair.controller;
 
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.page.PageQuery;
+import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
@@ -58,6 +60,46 @@ public class RepairWorkorderController {
         appendIlike(sql, args, "d.serial_number", serialNumber);
         sql.append(" ORDER BY d.device_code LIMIT 500");
         return Result.ok(jdbc.queryForList(sql.toString(), args.toArray()));
+    }
+
+    @GetMapping("/page")
+    public Result<PageResult<Map<String, Object>>> page(
+            PageQuery query,
+            @RequestParam(required = false) String mode,
+            @RequestParam(required = false) String status) {
+        StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        List<Object> args = new ArrayList<>();
+
+        if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
+            String kw = "%" + query.getKeyword().trim() + "%";
+            where.append("""
+                     AND (wo_no ILIKE ? OR device_code ILIKE ? OR device_name ILIKE ? OR fault_description ILIKE ?)
+                    """);
+            args.add(kw);
+            args.add(kw);
+            args.add(kw);
+            args.add(kw);
+        }
+        if (status != null && !status.isBlank()) {
+            where.append(" AND status = ? ");
+            args.add(status);
+        } else if (mode != null && !mode.isBlank()) {
+            switch (mode) {
+                case "apply" -> where.append(" AND status IN ('reported','dispatching') ");
+                case "handle" -> where.append(" AND status IN ('dispatching','pending_accept','accepted','repairing','suspended') ");
+                case "verify" -> where.append(" AND status = 'pending_verify' ");
+                default -> { }
+            }
+        }
+
+        Long total = jdbc.queryForObject("SELECT COUNT(*) FROM repair_workorder" + where, Long.class, args.toArray());
+        List<Object> pageArgs = new ArrayList<>(args);
+        pageArgs.add(query.limit());
+        pageArgs.add(query.offset());
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT * FROM repair_workorder" + where + " ORDER BY report_time DESC NULLS LAST, created_at DESC LIMIT ? OFFSET ?",
+                pageArgs.toArray());
+        return Result.ok(PageResult.of(rows, total != null ? total : 0, query.getPage(), query.getSize()));
     }
 
     @GetMapping("/{id:" + UUID_PATH + "}")

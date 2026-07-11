@@ -180,6 +180,20 @@ public class PurchaseAcceptanceController {
 
 
 
+    @GetMapping("/{id}/entry")
+    public Result<Map<String, Object>> entry(@PathVariable UUID id) {
+        var rows = jdbc.queryForList("""
+                SELECT de.* FROM device_entry de
+                JOIN purchase_acceptance a ON a.entry_id = de.id
+                WHERE a.id = ?::uuid
+                """, id);
+        if (rows.isEmpty()) return Result.ok(Map.of());
+        Map<String, Object> entry = new LinkedHashMap<>(rows.get(0));
+        entry.put("items", jdbc.queryForList(
+                "SELECT * FROM device_entry_item WHERE entry_id = ?::uuid", entry.get("id")));
+        return Result.ok(entry);
+    }
+
     @PostMapping("/{id}/pass")
 
     @Transactional

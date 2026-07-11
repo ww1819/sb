@@ -10,7 +10,8 @@ import java.util.Set;
 @RequestMapping("/api/analytics")
 public class DomainController extends GenericTableController {
     private final JdbcTemplate jdbcTemplate;
-    private static final Set<String> TABLES = Set.of("device_usage_record","device_cost_record","device_benefit_summary");
+    private static final Set<String> TABLES = Set.of(
+            "device_usage_record", "device_cost_record", "device_benefit_summary", "benefit_mapping");
     public DomainController(JdbcTemplate jdbcTemplate) { this.jdbcTemplate = jdbcTemplate; }
     @Override protected JdbcTemplate jdbc() { return jdbcTemplate; }
     @Override protected Set<String> tables() { return TABLES; }

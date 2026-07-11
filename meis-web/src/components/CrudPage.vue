@@ -217,9 +217,13 @@ async function load() {
       size: size.value
     }
     if (keyword.value) params.keyword = keyword.value
+    if (props.config.listMode) params.mode = props.config.listMode
     for (const f of props.config.listFilters ?? []) {
       const v = filterValues[f.key]
       if (v !== undefined && v !== null && v !== '') params[f.key] = v
+    }
+    for (const [k, v] of Object.entries(props.config.listParams ?? {})) {
+      if (v !== undefined && v !== null && v !== '') params[k] = v
     }
     const { data } = await http.get(url, { params })
     rows.value = data.data?.records ?? []
