@@ -135,23 +135,29 @@ public class PowerTagController {
     @Transactional
     @OperationLog(module = "power", description = "保存监测标签")
     public Result<Map<String, Object>> save(@RequestBody Map<String, Object> body) {
-        UUID id = body.containsKey("id") ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
-        fillDeviceInfo(body);
-        UUID newDeviceId = parseUuid(body.get("device_id"));
-        boolean exists = !jdbc.queryForList("SELECT 1 FROM power_tag WHERE id = ?::uuid", id).isEmpty();
+        UUID id = resolveTagId(body);
+        boolean exists = tagExists(id);
         UUID oldDeviceId = null;
         if (exists) {
             var oldRows = jdbc.queryForList("SELECT device_id FROM power_tag WHERE id = ?::uuid", id);
             if (!oldRows.isEmpty()) {
-                oldDeviceId = (UUID) oldRows.get(0).get("device_id");
+                oldDeviceId = parseUuidFromDb(oldRows.get(0).get("device_id"));
             }
-            jdbc.update("""
+        }
+        fillDeviceInfo(body);
+        UUID newDeviceId = parseUuid(body.get("device_id"));
+        normalizeTagName(body);
+        if (exists) {
+            int updated = jdbc.update("""
                     UPDATE power_tag SET tag_code=?, tag_name=?, device_id=?::uuid, station_id=?::uuid,
                     device_code=?, device_name=?, rated_power=?, install_date=?, is_active=?, remark=?, updated_at=NOW()
                     WHERE id=?::uuid
                     """, body.get("tag_code"), body.get("tag_name"), body.get("device_id"), body.get("station_id"),
                     body.get("device_code"), body.get("device_name"), body.get("rated_power"), body.get("install_date"),
                     body.getOrDefault("is_active", true), body.get("remark"), id);
+            if (updated == 0) {
+                throw new BizException(404, "tag not found");
+            }
         } else {
             jdbc.update("""
                     INSERT INTO power_tag (id, tag_code, tag_name, device_id, station_id, device_code, device_name,
@@ -161,7 +167,7 @@ public class PowerTagController {
                     body.get("device_code"), body.get("device_name"), body.get("rated_power"), body.get("install_date"),
                     body.getOrDefault("is_active", true), body.get("remark"));
         }
-        syncBindLog(id, oldDeviceId, newDeviceId, body);
+        recordBindChange(id, oldDeviceId, newDeviceId, body);
         return get(id);
     }
 
@@ -175,7 +181,7 @@ public class PowerTagController {
         if (tagRows.isEmpty()) {
             throw new BizException(404, "not found");
         }
-        UUID deviceId = (UUID) tagRows.get(0).get("device_id");
+        UUID deviceId = parseUuidFromDb(tagRows.get(0).get("device_id"));
         if (deviceId == null) {
             throw new BizException(400, "tag has no linked device");
         }
@@ -186,22 +192,115 @@ public class PowerTagController {
         return get(id);
     }
 
-    private void syncBindLog(UUID tagId, UUID oldDeviceId, UUID newDeviceId, Map<String, Object> body) {
-        if (Objects.equals(oldDeviceId, newDeviceId)) {
+    private void recordBindChange(UUID tagId, UUID oldDeviceId, UUID newDeviceId, Map<String, Object> body) {
+        if (deviceIdChanged(oldDeviceId, newDeviceId)) {
+            if (oldDeviceId != null) {
+                jdbc.update("""
+                        UPDATE power_tag_bind_log SET unbound_at = NOW()
+                        WHERE tag_id = ?::uuid AND device_id = ?::uuid AND unbound_at IS NULL
+                        """, tagId, oldDeviceId);
+            }
+            if (newDeviceId != null) {
+                insertBindLog(tagId, newDeviceId, body, body.get("bind_remark"));
+            }
             return;
         }
-        if (oldDeviceId != null) {
-            jdbc.update("""
-                    UPDATE power_tag_bind_log SET unbound_at = NOW()
-                    WHERE tag_id = ?::uuid AND device_id = ?::uuid AND unbound_at IS NULL
-                    """, tagId, oldDeviceId);
+        if (newDeviceId == null) {
+            return;
         }
-        if (newDeviceId != null) {
-            jdbc.update("""
-                    INSERT INTO power_tag_bind_log (tag_id, device_id, device_code, device_name, remark)
-                    VALUES (?::uuid, ?::uuid, ?, ?, ?)
-                    """, tagId, newDeviceId, body.get("device_code"), body.get("device_name"), body.get("bind_remark"));
+        Long active = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM power_tag_bind_log
+                WHERE tag_id = ?::uuid AND device_id = ?::uuid AND unbound_at IS NULL
+                """, Long.class, tagId, newDeviceId);
+        if (active == null || active == 0) {
+            insertBindLog(tagId, newDeviceId, body, "history-sync");
         }
+    }
+
+    private void insertBindLog(UUID tagId, UUID deviceId, Map<String, Object> body, Object remark) {
+        UUID safeDeviceId = resolveExistingDeviceId(deviceId);
+        jdbc.update("""
+                INSERT INTO power_tag_bind_log (tag_id, device_id, device_code, device_name, remark)
+                VALUES (?::uuid, ?::uuid, ?, ?, ?)
+                """, tagId, safeDeviceId, body.get("device_code"), body.get("device_name"), remark);
+    }
+
+    private UUID resolveExistingDeviceId(UUID deviceId) {
+        if (deviceId == null) {
+            return null;
+        }
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM medical_device WHERE id = ?::uuid", Long.class, deviceId);
+        if (count == null || count == 0) {
+            return null;
+        }
+        return deviceId;
+    }
+
+    /** 优先按 tag_code 解析已有标签，避免编辑时 id 缺失导致误 INSERT。 */
+    private UUID resolveTagId(Map<String, Object> body) {
+        Object code = body.get("tag_code");
+        if (code != null && !code.toString().isBlank()) {
+            var rows = jdbc.queryForList(
+                    "SELECT id FROM power_tag WHERE tag_code = ?", code.toString().trim());
+            if (!rows.isEmpty()) {
+                UUID existing = parseUuidFromDb(rows.get(0).get("id"));
+                body.put("id", existing.toString());
+                return existing;
+            }
+        }
+        Object idRaw = body.get("id");
+        if (idRaw != null && !idRaw.toString().isBlank()) {
+            try {
+                UUID parsed = UUID.fromString(idRaw.toString().trim());
+                if (tagExists(parsed)) {
+                    return parsed;
+                }
+            } catch (IllegalArgumentException ignored) {
+                // 非 UUID 格式，走新建
+            }
+        }
+        UUID newId = UUID.randomUUID();
+        body.put("id", newId.toString());
+        return newId;
+    }
+
+    private boolean tagExists(UUID id) {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM power_tag WHERE id = ?::uuid", Long.class, id);
+        return count != null && count > 0;
+    }
+
+    private static void normalizeTagName(Map<String, Object> body) {
+        Object name = body.get("tag_name");
+        Object code = body.get("tag_code");
+        if (name == null || name.toString().isBlank()) {
+            if (code != null && !code.toString().isBlank()) {
+                body.put("tag_name", code.toString().trim());
+            }
+            return;
+        }
+        body.put("tag_name", name.toString().trim());
+    }
+
+    private static boolean deviceIdChanged(UUID oldId, UUID newId) {
+        String oldKey = oldId == null ? "" : oldId.toString();
+        String newKey = newId == null ? "" : newId.toString();
+        return !oldKey.equals(newKey);
+    }
+
+    private static UUID parseUuidFromDb(Object v) {
+        if (v == null) {
+            return null;
+        }
+        if (v instanceof UUID uuid) {
+            return uuid;
+        }
+        String s = v.toString().trim();
+        if (s.isEmpty()) {
+            return null;
+        }
+        return UUID.fromString(s);
     }
 
     private void fillDeviceInfo(Map<String, Object> body) {
@@ -219,11 +318,11 @@ public class PowerTagController {
                 """, deviceId);
         if (!rows.isEmpty()) {
             var d = rows.get(0);
+            body.put("device_id", deviceId.toString());
             body.put("device_code", d.get("device_code"));
             body.put("device_name", d.get("device_name"));
         } else {
-            body.put("device_code", null);
-            body.put("device_name", null);
+            throw new BizException(400, "关联设备不存在，请重新选择");
         }
     }
 

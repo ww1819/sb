@@ -30,7 +30,7 @@ const selectedLabel = computed(() => {
 function onPicked(device: Record<string, unknown>) {
   emit('update:modelValue', {
     ...props.modelValue,
-    device_id: device.id,
+    device_id: device.id != null ? String(device.id) : null,
     device_code: device.device_code,
     device_name: device.device_name,
     specification: device.specification,

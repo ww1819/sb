@@ -9,6 +9,7 @@ spring:
     default-schema: public
     locations: classpath:db/migrations/public
     baseline-on-migrate: true
+    ignore-migration-patterns: "*:missing"
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:meis}
     username: ${POSTGRES_USER:med}

@@ -888,7 +888,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   ],
   power_tag: [
     { prop: 'tag_code', label: '标签编码', list: true, required: true },
-    { prop: 'tag_name', label: '标签名称', list: true, required: true },
+    { prop: 'tag_name', label: '标签名称', list: true, required: true, group: 'basic' },
     { prop: 'device_code', label: '设备编码', list: true, readonly: true },
     { prop: 'device_name', label: '设备名称', list: true, readonly: true },
     { prop: 'specification', label: '规格', list: true, readonly: true },

@@ -897,6 +897,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | 1.6 | 2026-07-11 | — | 清理 `R__tenant_schema_sync.sql` 建表语句；R__ 仅保留补列与种子数据 |
 | 1.7 | 2026-07-11 | — | 附录 E：开发完成验收清单；开发面板热加载改为同步执行并分步反馈 |
 | 1.8 | 2026-07-11 | — | 标签：修复换绑设备；待机电流独立行操作；列表展示上下限 |
+| 1.9 | 2026-07-11 | — | 标签：修复换绑与绑定记录；标签名称不得与编码相同 |
 
 ---
 
@@ -1010,11 +1011,46 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 步骤 | 组件 | 作用 |
 |------|------|------|
-| 1 | `SchemaTableEnsuring` | 幂等建表与索引：`V1__tables.sql` + `V2__extensions.sql` |
+| 1 | `SchemaTableEnsuring` | 幂等建表与索引：`V1__tables.sql` + `V2__extensions.sql`（**先** `CREATE EXTENSION`，再 `SET search_path TO tenant, public`） |
 | 2 | Flyway `migrate` | 补列与修正：`R__tenant_schema_sync.sql` 中的 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` 及字典/数据 UPDATE |
 | 3 | `SchemaCommentFiller` | 仅对空注释列/表补 `COMMENT ON` |
+| 4 | `TenantSchemaShadowGuard` | 校验 V1 表是否齐全；缺表则重跑建表；仍缺则**启动失败**（避免串写 public） |
 
-代码位置：`meis-tenant/.../TenantSchemaMigrator.java`、`SchemaTableEnsuring.java`。
+代码位置：`meis-tenant/.../TenantSchemaMigrator.java`、`SchemaTableEnsuring.java`、`TenantSchemaShadowGuard.java`。
+
+### D.5 租户缺表串写 public（Schema Shadow，2026-07-11）
+
+**现象**：保存成功或部分成功，但外键报错、绑定记录丢失、数据写到错误库。
+
+**根因链**：
+
+1. 连接 `search_path = tenant_xxx, public`（`TenantAwareDataSource`）
+2. 租户 schema **缺表**（如 `power_tag_bind_log`），未限定表名的 SQL 落到 **public 同名表**
+3. public 表外键指向 **public 父表**（空或旧数据），与租户业务数据不一致 → FK 失败或静默写错库
+
+**为何缺表**：`SchemaTableEnsuring` 曾未执行 `CREATE EXTENSION`，`uuid_generate_v4()` 解析失败，大量 `CREATE TABLE IF NOT EXISTS` 被 **skip**，启动日志仅有 warn。
+
+**已落地防护**：
+
+| 措施 | 说明 |
+|------|------|
+| `ensureDatabaseExtensions()` | 建表前确保 `uuid-ossp` / `pgcrypto` |
+| `TenantSchemaShadowGuard` | 启动后对照 V1 表清单；缺表重跑 ensure；仍缺则抛错阻断启动 |
+| `scripts/ensure-tenant-tables.ps1` | 离线对全部活跃租户补 V1/V2 表（不重启服务） |
+| `scripts/V1TenantGapScan.java` | 对比 V1 与租户实际表，标 `[PUBLIC SHADOW]` |
+
+**提交前 / 环境修复检查**：
+
+```powershell
+# 1) 扫描缺表（应为 0）
+cd scripts && javac -encoding UTF-8 -cp ../meis-common/target/deps/postgresql-42.7.3.jar V1TenantGapScan.java
+java -cp ".;../meis-common/target/deps/postgresql-42.7.3.jar" V1TenantGapScan
+
+# 2) 一键补表（可选，等同启动时 SchemaTableEnsuring）
+powershell -File scripts/ensure-tenant-tables.ps1
+```
+
+**注意**：`public` 中误建的租户业务表（如 `power_tag_bind_log`）不会自动删除；修复后以租户 schema 内表为准。新环境勿向 public 写入租户业务 DDL。
 
 ---
 
@@ -1051,7 +1087,9 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 ### E.4 数据库变更后
 
 - [ ] 改 `V1` + `R__` 双轨（见附录 D）
-- [ ] 重启 **meis-tenant** 触发迁库
+- [ ] 重启 **meis-tenant** 触发迁库（含 ShadowGuard 缺表校验）
+- [ ] 或执行 `scripts/ensure-tenant-tables.ps1` 离线补表
+- [ ] 运行 `V1TenantGapScan` 确认各租户 **missing = 0**
 - [ ] 再重启相关业务服务（如 meis-analytics）
 
 ### E.5 开发面板热加载说明
@@ -1065,6 +1103,39 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | 健康检查 | HTTP/JDWP 端口就绪 | ✗健康检查，服务未监听端口 |
 
 热加载为 **同步执行**（约 1–2 分钟），完成后立即显示成功或失败，不再仅提示「已提交后台」。
+
+---
+
+## 附录 F：public schema 迁移规范（2026-07-11）
+
+> 与租户 schema 对齐，**禁止**再新增 `V5+` 分散脚本。
+
+### F.1 文件职责
+
+| 文件 | 职责 |
+|------|------|
+| `public/V1__tables.sql` | 平台表全量 `CREATE TABLE` + `COMMENT ON`（含全部字段） |
+| `public/V2__extensions.sql` | 索引 |
+| `public/V3__seed_data.sql` | 一次性：演示租户、套餐、平台管理员 |
+| `public/V4__comments.sql` | 历史注释回填 |
+| `public/R__public_schema_sync.sql` | **菜单目录**幂等同步；**已有表**逐列 `ADD COLUMN` |
+
+### F.2 操作规则
+
+1. **新平台表** → 写入 `V1__tables.sql`
+2. **平台表加列** → V1 补 `CREATE TABLE` 字段 + R__ 补一行 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
+3. **新菜单 / 改菜单** → 只改 `R__public_schema_sync.sql`（`ON CONFLICT DO UPDATE`）
+4. **禁止**新建 `V5__xxx.sql` 等版本化菜单脚本（原 V5–V19 已删除并并入 R__）
+5. `spring.flyway.ignore-migration-patterns: "*:missing"` + dev 环境 `repair`，兼容已执行过旧版本的库
+
+### F.3 本次整合记录
+
+| 变更 | 说明 |
+|------|------|
+| 删除 | `V5`–`V19`（15 个模块菜单脚本） |
+| 新增 | `R__public_schema_sync.sql`（基础菜单 + 各模块调整 + 套餐/租户授权） |
+| 精简 | `V3__seed_data.sql` 仅保留平台级一次性种子 |
+| 配置 | `application.yml` 增加 `ignore-migration-patterns` |
 
 ---
 

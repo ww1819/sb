@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Profile;
 
 /**
  * 本地 dev 环境：迁移脚本合并/变更后，自动 repair 更新 flyway_schema_history 的 checksum，
- * 避免因 V1–V16 合并为 V1–V4 导致校验失败、meis-tenant 无法启动。
+ * 并忽略已删除的版本化脚本（V5–V19 已并入 R__public_schema_sync.sql）。
  */
 @Slf4j
 @Configuration

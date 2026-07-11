@@ -1,0 +1,689 @@
+-- =============================================================================
+-- public schema 同步（可重复迁移 R__）
+-- =============================================================================
+-- 约定：
+--   1. 建表 / 索引 → 只改 V1__tables.sql、V2__extensions.sql
+--   2. 本文件：菜单目录幂等同步（INSERT ON CONFLICT / UPDATE）
+--   3. 已有表加列 → 单独一行 ALTER TABLE ... ADD COLUMN IF NOT EXISTS
+--   4. 不要在本文件 COMMENT ON（注释在 V1/V4）
+-- =============================================================================
+
+-- ---------- 菜单：基础模块（工作台 / 采购 / 资产 / 运维 / 质控 / 决策 / 系统） ----------
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('mod_dashboard', NULL, '工作台', 'module', '/dashboard', 1),
+('dashboard', 'mod_dashboard', '工作台', 'menu', '/dashboard', 1),
+('mod_purchase', NULL, '采购管理', 'module', NULL, 3),
+('purchase_plan', 'mod_purchase', '采购计划', 'menu', '/purchase/plan', 1),
+('purchase_project', 'mod_purchase', '采购项目', 'menu', '/purchase/project', 2),
+('purchase_contract', 'mod_purchase', '采购合同', 'menu', '/purchase/contract', 3),
+('mod_asset', NULL, '资产台账', 'module', NULL, 4),
+('asset_device', 'mod_asset', '设备台账', 'menu', '/asset/device', 1),
+('asset_entry', 'mod_asset', '设备入库', 'menu', '/asset/entry', 2),
+('asset_outbound', 'mod_asset', '设备出库', 'menu', '/asset/outbound', 3),
+('asset_transfer', 'mod_asset', '资产流转', 'menu', '/asset/transfer', 4),
+('asset_inventory', 'mod_asset', '资产盘点', 'menu', '/asset/inventory', 5),
+('asset_scrap', 'mod_asset', '设备报废', 'menu', '/asset/scrap', 6),
+('mod_ops', NULL, '运维管理', 'module', NULL, 8),
+('repair_workorder', 'mod_ops', '维修工单', 'menu', '/repair/workorder', 1),
+('repair_engineer', 'mod_ops', '工程师', 'menu', '/repair/engineer', 2),
+('repair_spare', 'mod_ops', '备件管理', 'menu', '/repair/spare', 3),
+('maintain_template', 'mod_ops', '保养模板', 'menu', '/maintain/template', 4),
+('maintain_plan', 'mod_ops', '保养计划', 'menu', '/maintain/plan', 5),
+('maintain_record', 'mod_ops', '保养记录', 'menu', '/maintain/record', 6),
+('mod_quality', NULL, '质控合规', 'module', NULL, 9),
+('qc_risk', 'mod_quality', '风险评估', 'menu', '/qc/risk', 1),
+('qc_adverse', 'mod_quality', '不良事件', 'menu', '/qc/adverse', 2),
+('qc_metrology', 'mod_quality', '计量管理', 'menu', '/qc/metrology', 3),
+('qc_performance', 'mod_quality', '性能检测', 'menu', '/qc/performance', 4),
+('mcontract_list', 'mod_quality', '维保合同', 'menu', '/maintenance-contract/list', 5),
+('mcontract_fulfillment', 'mod_quality', '履约记录', 'menu', '/maintenance-contract/fulfillment', 6),
+('special_life', 'mod_quality', '生命支持', 'menu', '/special/life', 7),
+('special_emergency', 'mod_quality', '应急设备', 'menu', '/special/emergency', 8),
+('special_leased', 'mod_quality', '租赁设备', 'menu', '/special/leased', 9),
+('mod_analytics', NULL, '数据决策', 'module', NULL, 10),
+('analytics_benefit', 'mod_analytics', '效益分析', 'menu', '/analytics/benefit', 1),
+('analytics_reports', 'mod_analytics', '统计报表', 'menu', '/analytics/reports', 2),
+('mod_system', NULL, '系统管理', 'module', NULL, 13),
+('system_campus', 'mod_system', '院区管理', 'menu', '/system/campus', 1),
+('system_dept', 'mod_system', '科室管理', 'menu', '/system/dept', 2),
+('system_user', 'mod_system', '用户管理', 'menu', '/system/user', 3),
+('system_role', 'mod_system', '角色管理', 'menu', '/system/role', 4),
+('system_dict', 'mod_system', '数据字典', 'menu', '/system/dict', 5),
+('system_log', 'mod_system', '操作日志', 'menu', '/system/log', 6),
+('system_approval', 'mod_system', '审批配置', 'menu', '/system/approval', 7)
+ON CONFLICT (menu_code) DO NOTHING;
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('purchase_supplier', 'mod_purchase', '供应商管理', 'menu', '/purchase/supplier', 4),
+('purchase_category', 'mod_purchase', '设备分类', 'menu', '/purchase/category', 5),
+('purchase_acceptance', 'mod_purchase', '安装验收', 'menu', '/purchase/acceptance', 6),
+('purchase_manufacturer', 'mod_purchase', '生产厂商', 'menu', '/purchase/manufacturer', 7),
+('purchase_dashboard', 'mod_purchase', '采购看板', 'menu', '/purchase/dashboard', 8),
+('purchase_trace', 'mod_purchase', '业务追溯', 'menu', '/purchase/trace', 9),
+('purchase_report', 'mod_purchase', '预算执行', 'menu', '/purchase/report', 10)
+ON CONFLICT (menu_code) DO NOTHING;
+
+-- ---------- from V5__dict_module_menus.sql ----------
+-- MEIS 模块1：基础字典 — 独立菜单模块
+-- 将供应商/厂商/68码从采购模块归并到基础字典，并补全科室/仓库/资产分类/财务分类/单位
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('mod_dict', NULL, '基础字典', 'module', NULL, 2)
+ON CONFLICT (menu_code) DO UPDATE SET
+    menu_name = EXCLUDED.menu_name,
+    menu_type = EXCLUDED.menu_type,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+UPDATE sys_menu SET sort_order = 3 WHERE menu_code = 'mod_purchase';
+UPDATE sys_menu SET sort_order = 4 WHERE menu_code = 'mod_asset';
+UPDATE sys_menu SET sort_order = 5 WHERE menu_code = 'mod_ops';
+UPDATE sys_menu SET sort_order = 6 WHERE menu_code = 'mod_quality';
+UPDATE sys_menu SET sort_order = 7 WHERE menu_code = 'mod_analytics';
+UPDATE sys_menu SET sort_order = 8 WHERE menu_code = 'mod_system';
+
+UPDATE sys_menu SET parent_code = 'mod_dict', path = '/dict/supplier', menu_name = '供应商维护', sort_order = 1
+WHERE menu_code = 'purchase_supplier';
+UPDATE sys_menu SET parent_code = 'mod_dict', path = '/dict/manufacturer', menu_name = '生产厂家维护', sort_order = 2
+WHERE menu_code = 'purchase_manufacturer';
+UPDATE sys_menu SET parent_code = 'mod_dict', path = '/dict/category', menu_name = '设备68档案', sort_order = 3
+WHERE menu_code = 'purchase_category';
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('dict_asset_category', 'mod_dict', '资产分类', 'menu', '/dict/asset-category', 4),
+('dict_finance_category', 'mod_dict', '财务分类', 'menu', '/dict/finance-category', 5),
+('dict_dept', 'mod_dict', '科室维护', 'menu', '/dict/dept', 6),
+('dict_warehouse', 'mod_dict', '仓库维护', 'menu', '/dict/warehouse', 7),
+('dict_unit', 'mod_dict', '单位维护', 'menu', '/dict/unit', 8)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+UPDATE sys_menu SET is_active = FALSE WHERE menu_code = 'system_dept';
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN (
+    'mod_dict',
+    'purchase_supplier', 'purchase_manufacturer', 'purchase_category',
+    'dict_asset_category', 'dict_finance_category', 'dict_dept', 'dict_warehouse', 'dict_unit'
+)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN (
+    'mod_dict',
+    'purchase_supplier', 'purchase_manufacturer', 'purchase_category',
+    'dict_asset_category', 'dict_finance_category', 'dict_dept', 'dict_warehouse', 'dict_unit'
+)
+ON CONFLICT DO NOTHING;
+
+-- ---------- from V6__asset_ledger_menus.sql ----------
+-- 模块2：资产台账 — 菜单（导入 / 综合查询 / 资产管理）
+UPDATE sys_menu SET menu_name = '资产台账' WHERE menu_code = 'mod_asset';
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('asset_query', 'mod_asset', '资产综合查询', 'menu', '/asset/query', 1),
+('asset_import', 'mod_asset', '资产导入', 'menu', '/asset/import', 2)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+UPDATE sys_menu SET menu_name = '资产管理', sort_order = 3 WHERE menu_code = 'asset_device';
+UPDATE sys_menu SET sort_order = 4 WHERE menu_code = 'asset_entry';
+UPDATE sys_menu SET sort_order = 5 WHERE menu_code = 'asset_outbound';
+UPDATE sys_menu SET sort_order = 6 WHERE menu_code = 'asset_transfer';
+UPDATE sys_menu SET sort_order = 7 WHERE menu_code = 'asset_inventory';
+UPDATE sys_menu SET sort_order = 8 WHERE menu_code = 'asset_scrap';
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('asset_query', 'asset_import')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('asset_query', 'asset_import')
+ON CONFLICT DO NOTHING;
+
+-- ---------- from V7__repair_module_menus.sql ----------
+-- 模块3：维修管理 — 菜单拆分（报修/处理/配件档案/验收）
+
+UPDATE sys_menu SET menu_name = '运维管理' WHERE menu_code = 'mod_ops';
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('repair_apply', 'mod_ops', '报修申请', 'menu', '/repair/apply', 1),
+('repair_handle', 'mod_ops', '维修处理', 'menu', '/repair/handle', 2),
+('repair_spare_archive', 'mod_ops', '配件档案管理', 'menu', '/repair/spare-archive', 3),
+('repair_verify', 'mod_ops', '维修验收', 'menu', '/repair/verify', 4),
+('repair_fault', 'mod_ops', '故障库', 'menu', '/repair/fault', 5),
+('repair_engineer', 'mod_ops', '工程师', 'menu', '/repair/engineer', 6)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+UPDATE sys_menu SET is_active = FALSE WHERE menu_code IN ('repair_workorder', 'repair_spare');
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('repair_apply', 'repair_handle', 'repair_spare_archive', 'repair_verify', 'repair_fault')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('repair_apply', 'repair_handle', 'repair_spare_archive', 'repair_verify', 'repair_fault')
+ON CONFLICT DO NOTHING;
+
+-- ---------- from V8__maintain_module_menus.sql ----------
+-- 模块4：保养管理 — 菜单重组（参数/计划/执行/记录查询/设备管理）
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('maintain_param', 'mod_ops', '保养参数设置', 'menu', '/maintain/param', 7),
+('maintain_execution', 'mod_ops', '保养执行', 'menu', '/maintain/execution', 9),
+('maintain_query', 'mod_ops', '保养记录查询', 'menu', '/maintain/query', 10),
+('maintain_device', 'mod_ops', '保养设备管理', 'menu', '/maintain/device', 11)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+UPDATE sys_menu SET menu_name = '保养计划', path = '/maintain/plan', sort_order = 8, is_active = TRUE
+WHERE menu_code = 'maintain_plan';
+UPDATE sys_menu SET is_active = FALSE WHERE menu_code IN ('maintain_template', 'maintain_record');
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('maintain_param', 'maintain_plan', 'maintain_execution', 'maintain_query', 'maintain_device')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('maintain_param', 'maintain_plan', 'maintain_execution', 'maintain_query', 'maintain_device')
+ON CONFLICT DO NOTHING;
+
+-- ---------- from V9__inspection_module_menus.sql ----------
+-- 模块5：巡检管理 — 菜单重组（参数/计划/执行/记录查询/设备管理）
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('inspect_param', 'mod_ops', '巡检参数设置', 'menu', '/inspect/param', 12),
+('inspect_plan', 'mod_ops', '巡检计划', 'menu', '/inspect/plan', 13),
+('inspect_execution', 'mod_ops', '巡检执行', 'menu', '/inspect/execution', 14),
+('inspect_query', 'mod_ops', '巡检记录查询', 'menu', '/inspect/query', 15),
+('inspect_device', 'mod_ops', '巡检设备管理', 'menu', '/inspect/device', 16)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('inspect_param', 'inspect_plan', 'inspect_execution', 'inspect_query', 'inspect_device')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('inspect_param', 'inspect_plan', 'inspect_execution', 'inspect_query', 'inspect_device')
+ON CONFLICT DO NOTHING;
+
+-- ---------- from V10__metrology_module_menus.sql ----------
+-- 模块6：计量管理 — 菜单重组
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('metrology_param', 'mod_ops', '计量参数设置', 'menu', '/metrology/param', 17),
+('metrology_plan', 'mod_ops', '计量计划', 'menu', '/metrology/plan', 18),
+('metrology_execution', 'mod_ops', '计量执行', 'menu', '/metrology/execution', 19),
+('metrology_query', 'mod_ops', '计量记录查询', 'menu', '/metrology/query', 20),
+('metrology_device', 'mod_ops', '计量设备管理', 'menu', '/metrology/device', 21)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+UPDATE sys_menu SET is_active = FALSE WHERE menu_code = 'qc_metrology';
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('metrology_param', 'metrology_plan', 'metrology_execution', 'metrology_query', 'metrology_device')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('metrology_param', 'metrology_plan', 'metrology_execution', 'metrology_query', 'metrology_device')
+ON CONFLICT DO NOTHING;
+
+-- ---------- from V11__purchase_module_menus.sql ----------
+-- 模块7：采购管理 — 菜单对齐（申请/审批/合同/验收）
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('purchase_apply', 'mod_purchase', '采购申请', 'menu', '/purchase/apply', 1),
+('purchase_approval', 'mod_purchase', '采购审批', 'menu', '/purchase/approval', 2)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+UPDATE sys_menu SET menu_name = '设备合同管理', sort_order = 4 WHERE menu_code = 'purchase_contract';
+UPDATE sys_menu SET menu_name = '安装验收', sort_order = 5 WHERE menu_code = 'purchase_acceptance';
+UPDATE sys_menu SET menu_name = '采购项目', sort_order = 3 WHERE menu_code = 'purchase_project';
+UPDATE sys_menu SET is_active = FALSE WHERE menu_code = 'purchase_plan';
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('purchase_apply', 'purchase_approval')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('purchase_apply', 'purchase_approval')
+ON CONFLICT DO NOTHING;
+
+-- ---------- from V12__warehouse_module_menus.sql ----------
+-- 模块8：库房管理 — 独立菜单模块
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('mod_warehouse', NULL, '库房管理', 'module', NULL, 5)
+ON CONFLICT (menu_code) DO UPDATE SET
+    menu_name = EXCLUDED.menu_name,
+    menu_type = EXCLUDED.menu_type,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+UPDATE sys_menu SET sort_order = 6 WHERE menu_code = 'mod_ops';
+UPDATE sys_menu SET sort_order = 7 WHERE menu_code = 'mod_quality';
+UPDATE sys_menu SET sort_order = 8 WHERE menu_code = 'mod_analytics';
+UPDATE sys_menu SET sort_order = 9 WHERE menu_code = 'mod_system';
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('warehouse_setting', 'mod_warehouse', '库房维护', 'menu', '/warehouse/setting', 1),
+('warehouse_entry', 'mod_warehouse', '设备入库', 'menu', '/warehouse/entry', 2),
+('warehouse_outbound', 'mod_warehouse', '设备出库', 'menu', '/warehouse/outbound', 3),
+('warehouse_return', 'mod_warehouse', '设备退货', 'menu', '/warehouse/return', 4),
+('warehouse_transfer', 'mod_warehouse', '库房调拨', 'menu', '/warehouse/transfer', 5),
+('warehouse_inventory', 'mod_warehouse', '库存盘点', 'menu', '/warehouse/inventory', 6),
+('warehouse_scrap', 'mod_warehouse', '设备报废', 'menu', '/warehouse/scrap', 7)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+UPDATE sys_menu SET is_active = FALSE WHERE menu_code IN (
+    'asset_entry', 'asset_outbound', 'asset_transfer', 'asset_inventory', 'asset_scrap'
+);
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN (
+    'mod_warehouse',
+    'warehouse_setting', 'warehouse_entry', 'warehouse_outbound', 'warehouse_return',
+    'warehouse_transfer', 'warehouse_inventory', 'warehouse_scrap'
+)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN (
+    'mod_warehouse',
+    'warehouse_setting', 'warehouse_entry', 'warehouse_outbound', 'warehouse_return',
+    'warehouse_transfer', 'warehouse_inventory', 'warehouse_scrap'
+)
+ON CONFLICT DO NOTHING;
+
+-- ---------- from V13__adverse_module_menus.sql ----------
+-- 模块9：不良事件 — 菜单对齐（上报/查询）
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('qc_adverse_report', 'mod_quality', '不良事件上报', 'menu', '/qc/adverse/report', 2),
+('qc_adverse_query', 'mod_quality', '不良事件查询', 'menu', '/qc/adverse/query', 3)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+UPDATE sys_menu SET sort_order = 1 WHERE menu_code = 'qc_risk';
+UPDATE sys_menu SET sort_order = 4 WHERE menu_code = 'qc_performance';
+UPDATE sys_menu SET sort_order = 5 WHERE menu_code = 'mcontract_list';
+UPDATE sys_menu SET sort_order = 6 WHERE menu_code = 'mcontract_fulfillment';
+UPDATE sys_menu SET sort_order = 7 WHERE menu_code = 'special_life';
+UPDATE sys_menu SET sort_order = 8 WHERE menu_code = 'special_emergency';
+UPDATE sys_menu SET sort_order = 9 WHERE menu_code = 'special_leased';
+UPDATE sys_menu SET is_active = FALSE WHERE menu_code = 'qc_adverse';
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('qc_adverse_report', 'qc_adverse_query')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('qc_adverse_report', 'qc_adverse_query')
+ON CONFLICT DO NOTHING;
+
+-- ---------- from V14__special_module_menus.sql ----------
+-- 模块10：特种设备 — 独立菜单模块
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('mod_special', NULL, '特种设备', 'module', NULL, 6)
+ON CONFLICT (menu_code) DO UPDATE SET
+    menu_name = EXCLUDED.menu_name,
+    menu_type = EXCLUDED.menu_type,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+UPDATE sys_menu SET sort_order = 7 WHERE menu_code = 'mod_ops';
+UPDATE sys_menu SET sort_order = 8 WHERE menu_code = 'mod_quality';
+UPDATE sys_menu SET sort_order = 9 WHERE menu_code = 'mod_analytics';
+UPDATE sys_menu SET sort_order = 10 WHERE menu_code = 'mod_system';
+
+UPDATE sys_menu SET parent_code = 'mod_special', menu_name = '生命支持设备', path = '/special/life', sort_order = 1
+WHERE menu_code = 'special_life';
+UPDATE sys_menu SET parent_code = 'mod_special', menu_name = '应急设备库', path = '/special/emergency', sort_order = 2
+WHERE menu_code = 'special_emergency';
+UPDATE sys_menu SET parent_code = 'mod_special', menu_name = '租赁设备', path = '/special/leased', sort_order = 4
+WHERE menu_code = 'special_leased';
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('special_radiation', 'mod_special', '特种设备登记', 'menu', '/special/radiation', 3),
+('special_alerts', 'mod_special', '证照到期提醒', 'menu', '/special/alerts', 5)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('mod_special', 'special_radiation', 'special_alerts')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('mod_special', 'special_radiation', 'special_alerts')
+ON CONFLICT DO NOTHING;
+
+-- ---------- from V15__shared_module_menus.sql ----------
+-- 模块11：公用设备借调 — 独立菜单模块
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('mod_shared', NULL, '公用设备借调', 'module', NULL, 7)
+ON CONFLICT (menu_code) DO UPDATE SET
+    menu_name = EXCLUDED.menu_name,
+    menu_type = EXCLUDED.menu_type,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+UPDATE sys_menu SET sort_order = 8 WHERE menu_code = 'mod_ops';
+UPDATE sys_menu SET sort_order = 9 WHERE menu_code = 'mod_quality';
+UPDATE sys_menu SET sort_order = 10 WHERE menu_code = 'mod_analytics';
+UPDATE sys_menu SET sort_order = 11 WHERE menu_code = 'mod_system';
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('shared_device', 'mod_shared', '公用设备管理', 'menu', '/shared/device', 1),
+('shared_loan', 'mod_shared', '借调申请', 'menu', '/shared/loan', 2),
+('shared_loan_approve', 'mod_shared', '借调审批', 'menu', '/shared/loan-approve', 3),
+('shared_return', 'mod_shared', '归还申请', 'menu', '/shared/return', 4),
+('shared_return_approve', 'mod_shared', '归还审批', 'menu', '/shared/return-approve', 5),
+('shared_fee', 'mod_shared', '借调收费', 'menu', '/shared/fee', 6),
+('shared_record', 'mod_shared', '借调记录查询', 'menu', '/shared/record', 7)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN (
+    'mod_shared', 'shared_device', 'shared_loan', 'shared_loan_approve',
+    'shared_return', 'shared_return_approve', 'shared_fee', 'shared_record'
+)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN (
+    'mod_shared', 'shared_device', 'shared_loan', 'shared_loan_approve',
+    'shared_return', 'shared_return_approve', 'shared_fee', 'shared_record'
+)
+ON CONFLICT DO NOTHING;
+
+-- ---------- from V16__pm_module_menus.sql ----------
+-- 模块12：预防性维护 — 菜单（挂质控合规 mod_quality）
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('pm_param', 'mod_quality', '预防性维护参数', 'menu', '/pm/param', 10),
+('pm_plan', 'mod_quality', '预防性维护计划', 'menu', '/pm/plan', 11),
+('pm_execution', 'mod_quality', '预防性维护执行', 'menu', '/pm/execution', 12),
+('pm_query', 'mod_quality', '预防性维护记录', 'menu', '/pm/query', 13),
+('pm_device', 'mod_quality', '预防性维护设备', 'menu', '/pm/device', 14)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('pm_param', 'pm_plan', 'pm_execution', 'pm_query', 'pm_device')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('pm_param', 'pm_plan', 'pm_execution', 'pm_query', 'pm_device')
+ON CONFLICT DO NOTHING;
+
+-- ---------- from V17__benefit_module_menus.sql ----------
+-- 模块13：效益分析 — 菜单（挂数据决策 mod_analytics）
+
+UPDATE sys_menu SET is_active = FALSE WHERE menu_code = 'analytics_benefit';
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('analytics_mapping', 'mod_analytics', '对照管理', 'menu', '/analytics/mapping', 1),
+('analytics_sync', 'mod_analytics', '数据抓取', 'menu', '/analytics/sync', 2),
+('analytics_summary', 'mod_analytics', '效益分析汇总', 'menu', '/analytics/summary', 3),
+('analytics_cost', 'mod_analytics', '成本上报', 'menu', '/analytics/cost', 4),
+('analytics_device', 'mod_analytics', '单机效益分析', 'menu', '/analytics/device', 5)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship'), ('professional')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('analytics_mapping', 'analytics_sync', 'analytics_summary', 'analytics_cost', 'analytics_device')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('analytics_mapping', 'analytics_sync', 'analytics_summary', 'analytics_cost', 'analytics_device')
+ON CONFLICT DO NOTHING;
+
+-- ---------- from V18__power_module_menus.sql ----------
+-- 模块14：电流监测 — 独立菜单模块
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('mod_power', NULL, '电流监测', 'module', NULL, 11)
+ON CONFLICT (menu_code) DO UPDATE SET
+    menu_name = EXCLUDED.menu_name,
+    menu_type = EXCLUDED.menu_type,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+UPDATE sys_menu SET sort_order = 12 WHERE menu_code = 'mod_system';
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('power_station', 'mod_power', '基站维护', 'menu', '/power/station', 1),
+('power_tag', 'mod_power', '标签维护', 'menu', '/power/tag', 2),
+('power_status', 'mod_power', '设备运行状态', 'menu', '/power/status', 3),
+('power_stats', 'mod_power', '设备运行统计', 'menu', '/power/stats', 4),
+('power_record', 'mod_power', '监测记录', 'menu', '/power/record', 5)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship'), ('professional')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('mod_power', 'power_station', 'power_tag', 'power_status', 'power_stats', 'power_record')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('mod_power', 'power_station', 'power_tag', 'power_status', 'power_stats', 'power_record')
+ON CONFLICT DO NOTHING;
+
+-- ---------- from V19__screen_module_menus.sql ----------
+-- 模块15：设备大屏 — 独立菜单模块
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('mod_screen', NULL, '设备大屏', 'module', NULL, 12)
+ON CONFLICT (menu_code) DO UPDATE SET
+    menu_name = EXCLUDED.menu_name,
+    menu_type = EXCLUDED.menu_type,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+UPDATE sys_menu SET sort_order = 13 WHERE menu_code = 'mod_system';
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('screen_equipment', 'mod_screen', '设备运营大屏', 'menu', '/screen/equipment', 1)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship'), ('professional')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('mod_screen', 'screen_equipment')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('mod_screen', 'screen_equipment')
+ON CONFLICT DO NOTHING;
+
+-- ---------- 套餐 / 租户菜单授权（标准版、旗舰版、专业版） ----------
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT 'standard', menu_code FROM sys_menu
+WHERE menu_type IN ('module','menu')
+  AND menu_code NOT LIKE 'platform_%' AND menu_code <> 'mod_platform'
+  AND is_active = TRUE
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT 'flagship', menu_code FROM sys_menu
+WHERE menu_type IN ('module','menu')
+  AND menu_code NOT LIKE 'platform_%' AND menu_code <> 'mod_platform'
+  AND is_active = TRUE
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT 'professional', menu_code FROM sys_menu
+WHERE menu_type IN ('module','menu')
+  AND menu_code NOT LIKE 'platform_%' AND menu_code <> 'mod_platform'
+  AND is_active = TRUE
+  AND menu_code IN (
+    'mod_analytics', 'analytics_mapping', 'analytics_sync', 'analytics_summary',
+    'analytics_cost', 'analytics_device', 'mod_screen', 'screen_equipment',
+    'mod_power', 'power_station', 'power_tag', 'power_status', 'power_stats', 'power_record'
+  )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, pm.menu_code
+FROM sys_tenant t
+JOIN sys_package_menu pm ON pm.package_code = COALESCE(t.package_code, 'standard')
+WHERE t.status = 'active'
+  AND pm.menu_code NOT LIKE 'platform_%' AND pm.menu_code <> 'mod_platform'
+ON CONFLICT DO NOTHING;

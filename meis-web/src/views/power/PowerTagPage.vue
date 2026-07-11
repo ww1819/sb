@@ -19,6 +19,13 @@
       <template v-if="record">
         <el-form label-width="140px">
           <GroupedFormFields :table="pageConfig.table" :model="record" :fields="formFields">
+            <template #field-tag_name="{ model, field }">
+              <el-input
+                v-model="model[field.prop]"
+                placeholder="便于识别的名称，勿与标签编码相同"
+                clearable
+              />
+            </template>
             <template #field-device_id="{ model }">
               <AssetDevicePickerField
                 :model-value="model"
@@ -117,33 +124,41 @@ function openBindLog(row: Record<string, unknown>) {
 }
 
 function applyDevicePicker(model: Record<string, unknown>, value: Record<string, unknown>) {
-  const nextId = value.device_id ?? null
-  const prevId = model.device_id ?? null
-  model.device_id = nextId
-  model.device_code = value.device_code ?? null
-  model.device_name = value.device_name ?? null
-  if (String(nextId ?? '') !== String(prevId ?? '')) {
-    model.specification = value.specification ?? null
-    model.model = value.model ?? null
-    model.serial_number = value.serial_number ?? null
-    model.manufacturer_name = value.manufacturer_name ?? null
-    model.dept_name = value.dept_name ?? null
+  const nextId = value.device_id != null ? String(value.device_id) : null
+  const prevId = model.device_id != null ? String(model.device_id) : null
+  Object.assign(model, {
+    device_id: nextId,
+    device_code: value.device_code ?? null,
+    device_name: value.device_name ?? null
+  })
+  if (nextId !== prevId) {
+    Object.assign(model, {
+      specification: value.specification ?? null,
+      model: value.model ?? null,
+      serial_number: value.serial_number ?? null,
+      manufacturer_name: value.manufacturer_name ?? null,
+      dept_name: value.dept_name ?? null
+    })
   }
 }
 
 function applyStationPicker(model: Record<string, unknown>, value: Record<string, unknown>) {
-  model.station_id = value.station_id ?? null
-  model.station_code = value.station_code ?? null
-  model.station_name = value.station_name ?? null
+  Object.assign(model, {
+    station_id: value.station_id != null ? String(value.station_id) : null,
+    station_code: value.station_code ?? null,
+    station_name: value.station_name ?? null
+  })
 }
 
 function buildSavePayload(rec: Record<string, unknown>) {
+  const tagCode = String(rec.tag_code ?? '').trim()
+  const tagName = String(rec.tag_name ?? '').trim()
   return {
-    id: rec.id,
-    tag_code: rec.tag_code,
-    tag_name: rec.tag_name,
-    device_id: rec.device_id ?? null,
-    station_id: rec.station_id ?? null,
+    id: rec.id != null ? String(rec.id) : undefined,
+    tag_code: tagCode,
+    tag_name: tagName,
+    device_id: rec.device_id != null ? String(rec.device_id) : null,
+    station_id: rec.station_id != null ? String(rec.station_id) : null,
     rated_power: rec.rated_power,
     install_date: rec.install_date,
     is_active: rec.is_active ?? true,
@@ -153,6 +168,20 @@ function buildSavePayload(rec: Record<string, unknown>) {
 
 async function save() {
   if (!record.value) return
+  const tagCode = String(record.value.tag_code ?? '').trim()
+  const tagName = String(record.value.tag_name ?? '').trim()
+  if (!tagCode) {
+    ElMessage.warning('请填写标签编码')
+    return
+  }
+  if (!tagName) {
+    ElMessage.warning('请填写标签名称（可与编码不同，便于识别）')
+    return
+  }
+  if (tagName === tagCode) {
+    ElMessage.warning('标签名称请勿与标签编码相同，请填写便于识别的名称')
+    return
+  }
   const { data } = await http.post('/power/tag', buildSavePayload(record.value))
   record.value = data.data
   formVisible.value = false

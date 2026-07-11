@@ -50,6 +50,7 @@ public class SchemaTableEnsuring {
             log.warn("Schema {}: no structure statements loaded from V1/V2", schemaName);
             return;
         }
+        ensureDatabaseExtensions();
         jdbc.execute("SET search_path TO " + schemaName + ", public");
         int ok = 0;
         int skip = 0;
@@ -105,6 +106,12 @@ public class SchemaTableEnsuring {
         }
         // 其它语句（如无意义的）不执行
         return null;
+    }
+
+    /** uuid-ossp / pgcrypto 为库级扩展，须在租户建表前确保可用（V1 头部 DDL 不会进入 statements）。 */
+    private void ensureDatabaseExtensions() {
+        jdbc.execute("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"");
+        jdbc.execute("CREATE EXTENSION IF NOT EXISTS \"pgcrypto\"");
     }
 
     private static String readResource(String location) {

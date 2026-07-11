@@ -19,9 +19,10 @@ import java.util.Map;
  *
  * <p>老租户启动顺序（每个 {@code tenant_*} schema）：
  * <ol>
- *   <li>{@link SchemaTableEnsuring}：幂等执行 V1/V2/R__建表段（{@code CREATE TABLE IF NOT EXISTS}），仅补缺表，不改已有表</li>
+ *   <li>{@link SchemaTableEnsuring}：幂等执行 V1/V2 建表与索引（先扩展，再 {@code CREATE TABLE IF NOT EXISTS}）</li>
  *   <li>Flyway {@code migrate}：新租户跑 V1–V4；老租户主要跑 {@code R__tenant_schema_sync.sql} 逐列 {@code ADD COLUMN}</li>
  *   <li>{@link SchemaCommentFiller}：仅补空注释</li>
+ *   <li>{@link TenantSchemaShadowGuard}：V1 缺表串写检测，仍缺表则启动失败</li>
  * </ol>
  * 对老租户执行建表语句<strong>没有问题</strong>：{@code IF NOT EXISTS} 不会覆盖已有表与数据；缺列由 R__ 在之后补全。
  */
@@ -35,6 +36,7 @@ public class TenantSchemaMigrator {
     private final Environment environment;
     private final SchemaTableEnsuring schemaTableEnsuring;
     private final SchemaCommentFiller schemaCommentFiller;
+    private final TenantSchemaShadowGuard schemaShadowGuard;
 
     @Value("${meis.flyway.tenant-locations:classpath:db/migrations/tenant}")
     private String tenantLocations;
@@ -74,6 +76,8 @@ public class TenantSchemaMigrator {
         flyway.migrate();
         // 3) 仅补空注释
         schemaCommentFiller.fillEmptyComments(schemaName);
+        // 4) 缺表串写检测：租户无表但 public 有时，运行时 search_path 会写入 public
+        schemaShadowGuard.ensureNoShadowGaps(schemaName);
         log.info("Flyway migrated tenant schema {}", schemaName);
     }
 
