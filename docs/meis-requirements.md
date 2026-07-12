@@ -14,6 +14,7 @@
 - [设备报修 / 维修工单](repair-workorder.md)
 - [用户手册（骨架）](user-manual.md)
 - [本地开发部署](local-dev-deploy.md)
+- [**可复用工程约定包**](reusable-engineering-conventions.md)（跨项目沉淀，其他系统可直接复用）
 
 ---
 
@@ -27,7 +28,8 @@
 | 合理但暂缓开发 | 写入 [第 7 章 待开发功能池](#7-待开发功能池)（编号 `BACKLOG-{模块}-{序号}`） |
 | 模块已评审 | 更新模块表中的「状态」列 |
 | 版本留痕 | 更新 [第 6 章 版本记录](#6-版本记录) |
-| 协作约定 | 见 [附录 Q](#附录-q需求协作与交付约定)；可沉淀的约定确认后写入 Q |
+| 协作约定 | 见 [附录 Q](#附录-q需求协作与交付约定)；可沉淀的约定确认后写入 Q，**可复用部分须双写** [约定包](reusable-engineering-conventions.md) |
+| 跨项目复用约定 | 见 [可复用工程约定包](reusable-engineering-conventions.md) |
 
 **需求编号规则**（建议）：
 
@@ -908,6 +910,8 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | 1.8 | 2026-07-11 | — | 标签：修复换绑设备；待机电流独立行操作；列表展示上下限 |
 | 1.9 | 2026-07-11 | — | 标签：修复换绑与绑定记录；标签名称不得与编码相同 |
 | 1.10 | 2026-07-12 | — | 附录 Q 扩展：约定沉淀/衍生提示/待开发池；新增第 7 章；技术约定索引 |
+| 1.11 | 2026-07-12 | — | 抽出跨项目 [可复用工程约定包](reusable-engineering-conventions.md) |
+| 1.12 | 2026-07-12 | — | Q.3：约定双写可复用包（与需求文档同步维护） |
 
 ---
 
@@ -1787,6 +1791,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 ### Q.3 约定沉淀与跨模块推广
 
 - 需求合理且适合固化为**开发约定**时：与用户确认后写入本附录 Q（或对应技术附录），并同步 `.cursor/rules`（如有）。
+- **双写可复用包（强制）**：凡写入本需求文档的**可跨项目复用**约定（协作流程、库表双轨、软删审计、变更记录、字典/外键展示、草稿提交撤回、验收清单等），须**同步补充**到 [`docs/reusable-engineering-conventions.md`](reusable-engineering-conventions.md)；仅 MEIS 业务定稿（如具体表字段清单、报修状态机细项）可只留本需求文档，在可复用包「落地映射」中链回即可。
 - 同一思路可提升**其他模块**健壮性时：先提示影响范围与收益；用户确认后再批量修补，避免只改当前点、遗漏同类入口。
 
 ### Q.4 衍生需求提示
@@ -1803,6 +1808,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 | 主题 | 位置 |
 |------|------|
+| **跨项目可复用约定全集** | [reusable-engineering-conventions.md](reusable-engineering-conventions.md) |
 | 数据库迁移双轨（V1/V2 建表，R__ 补列） | [附录 D](#附录-d数据库迁移规范必读) |
 | 开发完成验收清单 | [附录 E](#附录-e开发完成验收清单必读) |
 | public schema 迁移 | [附录 F](#附录-fpublic-schema-迁移规范2026-07-11) |
