@@ -173,7 +173,7 @@ const props = defineProps<{
   canView?: (row: Record<string, unknown>) => boolean
 }>()
 const emit = defineEmits<{ detail: [row: Record<string, unknown>]; add: []; deleted: [row: Record<string, unknown>] }>()
-const { loadDict } = useDict()
+const { loadDict, preloadDictTypes } = useDict()
 
 const loading = ref(false)
 const rows = ref<Record<string, unknown>[]>([])
@@ -378,6 +378,10 @@ watch(() => props.config, load, { deep: true })
 
 let initialized = false
 onMounted(async () => {
+  const listDictTypes = (listFields.value ?? [])
+    .map((f) => f.dictType)
+    .concat((props.config.listFilters ?? []).map((f) => f.dictType))
+  await preloadDictTypes(listDictTypes)
   for (const f of props.config.listFilters ?? []) {
     if (f.dictType) filterOptions[f.key] = await loadDict(f.dictType)
   }
