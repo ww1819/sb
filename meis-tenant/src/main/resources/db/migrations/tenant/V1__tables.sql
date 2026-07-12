@@ -1046,6 +1046,20 @@ COMMENT ON COLUMN device_scrap.created_at IS '创建时间';
 COMMENT ON COLUMN device_scrap.updated_at IS '更新时间';
 COMMENT ON COLUMN device_scrap.approval_status IS '审批状态';
 
+-- 4.x 资产标签打印记录（附录 P）
+CREATE TABLE device_label_print_log (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    device_id UUID NOT NULL REFERENCES medical_device(id),
+    device_code VARCHAR(20) NOT NULL,
+    device_name VARCHAR(200),
+    printed_by UUID REFERENCES sys_user(id),
+    printed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    template_code VARCHAR(50) DEFAULT 'default',
+    remark TEXT
+);
+COMMENT ON TABLE device_label_print_log IS '资产标签打印记录';
+COMMENT ON COLUMN device_label_print_log.device_code IS '打印时设备编码快照（二维码载荷）';
+
 -- ================================================================================
 -- 5. 维修管理模块
 -- ================================================================================

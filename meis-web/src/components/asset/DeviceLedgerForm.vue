@@ -1,6 +1,6 @@
 <template>
-  <el-form label-width="96px" class="device-ledger-form">
-    <FormTabNav v-model="activeTab" :tabs="tabs" />
+  <el-form label-width="96px" class="device-ledger-form" :disabled="isView">
+    <FormTabNav v-model="activeTab" :tabs="visibleTabs" />
 
     <div class="device-ledger-form__panel">
       <GroupedFormFields
@@ -15,8 +15,8 @@
         <DeviceAssetCard :model="model" />
       </div>
 
-      <DeviceArchivePanel v-show="activeTab === 'archive'" />
-      <DeviceImagePanel v-show="activeTab === 'images'" />
+      <DeviceArchivePanel v-show="activeTab === 'archive'" :readonly="isView" />
+      <DeviceImagePanel v-show="activeTab === 'images'" :readonly="isView" />
 
       <DeviceRecordTablePanel
         v-show="activeTab === 'repair'"
@@ -72,33 +72,48 @@
         load-url="/qc/adverse/page"
         :device-id="String(model.id ?? '')"
       />
+      <DeviceLabelPanel
+        v-show="activeTab === 'label'"
+        :device-id="String(model.id ?? '')"
+        :device-code="String(model.device_code ?? '')"
+        :device-name="String(model.device_name ?? '')"
+      />
     </div>
   </el-form>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import FormTabNav from '@/components/form/FormTabNav.vue'
 import GroupedFormFields from '@/components/form/GroupedFormFields.vue'
 import DeviceAssetCard from '@/components/asset/DeviceAssetCard.vue'
 import DeviceArchivePanel from '@/components/asset/tabs/DeviceArchivePanel.vue'
 import DeviceImagePanel from '@/components/asset/tabs/DeviceImagePanel.vue'
 import DeviceRecordTablePanel from '@/components/asset/tabs/DeviceRecordTablePanel.vue'
+import DeviceLabelPanel from '@/components/asset/tabs/DeviceLabelPanel.vue'
 import type { RecordColumn } from '@/components/asset/tabs/DeviceRecordTablePanel.vue'
-import type { FieldSchema } from '@/config/pageSchemas'
+import { getSchema, type FieldSchema } from '@/config/pageSchemas'
 
-const props = defineProps<{
-  model: Record<string, unknown>
-  fields: FieldSchema[]
-}>()
+const props = withDefaults(
+  defineProps<{
+    model: Record<string, unknown>
+    fields?: FieldSchema[]
+    /** create | edit | view */
+    mode?: 'create' | 'edit' | 'view'
+  }>(),
+  { mode: 'edit' }
+)
 
 const activeTab = ref('basic')
+const isView = computed(() => props.mode === 'view')
+const isCreate = computed(() => props.mode === 'create' || !props.model.id)
 
-const tabs = [
+const allTabs = [
   { key: 'basic', label: '基本信息' },
   { key: 'card', label: '资产卡片' },
   { key: 'archive', label: '设备档案' },
   { key: 'images', label: '设备图片' },
+  { key: 'label', label: '资产标签' },
   { key: 'repair', label: '维修记录' },
   { key: 'maintain', label: '保养记录' },
   { key: 'inspection', label: '巡检记录' },
@@ -109,11 +124,34 @@ const tabs = [
   { key: 'adverse', label: '不良事件' }
 ]
 
+/** 编辑：基本信息+图片+档案；查看：全部（含标签与业务 Sheet） */
+const visibleTabs = computed(() => {
+  if (isView.value) return allTabs
+  const editKeys = new Set(['basic', 'archive', 'images'])
+  return allTabs.filter((t) => editKeys.has(t.key))
+})
+
+watch(
+  () => props.mode,
+  () => {
+    activeTab.value = 'basic'
+  }
+)
+
 const basicGroupKeys = new Set(['basic', 'finance', 'location', 'time', 'status', 'compliance', 'attachment', 'remark', 'other'])
 
-const basicFields = computed(() =>
-  props.fields.filter((f) => basicGroupKeys.has(f.group ?? 'other'))
-)
+const basicFields = computed(() => {
+  const source = props.fields?.length ? props.fields : getSchema('medical_device')
+  return source
+    .filter((f) => basicGroupKeys.has(f.group ?? 'other'))
+    .map((f) => {
+      const lockedCode = f.prop === 'device_code' && !isCreate.value
+      return {
+        ...f,
+        readonly: isView.value || lockedCode || !!f.readonly
+      }
+    })
+})
 
 const repairColumns: RecordColumn[] = [
   { prop: 'wo_no', label: '工单号', minWidth: 140 },

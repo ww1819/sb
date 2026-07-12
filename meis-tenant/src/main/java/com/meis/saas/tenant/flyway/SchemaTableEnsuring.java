@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -36,21 +37,33 @@ public class SchemaTableEnsuring {
             Pattern.compile("(?i)^CREATE\\s+UNIQUE\\s+INDEX\\s+(?!IF\\s+NOT\\s+EXISTS)");
     private static final Pattern CREATE_INDEX =
             Pattern.compile("(?i)^CREATE\\s+INDEX\\s+(?!IF\\s+NOT\\s+EXISTS)");
+    /** 将 CREATE TABLE IF NOT EXISTS name 限定到指定 schema，避免 public 同名表导致跳过建表。 */
+    private static final Pattern QUALIFY_TABLE =
+            Pattern.compile("(?i)^(CREATE\\s+TABLE\\s+IF\\s+NOT\\s+EXISTS\\s+)(?!\\w+\\.)(\\w+)");
+    /** 将 CREATE INDEX ... ON name 限定到指定 schema。 */
+    private static final Pattern QUALIFY_INDEX_ON =
+            Pattern.compile("(?i)^(CREATE\\s+(?:UNIQUE\\s+)?INDEX\\s+IF\\s+NOT\\s+EXISTS\\s+\\w+\\s+ON\\s+)(?!\\w+\\.)(\\w+)");
+    private static final Pattern QUALIFY_VIEW =
+            Pattern.compile("(?i)^(CREATE\\s+OR\\s+REPLACE\\s+VIEW\\s+)(?!\\w+\\.)(\\w+)");
 
     private final JdbcTemplate jdbc;
 
     public void ensureFromMigrations(String schemaName) {
         validateSchema(schemaName);
         List<String> statements = new ArrayList<>();
-        // 1) V1 全量建表（CREATE TABLE → IF NOT EXISTS）
-        statements.addAll(loadIdempotentStatements("classpath:db/migrations/tenant/V1__tables.sql"));
+        // 1) V1 全量建表（CREATE TABLE → IF NOT EXISTS，并 schema 限定）
+        statements.addAll(loadIdempotentStatements("classpath:db/migrations/tenant/V1__tables.sql", schemaName));
         // 2) V2 索引
-        statements.addAll(loadIdempotentStatements("classpath:db/migrations/tenant/V2__extensions.sql"));
+        statements.addAll(loadIdempotentStatements("classpath:db/migrations/tenant/V2__extensions.sql", schemaName));
         if (statements.isEmpty()) {
             log.warn("Schema {}: no structure statements loaded from V1/V2", schemaName);
             return;
         }
         ensureDatabaseExtensions();
+        // 清理误写入 public 的租户表影子，避免 REFERENCES / IF NOT EXISTS 命中 public
+        jdbc.execute("DROP TABLE IF EXISTS public.metrology_type CASCADE");
+        // public 仅用于解析 uuid_generate_v4 等扩展函数；建表/索引已 schema 限定，不会误命中 public 同名对象
+        String previousPath = jdbc.queryForObject("SHOW search_path", String.class);
         jdbc.execute("SET search_path TO " + schemaName + ", public");
         int ok = 0;
         int skip = 0;
@@ -66,13 +79,18 @@ public class SchemaTableEnsuring {
                 }
             }
         } finally {
-            jdbc.execute("SET search_path TO public");
+            // 归还连接前恢复 search_path，避免污染连接池影响后续 Flyway
+            if (previousPath != null && !previousPath.isBlank()) {
+                jdbc.execute("SET search_path TO " + previousPath);
+            } else {
+                jdbc.execute("SET search_path TO DEFAULT");
+            }
         }
         log.info("Schema {}: ensured tables/indexes before column sync (applied={}, skipped={})",
                 schemaName, ok, skip);
     }
 
-    private List<String> loadIdempotentStatements(String classpath) {
+    private List<String> loadIdempotentStatements(String classpath, String schemaName) {
         List<String> raw = splitSql(readResource(classpath));
         List<String> out = new ArrayList<>();
         for (String stmt : raw) {
@@ -82,7 +100,7 @@ public class SchemaTableEnsuring {
             // 跳过注释语句，避免覆盖租户已有注释
             if (upper.startsWith("COMMENT ON")) continue;
             if (upper.startsWith("ALTER TABLE")) continue;
-            String idempotent = toIdempotent(trimmed);
+            String idempotent = toIdempotent(trimmed, schemaName);
             if (idempotent != null) {
                 out.add(idempotent);
             }
@@ -90,22 +108,49 @@ public class SchemaTableEnsuring {
         return out;
     }
 
-    private static String toIdempotent(String sql) {
+    private static String toIdempotent(String sql, String schemaName) {
         String upper = sql.toUpperCase(Locale.ROOT);
         if (upper.startsWith("CREATE TABLE")) {
-            return CREATE_TABLE.matcher(sql).replaceFirst("CREATE TABLE IF NOT EXISTS ");
+            String s = CREATE_TABLE.matcher(sql).replaceFirst("CREATE TABLE IF NOT EXISTS ");
+            s = qualify(QUALIFY_TABLE, s, schemaName);
+            // REFERENCES bare_table(...) 必须限定到租户 schema，否则会绑到 public 同名表
+            return qualifyReferences(s, schemaName);
         }
         if (upper.startsWith("CREATE VIEW") || upper.startsWith("CREATE OR REPLACE VIEW")) {
-            return CREATE_VIEW.matcher(sql).replaceFirst("CREATE OR REPLACE VIEW ");
+            String s = CREATE_VIEW.matcher(sql).replaceFirst("CREATE OR REPLACE VIEW ");
+            return qualify(QUALIFY_VIEW, s, schemaName);
         }
         if (upper.startsWith("CREATE UNIQUE INDEX")) {
-            return CREATE_UNIQUE_INDEX.matcher(sql).replaceFirst("CREATE UNIQUE INDEX IF NOT EXISTS ");
+            String s = CREATE_UNIQUE_INDEX.matcher(sql).replaceFirst("CREATE UNIQUE INDEX IF NOT EXISTS ");
+            return qualify(QUALIFY_INDEX_ON, s, schemaName);
         }
         if (upper.startsWith("CREATE INDEX")) {
-            return CREATE_INDEX.matcher(sql).replaceFirst("CREATE INDEX IF NOT EXISTS ");
+            String s = CREATE_INDEX.matcher(sql).replaceFirst("CREATE INDEX IF NOT EXISTS ");
+            return qualify(QUALIFY_INDEX_ON, s, schemaName);
         }
         // 其它语句（如无意义的）不执行
         return null;
+    }
+
+    private static String qualify(Pattern pattern, String sql, String schemaName) {
+        Matcher m = pattern.matcher(sql);
+        if (m.find()) {
+            return m.replaceFirst(Matcher.quoteReplacement(m.group(1) + schemaName + "." + m.group(2)));
+        }
+        return sql;
+    }
+
+    private static final Pattern UNQUALIFIED_REFERENCES =
+            Pattern.compile("(?i)REFERENCES\\s+(?!\\w+\\.)(\\w+)\\s*\\(");
+
+    private static String qualifyReferences(String sql, String schemaName) {
+        Matcher m = UNQUALIFIED_REFERENCES.matcher(sql);
+        StringBuffer sb = new StringBuffer();
+        while (m.find()) {
+            m.appendReplacement(sb, Matcher.quoteReplacement("REFERENCES " + schemaName + "." + m.group(1) + "("));
+        }
+        m.appendTail(sb);
+        return sb.toString();
     }
 
     /** uuid-ossp / pgcrypto 为库级扩展，须在租户建表前确保可用（V1 头部 DDL 不会进入 statements）。 */

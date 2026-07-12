@@ -1,5 +1,6 @@
 package com.meis.saas.common.web;
 
+import com.meis.saas.common.asset.MedicalDeviceDeleteGuard;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.persistence.TableColumnCache;
@@ -98,6 +99,8 @@ public abstract class GenericTableController {
         SoftDeleteSupport.stripClientUpdateFields(body);
         if ("medical_device".equals(table)) {
             MedicalDeviceFieldHelper.applyDerivedFields(body);
+            // 附录 P：设备编码创建后禁止修改
+            body.remove("device_code");
         }
         normalizeUuidFields(body);
         if (body.isEmpty()) return Result.ok();
@@ -166,6 +169,9 @@ public abstract class GenericTableController {
     public Result<Void> delete(@PathVariable String table, @PathVariable String id) {
         check(table);
         guardInventoryCheckMutable(table, id);
+        if ("medical_device".equals(table)) {
+            MedicalDeviceDeleteGuard.assertDeletable(jdbc(), id);
+        }
         int n = SoftDeleteSupport.softDelete(jdbc(), table, id);
         if (n == 0 && SoftDeleteSupport.supportsSoftDelete(jdbc(), table)) {
             throw new BizException(404, "not found");

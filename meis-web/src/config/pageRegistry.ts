@@ -115,7 +115,8 @@ export const pageRegistry: Record<string, PageConfig> = {
   '/asset/device': {
     title: '资产管理',
     apiBase: '/asset',
-    table: 'medical_device'
+    table: 'medical_device',
+    listPageUrl: '/asset/device/page'
   },
   '/asset/entry': {
     title: '设备入库',

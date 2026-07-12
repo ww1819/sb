@@ -75,9 +75,17 @@
           <TableCellValue :field="f" :value="row[f.prop]" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" :width="enableView ? 220 : 200" fixed="right">
         <template #default="{ row }">
           <div class="table-actions">
+            <el-button
+              v-if="enableView && canViewRow(row)"
+              link
+              type="primary"
+              @click="onView(row)"
+            >
+              查看
+            </el-button>
             <el-button
               v-if="canEditRow(row)"
               link
@@ -104,9 +112,16 @@
       </template>
     </el-table>
 
-    <FormDrawer v-if="!detailMode" v-model="formVisible" :title="formTitle" size="lg" @save="save">
-      <slot name="form" :form="form" :fields="formFields">
-        <el-form label-width="120px">
+    <FormDrawer
+      v-if="!detailMode"
+      v-model="formVisible"
+      :title="formTitle"
+      size="lg"
+      :show-save="formMode !== 'view'"
+      @save="save"
+    >
+      <slot name="form" :form="form" :fields="formFields" :mode="formMode">
+        <el-form label-width="120px" :disabled="formMode === 'view'">
           <GroupedFormFields :table="config.table" :model="form" :fields="formFields" />
         </el-form>
       </slot>
@@ -151,8 +166,11 @@ const props = defineProps<{
   detailMode?: boolean
   hideAdd?: boolean
   deleteUrl?: string
+  /** 启用「查看」操作（编辑与删除之间） */
+  enableView?: boolean
   canEdit?: (row: Record<string, unknown>) => boolean
   canDelete?: (row: Record<string, unknown>) => boolean
+  canView?: (row: Record<string, unknown>) => boolean
 }>()
 const emit = defineEmits<{ detail: [row: Record<string, unknown>]; add: []; deleted: [row: Record<string, unknown>] }>()
 const { loadDict } = useDict()
@@ -169,6 +187,7 @@ const formVisible = ref(false)
 const importVisible = ref(false)
 const form = ref<Record<string, unknown>>({})
 const formTitle = ref('新增')
+const formMode = ref<'create' | 'edit' | 'view'>('create')
 const tableRef = ref()
 const { selectedCount, syncFromTable, selectedIds, clear: clearSelection } = useCrossPageSelection()
 
@@ -201,6 +220,10 @@ function canEditRow(row: Record<string, unknown>) {
 
 function canDeleteRow(row: Record<string, unknown>) {
   return props.canDelete ? props.canDelete(row) : true
+}
+
+function canViewRow(row: Record<string, unknown>) {
+  return props.canView ? props.canView(row) : true
 }
 
 async function loadRefLabels() {
@@ -252,13 +275,15 @@ function onReset() {
   load()
 }
 
-function openForm(row?: Record<string, unknown>) {
+function openForm(row?: Record<string, unknown>, mode: 'create' | 'edit' | 'view' = 'create') {
   form.value = row ? { ...row } : {}
-  formTitle.value = row ? '编辑' : '新增'
+  formMode.value = mode
+  formTitle.value = mode === 'view' ? '查看' : mode === 'edit' ? '编辑' : '新增'
   formVisible.value = true
 }
 
 async function save() {
+  if (formMode.value === 'view') return
   const missing = formFields.value.filter(
     (f) => f.required && (form.value[f.prop] === undefined || form.value[f.prop] === null || form.value[f.prop] === '')
   )
@@ -285,12 +310,16 @@ async function save() {
 
 function onAdd() {
   if (props.detailMode) emit('add')
-  else openForm()
+  else openForm(undefined, 'create')
 }
 
 function onEdit(row: Record<string, unknown>) {
   if (props.detailMode) emit('detail', row)
-  else openForm(row)
+  else openForm(row, 'edit')
+}
+
+function onView(row: Record<string, unknown>) {
+  openForm(row, 'view')
 }
 
 async function remove(row: Record<string, unknown>) {
@@ -303,9 +332,10 @@ async function remove(row: Record<string, unknown>) {
     emit('deleted', row)
     ElMessage.success('已删除')
     load()
-  } catch (e) {
+  } catch (e: unknown) {
     if (e !== 'cancel' && e !== 'close') {
-      ElMessage.error('删除失败')
+      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
+      ElMessage.error(msg || '删除失败')
     }
   }
 }

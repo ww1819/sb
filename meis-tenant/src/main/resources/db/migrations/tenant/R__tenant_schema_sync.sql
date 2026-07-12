@@ -222,7 +222,14 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('metrology_certificate_kind', 'none', '无法定证书', 'none', 3)
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
 
-INSERT INTO metrology_type (type_code, type_name, classification_group, regulatory_attr, traceability_mode, certificate_kind, sort_order, legal_basis, executor_scope, cycle_rule, description) VALUES
+-- 计量检定类型：纠正错误绑定到 public.metrology_type 的自引用外键（历史 search_path 串写）
+ALTER TABLE "${flyway:defaultSchema}".metrology_type DROP CONSTRAINT IF EXISTS metrology_type_parent_id_fkey;
+ALTER TABLE "${flyway:defaultSchema}".metrology_type
+  ADD CONSTRAINT metrology_type_parent_id_fkey
+  FOREIGN KEY (parent_id) REFERENCES "${flyway:defaultSchema}".metrology_type(id);
+
+-- 计量检定类型种子：显式限定当前迁移 schema，避免 public.metrology_type 影子表导致 parent_id 外键失败
+INSERT INTO "${flyway:defaultSchema}".metrology_type (type_code, type_name, classification_group, regulatory_attr, traceability_mode, certificate_kind, sort_order, legal_basis, executor_scope, cycle_rule, description) VALUES
 ('MANDATORY', '强制检定（法定强制管理）', 'regulatory', 'mandatory', 'verification', 'verification_cert', 1,
  '《计量法》及《实施强制管理的计量器具目录》', '仅限法定计量技术机构', '按检定规程固定周期，不可自行缩短或延长',
  '用于医疗卫生且标注 V/P+V 的设备，必须按期送法定计量机构检定，超期/不合格严禁临床使用。'),
@@ -231,38 +238,38 @@ INSERT INTO metrology_type (type_code, type_name, classification_group, regulato
  '未列入强检目录但诊疗质控需保证量值准确的设备，可检定或校准，医院自行判定是否可用。')
 ON CONFLICT (type_code) DO NOTHING;
 
-INSERT INTO metrology_type (type_code, type_name, parent_id, classification_group, regulatory_attr, traceability_mode, timing_kind, certificate_kind, sort_order, cycle_rule, description)
+INSERT INTO "${flyway:defaultSchema}".metrology_type (type_code, type_name, parent_id, classification_group, regulatory_attr, traceability_mode, timing_kind, certificate_kind, sort_order, cycle_rule, description)
 SELECT 'MAND_FIRST_ONCE', '首次检定（失准报废/到期轮换）', id, 'regulatory', 'mandatory', 'verification', 'first_only', 'verification_cert', 1,
  '仅出厂/入库做一次检定，使用中不周期复检，失准直接报废',
  '典型：玻璃水银体温计。'
-FROM metrology_type WHERE type_code = 'MANDATORY'
+FROM "${flyway:defaultSchema}".metrology_type WHERE type_code = 'MANDATORY'
 ON CONFLICT (type_code) DO NOTHING;
 
-INSERT INTO metrology_type (type_code, type_name, parent_id, classification_group, regulatory_attr, traceability_mode, timing_kind, certificate_kind, sort_order, cycle_rule, description)
+INSERT INTO "${flyway:defaultSchema}".metrology_type (type_code, type_name, parent_id, classification_group, regulatory_attr, traceability_mode, timing_kind, certificate_kind, sort_order, cycle_rule, description)
 SELECT 'MAND_PERIODIC', '周期强制检定', id, 'regulatory', 'mandatory', 'verification', 'periodic', 'verification_cert', 2,
  '按检定规程每年/每半年送检，周期不可更改',
  '绝大多数医用强检设备。出具检定证书（合格/不合格结论），带法定计量印记。'
-FROM metrology_type WHERE type_code = 'MANDATORY'
+FROM "${flyway:defaultSchema}".metrology_type WHERE type_code = 'MANDATORY'
 ON CONFLICT (type_code) DO NOTHING;
 
-INSERT INTO metrology_type (type_code, type_name, parent_id, classification_group, regulatory_attr, traceability_mode, timing_kind, sort_order, description)
-SELECT v.code, v.name, p.id, 'device_scope', 'mandatory', 'verification', 'periodic', v.ord, v.desc
-FROM metrology_type p
+INSERT INTO "${flyway:defaultSchema}".metrology_type (type_code, type_name, parent_id, classification_group, regulatory_attr, traceability_mode, timing_kind, sort_order, description)
+SELECT v.code, v.name, p.id, 'device_scope', 'mandatory', 'verification', 'periodic', v.ord, v.descr
+FROM "${flyway:defaultSchema}".metrology_type p
 CROSS JOIN (VALUES
  ('MAND_SCOPE_VITAL', '生命体征类', 1, '电子血压计、水银血压计、电子体温计、多参数监护仪、心电图机、脑电图机'),
  ('MAND_SCOPE_ENT', '眼科耳鼻喉类', 2, '眼压计、纯音听力计、验光仪、验光镜片箱、焦度计'),
  ('MAND_SCOPE_RAD', '放射/核医学类', 3, 'DR/CT/乳腺钼靶、医用诊断X射线机、放射治疗电离室剂量计、医用活度计')
-) AS v(code, name, ord, desc)
+) AS v(code, name, ord, descr)
 WHERE p.type_code = 'MAND_PERIODIC'
 ON CONFLICT (type_code) DO NOTHING;
 
-INSERT INTO metrology_type (type_code, type_name, parent_id, classification_group, regulatory_attr, traceability_mode, sort_order, description)
+INSERT INTO "${flyway:defaultSchema}".metrology_type (type_code, type_name, parent_id, classification_group, regulatory_attr, traceability_mode, sort_order, description)
 SELECT 'VOL_SCOPE_COMMON', '常见非强检设备', id, 'device_scope', 'voluntary', 'calibration', 1,
  '呼吸机、麻醉机、注射泵/输液泵、除颤仪、高频电刀、B超/MRI、骨密度仪、肺功能仪、医用激光源、负压压力表、生化分析仪、理疗设备等。'
-FROM metrology_type WHERE type_code = 'VOLUNTARY'
+FROM "${flyway:defaultSchema}".metrology_type WHERE type_code = 'VOLUNTARY'
 ON CONFLICT (type_code) DO NOTHING;
 
-INSERT INTO metrology_type (type_code, type_name, classification_group, timing_kind, traceability_mode, sort_order, description) VALUES
+INSERT INTO "${flyway:defaultSchema}".metrology_type (type_code, type_name, classification_group, timing_kind, traceability_mode, sort_order, description) VALUES
 ('TIME_FIRST', '首次检定', 'timing', 'first_only', 'verification', 1, '新设备入库、维修后、更换核心传感器后首次计量，合格后方可投入临床。'),
 ('TIME_PERIODIC', '周期检定（定期检定）', 'timing', 'periodic', 'verification', 2, '强检设备法定周期、非强检设备医院规定周期，到期统一送检/上门检。'),
 ('TIME_AFTER_REPAIR', '修理后检定', 'timing', 'after_repair', 'verification', 3, '大修、更换探头/传感器、搬迁、故障维修后必须重新计量，合格再使用。'),
@@ -270,12 +277,12 @@ INSERT INTO metrology_type (type_code, type_name, classification_group, timing_k
 ('TIME_INTERIM', '期间核查', 'timing', 'interim', 'calibration', 5, '两次周期检定之间医院内部简易比对与稳定性核查，仅内部质控，无法定证书。')
 ON CONFLICT (type_code) DO NOTHING;
 
-INSERT INTO metrology_type (type_code, type_name, classification_group, location_kind, sort_order, description) VALUES
+INSERT INTO "${flyway:defaultSchema}".metrology_type (type_code, type_name, classification_group, location_kind, sort_order, description) VALUES
 ('LOC_LAB', '送检检定', 'location', 'lab', 1, '小型设备（血压计、体温计、验光镜片等）送至计量实验室检测。'),
 ('LOC_ONSITE', '现场上门检定', 'location', 'onsite', 2, '大型固定设备（CT、DR、监护仪、直线加速器等）计量人员到院内现场检测。')
 ON CONFLICT (type_code) DO NOTHING;
 
-INSERT INTO metrology_type (type_code, type_name, classification_group, management_grade, regulatory_attr, traceability_mode, sort_order, cycle_rule, description) VALUES
+INSERT INTO "${flyway:defaultSchema}".metrology_type (type_code, type_name, classification_group, management_grade, regulatory_attr, traceability_mode, sort_order, cycle_rule, description) VALUES
 ('GRADE_A', 'A级（强检类）', 'grade', 'A', 'mandatory', 'verification', 1, '法定周期，专人台账、证书存档',
  '全部强制检定设备，专人台账、法定周期、证书存档。'),
 ('GRADE_B', 'B级（重要非强检）', 'grade', 'B', 'voluntary', 'calibration', 2, '建议每年校准',
@@ -463,3 +470,15 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('power_work_state', 'offline', '离线', 'offline', 3),
 ('power_work_state', 'alarm', '告警', 'alarm', 4)
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
+
+-- ---------- 附录 P：资产标签打印记录 ----------
+CREATE TABLE IF NOT EXISTS device_label_print_log (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    device_id UUID NOT NULL REFERENCES medical_device(id),
+    device_code VARCHAR(20) NOT NULL,
+    device_name VARCHAR(200),
+    printed_by UUID,
+    printed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    template_code VARCHAR(50) DEFAULT 'default',
+    remark TEXT
+);

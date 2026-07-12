@@ -6,7 +6,7 @@
         <el-input v-model="keyword" placeholder="请输入图片名称" clearable class="device-image-panel__input" />
         <el-button type="primary">搜索</el-button>
       </div>
-      <div class="device-image-panel__actions">
+      <div class="device-image-panel__actions" v-if="!readonly">
         <el-button type="primary" plain>选择图片</el-button>
         <el-button type="primary">上传</el-button>
         <el-button type="warning" plain>选中下载</el-button>
@@ -33,6 +33,8 @@
 import { ref } from 'vue'
 import { Picture } from '@element-plus/icons-vue'
 import PageEmpty from '@/components/table/PageEmpty.vue'
+
+defineProps<{ readonly?: boolean }>()
 
 const keyword = ref('')
 </script>

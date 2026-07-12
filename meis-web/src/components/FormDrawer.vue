@@ -8,8 +8,8 @@
     <slot />
     <template #footer>
       <div class="form-drawer-footer">
-        <el-button @click="$emit('update:modelValue', false)">取消</el-button>
-        <el-button type="primary" @click="$emit('save')">保存</el-button>
+        <el-button @click="$emit('update:modelValue', false)">{{ showSave ? '取消' : '关闭' }}</el-button>
+        <el-button v-if="showSave" type="primary" @click="$emit('save')">保存</el-button>
       </div>
     </template>
   </AppModal>
@@ -23,8 +23,9 @@ withDefaults(
     modelValue: boolean
     title: string
     size?: 'sm' | 'md' | 'lg' | 'xl'
+    showSave?: boolean
   }>(),
-  { size: 'md' }
+  { size: 'md', showSave: true }
 )
 
 defineEmits<{ 'update:modelValue': [v: boolean]; save: [] }>()
