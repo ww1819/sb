@@ -75,11 +75,11 @@
           <TableCellValue :field="f" :value="row[f.prop]" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" :width="enableView ? 220 : 200" fixed="right">
+      <el-table-column label="操作" :width="viewEnabled ? 220 : 200" fixed="right">
         <template #default="{ row }">
           <div class="table-actions">
             <el-button
-              v-if="enableView && canViewRow(row)"
+              v-if="viewEnabled && canViewRow(row)"
               link
               type="primary"
               @click="onView(row)"
@@ -120,12 +120,21 @@
       :show-save="formMode !== 'view'"
       @save="save"
     >
+      <div v-if="formMode === 'view' && form.id && changeLogEnabled" class="change-log-bar">
+        <el-button @click="openChangeLog">变更记录</el-button>
+      </div>
       <slot name="form" :form="form" :fields="formFields" :mode="formMode">
         <el-form label-width="120px" :disabled="formMode === 'view'">
           <GroupedFormFields :table="config.table" :model="form" :fields="formFields" />
         </el-form>
       </slot>
     </FormDrawer>
+
+    <EntityChangeHistoryDrawer
+      v-model="changeLogVisible"
+      :entity-type="config.table"
+      :entity-id="changeLogEntityId"
+    />
 
     <ImportDialog
       v-if="showImport"
@@ -154,6 +163,7 @@ import type { PageConfig } from '@/config/pageRegistry'
 import { getListFields, getSchema, collectLinkTables } from '@/config/pageSchemas'
 import GroupedFormFields from './form/GroupedFormFields.vue'
 import ImportDialog from './ImportDialog.vue'
+import EntityChangeHistoryDrawer from './EntityChangeHistoryDrawer.vue'
 import { columnAlign } from '@/utils/tableCell'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
 import { useDict } from '@/composables/useDict'
@@ -189,9 +199,14 @@ const form = ref<Record<string, unknown>>({})
 const formTitle = ref('新增')
 const formMode = ref<'create' | 'edit' | 'view'>('create')
 const tableRef = ref()
+const changeLogVisible = ref(false)
+const changeLogEntityId = ref<string>('')
 const { selectedCount, syncFromTable, selectedIds, clear: clearSelection } = useCrossPageSelection()
 
 const tableHeight = useSystemTableHeight()
+
+const viewEnabled = computed(() => props.enableView === true || props.config.enableView === true)
+const changeLogEnabled = computed(() => props.config.enableChangeLog !== false && viewEnabled.value)
 
 const schema = computed(() => getSchema(props.config.table))
 const listFields = computed(() => {
@@ -202,6 +217,11 @@ const listFields = computed(() => {
   return Object.keys(first).filter((k) => !['password_hash'].includes(k)).slice(0, 12).map((k) => ({ prop: k, label: k }))
 })
 const formFields = computed(() => {
+  if (formMode.value === 'view') {
+    const all = schema.value
+    if (all.length) return all
+    return listFields.value
+  }
   const s = schema.value.filter((f) => !f.readonly)
   if (s.length) return s
   return listFields.value
@@ -320,6 +340,11 @@ function onEdit(row: Record<string, unknown>) {
 
 function onView(row: Record<string, unknown>) {
   openForm(row, 'view')
+}
+
+function openChangeLog() {
+  changeLogEntityId.value = String(form.value.id ?? '')
+  changeLogVisible.value = true
 }
 
 async function remove(row: Record<string, unknown>) {

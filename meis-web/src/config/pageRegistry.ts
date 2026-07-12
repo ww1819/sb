@@ -27,6 +27,10 @@ export interface PageConfig {
   listParams?: Record<string, string | number | boolean>
   /** 保存接口（POST，支持新增/编辑合一） */
   saveUrl?: string
+  /** 启用查看（只读） */
+  enableView?: boolean
+  /** 是否提供变更记录（默认跟随 enableView） */
+  enableChangeLog?: boolean
 }
 
 export const pageRegistry: Record<string, PageConfig> = {
@@ -90,17 +94,39 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/purchase/acceptance/page',
     listFilters: [{ key: 'acceptance_status', label: '验收状态', dictType: 'acceptance_status' }]
   },
-  '/purchase/supplier': { title: '供应商管理', apiBase: '/system', table: 'supplier', importable: true, pinyinCode: true },
-  '/purchase/category': { title: '设备分类', apiBase: '/system', table: 'medical_device_category' },
-  '/purchase/manufacturer': { title: '生产厂商', apiBase: '/system', table: 'manufacturer', importable: true, pinyinCode: true },
-  '/dict/supplier': { title: '供应商维护', apiBase: '/system', table: 'supplier', importable: true, pinyinCode: true },
-  '/dict/manufacturer': { title: '生产厂家维护', apiBase: '/system', table: 'manufacturer', importable: true, pinyinCode: true },
-  '/dict/category': { title: '设备68档案', apiBase: '/system', table: 'medical_device_category' },
-  '/dict/asset-category': { title: '资产分类', apiBase: '/system', table: 'asset_category' },
-  '/dict/finance-category': { title: '财务分类', apiBase: '/system', table: 'finance_category' },
-  '/dict/dept': { title: '科室维护', apiBase: '/system', table: 'department', pinyinCode: true },
-  '/dict/warehouse': { title: '仓库维护', apiBase: '/system', table: 'warehouse' },
-  '/dict/unit': { title: '单位维护', apiBase: '/system', table: 'unit_dict' },
+  '/purchase/supplier': { title: '供应商管理', apiBase: '/system', table: 'supplier', importable: true, pinyinCode: true,
+  enableView: true
+},
+  '/purchase/category': { title: '设备分类', apiBase: '/system', table: 'medical_device_category',
+  enableView: true
+},
+  '/purchase/manufacturer': { title: '生产厂商', apiBase: '/system', table: 'manufacturer', importable: true, pinyinCode: true,
+  enableView: true
+},
+  '/dict/supplier': { title: '供应商维护', apiBase: '/system', table: 'supplier', importable: true, pinyinCode: true,
+  enableView: true
+},
+  '/dict/manufacturer': { title: '生产厂家维护', apiBase: '/system', table: 'manufacturer', importable: true, pinyinCode: true,
+  enableView: true
+},
+  '/dict/category': { title: '设备68档案', apiBase: '/system', table: 'medical_device_category',
+  enableView: true
+},
+  '/dict/asset-category': { title: '资产分类', apiBase: '/system', table: 'asset_category',
+  enableView: true
+},
+  '/dict/finance-category': { title: '财务分类', apiBase: '/system', table: 'finance_category',
+  enableView: true
+},
+  '/dict/dept': { title: '科室维护', apiBase: '/system', table: 'department', pinyinCode: true,
+  enableView: true
+},
+  '/dict/warehouse': { title: '仓库维护', apiBase: '/system', table: 'warehouse',
+  enableView: true
+},
+  '/dict/unit': { title: '单位维护', apiBase: '/system', table: 'unit_dict',
+  enableView: true
+},
   '/purchase/dashboard': { title: '采购看板', apiBase: '/purchase', table: 'purchase_plan' },
   '/purchase/trace': { title: '业务追溯', apiBase: '/purchase', table: 'purchase_plan' },
   '/asset/query': { title: '资产综合查询', apiBase: '/asset', table: 'medical_device' },
@@ -116,8 +142,9 @@ export const pageRegistry: Record<string, PageConfig> = {
     title: '资产管理',
     apiBase: '/asset',
     table: 'medical_device',
-    listPageUrl: '/asset/device/page'
-  },
+    listPageUrl: '/asset/device/page',
+  enableView: true
+},
   '/asset/entry': {
     title: '设备入库',
     apiBase: '/asset',
@@ -153,7 +180,9 @@ export const pageRegistry: Record<string, PageConfig> = {
     listFilters: [{ key: 'audit_status', label: '审核状态', dictType: 'audit_status' }]
   },
   '/asset/scrap': { title: '设备报废', apiBase: '/asset', table: 'device_scrap', saveUrl: '/asset/scrap' },
-  '/warehouse/setting': { title: '库房维护', apiBase: '/system', table: 'warehouse' },
+  '/warehouse/setting': { title: '库房维护', apiBase: '/system', table: 'warehouse',
+  enableView: true
+},
   '/warehouse/entry': {
     title: '设备入库',
     apiBase: '/asset',
@@ -230,9 +259,13 @@ export const pageRegistry: Record<string, PageConfig> = {
     saveUrl: '/repair/workorder',
     listFilters: [{ key: 'status', label: '状态', dictType: 'wo_status' }]
   },
-  '/repair/engineer': { title: '工程师', apiBase: '/repair', table: 'engineer' },
+  '/repair/engineer': { title: '工程师', apiBase: '/repair', table: 'engineer',
+  enableView: true
+},
   '/repair/spare-archive': { title: '配件档案管理', apiBase: '/repair', table: 'spare_part' },
-  '/repair/fault': { title: '故障库', apiBase: '/repair', table: 'fault_type_dict' },
+  '/repair/fault': { title: '故障库', apiBase: '/repair', table: 'fault_type_dict',
+  enableView: true
+},
   '/maintain/param': { title: '保养参数设置', apiBase: '/maintain', table: 'maintenance_level' },
   '/maintain/plan': { title: '保养计划', apiBase: '/maintain', table: 'maintenance_plan', saveUrl: '/maintain/plan' },
   '/maintain/execution': {
@@ -443,10 +476,18 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/power/record/page'
   },
   '/screen/equipment': { title: '设备运营大屏', apiBase: '/screen', table: 'medical_device' },
-  '/system/campus': { title: '院区管理', apiBase: '/system', table: 'campus' },
-  '/system/dept': { title: '科室管理', apiBase: '/system', table: 'department' },
-  '/system/user': { title: '用户管理', apiBase: '/system', table: 'sys_user' },
-  '/system/role': { title: '角色管理', apiBase: '/system', table: 'sys_role' },
+  '/system/campus': { title: '院区管理', apiBase: '/system', table: 'campus',
+  enableView: true
+},
+  '/system/dept': { title: '科室管理', apiBase: '/system', table: 'department',
+  enableView: true
+},
+  '/system/user': { title: '用户管理', apiBase: '/system', table: 'sys_user',
+  enableView: true
+},
+  '/system/role': { title: '角色管理', apiBase: '/system', table: 'sys_role',
+  enableView: true
+},
   '/system/dict': { title: '数据字典', apiBase: '/system', table: 'sys_dict' },
   '/system/log': { title: '操作日志', apiBase: '/system', table: 'sys_operation_log' },
   '/system/approval': { title: '审批配置', apiBase: '/system', table: 'sys_approval_flow' }

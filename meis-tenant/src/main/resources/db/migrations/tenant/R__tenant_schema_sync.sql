@@ -482,3 +482,23 @@ CREATE TABLE IF NOT EXISTS device_label_print_log (
     template_code VARCHAR(50) DEFAULT 'default',
     remark TEXT
 );
+
+-- ---------- 附录 S/T：报修草稿状态 + 实体变更记录 ----------
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('wo_status', 'draft', '未提交', 'draft', 0)
+ON CONFLICT (dict_type, dict_code) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS sys_entity_change_log (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    entity_type VARCHAR(64) NOT NULL,
+    entity_id UUID NOT NULL,
+    action VARCHAR(32) NOT NULL,
+    changed_fields JSONB,
+    snapshot_json JSONB,
+    operator_id UUID,
+    operator_name VARCHAR(100),
+    remark TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_sys_entity_change_log_entity
+    ON sys_entity_change_log (entity_type, entity_id, created_at DESC);

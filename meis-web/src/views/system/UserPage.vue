@@ -94,9 +94,10 @@
           <span class="text-time">{{ formatTime(row.last_login_at) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="240" fixed="right">
         <template #default="{ row }">
           <div class="table-actions">
+            <el-button link type="primary" @click="openChangeLog(row)">变更记录</el-button>
             <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
             <el-button link type="primary" @click="openRole(row)">分配角色</el-button>
             <el-dropdown trigger="click" @command="(cmd: string) => onUserAction(cmd, row)">
@@ -259,6 +260,7 @@
         <el-button type="primary" :loading="savingPerm" @click="savePerm">保存权限</el-button>
       </template>
     </AppModal>
+    <EntityChangeHistoryDrawer v-model="changeLogVisible" entity-type="sys_user" :entity-id="changeLogId" />
   </SystemPageCard>
 </template>
 
@@ -272,6 +274,7 @@ import PageFilterBar from '@/components/system/PageFilterBar.vue'
 import { fetchPage, usePagedList } from '@/composables/usePagedList'
 import PermissionEditor, { type PermissionModel } from '@/components/PermissionEditor.vue'
 import AppModal from '@/components/AppModal.vue'
+import EntityChangeHistoryDrawer from '@/components/EntityChangeHistoryDrawer.vue'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
 
 const tableHeight = useSystemTableHeight()
@@ -282,9 +285,16 @@ const flatDepts = ref<any[]>([])
 const formVisible = ref(false)
 const roleVisible = ref(false)
 const permVisible = ref(false)
+const changeLogVisible = ref(false)
+const changeLogId = ref('')
 const formTitle = ref('新建用户')
 const form = ref<any>({ is_active: true })
 const currentUser = ref<any>(null)
+
+function openChangeLog(row: any) {
+  changeLogId.value = String(row.id)
+  changeLogVisible.value = true
+}
 const selectedRoleId = ref('')
 const syncOnAssign = ref(true)
 const permValue = ref<PermissionModel>()

@@ -30,9 +30,10 @@
           <el-tag :type="row.is_active ? 'success' : 'info'" size="small">{{ row.is_active ? '是' : '否' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="140">
+      <el-table-column label="操作" width="200">
         <template #default="{ row }">
           <div class="table-actions">
+            <el-button link type="primary" @click="openChangeLog(row)">变更记录</el-button>
             <el-button link type="primary" @click="openForm(row)">编辑</el-button>
             <el-button link type="danger" @click="remove(row)">删除</el-button>
           </div>
@@ -63,6 +64,7 @@
         <el-button type="primary" @click="save">保存</el-button>
       </template>
     </el-dialog>
+    <EntityChangeHistoryDrawer v-model="changeLogVisible" entity-type="department" :entity-id="changeLogId" />
     <ImportDialog
       v-model="importVisible"
       title="科室导入"
@@ -80,6 +82,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
 import ImportDialog from '@/components/ImportDialog.vue'
+import EntityChangeHistoryDrawer from '@/components/EntityChangeHistoryDrawer.vue'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
 import { downloadApiFile } from '@/utils/fileDownload'
 import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
@@ -93,9 +96,16 @@ const loading = ref(false)
 const campuses = ref<any[]>([])
 const visible = ref(false)
 const importVisible = ref(false)
+const changeLogVisible = ref(false)
+const changeLogId = ref('')
 const form = ref<any>({ is_active: true, is_clinical: false, sort_order: 0 })
 const tableRef = ref()
 const { selectedCount, syncFromTable, selectedIds, clear: clearSelection } = useCrossPageSelection()
+
+function openChangeLog(row: any) {
+  changeLogId.value = String(row.id)
+  changeLogVisible.value = true
+}
 
 const filteredList = computed(() => {
   const kw = keyword.value.trim().toLowerCase()

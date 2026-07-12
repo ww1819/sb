@@ -1,6 +1,7 @@
 package com.meis.saas.system.controller;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.meis.saas.common.audit.EntityChangeLogService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.cache.CacheKeys;
 import com.meis.saas.common.cache.MeisCacheEviction;
@@ -35,6 +36,7 @@ public class DepartmentController {
     private final MeisCacheProperties cacheProps;
     private final MeisCacheEviction cacheEviction;
     private final ImportProfileService importProfileService;
+    private final EntityChangeLogService changeLog;
 
     @GetMapping
     public Result<List<Map<String, Object>>> list() {
@@ -75,6 +77,7 @@ public class DepartmentController {
         String pinyin = resolvePinyin(body);
         if (softDeletedId.isPresent()) {
             UUID existingId = UUID.fromString(softDeletedId.get());
+            Map<String, Object> before = changeLog.loadRow("department", existingId);
             jdbc.update("""
                     UPDATE department SET dept_code=?, dept_name=?, pinyin_code=?, parent_id=?::uuid, campus_id=?::uuid,
                     floor_number=?, room_number=?, is_clinical=?, sort_order=?, is_active=?,
@@ -85,6 +88,8 @@ public class DepartmentController {
                     body.getOrDefault("is_clinical", false), body.getOrDefault("sort_order", 0),
                     body.getOrDefault("is_active", true), TenantContext.getUserId(), existingId);
             cacheEviction.evictSchemaOrg(schema());
+            Map<String, Object> after = changeLog.loadRow("department", existingId);
+            changeLog.recordUpdate("department", existingId, before, after);
             return Result.ok(jdbc.queryForList("SELECT * FROM department WHERE id = ?::uuid", existingId).get(0));
         }
         UUID id = UUID.randomUUID();
@@ -95,12 +100,15 @@ public class DepartmentController {
                 body.getOrDefault("is_clinical", false), body.getOrDefault("sort_order", 0),
                 body.getOrDefault("is_active", true), SoftDeleteSupport.currentUserId(), 0);
         cacheEviction.evictSchemaOrg(schema());
-        return Result.ok(jdbc.queryForList("SELECT * FROM department WHERE id = ?::uuid", id).get(0));
+        Map<String, Object> created = jdbc.queryForList("SELECT * FROM department WHERE id = ?::uuid", id).get(0);
+        changeLog.recordCreate("department", id, created);
+        return Result.ok(created);
     }
 
     @PutMapping("/{id}")
     @OperationLog(module = "system", description = "更新科室")
     public Result<Map<String, Object>> update(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
+        Map<String, Object> before = changeLog.loadRow("department", id);
         String pinyin = resolvePinyin(body);
         jdbc.update(
                 "UPDATE department SET dept_code=?, dept_name=?, pinyin_code=?, parent_id=?::uuid, campus_id=?::uuid, floor_number=?, room_number=?, is_clinical=?, sort_order=?, is_active=?, updated_at=NOW(), updated_by=?::uuid WHERE id=?::uuid",
@@ -109,13 +117,17 @@ public class DepartmentController {
                 body.getOrDefault("is_clinical", false), body.getOrDefault("sort_order", 0),
                 body.getOrDefault("is_active", true), SoftDeleteSupport.currentUserId(), id);
         cacheEviction.evictSchemaOrg(schema());
+        Map<String, Object> after = changeLog.loadRow("department", id);
+        changeLog.recordUpdate("department", id, before, after);
         return Result.ok(jdbc.queryForList("SELECT * FROM department WHERE id = ?::uuid", id).get(0));
     }
 
     @DeleteMapping("/{id}")
     @OperationLog(module = "system", description = "删除科室")
     public Result<Void> delete(@PathVariable UUID id) {
+        Map<String, Object> before = changeLog.loadRow("department", id);
         SoftDeleteSupport.softDelete(jdbc, "department", id.toString());
+        changeLog.recordDelete("department", id, before);
         cacheEviction.evictSchemaOrg(schema());
         return Result.ok();
     }

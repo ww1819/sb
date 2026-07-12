@@ -1780,3 +1780,67 @@ powershell -File scripts/ensure-tenant-tables.ps1
 3. 不改后端存值；筛选下拉已走字典，保持一致。
 
 **状态**：按 R.2 实施。
+
+
+---
+
+## 附录 S：设备报修草稿 / 提交 / 撤回
+
+> 来源：用户需求（2026-07-12）；定稿：撤回后可再提交；与「取消」并存；用语「撤回」。
+
+### S.1 状态与规则
+
+| 状态/操作 | 说明 |
+|---|---|
+| `draft` | 未提交草稿；可修改、删除 |
+| **提交** | `draft` → `reported`；占用设备（`maintenance`）；进入派工流程 |
+| **撤回** | 仅 `reported` 且尚未派单/接单/开始维修；回到 `draft`；释放设备；可再改/删/提交 |
+| **取消** | 流程作废 → `cancelled`（与撤回并存）；草稿请用删除，勿取消 |
+| 已提交后 | `reported` 及之后禁止修改、删除（走流程动作） |
+
+### S.2 审计
+
+- 修改 / 提交 / 撤回 / 删除：写入 `repair_workorder_event`（`update`/`submit`/`withdraw`/`delete`）+ 通用 `sys_entity_change_log`。
+- 取消等原有流程事件保持不变。
+
+### S.3 实现要点
+
+- 创建默认 `draft`，**不**占用设备；提交时再占用。
+- 专用 API：`PUT` 更新、`POST .../submit`、`POST .../withdraw`、`DELETE`；通用 CRUD 对 `repair_workorder` 禁止绕过。
+- 字典 `wo_status` 增加 `draft`=未提交。
+
+**状态**：按 S 实施。
+
+---
+
+## 附录 T：主数据查看与变更记录
+
+> 来源：用户需求（2026-07-12）；定稿：粒度 A+C（字段级 diff + 删/提交类附精简快照）；范围 P0+P1+P2 本轮。
+
+### T.1 目标
+
+- 主数据支持 **查看**（只读）与 **变更记录**，便于 CRUD 分权与追溯。
+- 与 `sys_operation_log`（接口审计）分离：新建 `sys_entity_change_log`（实体级）。
+
+### T.2 变更记录模型（A+C）
+
+| 动作 | 记录内容 |
+|---|---|
+| create / update | 字段级 `changed_fields`：`[{field, label, oldValue, newValue}]` |
+| delete / submit / withdraw | 字段 diff（如有）+ `snapshot_json` 精简快照 |
+| 敏感字段 | 不落库（如 `password`/`password_hash`/`token` 等） |
+
+### T.3 纳入实体（本轮）
+
+| 批次 | 实体 |
+|---|---|
+| P0 | `medical_device`、`manufacturer`、`supplier`、`department`、`sys_user`、`repair_workorder` |
+| P1 | `campus`、`building`、`warehouse`、`asset_category`、`medical_device_category` |
+| P2 | `engineer`、`fault_type_dict`、`finance_category`、`unit_dict`、`sys_role` |
+
+### T.4 前端
+
+- 上述实体列表启用「查看」；详情提供「变更记录」入口。
+- 报修详情同时保留时间轴事件与变更记录。
+
+**状态**：按 T 实施。

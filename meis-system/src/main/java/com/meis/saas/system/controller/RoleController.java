@@ -1,5 +1,6 @@
 package com.meis.saas.system.controller;
 
+import com.meis.saas.common.audit.EntityChangeLogService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.cache.MeisCacheEviction;
 import com.meis.saas.common.exception.BizException;
@@ -20,6 +21,7 @@ public class RoleController {
     private final JdbcTemplate jdbc;
     private final PermissionService permissionService;
     private final MeisCacheEviction cacheEviction;
+    private final EntityChangeLogService changeLog;
 
     @GetMapping
     public Result<List<Map<String, Object>>> list() {
@@ -54,6 +56,7 @@ public class RoleController {
         String emptyPerms = permissionService.toJson(permissionService.emptyPermissions());
         if (softDeletedId.isPresent()) {
             UUID existingId = UUID.fromString(softDeletedId.get());
+            Map<String, Object> before = changeLog.loadRow("sys_role", existingId);
             jdbc.update("""
                     UPDATE sys_role SET role_code=?, role_name=?, description=?, permissions=?::jsonb,
                     sort_order=?, is_active=?,
@@ -62,6 +65,7 @@ public class RoleController {
                     """, code, body.get("role_name"), body.get("description"), emptyPerms,
                     body.getOrDefault("sort_order", 0), body.getOrDefault("is_active", true),
                     SoftDeleteSupport.currentUserId(), existingId);
+            changeLog.recordUpdate("sys_role", existingId, before, changeLog.loadRow("sys_role", existingId));
             return get(existingId);
         }
         UUID id = UUID.randomUUID();
@@ -71,14 +75,15 @@ public class RoleController {
                 """, id, code, body.get("role_name"), body.get("description"), emptyPerms,
                 body.getOrDefault("sort_order", 0), body.getOrDefault("is_active", true),
                 SoftDeleteSupport.currentUserId(), 0);
+        changeLog.recordCreate("sys_role", id, changeLog.loadRow("sys_role", id));
         return get(id);
     }
 
     @PutMapping("/{id}")
     @OperationLog(module = "system", description = "更新角色")
     public Result<Map<String, Object>> update(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
-        if (jdbc.queryForList("SELECT 1 FROM sys_role WHERE id = ?::uuid "
-                + SoftDeleteSupport.notDeletedClause(jdbc, "sys_role", null), id).isEmpty()) {
+        Map<String, Object> before = changeLog.loadRow("sys_role", id);
+        if (before == null) {
             throw new BizException(404, "role not found");
         }
         jdbc.update("""
@@ -86,6 +91,7 @@ public class RoleController {
                 updated_at=NOW(), updated_by=?::uuid WHERE id=?::uuid
                 """, body.get("role_name"), body.get("description"), body.getOrDefault("sort_order", 0),
                 body.getOrDefault("is_active", true), SoftDeleteSupport.currentUserId(), id);
+        changeLog.recordUpdate("sys_role", id, before, changeLog.loadRow("sys_role", id));
         return get(id);
     }
 
@@ -96,8 +102,10 @@ public class RoleController {
                                           @RequestBody Map<String, Object> permissions) {
         if (tenantId == null) tenantId = TenantContext.getTenantId();
         permissionService.validatePermissions(tenantId, TenantContext.getSchemaName(), permissions);
+        Map<String, Object> before = changeLog.loadRow("sys_role", id);
         jdbc.update("UPDATE sys_role SET permissions = ?::jsonb, updated_at = NOW(), updated_by = ?::uuid WHERE id = ?::uuid",
                 permissionService.toJson(permissions), SoftDeleteSupport.currentUserId(), id);
+        changeLog.recordAction("sys_role", id, "update", before, changeLog.loadRow("sys_role", id), "更新权限");
         cacheEviction.evictTenantPermissions(tenantId);
         return Result.ok();
     }
@@ -124,7 +132,9 @@ public class RoleController {
         List<Map<String, Object>> users = jdbc.queryForList(
                 "SELECT 1 FROM sys_user WHERE role_ids IS NOT NULL AND ?::uuid = ANY(role_ids) LIMIT 1", id);
         if (!users.isEmpty()) throw new BizException(400, "role in use by users");
+        Map<String, Object> before = changeLog.loadRow("sys_role", id);
         SoftDeleteSupport.softDelete(jdbc, "sys_role", id.toString());
+        changeLog.recordDelete("sys_role", id, before);
         return Result.ok();
     }
 }

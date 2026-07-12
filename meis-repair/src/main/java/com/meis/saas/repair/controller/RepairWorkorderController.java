@@ -1,9 +1,11 @@
 package com.meis.saas.repair.controller;
 
+import com.meis.saas.common.audit.EntityChangeLogService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
@@ -22,13 +24,20 @@ public class RepairWorkorderController {
     private static final String UUID_PATH =
             "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
 
-    /** 占用设备、不可再报修的工单状态 */
+    /** 占用设备、不可再报修的工单状态（不含草稿） */
     private static final Set<String> ACTIVE_STATUSES = Set.of(
             "reported", "dispatching", "pending_accept", "accepted",
             "repairing", "pending_verify", "suspended"
     );
 
+    private static final Set<String> DRAFT_EDITABLE_FIELDS = Set.of(
+            "device_id", "device_code", "device_name", "reporter_id", "report_dept_id",
+            "report_method", "report_time", "fault_description", "urgency_level",
+            "fault_type_id", "remark"
+    );
+
     private final JdbcTemplate jdbc;
+    private final EntityChangeLogService changeLog;
 
     @GetMapping("/devices/candidates")
     public Result<List<Map<String, Object>>> deviceCandidates(
@@ -68,6 +77,7 @@ public class RepairWorkorderController {
             @RequestParam(required = false) String mode,
             @RequestParam(required = false) String status) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null));
         List<Object> args = new ArrayList<>();
 
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
@@ -85,7 +95,7 @@ public class RepairWorkorderController {
             args.add(status);
         } else if (mode != null && !mode.isBlank()) {
             switch (mode) {
-                case "apply" -> where.append(" AND status IN ('reported','dispatching') ");
+                case "apply" -> where.append(" AND status IN ('draft','reported','dispatching') ");
                 case "handle" -> where.append(" AND status IN ('dispatching','pending_accept','accepted','repairing','suspended') ");
                 case "verify" -> where.append(" AND status = 'pending_verify' ");
                 default -> { }
@@ -127,7 +137,7 @@ public class RepairWorkorderController {
 
     @PostMapping
     @Transactional
-    @OperationLog(module = "repair", description = "创建报修工单")
+    @OperationLog(module = "repair", description = "保存报修草稿")
     public Result<Map<String, Object>> create(@RequestBody Map<String, Object> body) {
         if (body.get("device_id") == null || String.valueOf(body.get("device_id")).isBlank()) {
             throw new BizException(400, "请选择报修设备");
@@ -135,20 +145,120 @@ public class RepairWorkorderController {
         if (body.get("fault_description") == null || String.valueOf(body.get("fault_description")).isBlank()) {
             throw new BizException(400, "请填写故障描述");
         }
+        assertDeviceAvailable(body.get("device_id"), null);
         UUID id = UUID.randomUUID();
         String woNo = "WO" + System.currentTimeMillis();
         jdbc.update("""
             INSERT INTO repair_workorder (id, wo_no, device_id, device_code, device_name, reporter_id, report_dept_id,
-                report_method, report_time, fault_description, urgency_level, status)
-            VALUES (?::uuid,?,?::uuid,?,?,?::uuid,?::uuid,?,?::timestamptz,?,?,?)
+                report_method, report_time, fault_description, urgency_level, fault_type_id, remark, status)
+            VALUES (?::uuid,?,?::uuid,?,?,?::uuid,?::uuid,?,?::timestamptz,?,?,?::uuid,?,?)
             """,
                 id, woNo, body.get("device_id"), body.get("device_code"), body.get("device_name"),
                 blankToNull(body.get("reporter_id")), blankToNull(body.get("report_dept_id")),
                 body.getOrDefault("report_method", "web"), body.get("report_time"),
-                body.get("fault_description"), body.getOrDefault("urgency_level", "normal"), "reported");
-        syncDeviceStatus(body.get("device_id"), "maintenance");
-        addEvent(id, "created", null, "reported", null, null, null, null, null, "临床报修", null);
-        return Result.ok(requireWo(id));
+                body.get("fault_description"), body.getOrDefault("urgency_level", "normal"),
+                blankToNull(body.get("fault_type_id")), blankToNull(body.get("remark")), "draft");
+        Map<String, Object> row = requireWo(id);
+        addEvent(id, "created", null, "draft", null, null, null, null, null, "保存草稿", null);
+        changeLog.recordCreate("repair_workorder", id, row);
+        return Result.ok(row);
+    }
+
+    @PutMapping("/{id:" + UUID_PATH + "}")
+    @Transactional
+    @OperationLog(module = "repair", description = "修改报修草稿")
+    public Result<Map<String, Object>> update(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
+        Map<String, Object> before = requireWo(id);
+        if (!"draft".equals(str(before.get("status")))) {
+            throw new BizException(400, "仅未提交的报修单可修改");
+        }
+        Object deviceId = body.containsKey("device_id") ? body.get("device_id") : before.get("device_id");
+        if (deviceId == null || String.valueOf(deviceId).isBlank()) {
+            throw new BizException(400, "请选择报修设备");
+        }
+        Object fault = body.containsKey("fault_description") ? body.get("fault_description") : before.get("fault_description");
+        if (fault == null || String.valueOf(fault).isBlank()) {
+            throw new BizException(400, "请填写故障描述");
+        }
+        assertDeviceAvailable(deviceId, id);
+        List<String> sets = new ArrayList<>();
+        List<Object> args = new ArrayList<>();
+        for (String col : DRAFT_EDITABLE_FIELDS) {
+            if (!body.containsKey(col)) continue;
+            Object v = body.get(col);
+            if ("device_id".equals(col) || col.endsWith("_id")) {
+                sets.add(col + " = ?::uuid");
+                args.add(blankToNull(v));
+            } else if ("report_time".equals(col)) {
+                sets.add(col + " = ?::timestamptz");
+                args.add(v);
+            } else {
+                sets.add(col + " = ?");
+                args.add(v);
+            }
+        }
+        if (sets.isEmpty()) return Result.ok(before);
+        sets.add("updated_at = NOW()");
+        args.add(id);
+        jdbc.update("UPDATE repair_workorder SET " + String.join(", ", sets) + " WHERE id = ?::uuid", args.toArray());
+        Map<String, Object> after = requireWo(id);
+        addEvent(id, "update", "draft", "draft", null, null, null, null, null, "修改草稿", null);
+        changeLog.recordUpdate("repair_workorder", id, before, after);
+        return Result.ok(after);
+    }
+
+    @PostMapping("/{id:" + UUID_PATH + "}/submit")
+    @Transactional
+    @OperationLog(module = "repair", description = "提交报修")
+    public Result<Map<String, Object>> submit(@PathVariable UUID id) {
+        Map<String, Object> before = requireWo(id);
+        if (!"draft".equals(str(before.get("status")))) {
+            throw new BizException(400, "仅未提交草稿可提交");
+        }
+        assertDeviceAvailable(before.get("device_id"), id);
+        jdbc.update("""
+            UPDATE repair_workorder SET status = 'reported',
+            report_time = COALESCE(report_time, NOW()), updated_at = NOW()
+            WHERE id = ?::uuid
+            """, id);
+        syncDeviceStatus(before.get("device_id"), "maintenance");
+        Map<String, Object> after = requireWo(id);
+        addEvent(id, "submit", "draft", "reported", null, null, null, null, null, "提交报修", null);
+        changeLog.recordAction("repair_workorder", id, "submit", before, after, "提交报修");
+        return Result.ok(after);
+    }
+
+    @PostMapping("/{id:" + UUID_PATH + "}/withdraw")
+    @Transactional
+    @OperationLog(module = "repair", description = "撤回报修")
+    public Result<Map<String, Object>> withdraw(@PathVariable UUID id, @RequestBody(required = false) Map<String, Object> body) {
+        Map<String, Object> before = requireWo(id);
+        assertWithdrawable(before);
+        jdbc.update("""
+            UPDATE repair_workorder SET status = 'draft', updated_at = NOW()
+            WHERE id = ?::uuid
+            """, id);
+        syncDeviceStatus(before.get("device_id"), "normal");
+        Map<String, Object> after = requireWo(id);
+        String remark = body != null ? str(body.get("remark")) : "撤回报修";
+        if (remark.isBlank()) remark = "撤回报修";
+        addEvent(id, "withdraw", "reported", "draft", null, null, null, null, null, remark, null);
+        changeLog.recordAction("repair_workorder", id, "withdraw", before, after, remark);
+        return Result.ok(after);
+    }
+
+    @DeleteMapping("/{id:" + UUID_PATH + "}")
+    @Transactional
+    @OperationLog(module = "repair", description = "删除报修草稿")
+    public Result<Void> delete(@PathVariable UUID id) {
+        Map<String, Object> before = requireWo(id);
+        if (!"draft".equals(str(before.get("status")))) {
+            throw new BizException(400, "仅未提交的报修单可删除");
+        }
+        addEvent(id, "delete", "draft", "draft", null, null, null, null, null, "删除草稿", null);
+        changeLog.recordDelete("repair_workorder", id, before);
+        SoftDeleteSupport.softDelete(jdbc, "repair_workorder", id.toString());
+        return Result.ok();
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/dispatch")
@@ -416,6 +526,9 @@ public class RepairWorkorderController {
     public Result<Map<String, Object>> cancel(@PathVariable UUID id, @RequestBody(required = false) Map<String, Object> body) {
         Map<String, Object> wo = requireWo(id);
         String current = str(wo.get("status"));
+        if ("draft".equals(current)) {
+            throw new BizException(400, "草稿请直接删除，无需取消");
+        }
         if (Set.of("closed", "cancelled", "verified").contains(current)) {
             throw new BizException(400, "当前状态不可取消");
         }
@@ -423,15 +536,62 @@ public class RepairWorkorderController {
         addEvent(id, "cancel", current, "cancelled", str(wo.get("repair_sub_status")), null,
                 null, null, null, body != null ? str(body.get("remark")) : "取消工单", null);
         syncDeviceStatus(wo.get("device_id"), "normal");
+        changeLog.recordAction("repair_workorder", id, "cancel", wo, requireWo(id),
+                body != null ? str(body.get("remark")) : "取消工单");
         return Result.ok(requireWo(id));
     }
 
     // ---------- helpers ----------
 
     private Map<String, Object> requireWo(UUID id) {
-        List<Map<String, Object>> rows = jdbc.queryForList("SELECT * FROM repair_workorder WHERE id = ?::uuid", id);
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT * FROM repair_workorder WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null), id);
         if (rows.isEmpty()) throw new BizException(404, "workorder not found");
         return rows.get(0);
+    }
+
+    private void assertWithdrawable(Map<String, Object> wo) {
+        if (!"reported".equals(str(wo.get("status")))) {
+            throw new BizException(400, "仅已提交且尚未派单/响应的报修可撤回");
+        }
+        if (!isBlankObj(wo.get("assigned_engineer_id"))
+                || !isBlankObj(wo.get("dispatch_started_at"))
+                || !isBlankObj(wo.get("assigned_at"))
+                || !isBlankObj(wo.get("accepted_at"))
+                || !isBlankObj(wo.get("repair_start_time"))
+                || !isBlankObj(wo.get("response_time"))) {
+            throw new BizException(400, "已进入派单或维修流程，不可撤回，如需作废请使用取消");
+        }
+    }
+
+    private void assertDeviceAvailable(Object deviceId, UUID excludeWoId) {
+        if (deviceId == null || String.valueOf(deviceId).isBlank()) return;
+        List<Map<String, Object>> device = jdbc.queryForList(
+                "SELECT device_status FROM medical_device WHERE id = ?::uuid", deviceId);
+        if (device.isEmpty()) throw new BizException(400, "设备不存在");
+        String ds = str(device.get(0).get("device_status"));
+        if (Set.of("maintenance", "pending_verify", "scrap").contains(ds)) {
+            throw new BizException(400, "设备当前不可报修: " + ds);
+        }
+        String sql = """
+                SELECT id FROM repair_workorder
+                WHERE device_id = ?::uuid AND status IN ('reported','dispatching','pending_accept','accepted','repairing','pending_verify','suspended')
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null);
+        List<Object> args = new ArrayList<>();
+        args.add(deviceId);
+        if (excludeWoId != null) {
+            sql += " AND id <> ?::uuid";
+            args.add(excludeWoId);
+        }
+        List<Map<String, Object>> busy = jdbc.queryForList(sql, args.toArray());
+        if (!busy.isEmpty()) {
+            throw new BizException(400, "该设备已有进行中的报修单");
+        }
+    }
+
+    private static boolean isBlankObj(Object v) {
+        return v == null || String.valueOf(v).isBlank() || "null".equalsIgnoreCase(String.valueOf(v));
     }
 
     private void syncDeviceStatus(Object deviceId, String status) {
@@ -494,7 +654,11 @@ public class RepairWorkorderController {
 
     private static String eventLabel(String type) {
         return switch (type) {
-            case "created" -> "报修提交";
+            case "created" -> "保存草稿";
+            case "update" -> "修改草稿";
+            case "submit" -> "提交报修";
+            case "withdraw" -> "撤回报修";
+            case "delete" -> "删除草稿";
             case "dispatch" -> "派工";
             case "transfer" -> "转派";
             case "accept" -> "接单";

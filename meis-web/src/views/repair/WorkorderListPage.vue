@@ -56,14 +56,18 @@
       </template>
       <template #footer>
         <el-button @click="visible = false">关闭</el-button>
+        <el-button v-if="wo?.id" @click="openChangeLog">变更记录</el-button>
         <template v-if="wo?.id">
-          <template v-if="pageMode === 'apply'">
+          <template v-if="pageMode === 'apply' || pageMode === 'all'">
+            <el-button v-if="can('submit')" type="primary" @click="doSubmit">提交</el-button>
+            <el-button v-if="can('withdraw')" type="warning" plain @click="doWithdraw">撤回</el-button>
+            <el-button v-if="can('delete')" type="danger" plain @click="doDelete">删除</el-button>
             <el-button v-if="can('cancel')" type="danger" plain @click="doCancel">取消报修</el-button>
           </template>
-          <template v-else-if="pageMode === 'verify'">
+          <template v-if="pageMode === 'verify'">
             <el-button v-if="can('verify')" type="success" @click="openVerify">验收</el-button>
           </template>
-          <template v-else>
+          <template v-if="pageMode === 'handle' || pageMode === 'all'">
             <el-button v-if="can('dispatch')" @click="openDispatch">派工</el-button>
             <el-button v-if="can('start')" type="success" plain @click="doStartRepair">开始维修</el-button>
             <el-button v-if="can('accept')" @click="doAccept">接单</el-button>
@@ -72,12 +76,19 @@
             <el-button v-if="can('complete')" type="warning" @click="openComplete">完工</el-button>
             <el-button v-if="can('suspend')" @click="doSuspend">挂起</el-button>
             <el-button v-if="can('resume')" @click="doResume">恢复</el-button>
-            <el-button v-if="can('cancel')" type="danger" plain @click="doCancel">取消</el-button>
+            <el-button v-if="pageMode === 'handle' && can('cancel')" type="danger" plain @click="doCancel">取消</el-button>
           </template>
         </template>
-        <el-button v-if="editable && !wo?.id" type="primary" @click="save">保存</el-button>
+        <el-button v-if="editable && !wo?.id" type="primary" @click="saveDraft">保存草稿</el-button>
+        <el-button v-if="editable && wo?.id && status === 'draft'" type="primary" plain @click="saveDraft">保存</el-button>
       </template>
     </AppModal>
+
+    <EntityChangeHistoryDrawer
+      v-model="changeLogVisible"
+      entity-type="repair_workorder"
+      :entity-id="wo?.id ? String(wo.id) : ''"
+    />
 
     <AppModal v-model="dispatchVisible" title="派工 / 指派工程师" size="md">
       <el-form label-width="100px">
@@ -183,6 +194,7 @@ import AppModal from '@/components/AppModal.vue'
 import GroupedFormFields from '@/components/form/GroupedFormFields.vue'
 import FormSection from '@/components/form/FormSection.vue'
 import RefSelect from '@/components/form/RefSelect.vue'
+import EntityChangeHistoryDrawer from '@/components/EntityChangeHistoryDrawer.vue'
 import type { PageConfig } from '@/config/pageRegistry'
 import { getSchema } from '@/config/pageSchemas'
 
@@ -215,6 +227,7 @@ const showCreate = computed(() => pageMode.value === 'apply' || pageMode.value =
 const auth = useAuthStore()
 const crudRef = ref<InstanceType<typeof CrudPage> | null>(null)
 const visible = ref(false)
+const changeLogVisible = ref(false)
 const wo = ref<Record<string, unknown> | null>(null)
 const timelineData = ref<{
   summary?: Record<string, number | string>
@@ -252,9 +265,17 @@ const subOptions = [
 ]
 
 const status = computed(() => String(wo.value?.status ?? ''))
-const editable = computed(() => !wo.value?.id || status.value === 'reported')
+const editable = computed(() => !wo.value?.id || status.value === 'draft')
+const canWithdraw = computed(() => {
+  if (status.value !== 'reported') return false
+  const row = wo.value
+  if (!row) return false
+  return !row.assigned_engineer_id && !row.dispatch_started_at && !row.assigned_at
+    && !row.accepted_at && !row.repair_start_time && !row.response_time
+})
 const modalTitle = computed(() => {
   if (!wo.value?.id) return '维修工单 新增'
+  if (status.value === 'draft') return '维修工单 草稿'
   return editable.value ? '维修工单 编辑' : '维修工单 详情'
 })
 const formFields = computed(() => {
@@ -266,8 +287,12 @@ const formFields = computed(() => {
 function can(action: string) {
   const s = status.value
   const mode = pageMode.value
+  if (action === 'submit') return s === 'draft' && (mode === 'apply' || mode === 'all')
+  if (action === 'withdraw') return canWithdraw.value && (mode === 'apply' || mode === 'all')
+  if (action === 'delete') return s === 'draft' && (mode === 'apply' || mode === 'all')
   if (mode === 'apply') {
-    return action === 'cancel' && ['reported', 'dispatching'].includes(s)
+    if (action === 'cancel') return ['reported', 'dispatching'].includes(s)
+    return false
   }
   if (mode === 'verify') {
     return action === 'verify' && s === 'pending_verify'
@@ -293,7 +318,7 @@ function can(action: string) {
     case 'resume':
       return s === 'suspended'
     case 'cancel':
-      return !['closed', 'cancelled', 'verified'].includes(s)
+      return !['draft', 'closed', 'cancelled', 'verified'].includes(s)
     default:
       return false
   }
@@ -350,7 +375,7 @@ async function refresh() {
   crudRef.value?.load()
 }
 
-async function save() {
+async function saveDraft() {
   if (!wo.value) return
   if (!wo.value.device_id) {
     ElMessage.warning('请选择报修设备')
@@ -360,15 +385,64 @@ async function save() {
     ElMessage.warning('请填写故障描述')
     return
   }
-  const { data } = await http.post('/repair/workorder', wo.value)
+  const id = wo.value.id
+  const { data } = id
+    ? await http.put(`/repair/workorder/${id}`, wo.value)
+    : await http.post('/repair/workorder', wo.value)
   if (data.code !== 0 && data.code !== 200) {
     ElMessage.error(data.message || '保存失败')
     return
   }
   wo.value = data.data
-  ElMessage.success('报修成功')
+  ElMessage.success(id ? '草稿已保存' : '草稿已创建')
+  await loadTimeline()
+  crudRef.value?.load()
+}
+
+async function doSubmit() {
+  if (!wo.value) return
+  if (!wo.value.id) {
+    await saveDraft()
+    if (!wo.value?.id) return
+  }
+  await ElMessageBox.confirm('提交后将进入维修流程，提交前请确认信息无误。', '提交报修', { type: 'warning' })
+  const { data } = await http.post(`/repair/workorder/${wo.value.id}/submit`)
+  if (data.code !== 0 && data.code !== 200) {
+    ElMessage.error(data.message || '提交失败')
+    return
+  }
+  ElMessage.success('已提交')
   visible.value = false
   crudRef.value?.load()
+}
+
+async function doWithdraw() {
+  if (!wo.value?.id) return
+  await ElMessageBox.confirm('撤回后将回到草稿，可再次修改并提交。设备将恢复可用。', '撤回报修', { type: 'warning' })
+  const { data } = await http.post(`/repair/workorder/${wo.value.id}/withdraw`, { remark: '用户撤回' })
+  if (data.code !== 0 && data.code !== 200) {
+    ElMessage.error(data.message || '撤回失败')
+    return
+  }
+  ElMessage.success('已撤回为草稿')
+  await refresh()
+}
+
+async function doDelete() {
+  if (!wo.value?.id) return
+  await ElMessageBox.confirm('确认删除该草稿报修单？', '删除', { type: 'warning' })
+  const { data } = await http.delete(`/repair/workorder/${wo.value.id}`)
+  if (data.code !== 0 && data.code !== 200) {
+    ElMessage.error(data.message || '删除失败')
+    return
+  }
+  ElMessage.success('已删除')
+  visible.value = false
+  crudRef.value?.load()
+}
+
+function openChangeLog() {
+  changeLogVisible.value = true
 }
 
 function resetActionForm() {

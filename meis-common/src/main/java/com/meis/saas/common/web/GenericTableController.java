@@ -1,6 +1,7 @@
 package com.meis.saas.common.web;
 
 import com.meis.saas.common.asset.MedicalDeviceDeleteGuard;
+import com.meis.saas.common.audit.EntityChangeLogService;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.persistence.TableColumnCache;
@@ -29,6 +30,9 @@ import java.util.*;
 public abstract class GenericTableController {
     @Autowired(required = false)
     private ImportProfileService importProfileService;
+
+    @Autowired(required = false)
+    private EntityChangeLogService changeLogService;
 
     protected void setImportProfileService(ImportProfileService service) {
         this.importProfileService = service;
@@ -68,6 +72,7 @@ public abstract class GenericTableController {
     @PostMapping("/{table}")
     public Result<Map<String, Object>> create(@PathVariable String table, @RequestBody Map<String, Object> body) {
         check(table);
+        denyRepairWorkorderBypass(table);
         if ("medical_device".equals(table)) {
             MedicalDeviceFieldHelper.applyDerivedFields(body);
         }
@@ -78,9 +83,14 @@ public abstract class GenericTableController {
         var softDeletedId = SoftDeleteSupport.findSoftDeletedId(jdbc(), table, body);
         if (softDeletedId.isPresent()) {
             String existingId = softDeletedId.get();
+            Map<String, Object> before = loadTracked(table, existingId);
             body.put("id", existingId);
             SoftDeleteSupport.prepareRestore(body, cols);
             executeUpdate(table, existingId, body);
+            Map<String, Object> after = loadTracked(table, existingId);
+            if (changeLogService != null) {
+                changeLogService.recordUpdate(table, existingId, before, after);
+            }
             return Result.ok(body);
         }
         if (!body.containsKey("id") || isBlank(body.get("id"))) {
@@ -89,12 +99,16 @@ public abstract class GenericTableController {
         String colNames = String.join(",", body.keySet());
         String vals = String.join(",", body.keySet().stream().map(GenericTableController::placeholder).toList());
         jdbc().update("INSERT INTO " + table + " (" + colNames + ") VALUES (" + vals + ")", body.values().toArray());
+        if (changeLogService != null) {
+            changeLogService.recordCreate(table, body.get("id"), body);
+        }
         return Result.ok(body);
     }
 
     @PutMapping("/{table}/{id}")
     public Result<Void> update(@PathVariable String table, @PathVariable String id, @RequestBody Map<String, Object> body) {
         check(table);
+        denyRepairWorkorderBypass(table);
         guardInventoryCheckMutable(table, id);
         SoftDeleteSupport.stripClientUpdateFields(body);
         if ("medical_device".equals(table)) {
@@ -104,7 +118,12 @@ public abstract class GenericTableController {
         }
         normalizeUuidFields(body);
         if (body.isEmpty()) return Result.ok();
+        Map<String, Object> before = loadTracked(table, id);
         executeUpdate(table, id, body);
+        Map<String, Object> after = loadTracked(table, id);
+        if (changeLogService != null) {
+            changeLogService.recordUpdate(table, id, before, after);
+        }
         return Result.ok();
     }
 
@@ -168,15 +187,31 @@ public abstract class GenericTableController {
     @DeleteMapping("/{table}/{id}")
     public Result<Void> delete(@PathVariable String table, @PathVariable String id) {
         check(table);
+        denyRepairWorkorderBypass(table);
         guardInventoryCheckMutable(table, id);
         if ("medical_device".equals(table)) {
             MedicalDeviceDeleteGuard.assertDeletable(jdbc(), id);
         }
+        Map<String, Object> before = loadTracked(table, id);
         int n = SoftDeleteSupport.softDelete(jdbc(), table, id);
         if (n == 0 && SoftDeleteSupport.supportsSoftDelete(jdbc(), table)) {
             throw new BizException(404, "not found");
         }
+        if (changeLogService != null && before != null) {
+            changeLogService.recordDelete(table, id, before);
+        }
         return Result.ok();
+    }
+
+    private Map<String, Object> loadTracked(String table, String id) {
+        if (changeLogService == null || !changeLogService.tracks(table)) return null;
+        return changeLogService.loadRow(table, id);
+    }
+
+    private static void denyRepairWorkorderBypass(String table) {
+        if ("repair_workorder".equals(table)) {
+            throw new BizException(400, "报修请使用 /api/repair/workorder 专用接口（草稿/提交/撤回）");
+        }
     }
 
     private void check(String table) {
