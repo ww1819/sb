@@ -4,7 +4,7 @@
 > 请在本文件中直接增删改；模块细节可拆分子文档后在此链接。
 
 **文档状态**：草稿  
-**最后更新**：2026-07-11  
+**最后更新**：2026-07-12  
 **负责人**：待填写  
 **系统定位**：医院医疗设备与固定资产全生命周期管理 SaaS（Schema 多租户）
 
@@ -24,8 +24,10 @@
 | 写新需求 | 在对应模块章节新增条目，或复制 [附录 A 需求模板](#附录-a-需求条目模板) |
 | 记录缺陷 | 写入 [第 4 章 已知问题](#4-已知问题与技术债) |
 | 待产品决策 | 写入 [第 5 章 待确认问题](#5-待确认问题) |
+| 合理但暂缓开发 | 写入 [第 7 章 待开发功能池](#7-待开发功能池)（编号 `BACKLOG-{模块}-{序号}`） |
 | 模块已评审 | 更新模块表中的「状态」列 |
 | 版本留痕 | 更新 [第 6 章 版本记录](#6-版本记录) |
+| 协作约定 | 见 [附录 Q](#附录-q需求协作与交付约定)；可沉淀的约定确认后写入 Q |
 
 **需求编号规则**（建议）：
 
@@ -905,9 +907,30 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | 1.7 | 2026-07-11 | — | 附录 E：开发完成验收清单；开发面板热加载改为同步执行并分步反馈 |
 | 1.8 | 2026-07-11 | — | 标签：修复换绑设备；待机电流独立行操作；列表展示上下限 |
 | 1.9 | 2026-07-11 | — | 标签：修复换绑与绑定记录；标签名称不得与编码相同 |
+| 1.10 | 2026-07-12 | — | 附录 Q 扩展：约定沉淀/衍生提示/待开发池；新增第 7 章；技术约定索引 |
 
 ---
 
+
+## 7. 待开发功能池
+
+> 已认可、值得做，但因现场节奏/人力暂未开发或未测完的功能。  
+> **区别**：第 4 章 = 缺陷/技术债；第 5 章 = 产品决策未定；**本章 = 已确认方向、待排期**。  
+> 编号规则：`BACKLOG-{模块缩写}-{序号}`，模块缩写同文档开头（如 `REP` 维修、`AST` 资产、`SYS` 系统）。
+
+| 编号 | 模块 | 摘要 | 来源/背景 | 优先级 | 阻塞原因 | 状态 |
+|------|------|------|-----------|--------|----------|------|
+| （暂无） | — | — | — | — | — | — |
+
+**状态取值**：`暂缓` / `可排期` / `开发中` / `已完成`。完成后可移入版本记录说明，或将状态改为已完成并保留一行备查。
+
+**新增条目模板**（复制到上表）：
+
+```markdown
+| BACKLOG-XXX-01 | 模块 | 一句话摘要 | 谁提出/哪个现场 | P0/P1/P2 | 暂无时间测试 / 等客户验收窗口 等 | 暂缓 |
+```
+
+---
 ## 附录 A：需求条目模板
 
 ```markdown
@@ -1761,6 +1784,35 @@ powershell -File scripts/ensure-tenant-tables.ps1
 - 用户后续发送需求时，**自动**执行 Q.1，无需再次强调「先合理性检查 / 前后端逻辑检查」。
 - 若需求已足够明确且无风险，可在简要确认要点后写入文档并开发；有疑问仍须先对齐。
 
+### Q.3 约定沉淀与跨模块推广
+
+- 需求合理且适合固化为**开发约定**时：与用户确认后写入本附录 Q（或对应技术附录），并同步 `.cursor/rules`（如有）。
+- 同一思路可提升**其他模块**健壮性时：先提示影响范围与收益；用户确认后再批量修补，避免只改当前点、遗漏同类入口。
+
+### Q.4 衍生需求提示
+
+- 主需求本身无问题，但经验上常连带相邻能力（如草稿/提交、查看/变更记录、字典中文等）时：**主动提醒**衍生项及建议优先级。
+- 用户确认纳入后：**先写入文档**（模块章节、附录，或 [第 7 章 待开发功能池](#7-待开发功能池)），再排期开发，减少返工。
+
+### Q.5 待开发功能池
+
+- 合理、能提高完成度，但暂无时间开发或测试的需求：记入 [第 7 章](#7-待开发功能池)，编号 `BACKLOG-{模块}-{序号}`。
+- 不得与第 4 章缺陷、第 5 章待确认问题混放。
+
+### Q.6 技术约定索引
+
+| 主题 | 位置 |
+|------|------|
+| 数据库迁移双轨（V1/V2 建表，R__ 补列） | [附录 D](#附录-d数据库迁移规范必读) |
+| 开发完成验收清单 | [附录 E](#附录-e开发完成验收清单必读) |
+| public schema 迁移 | [附录 F](#附录-fpublic-schema-迁移规范2026-07-11) |
+| 标准七列 / 软删与审计 | [附录 G](#附录-g软删除与审计字段规范2026-07-12)、[附录 I](#附录-i删除状态字段-is_deleted2026-07-12)、[附录 K](#附录-k审计字段与软删唯一键修补2026-07-12) |
+| 外键显示名称 | [附录 H](#附录-h外键字段显示名称2026-07-12) |
+| 开发面板 Clean/打包与状态 | [附录 J](#附录-j开发面板整体-clean-与打包2026-07-12)、[附录 L](#附录-l开发面板状态显示滞后2026-07-12) |
+| 主数据变更记录与精简快照 | [附录 T](#附录-t主数据查看与变更记录)（含 T.5 / T.6） |
+| 列表字典中文 | [附录 R](#附录-r列表状态与字典值中文显示) |
+| 报修草稿/提交/撤回 | [附录 S](#附录-s设备报修草稿--提交--撤回) |
+
 ---
 
 ## 附录 R：列表状态与字典值中文显示
@@ -1844,3 +1896,214 @@ powershell -File scripts/ensure-tenant-tables.ps1
 - 报修详情同时保留时间轴事件与变更记录。
 
 **状态**：按 T 实施。
+
+### T.5 精简快照字段清单（`snapshot_json`）
+
+> 用于 delete / submit / withdraw 等动作。**一项主数据一张表**；列为字段名、类型、中文注释；字段顺序即落库顺序。
+> 扩展时**先改本节再改代码**（`EntityChangeLogService.SNAPSHOT_FIELDS`）。
+> 通用排除：`id` 不进快照（已有 `entity_id`）；审计列 `created_*/updated_*/deleted_*/is_deleted` 不进；敏感列永不落库。
+> 说明：`sys_role.permissions`、`sys_user.permissions` / `role_ids` / 密码类字段不进精简快照。
+
+#### `medical_device`（资产台账）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `device_code` | `VARCHAR(20)` | 设备编码 |
+| `device_name` | `VARCHAR(200)` | 设备名称 |
+| `brand` | `VARCHAR(100)` | 品牌 |
+| `model` | `VARCHAR(100)` | 型号 |
+| `serial_number` | `VARCHAR(100)` | 出厂序列号 |
+| `device_status` | `VARCHAR(20)` | 设备运行状态 |
+| `risk_level` | `VARCHAR(20)` | 风险等级 |
+| `dept_id` | `UUID` | 领用科室 |
+| `campus_id` | `UUID` | 所属院区 |
+| `original_value` | `DECIMAL(15,2)` | 原值 |
+| `enable_date` | `DATE` | 启用日期 |
+| `is_active` | `BOOLEAN` | 是否启用 |
+
+#### `manufacturer`（生产厂家）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `manufacturer_code` | `VARCHAR(20)` | 厂商编码 |
+| `manufacturer_name` | `VARCHAR(200)` | 厂商名称 |
+| `pinyin_code` | `VARCHAR(50)` | 拼音简码 |
+| `country` | `VARCHAR(50)` | 国家/地区 |
+| `is_domestic` | `BOOLEAN` | 是否国产厂商 |
+| `contact_phone` | `VARCHAR(20)` | 联系电话 |
+| `is_active` | `BOOLEAN` | 是否启用 |
+
+#### `supplier`（供应商）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `supplier_code` | `VARCHAR(20)` | 供应商编码 |
+| `supplier_name` | `VARCHAR(200)` | 供应商名称 |
+| `pinyin_code` | `VARCHAR(50)` | 拼音简码 |
+| `contact_person` | `VARCHAR(50)` | 联系人 |
+| `contact_phone` | `VARCHAR(20)` | 联系电话 |
+| `unified_social_credit_code` | `VARCHAR(18)` | 统一社会信用代码 |
+| `is_authorized` | `BOOLEAN` | 是否授权经销商 |
+| `is_active` | `BOOLEAN` | 是否启用 |
+
+#### `department`（科室）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `dept_code` | `VARCHAR(3)` | 科室编码 |
+| `dept_name` | `VARCHAR(100)` | 科室名称 |
+| `pinyin_code` | `VARCHAR(50)` | 拼音简码 |
+| `campus_id` | `UUID` | 所属院区 |
+| `parent_id` | `UUID` | 上级科室 |
+| `is_clinical` | `BOOLEAN` | 是否临床科室 |
+| `sort_order` | `INTEGER` | 排序号 |
+| `is_active` | `BOOLEAN` | 是否启用 |
+
+#### `sys_user`（人员/用户）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `username` | `VARCHAR(50)` | 用户名 |
+| `real_name` | `VARCHAR(50)` | 姓名 |
+| `employee_no` | `VARCHAR(20)` | 工号 |
+| `phone` | `VARCHAR(20)` | 手机号 |
+| `email` | `VARCHAR(100)` | 邮箱 |
+| `dept_id` | `UUID` | 所属科室 |
+| `is_active` | `BOOLEAN` | 是否启用 |
+| `permission_mode` | `VARCHAR(20)` | 权限模式（synced/custom） |
+
+#### `repair_workorder`（报修工单）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `wo_no` | `VARCHAR(30)` | 工单号 |
+| `device_id` | `UUID` | 设备ID |
+| `device_code` | `VARCHAR(20)` | 设备编码 |
+| `device_name` | `VARCHAR(200)` | 设备名称 |
+| `status` | `VARCHAR(20)` | 工单状态 |
+| `urgency_level` | `VARCHAR(20)` | 紧急程度 |
+| `fault_description` | `TEXT` | 故障描述 |
+| `reporter_id` | `UUID` | 报修人 |
+| `report_dept_id` | `UUID` | 报修科室 |
+| `report_time` | `TIMESTAMP WITH TIME ZONE` | 报修时间 |
+| `assigned_engineer_id` | `UUID` | 指派工程师 |
+| `repair_sub_status` | `VARCHAR(30)` | 维修子状态 |
+
+#### `campus`（院区）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `campus_code` | `VARCHAR(1)` | 院区编码 |
+| `campus_name` | `VARCHAR(100)` | 院区名称 |
+| `address` | `VARCHAR(500)` | 地址 |
+| `contact_phone` | `VARCHAR(20)` | 联系电话 |
+| `is_active` | `BOOLEAN` | 是否启用 |
+
+#### `building`（楼栋）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `building_code` | `VARCHAR(1)` | 建筑物编码 |
+| `building_name` | `VARCHAR(100)` | 建筑物名称 |
+| `campus_id` | `UUID` | 所属院区 |
+| `floor_count` | `INTEGER` | 楼层数 |
+| `is_active` | `BOOLEAN` | 是否启用 |
+
+#### `warehouse`（仓库）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `warehouse_code` | `VARCHAR(50)` | 库房编码 |
+| `warehouse_name` | `VARCHAR(100)` | 库房名称 |
+| `warehouse_type` | `VARCHAR(30)` | 库房类型 |
+| `campus_id` | `UUID` | 所属院区 |
+| `dept_id` | `UUID` | 归属科室 |
+| `manager_id` | `UUID` | 管理员 |
+| `address` | `VARCHAR(500)` | 地址 |
+| `is_active` | `BOOLEAN` | 是否启用 |
+
+#### `asset_category`（资产分类）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `category_code` | `VARCHAR(50)` | 分类编码 |
+| `category_name` | `VARCHAR(200)` | 分类名称 |
+| `parent_id` | `UUID` | 上级分类 |
+| `depreciation_years` | `INTEGER` | 折旧年限 |
+| `residual_rate` | `DECIMAL(5,2)` | 残值率 |
+| `sort_order` | `INTEGER` | 排序号 |
+| `is_active` | `BOOLEAN` | 是否启用 |
+
+#### `medical_device_category`（设备68码分类）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `category_code` | `VARCHAR(6)` | 分类编码（68码） |
+| `category_name` | `VARCHAR(200)` | 分类名称 |
+| `parent_code` | `VARCHAR(6)` | 上级编码 |
+| `level` | `INTEGER` | 层级 |
+| `sort_order` | `INTEGER` | 排序号 |
+| `is_active` | `BOOLEAN` | 是否启用 |
+
+#### `engineer`（工程师）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `engineer_no` | `VARCHAR(20)` | 工号 |
+| `real_name` | `VARCHAR(50)` | 姓名 |
+| `user_id` | `UUID` | 关联用户 |
+| `specialty` | `VARCHAR(100)` | 专业方向 |
+| `phone` | `VARCHAR(20)` | 电话 |
+| `is_on_duty` | `BOOLEAN` | 是否在岗 |
+
+#### `fault_type_dict`（故障类型）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `fault_code` | `VARCHAR(20)` | 故障编码 |
+| `fault_name` | `VARCHAR(100)` | 故障名称 |
+| `level` | `INTEGER` | 层级 |
+| `is_active` | `BOOLEAN` | 是否启用 |
+
+#### `finance_category`（财务分类）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `finance_code` | `VARCHAR(50)` | 财务编码 |
+| `finance_name` | `VARCHAR(200)` | 财务名称 |
+| `parent_id` | `UUID` | 上级分类 |
+| `account_subject` | `VARCHAR(50)` | 会计科目 |
+| `fund_source` | `VARCHAR(50)` | 资金来源 |
+| `sort_order` | `INTEGER` | 排序号 |
+| `is_active` | `BOOLEAN` | 是否启用 |
+
+#### `unit_dict`（计量单位）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `unit_code` | `VARCHAR(20)` | 单位编码 |
+| `unit_name` | `VARCHAR(50)` | 单位名称 |
+| `unit_type` | `VARCHAR(20)` | 单位类型 |
+| `sort_order` | `INTEGER` | 排序号 |
+| `is_active` | `BOOLEAN` | 是否启用 |
+
+#### `sys_role`（角色）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `role_code` | `VARCHAR(50)` | 角色编码 |
+| `role_name` | `VARCHAR(100)` | 角色名称 |
+| `description` | `TEXT` | 描述 |
+| `sort_order` | `INTEGER` | 排序号 |
+| `is_active` | `BOOLEAN` | 是否启用 |
+
+### T.6 后续主数据约定（强制）
+
+1. **新增主数据表/类型**时，必须：
+   - 纳入 `EntityChangeLogService.TRACKED_TABLES`（及通用 CRUD / 专用 Controller 的写路径打点）；
+   - 在本附录 **T.5** 增加一张「字段名 / 类型 / 中文注释」表；
+   - 代码 `SNAPSHOT_FIELDS` 与 T.5 **保持一致**。
+2. **扩展已有实体快照字段**时：先改 T.5 对应表格，再改 `SNAPSHOT_FIELDS`，便于比对与评审。
+3. 交付自检：创建 / 更新 / 删除（及有业务动作的 submit/withdraw 等）均能查到变更记录。
+
+**状态**：按 T 实施（含 T.5 / T.6）。

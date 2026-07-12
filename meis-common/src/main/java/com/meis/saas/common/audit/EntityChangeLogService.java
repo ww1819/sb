@@ -10,6 +10,7 @@ import java.util.*;
 
 /**
  * 实体级变更记录（附录 T）：字段 diff + 删/提交类精简快照。
+ * 精简快照字段以 docs/meis-requirements.md 附录 T.5 为准，与 SNAPSHOT_FIELDS 保持同步。
  */
 @Service
 @RequiredArgsConstructor
@@ -18,6 +19,53 @@ public class EntityChangeLogService {
             "medical_device", "manufacturer", "supplier", "department", "sys_user", "repair_workorder",
             "campus", "building", "warehouse", "asset_category", "medical_device_category",
             "engineer", "fault_type_dict", "finance_category", "unit_dict", "sys_role"
+    );
+
+    /** 附录 T.5：delete/submit/withdraw 精简快照字段（按实体） */
+    public static final Map<String, List<String>> SNAPSHOT_FIELDS = Map.ofEntries(
+            Map.entry("medical_device", List.of(
+                    "device_code", "device_name", "brand", "model", "serial_number",
+                    "device_status", "risk_level", "dept_id", "campus_id",
+                    "original_value", "enable_date", "is_active")),
+            Map.entry("manufacturer", List.of(
+                    "manufacturer_code", "manufacturer_name", "pinyin_code", "country",
+                    "is_domestic", "contact_phone", "is_active")),
+            Map.entry("supplier", List.of(
+                    "supplier_code", "supplier_name", "pinyin_code", "contact_person",
+                    "contact_phone", "unified_social_credit_code", "is_authorized", "is_active")),
+            Map.entry("department", List.of(
+                    "dept_code", "dept_name", "pinyin_code", "campus_id", "parent_id",
+                    "is_clinical", "sort_order", "is_active")),
+            Map.entry("sys_user", List.of(
+                    "username", "real_name", "employee_no", "phone", "email",
+                    "dept_id", "is_active", "permission_mode")),
+            Map.entry("repair_workorder", List.of(
+                    "wo_no", "device_id", "device_code", "device_name", "status", "urgency_level",
+                    "fault_description", "reporter_id", "report_dept_id", "report_time",
+                    "assigned_engineer_id", "repair_sub_status")),
+            Map.entry("campus", List.of(
+                    "campus_code", "campus_name", "address", "contact_phone", "is_active")),
+            Map.entry("building", List.of(
+                    "building_code", "building_name", "campus_id", "floor_count", "is_active")),
+            Map.entry("warehouse", List.of(
+                    "warehouse_code", "warehouse_name", "warehouse_type", "campus_id",
+                    "dept_id", "manager_id", "address", "is_active")),
+            Map.entry("asset_category", List.of(
+                    "category_code", "category_name", "parent_id", "depreciation_years",
+                    "residual_rate", "sort_order", "is_active")),
+            Map.entry("medical_device_category", List.of(
+                    "category_code", "category_name", "parent_code", "level", "sort_order", "is_active")),
+            Map.entry("engineer", List.of(
+                    "engineer_no", "real_name", "user_id", "specialty", "phone", "is_on_duty")),
+            Map.entry("fault_type_dict", List.of(
+                    "fault_code", "fault_name", "level", "is_active")),
+            Map.entry("finance_category", List.of(
+                    "finance_code", "finance_name", "parent_id", "account_subject",
+                    "fund_source", "sort_order", "is_active")),
+            Map.entry("unit_dict", List.of(
+                    "unit_code", "unit_name", "unit_type", "sort_order", "is_active")),
+            Map.entry("sys_role", List.of(
+                    "role_code", "role_name", "description", "sort_order", "is_active"))
     );
 
     private static final Set<String> SENSITIVE = Set.of(
@@ -53,7 +101,7 @@ public class EntityChangeLogService {
 
     public void recordDelete(String entityType, Object entityId, Map<String, Object> before) {
         if (!tracks(entityType)) return;
-        Map<String, Object> snap = compactSnapshot(sanitize(before));
+        Map<String, Object> snap = compactSnapshot(entityType, sanitize(before));
         write(entityType, entityId, "delete", List.of(), snap, null);
     }
 
@@ -62,7 +110,7 @@ public class EntityChangeLogService {
                              Map<String, Object> before, Map<String, Object> after, String remark) {
         if (!tracks(entityType)) return;
         List<Map<String, Object>> fields = diff(sanitize(before), sanitize(after));
-        Map<String, Object> snap = compactSnapshot(sanitize(after != null ? after : before));
+        Map<String, Object> snap = compactSnapshot(entityType, sanitize(after != null ? after : before));
         write(entityType, entityId, action, fields, snap, remark);
     }
 
@@ -117,12 +165,21 @@ public class EntityChangeLogService {
         return out;
     }
 
-    private Map<String, Object> compactSnapshot(Map<String, Object> row) {
+    /** 按附录 T.5 白名单裁剪；未配置清单时回退为有限字段数兜底 */
+    private Map<String, Object> compactSnapshot(String entityType, Map<String, Object> row) {
         if (row == null || row.isEmpty()) return null;
         Map<String, Object> out = new LinkedHashMap<>();
+        List<String> keys = SNAPSHOT_FIELDS.get(entityType);
+        if (keys != null && !keys.isEmpty()) {
+            for (String k : keys) {
+                if (SKIP_COMPARE.contains(k) || !row.containsKey(k)) continue;
+                out.put(k, row.get(k));
+            }
+            return out.isEmpty() ? null : out;
+        }
         int n = 0;
         for (Map.Entry<String, Object> e : row.entrySet()) {
-            if (SKIP_COMPARE.contains(e.getKey())) continue;
+            if (SKIP_COMPARE.contains(e.getKey()) || "id".equals(e.getKey())) continue;
             out.put(e.getKey(), e.getValue());
             if (++n >= 40) break;
         }
