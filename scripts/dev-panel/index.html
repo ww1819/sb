@@ -563,6 +563,9 @@
     let timer = null
     let logTimer = null
     let refreshInFlight = false
+    let lastStatusAt = ''
+    let statusRefreshFailed = false
+    let lastStatusData = null
     let refreshLogsInFlight = false
     let logFollowBottom = true
     let pinnedService = 'all'
@@ -1451,7 +1454,7 @@
     }
 
     async function refreshLogs() {
-      if (document.hidden || refreshLogsInFlight) return
+      if (document.hidden || refreshLogsInFlight || refreshInFlight) return
       refreshLogsInFlight = true
       const errorsOnly = document.getElementById('log-errors-only').checked ? '1' : '0'
       const debug = document.getElementById('log-debug').checked ? '1' : '0'
@@ -1539,11 +1542,15 @@
       const buildHint = bg.length
         ? bg.map(j => buildLabels[j] || j).join('、') + ' 进行中…'
         : ''
+      const staleHint = statusRefreshFailed
+        ? '<div class="stat"><div class="label">状态</div><div class="value" style="font-size:0.9rem;color:var(--warn)">刷新失败，显示可能过期</div></div>'
+        : (lastStatusAt ? `<div class="stat"><div class="label">刷新</div><div class="value" style="font-size:0.85rem">${escapeHtml(lastStatusAt)}</div></div>` : '')
       document.getElementById('stats').innerHTML = `
         <div class="stat"><div class="label">后端在线</div><div class="value">${up}/${total}</div></div>
         <div class="stat"><div class="label">前端</div><div class="value">${fe ? '运行' : '停止'}</div></div>
         <div class="stat"><div class="label">Redis</div><div class="value">${data.redisUp ? 'OK' : '—'}</div></div>
         <div class="stat"><div class="label">网关</div><div class="value" style="font-size:0.95rem"><a href="${data.gatewayUrl}" target="_blank">:8080</a></div></div>
+        ${staleHint}
         ${buildHint ? `<div class="stat"><div class="label">后台任务</div><div class="value" style="font-size:0.9rem;color:var(--warn)">${buildHint}</div></div>` : ''}
       `
     }
@@ -1596,6 +1603,7 @@
       refreshInFlight = true
       try {
         const data = await api('/api/status', 'GET', 20000)
+        lastStatusData = data
         coreServiceNames = data.coreServices || []
         const names = ['meis-web', 'panel']
           .concat((data.libraries || []).map(l => l.name))
@@ -1609,6 +1617,8 @@
         renderLibraries(data.libraries)
         renderServices(data.services)
         updateDebugPendingFromStatus(data.services)
+        statusRefreshFailed = false
+        lastStatusAt = new Date().toLocaleTimeString()
         for (const s of (data.services || [])) {
           if (s.jarExists && s.jarHealthy) delete buildPendingUntil[s.name]
           else if (s.classesExists) delete buildPendingUntil[s.name]
@@ -1618,6 +1628,8 @@
           if (lib.classesExists) delete buildPendingUntil[lib.name]
         }
       } catch (e) {
+        statusRefreshFailed = true
+        if (lastStatusData) renderStats(lastStatusData)
         // 轮询失败不弹 toast，避免后台标签页刷屏
         if (!document.hidden) {
           console.warn('status refresh failed:', e.message)
@@ -1639,7 +1651,7 @@
     }
 
     function resumeAutoRefresh() {
-      if (!timer) timer = setInterval(refresh, 4000)
+      if (!timer) timer = setInterval(refresh, 5000)
       toggleLogAuto()
     }
 
@@ -1658,7 +1670,7 @@
 
     refresh()
     refreshLogs()
-    timer = setInterval(refresh, 4000)
+    timer = setInterval(refresh, 5000)
     toggleLogAuto()
 
     document.getElementById('log-console').addEventListener('scroll', (e) => {

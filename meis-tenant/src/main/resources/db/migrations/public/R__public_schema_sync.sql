@@ -202,8 +202,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
 ('maintain_param', 'mod_ops', '保养参数设置', 'menu', '/maintain/param', 7),
 ('maintain_execution', 'mod_ops', '保养执行', 'menu', '/maintain/execution', 9),
-('maintain_query', 'mod_ops', '保养记录查询', 'menu', '/maintain/query', 10),
-('maintain_device', 'mod_ops', '保养设备管理', 'menu', '/maintain/device', 11)
+('maintain_query', 'mod_ops', '保养记录查询', 'menu', '/maintain/query', 10)
 ON CONFLICT (menu_code) DO UPDATE SET
     parent_code = EXCLUDED.parent_code,
     menu_name = EXCLUDED.menu_name,
@@ -219,14 +218,14 @@ INSERT INTO sys_package_menu (package_code, menu_code)
 SELECT pkg, m.menu_code
 FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
 CROSS JOIN sys_menu m
-WHERE m.menu_code IN ('maintain_param', 'maintain_plan', 'maintain_execution', 'maintain_query', 'maintain_device')
+WHERE m.menu_code IN ('maintain_param', 'maintain_plan', 'maintain_execution', 'maintain_query')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO sys_tenant_menu (tenant_id, menu_code)
 SELECT t.id, m.menu_code
 FROM sys_tenant t
 CROSS JOIN sys_menu m
-WHERE m.menu_code IN ('maintain_param', 'maintain_plan', 'maintain_execution', 'maintain_query', 'maintain_device')
+WHERE m.menu_code IN ('maintain_param', 'maintain_plan', 'maintain_execution', 'maintain_query')
 ON CONFLICT DO NOTHING;
 
 -- ---------- from V9__inspection_module_menus.sql ----------
@@ -236,8 +235,7 @@ INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_o
 ('inspect_param', 'mod_ops', '巡检参数设置', 'menu', '/inspect/param', 12),
 ('inspect_plan', 'mod_ops', '巡检计划', 'menu', '/inspect/plan', 13),
 ('inspect_execution', 'mod_ops', '巡检执行', 'menu', '/inspect/execution', 14),
-('inspect_query', 'mod_ops', '巡检记录查询', 'menu', '/inspect/query', 15),
-('inspect_device', 'mod_ops', '巡检设备管理', 'menu', '/inspect/device', 16)
+('inspect_query', 'mod_ops', '巡检记录查询', 'menu', '/inspect/query', 15)
 ON CONFLICT (menu_code) DO UPDATE SET
     parent_code = EXCLUDED.parent_code,
     menu_name = EXCLUDED.menu_name,
@@ -249,14 +247,14 @@ INSERT INTO sys_package_menu (package_code, menu_code)
 SELECT pkg, m.menu_code
 FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
 CROSS JOIN sys_menu m
-WHERE m.menu_code IN ('inspect_param', 'inspect_plan', 'inspect_execution', 'inspect_query', 'inspect_device')
+WHERE m.menu_code IN ('inspect_param', 'inspect_plan', 'inspect_execution', 'inspect_query')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO sys_tenant_menu (tenant_id, menu_code)
 SELECT t.id, m.menu_code
 FROM sys_tenant t
 CROSS JOIN sys_menu m
-WHERE m.menu_code IN ('inspect_param', 'inspect_plan', 'inspect_execution', 'inspect_query', 'inspect_device')
+WHERE m.menu_code IN ('inspect_param', 'inspect_plan', 'inspect_execution', 'inspect_query')
 ON CONFLICT DO NOTHING;
 
 -- ---------- from V10__metrology_module_menus.sql ----------
@@ -266,8 +264,7 @@ INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_o
 ('metrology_param', 'mod_ops', '计量参数设置', 'menu', '/metrology/param', 17),
 ('metrology_plan', 'mod_ops', '计量计划', 'menu', '/metrology/plan', 18),
 ('metrology_execution', 'mod_ops', '计量执行', 'menu', '/metrology/execution', 19),
-('metrology_query', 'mod_ops', '计量记录查询', 'menu', '/metrology/query', 20),
-('metrology_device', 'mod_ops', '计量设备管理', 'menu', '/metrology/device', 21)
+('metrology_query', 'mod_ops', '计量记录查询', 'menu', '/metrology/query', 20)
 ON CONFLICT (menu_code) DO UPDATE SET
     parent_code = EXCLUDED.parent_code,
     menu_name = EXCLUDED.menu_name,
@@ -281,14 +278,14 @@ INSERT INTO sys_package_menu (package_code, menu_code)
 SELECT pkg, m.menu_code
 FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
 CROSS JOIN sys_menu m
-WHERE m.menu_code IN ('metrology_param', 'metrology_plan', 'metrology_execution', 'metrology_query', 'metrology_device')
+WHERE m.menu_code IN ('metrology_param', 'metrology_plan', 'metrology_execution', 'metrology_query')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO sys_tenant_menu (tenant_id, menu_code)
 SELECT t.id, m.menu_code
 FROM sys_tenant t
 CROSS JOIN sys_menu m
-WHERE m.menu_code IN ('metrology_param', 'metrology_plan', 'metrology_execution', 'metrology_query', 'metrology_device')
+WHERE m.menu_code IN ('metrology_param', 'metrology_plan', 'metrology_execution', 'metrology_query')
 ON CONFLICT DO NOTHING;
 
 -- ---------- from V11__purchase_module_menus.sql ----------
@@ -521,8 +518,7 @@ INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_o
 ('pm_param', 'mod_quality', '预防性维护参数', 'menu', '/pm/param', 10),
 ('pm_plan', 'mod_quality', '预防性维护计划', 'menu', '/pm/plan', 11),
 ('pm_execution', 'mod_quality', '预防性维护执行', 'menu', '/pm/execution', 12),
-('pm_query', 'mod_quality', '预防性维护记录', 'menu', '/pm/query', 13),
-('pm_device', 'mod_quality', '预防性维护设备', 'menu', '/pm/device', 14)
+('pm_query', 'mod_quality', '预防性维护记录', 'menu', '/pm/query', 13)
 ON CONFLICT (menu_code) DO UPDATE SET
     parent_code = EXCLUDED.parent_code,
     menu_name = EXCLUDED.menu_name,
@@ -534,14 +530,14 @@ INSERT INTO sys_package_menu (package_code, menu_code)
 SELECT pkg, m.menu_code
 FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
 CROSS JOIN sys_menu m
-WHERE m.menu_code IN ('pm_param', 'pm_plan', 'pm_execution', 'pm_query', 'pm_device')
+WHERE m.menu_code IN ('pm_param', 'pm_plan', 'pm_execution', 'pm_query')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO sys_tenant_menu (tenant_id, menu_code)
 SELECT t.id, m.menu_code
 FROM sys_tenant t
 CROSS JOIN sys_menu m
-WHERE m.menu_code IN ('pm_param', 'pm_plan', 'pm_execution', 'pm_query', 'pm_device')
+WHERE m.menu_code IN ('pm_param', 'pm_plan', 'pm_execution', 'pm_query')
 ON CONFLICT DO NOTHING;
 
 -- ---------- from V17__benefit_module_menus.sql ----------
@@ -687,3 +683,13 @@ JOIN sys_package_menu pm ON pm.package_code = COALESCE(t.package_code, 'standard
 WHERE t.status = 'active'
   AND pm.menu_code NOT LIKE 'platform_%' AND pm.menu_code <> 'mod_platform'
 ON CONFLICT DO NOTHING;
+
+-- ---------- 附录 O：停用独立「设备管理」子菜单（设备主数据统一在资产台账） ----------
+UPDATE sys_menu SET is_active = FALSE
+WHERE menu_code IN ('maintain_device', 'inspect_device', 'metrology_device', 'pm_device');
+
+DELETE FROM sys_package_menu
+WHERE menu_code IN ('maintain_device', 'inspect_device', 'metrology_device', 'pm_device');
+
+DELETE FROM sys_tenant_menu
+WHERE menu_code IN ('maintain_device', 'inspect_device', 'metrology_device', 'pm_device');

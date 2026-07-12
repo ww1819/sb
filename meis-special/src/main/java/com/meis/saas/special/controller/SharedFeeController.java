@@ -17,8 +17,10 @@ public class SharedFeeController {
     private final JdbcTemplate jdbc;
 
     @GetMapping("/page")
-    public Result<PageResult<Map<String, Object>>> page(PageQuery query,
-            @RequestParam(required = false) String paidStatus) {
+    public Result<PageResult<Map<String, Object>>> page(
+            PageQuery query,
+            @RequestParam(required = false) String paidStatus,
+            @RequestParam(required = false) UUID deviceId) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         List<Object> args = new ArrayList<>();
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
@@ -31,6 +33,10 @@ public class SharedFeeController {
         if (paidStatus != null && !paidStatus.isBlank()) {
             where.append(" AND f.paid_status = ? ");
             args.add(paidStatus);
+        }
+        if (deviceId != null) {
+            where.append(" AND l.device_id = ?::uuid ");
+            args.add(deviceId);
         }
         String from = " FROM shared_device_fee f LEFT JOIN shared_device_loan l ON l.id = f.loan_id ";
         long total = jdbc.queryForObject("SELECT COUNT(*) " + from + where, Long.class, args.toArray());

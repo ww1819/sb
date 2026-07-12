@@ -60,6 +60,12 @@ COMMENT ON INDEX idx_metrology_device IS '索引：metrology record.关联设备
 CREATE INDEX idx_metrology_due ON metrology_record(next_due_date);
 COMMENT ON INDEX idx_metrology_due IS '索引：metrology record.下次到期日';
 
+CREATE INDEX idx_metrology_type_parent ON metrology_type(parent_id);
+COMMENT ON INDEX idx_metrology_type_parent IS '索引：metrology type.上级类型';
+
+CREATE INDEX idx_metrology_type_group ON metrology_type(classification_group);
+COMMENT ON INDEX idx_metrology_type_group IS '索引：metrology type.分类维度';
+
 CREATE INDEX idx_perf_test_device ON performance_test(device_id);
 COMMENT ON INDEX idx_perf_test_device IS '索引：performance test.关联设备';
 

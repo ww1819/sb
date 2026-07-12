@@ -661,6 +661,7 @@ CREATE TABLE medical_device (
     is_life_support BOOLEAN DEFAULT FALSE,
     is_emergency BOOLEAN DEFAULT FALSE,
     is_metrology BOOLEAN DEFAULT FALSE,
+    metrology_type_code VARCHAR(50),
     is_maintain_device BOOLEAN DEFAULT FALSE,
     is_inspection_device BOOLEAN DEFAULT FALSE,
     pinyin_code VARCHAR(50),
@@ -688,6 +689,9 @@ CREATE TABLE medical_device (
     next_calibration_date DATE,
     service_expiry_date DATE,
     is_shared_device BOOLEAN DEFAULT FALSE,
+    shared_fee_mode VARCHAR(20),
+    shared_fee_time_unit VARCHAR(10),
+    shared_fee_unit_price DECIMAL(12,2),
     is_pm_device BOOLEAN DEFAULT FALSE,
     standby_current_max_ma DECIMAL(10,2),
     standby_current_min_ma DECIMAL(10,2)
@@ -1649,6 +1653,48 @@ CREATE TABLE metrology_category (
 );
 COMMENT ON TABLE metrology_category IS '计量类别表';
 
+-- 7.3.1b 计量检定类型（法规/时机/地点/分级）
+CREATE TABLE metrology_type (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    type_code VARCHAR(50) NOT NULL UNIQUE,
+    type_name VARCHAR(200) NOT NULL,
+    parent_id UUID REFERENCES metrology_type(id),
+    classification_group VARCHAR(30) NOT NULL,
+    regulatory_attr VARCHAR(20),
+    traceability_mode VARCHAR(20),
+    timing_kind VARCHAR(30),
+    location_kind VARCHAR(20),
+    management_grade VARCHAR(10),
+    cycle_rule VARCHAR(200),
+    legal_basis TEXT,
+    executor_scope VARCHAR(300),
+    certificate_kind VARCHAR(50),
+    sort_order INTEGER DEFAULT 0,
+    description TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID
+);
+COMMENT ON TABLE metrology_type IS '计量检定类型（法规/时机/地点/分级）';
+COMMENT ON COLUMN metrology_type.type_code IS '类型编码';
+COMMENT ON COLUMN metrology_type.type_name IS '类型名称';
+COMMENT ON COLUMN metrology_type.parent_id IS '上级类型';
+COMMENT ON COLUMN metrology_type.classification_group IS '分类维度：regulatory/timing/location/grade/device_scope';
+COMMENT ON COLUMN metrology_type.regulatory_attr IS '法规属性：mandatory/voluntary';
+COMMENT ON COLUMN metrology_type.traceability_mode IS '溯源方式：verification/calibration';
+COMMENT ON COLUMN metrology_type.timing_kind IS '实施时机：first_only/periodic/after_repair/arbitration/interim';
+COMMENT ON COLUMN metrology_type.location_kind IS '执行地点：lab/onsite/both';
+COMMENT ON COLUMN metrology_type.management_grade IS '管理分级：A/B/C';
+COMMENT ON COLUMN metrology_type.cycle_rule IS '周期规则说明';
+COMMENT ON COLUMN metrology_type.legal_basis IS '法规依据';
+COMMENT ON COLUMN metrology_type.executor_scope IS '执行机构范围';
+COMMENT ON COLUMN metrology_type.certificate_kind IS '证书类型：verification_cert/calibration_cert/none';
+
 -- 7.3.2 检定机构
 CREATE TABLE metrology_org (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -2090,33 +2136,11 @@ COMMENT ON COLUMN leased_device.remark IS '备注';
 COMMENT ON COLUMN leased_device.created_at IS '创建时间';
 COMMENT ON COLUMN leased_device.updated_at IS '更新时间';
 
--- 9.5 公用设备池
-CREATE TABLE shared_device (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    device_id UUID REFERENCES medical_device(id) UNIQUE,
-    device_code VARCHAR(20),
-    device_name VARCHAR(200),
-    owner_dept_id UUID REFERENCES department(id),
-    location VARCHAR(200),
-    fee_standard DECIMAL(12,2) DEFAULT 0,
-    availability_status VARCHAR(20) DEFAULT 'available',
-    is_active BOOLEAN DEFAULT TRUE,
-    remark TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-COMMENT ON TABLE shared_device IS '公用设备池表';
-COMMENT ON COLUMN shared_device.device_id IS '关联设备';
-COMMENT ON COLUMN shared_device.owner_dept_id IS '归属科室';
-COMMENT ON COLUMN shared_device.fee_standard IS '收费标准(元/天)';
-COMMENT ON COLUMN shared_device.availability_status IS '可用状态';
-
 -- 9.6 公用设备借调单
 CREATE TABLE shared_device_loan (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     loan_no VARCHAR(30) UNIQUE NOT NULL,
     device_id UUID REFERENCES medical_device(id),
-    shared_device_id UUID REFERENCES shared_device(id),
     device_code VARCHAR(20),
     device_name VARCHAR(200),
     from_dept_id UUID REFERENCES department(id),
@@ -2124,7 +2148,11 @@ CREATE TABLE shared_device_loan (
     applicant_id UUID REFERENCES sys_user(id),
     loan_start DATE,
     loan_end DATE,
-    fee_standard DECIMAL(12,2),
+    fee_mode VARCHAR(20),
+    fee_time_unit VARCHAR(10),
+    fee_unit_price DECIMAL(12,2),
+    billing_start_at TIMESTAMP WITH TIME ZONE,
+    billing_end_at TIMESTAMP WITH TIME ZONE,
     reason TEXT,
     status VARCHAR(20) DEFAULT 'draft',
     approval_status VARCHAR(20) DEFAULT 'draft',

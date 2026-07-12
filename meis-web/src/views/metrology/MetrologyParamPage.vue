@@ -1,7 +1,10 @@
 <template>
   <div class="metrology-param-page">
     <el-tabs v-model="activeTab">
-      <el-tab-pane label="计量类别" name="category">
+      <el-tab-pane label="计量检定类型" name="type">
+        <CrudPage :config="typeConfig" delete-url="/metrology/type" />
+      </el-tab-pane>
+      <el-tab-pane label="计量参量类别" name="category">
         <CrudPage :config="categoryConfig" />
       </el-tab-pane>
       <el-tab-pane label="检定机构" name="org">
@@ -53,8 +56,18 @@ import FormSection from '@/components/form/FormSection.vue'
 import AppModal from '@/components/AppModal.vue'
 import type { PageConfig } from '@/config/pageRegistry'
 
-const activeTab = ref('category')
-const categoryConfig: PageConfig = { title: '计量类别', apiBase: '/metrology', table: 'metrology_category' }
+const activeTab = ref('type')
+const typeConfig: PageConfig = {
+  title: '计量检定类型',
+  apiBase: '/metrology',
+  table: 'metrology_type',
+  saveUrl: '/metrology/type',
+  listPageUrl: '/metrology/type/page',
+  listFilters: [
+    { key: 'classification_group', label: '分类维度', dictType: 'metrology_classification_group' }
+  ]
+}
+const categoryConfig: PageConfig = { title: '计量参量类别', apiBase: '/metrology', table: 'metrology_category' }
 const orgConfig: PageConfig = { title: '检定机构', apiBase: '/metrology', table: 'metrology_org' }
 const templateConfig: PageConfig = { title: '计量模板', apiBase: '/metrology', table: 'metrology_template' }
 const templateVisible = ref(false)

@@ -7,11 +7,16 @@ import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
 import com.meis.saas.common.workflow.ApprovalInstanceService;
+import com.meis.saas.common.shared.SharedFeeCalculator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.*;
 
 @RestController
@@ -22,7 +27,8 @@ public class SharedReturnController {
     private final ApprovalInstanceService approvalService;
 
     @GetMapping("/page")
-    public Result<PageResult<Map<String, Object>>> page(PageQuery query,
+    public Result<PageResult<Map<String, Object>>> page(
+            PageQuery query,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Boolean pendingOnly) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
@@ -106,11 +112,12 @@ public class SharedReturnController {
     public Result<Map<String, Object>> approve(@PathVariable UUID id) {
         var ret = loadReturn(id);
         String userId = TenantContext.getUserId();
+        Instant billingEnd = Instant.now();
         jdbc.update("""
             UPDATE shared_device_return SET status='approved', approval_status='approved',
             approved_by=?::uuid, approved_at=NOW(), updated_at=NOW() WHERE id=?::uuid
             """, userId != null ? UUID.fromString(userId) : null, id);
-        completeReturn(ret);
+        completeReturn(ret, billingEnd);
         return get(id);
     }
 
@@ -124,22 +131,48 @@ public class SharedReturnController {
         return get(id);
     }
 
-    private void completeReturn(Map<String, Object> ret) {
+    private void completeReturn(Map<String, Object> ret, Instant billingEnd) {
         var loans = jdbc.queryForList("SELECT * FROM shared_device_loan WHERE id = ?::uuid", ret.get("loan_id"));
         if (loans.isEmpty()) return;
         Map<String, Object> loan = loans.get(0);
         jdbc.update("""
-            UPDATE shared_device_loan SET status='returned', return_time=NOW(), updated_at=NOW() WHERE id=?::uuid
-            """, loan.get("id"));
+            UPDATE shared_device_loan SET status='returned', return_time=NOW(),
+            billing_end_at=?, updated_at=NOW() WHERE id=?::uuid
+            """, Timestamp.from(billingEnd), loan.get("id"));
         if (loan.get("device_id") != null && loan.get("from_dept_id") != null) {
             jdbc.update("UPDATE medical_device SET dept_id = ?::uuid, updated_at = NOW() WHERE id = ?::uuid",
                     loan.get("from_dept_id"), loan.get("device_id"));
         }
-        if (loan.get("shared_device_id") != null) {
-            jdbc.update("""
-                UPDATE shared_device SET availability_status='available', updated_at=NOW() WHERE id=?::uuid
-                """, loan.get("shared_device_id"));
-        }
+        createFeeIfAbsent(loan, billingEnd);
+    }
+
+    private void createFeeIfAbsent(Map<String, Object> loan, Instant billingEnd) {
+        var existing = jdbc.queryForList(
+                "SELECT 1 FROM shared_device_fee WHERE loan_id = ?::uuid LIMIT 1", loan.get("id"));
+        if (!existing.isEmpty()) return;
+
+        Instant billingStart = toInstant(loan.get("billing_start_at"));
+        if (billingStart == null) billingStart = toInstant(loan.get("approved_at"));
+        BigDecimal amount = SharedFeeCalculator.calculate(
+                String.valueOf(loan.get("fee_mode")),
+                loan.get("fee_time_unit") != null ? String.valueOf(loan.get("fee_time_unit")) : null,
+                loan.get("fee_unit_price") instanceof BigDecimal bd ? bd
+                        : loan.get("fee_unit_price") != null ? new BigDecimal(loan.get("fee_unit_price").toString())
+                        : BigDecimal.ZERO,
+                billingStart,
+                billingEnd);
+        jdbc.update("""
+            INSERT INTO shared_device_fee (id, fee_no, loan_id, fee_amount, fee_date, paid_status, remark)
+            VALUES (?::uuid,?,?::uuid,?,?,?,?)
+            """, UUID.randomUUID(), "SF" + System.currentTimeMillis(), loan.get("id"), amount,
+                LocalDate.now(), "unpaid", "归还审批自动生成");
+    }
+
+    private static Instant toInstant(Object value) {
+        if (value == null) return null;
+        if (value instanceof Timestamp ts) return ts.toInstant();
+        if (value instanceof java.util.Date d) return d.toInstant();
+        return null;
     }
 
     private Map<String, Object> loadReturn(UUID id) {

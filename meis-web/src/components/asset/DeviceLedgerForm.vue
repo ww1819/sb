@@ -49,6 +49,22 @@
         filter-placeholder="盘点单号"
       />
       <DeviceRecordTablePanel
+        v-show="activeTab === 'shared_loan'"
+        :columns="sharedLoanColumns"
+        empty-text="暂无借调记录"
+        filter-placeholder="借调单号"
+        load-url="/shared/loan/page"
+        :device-id="String(model.id ?? '')"
+      />
+      <DeviceRecordTablePanel
+        v-show="activeTab === 'shared_fee'"
+        :columns="sharedFeeColumns"
+        empty-text="暂无借调费用"
+        filter-placeholder="收费单号"
+        load-url="/shared/fee/page"
+        :device-id="String(model.id ?? '')"
+      />
+      <DeviceRecordTablePanel
         v-show="activeTab === 'adverse'"
         :columns="adverseColumns"
         empty-text="暂无不良事件"
@@ -87,11 +103,13 @@ const tabs = [
   { key: 'maintain', label: '保养记录' },
   { key: 'inspection', label: '巡检记录' },
   { key: 'metrology', label: '计量记录' },
+  { key: 'shared_loan', label: '借调记录' },
+  { key: 'shared_fee', label: '借调费用' },
   { key: 'inventory', label: '盘点记录' },
   { key: 'adverse', label: '不良事件' }
 ]
 
-const basicGroupKeys = new Set(['basic', 'finance', 'location', 'time', 'status', 'attachment', 'remark', 'other'])
+const basicGroupKeys = new Set(['basic', 'finance', 'location', 'time', 'status', 'compliance', 'attachment', 'remark', 'other'])
 
 const basicFields = computed(() =>
   props.fields.filter((f) => basicGroupKeys.has(f.group ?? 'other'))
@@ -135,6 +153,24 @@ const inventoryColumns: RecordColumn[] = [
   { prop: 'status', label: '状态', minWidth: 100 },
   { prop: 'dept_name', label: '盘点科室', minWidth: 140 },
   { prop: 'check_date', label: '盘点日期', minWidth: 140 }
+]
+
+const sharedLoanColumns: RecordColumn[] = [
+  { prop: 'loan_no', label: '借调单号', minWidth: 140 },
+  { prop: 'to_dept_name', label: '借入科室', minWidth: 120 },
+  { prop: 'status', label: '状态', minWidth: 100 },
+  { prop: 'fee_mode', label: '计费方式', minWidth: 100 },
+  { prop: 'fee_unit_price', label: '单价', minWidth: 90 },
+  { prop: 'loan_start', label: '计划开始', minWidth: 120 },
+  { prop: 'loan_end', label: '计划结束', minWidth: 120 }
+]
+
+const sharedFeeColumns: RecordColumn[] = [
+  { prop: 'fee_no', label: '收费单号', minWidth: 140 },
+  { prop: 'loan_no', label: '借调单号', minWidth: 140 },
+  { prop: 'fee_amount', label: '金额', minWidth: 100 },
+  { prop: 'fee_date', label: '收费日期', minWidth: 120 },
+  { prop: 'paid_status', label: '状态', minWidth: 100 }
 ]
 
 const adverseColumns: RecordColumn[] = [

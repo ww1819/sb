@@ -241,6 +241,8 @@
 **需求摘要（待补充）**：
 
 - [ ] AST-F-01 设备台账字段分组：基本信息 / 财务 / 位置 / 合规
+- [x] AST-01 计量检定类型字段（`metrology_type_code`，见附录 N / M）
+- [x] AST-02~04 公用设备标志、借调计费配置、借调记录 Tab（见附录 N）
 - [ ] AST-B-01 设备编码、财务编码生成规则
 - [ ] AST-B-02 设备状态枚举及与各业务模块联动
 - [ ] AST-D-01 台账新增待机电流上下限（见 [3.16.1](#3161-待机电流与运行状态判定)）
@@ -360,7 +362,7 @@
 
 **需求摘要（待补充）**：
 
-- [ ] MET-B-01 强检/非强检分类
+- [x] MET-B-01 强检/非强检分类（`metrology_type` 维护，见附录 M）
 - [ ] MET-B-02 证书有效期与到期预警
 - [ ] MET-F-01 检定机构管理
 - [ ] MET-F-02 计量结果与台账 `is_metrology` 联动
@@ -430,8 +432,8 @@
 
 ### 3.13 公用设备（SHR）
 
-**服务**：meis-shared  
-**状态**：未开始
+**服务**：meis-special（`meis-shared` 路由别名）  
+**状态**：部分骨架已实现，业务待按附录 N 重构
 
 | 子模块 | 路径 |
 |--------|------|
@@ -443,12 +445,17 @@
 | 借调收费 | `/shared/fee` |
 | 借调记录查询 | `/shared/record` |
 
-**需求摘要（待补充）**：
+**需求摘要**（详见 **附录 N**）：
 
-- [ ] SHR-B-01 借调审批流程
-- [ ] SHR-B-02 归还验收与设备状态恢复
-- [ ] SHR-F-01 借调计费规则
-- [ ] SHR-D-01 租户 Schema 须含 `shared_device*` 表
+- [x] SHR-01 公用设备列表改查资产台账（`is_shared_device`）；**废弃 `shared_device` 表**
+- [x] SHR-02 从非公用设备中新增为公用设备
+- [x] SHR-03 取消公用设备 / 查看借用记录
+- [x] SHR-05 列表展示借调状态（在库/申请中/已借用/归还申请中）
+- [x] SHR-F-01~06 计费方式（按次/计时月天小时）、借调快照、归还自动计费
+- [x] AST-01~04 台账计量类型、公用标志、计费配置、借调记录 Tab
+- [x] SHR-D-01 租户 Schema 含 `shared_device*` 表（V1 已有）
+- [~] SHR-B-01 借调审批流程（骨架已有，待与状态/计费联动）
+- [~] SHR-B-02 归还验收与设备状态恢复（已有，缺自动计费）
 
 ---
 
@@ -988,6 +995,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 - [ ] `V2__extensions.sql` 已补充必要索引
 - [ ] `tenant_column_patches.sql` 已镜像 R__ 业务补列语句
 - [ ] 未在 R__ 中写 `COMMENT ON`（空注释由 `SchemaCommentFiller` 补全）
+- [ ] 前后端 CRUD 与交互走通（清单见附录 M.7）
 
 ### D.3 本次审计补全记录（2026-07-11）
 
@@ -998,6 +1006,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | `medical_device` | `is_shared_device`、`is_pm_device`、`standby_current_max_ma`、`standby_current_min_ma` |
 | `power_tag` | `device_code`、`device_name` |
 | （新表） | `power_current_reading`、`power_tag_bind_log` + 索引 |
+| （新表） | `metrology_type`（计量检定类型）+ 索引 `idx_metrology_type_parent` / `idx_metrology_type_group` |
 
 其余 R__ 中的 `ALTER` 列（如 `repair_workorder`、`inspection_plan`、`device_outbound` 等）经核对 **已在 V1 中存在**，无需重复添加。
 
@@ -1374,3 +1383,304 @@ powershell -File scripts/ensure-tenant-tables.ps1
 - **common**：`MedicalDeviceImporter`、`ImportMasterDataResolver`；`SoftDeleteSupport.prepareCreate`
 
 部署：热加载 **meis-common** 及依赖模块（system / analytics / special / qc / maintain）。
+
+## 附录 L：开发面板状态显示滞后（2026-07-12）
+
+### L.1 现象
+
+终端显示 15 个服务均已绑定端口，但面板仅显示 5 个核心服务「运行中」；终端偶发 `Request error: …指定的网络名不再可用`。
+
+### L.2 根因
+
+1. `/api/status` 对每个服务各执行一次 `netstat`（15 服务 × HTTP+JDWP ≈ 30 次），单次轮询可达 **5s+**
+2. 面板 **单线程** 处理 HTTP；日志 `/api/logs/stream` 与状态轮询（原 4s）叠加排队
+3. 浏览器请求超时/取消后，服务端写响应失败 → 终端报「网络名不再可用」
+4. 前端刷新失败时 **保留旧快照**（例如仅启动过 core 5 个时的状态）
+
+### L.3 修补
+
+| 项 | 改动 |
+|----|------|
+| `meis-services.ps1` | `Get-MeisListeningPortSet`：一次 netstat 解析全部 LISTENING 端口并缓存 800ms |
+| `Get-MeisServiceStatusList` / 日志 | 复用端口快照，不再逐服务 netstat |
+| `dev-panel.ps1` | 客户端断开不再红色报错；`Invoke-PanelRequestSafe` 统一捕获 |
+| `index.html` | 状态轮询 5s；日志轮询避让 `refreshInFlight`；失败时提示「刷新失败，显示可能过期」 |
+
+### L.4 使用说明
+
+修改脚本后需 **重启开发面板**（关闭 :5099 再运行 `scripts\dev-panel.ps1`），否则仍跑旧逻辑。可用 `scripts\status.ps1` 核对真实端口状态。
+
+---
+
+## 附录 M：医学装备计量检定类型维护（2026-07-12）
+
+### M.1 业务分类体系（用户规范摘要）
+
+| 维度 | 说明 | 字典 `metrology_classification_group` |
+|------|------|----------------------------------------|
+| 法规监管 | 强制检定（法定）/ 非强制（校准溯源） | `regulatory` |
+| 实施时机 | 首次 / 周期 / 修理后 / 仲裁 / 期间核查 | `timing` |
+| 执行地点 | 送检 / 现场上门 | `location` |
+| 医院分级 | A 强检 / B 重要非强检 / C 一般辅助 | `grade` |
+
+**与 `metrology_category` 区分**：`metrology_category` 为力学/电学等**参量类别**；`metrology_type` 为**检定管理分类**（法规属性、时机、地点、ABC 分级及设备范围说明）。
+
+### M.2 数据模型 `metrology_type`
+
+| 字段 | 说明 |
+|------|------|
+| `type_code` / `type_name` | 类型编码与名称（租户内唯一，软删后可重建） |
+| `classification_group` | 分类维度 |
+| `parent_id` | 上级类型（树形，如强制检定 → 周期强检） |
+| `regulatory_attr` | 法规属性（强制 / 非强制） |
+| `traceability_mode` | 溯源方式（检定 / 校准） |
+| `timing_kind` | 实施时机 |
+| `location_kind` | 执行地点（送检 / 现场） |
+| `management_grade` | 医院 A/B/C 分级 |
+| `cycle_rule` | 周期规则说明 |
+| `certificate_kind` | 证书类型（检定证 / 校准证） |
+| `legal_basis` / `executor_scope` | 法规依据、执行机构范围 |
+| `sort_order` / `is_active` | 排序与启用 |
+
+### M.3 种子数据
+
+`R__tenant_schema_sync.sql` 预置：法规（`MANDATORY`、`MANDATORY_ONCE`、`MANDATORY_PERIODIC`、`VOLUNTARY` 及设备范围）、时机、地点、A/B/C 分级等条目。
+
+### M.4 接口与前端
+
+| 能力 | 路径 |
+|------|------|
+| 分页 + 维度筛选 | `GET /api/metrology/type/page?classification_group=` |
+| 全量列表 | `GET /api/metrology/type/list` |
+| 保存 | `POST /api/metrology/type` |
+| 删除 | `DELETE /api/metrology/type/{id}` |
+| 页面 | **计量管理 → 计量参数设置** →「计量检定类型」Tab |
+
+### M.5 部署
+
+重启 **meis-tenant**（`V1__tables.sql` 已含 `metrology_type` 建表 + `R__` 种子）与 **meis-qc**（`MetrologyTypeController`）后生效。新建表须写入 V1，禁止再增 `V5+` 版本脚本（见附录 G.0）。
+
+### M.6 CRUD 完整性检查（`metrology_type` 审计结果，2026-07-12）
+
+| 项 | 后端 | 前端 | 状态 |
+|----|------|------|------|
+| **C 新增** | `POST /api/metrology/type`；`applyInsertAudit` + 软删唯一键恢复 | `CrudPage` 新增 → `saveUrl`；必填校验 | 通过 |
+| **R 查询** | `GET /page`（分页+关键词+维度筛选）、`GET /list`（下拉）、`GET /{id}` | 列表 `listPageUrl`；`listFilters` 维度筛选；`parent_id` 外键显示 | 通过（已修 `refSelectConfig` 用 `id` 作 FK 值） |
+| **U 更新** | 同 POST，按 `id` 分支 UPDATE + `updated_by` | 行内编辑 → 同一 `saveUrl` | 通过 |
+| **D 删除** | `DELETE /{id}` → `SoftDeleteSupport.softDelete` | `delete-url="/metrology/type"` | 通过 |
+| **审计/软删** | 七列 + `findSoftDeletedId(type_code)` | — | 通过 |
+| **字典/外键** | 种子字典 6 类 | `businessSchemas` 字段 + `dictType` / `linkTable` | 通过 |
+
+**本次修补**：`parent_id` 外键 `valueKey` 改回 `id`；分页关键词搜 `type_code`/`type_name`；空 `parent_id` UUID 规范化；`CrudPage` 保存成功/失败提示与必填校验。
+
+### M.7 新增表/字段通用检查清单（每次必做）
+
+**数据库**
+
+- [ ] `V1__tables.sql` 全量建表（含标准七列）；索引写 `V2__extensions.sql`
+- [ ] 业务补列写 `R__tenant_schema_sync.sql`；种子数据（字典/主数据）同步
+- [ ] `MetrologyDomainController`（或对应域 `TABLES`）注册表名
+
+**后端**
+
+- [ ] 分页 `GET .../page`（返回 `PageResult`：`records` + `total`）
+- [ ] 保存 `POST`（新增/更新合一；软删恢复；审计字段）
+- [ ] 删除 `DELETE`（软删，非物理删）
+- [ ] 可选：`GET /list`（下拉）、`GET /{id}`（详情）
+- [ ] 关键词/筛选参数与前端 `listFilters` 对齐
+
+**前端**
+
+- [ ] `businessSchemas.ts` 字段定义（`list`/`required`/`dictType`/`linkTable`）
+- [ ] `refSelectConfig.ts` 外键下拉（`valueKey`：`*_id` 用 `id`，编码列另建 `*_code` 键）
+- [ ] 页面 `PageConfig`：`saveUrl`、`listPageUrl`、`deleteUrl`（自定义 Controller 时必配）
+- [ ] 路由/菜单可访问；列表筛选、新增、编辑、删除走通
+
+**验证**
+
+- [ ] `mvn compile` 通过；重启相关服务后手工点一遍 CRUD
+
+---
+
+## 附录 N：资产台账 × 公用设备需求梳理（2026-07-12）
+
+> 来源：语音输入原始需求。**N.8 已确认（2026-07-12），可按 N.7 实施。**
+
+### N.1 需求背景与目标
+
+在现有资产台账（`medical_device`）与公用设备模块基础上，打通「计量类型维护」「公用设备标识」「借调全生命周期」「计费快照与自动结算」，并在台账侧提供与保养/巡检一致的子页签体验。
+
+### N.2 功能域拆分
+
+#### N.2.1 资产台账扩展（AST）
+
+| 编号 | 需求 | 说明 |
+|------|------|------|
+| AST-01 | 计量类型字段 | 台账维护设备所属**计量检定类型**（关联 `metrology_type.type_code`），用于计量计划/到期规则，与 `is_metrology` 联动展示 |
+| AST-02 | 公用设备标志 | 台账增加「是否公用设备」`is_shared_device`（库表已有，前端 schema 未暴露） |
+| AST-03 | 借调计费配置 | 公用设备在台账维护**计费方式**与**单价**（见 N.2.3） |
+| AST-04 | 借调记录子页 | 台账新增 **「借调记录」Sheet**，与维修/保养/巡检/计量记录同级，按 `device_id` 查 `shared_device_loan` |
+
+#### N.2.2 公用设备管理重构（SHR）
+
+| 编号 | 需求 | 说明 |
+|------|------|------|
+| SHR-01 | 列表数据源 | **直接展示资产台账**，筛选 `is_shared_device = true`；不以 `shared_device` 快照表作为主列表 |
+| SHR-02 | 新增公用设备 | 从**非公用设备**（`is_shared_device = false`）中检索选择，确认后标记为公用并写入计费配置 |
+| SHR-03 | 取消公用设备 | 操作项：取消公用资格（`is_shared_device = false`）；**借调中/归还审批中禁止取消** |
+| SHR-04 | 查看借用记录 | 操作项：跳转或弹窗展示该设备全部借调单 |
+| SHR-05 | 借调状态列 | 列表展示设备**当前借调态**（见 N.3 状态机），非仅 `availability_status` |
+
+#### N.2.3 计费规则（SHR-F）
+
+| 编号 | 需求 | 说明 |
+|------|------|------|
+| SHR-F-01 | 计费方式维护 | 字典 `shared_fee_mode`：`per_use` 按次 / `time` 计时 |
+| SHR-F-02 | 计时单位 | 计时收费子字典 `shared_fee_time_unit`：`month` / `day` / `hour` |
+| SHR-F-03 | 单价维护 | 台账或公用设备配置页维护 `fee_unit_price`（单价，元） |
+| SHR-F-04 | 借调单快照 | 创建/提交借调申请时，将当时 `fee_mode`、`fee_time_unit`、`fee_unit_price` **写入借调单**，与设备后续改价脱钩 |
+| SHR-F-05 | 归还自动计费 | 归还单**审批通过**后，按快照规则自动结算并写入 `shared_device_fee`（算法见 **N.8.2**） |
+| SHR-F-06 | 费用查看 | 台账可查看该设备历史借调费用汇总/明细 |
+
+### N.3 借调状态（列表展示用）
+
+设备在公用设备列表上的「当前状态」由借调/归还单据**派生**（不再使用 `shared_device` 表）：
+
+| 展示状态 | 判定条件（建议） |
+|----------|------------------|
+| 在库 | 无进行中借调；或最近借调已归还 |
+| 借调申请中 | 存在 `shared_device_loan.status IN ('draft','pending')` |
+| 已借用 | 存在 `shared_device_loan.status = 'on_loan'` |
+| 归还申请中 | 借调单 `on_loan` 且存在 `shared_device_return.status IN ('pending',…)` 待审 |
+
+### N.4 与现状差距（代码审计）
+
+| 项 | 现状 | 差距 |
+|----|------|------|
+| `medical_device.is_shared_device` | V1 已有字段；登记公用设备时会置 `true` | 台账表单未展示；无「取消公用」 |
+| `medical_device` 计量类型 | 仅有 `is_metrology`、校准日期；**无** `metrology_type_code` | 需加字段 + 关联 `metrology_type` 下拉 |
+| 公用设备列表 | `SharedDevicePage` 查 `shared_device` 表 | 改查 `medical_device`；**废弃 `shared_device` 表** |
+| `shared_device` 表 | 冗余快照 + `fee_standard`（元/天） | **本期直接废弃**（见 N.8.1） |
+| `shared_device_loan` | 含 `shared_device_id`、`fee_standard` | 去掉 `shared_device_id`；改 `fee_mode` / `fee_time_unit` / `fee_unit_price` 快照 |
+| 归还审批 | `SharedReturnController.approve` 恢复科室与可用状态 | **未**自动生成 `shared_device_fee` |
+| 台账借调记录 Tab | `DeviceLedgerForm` 有维修/保养/巡检/计量等 Tab | **无**借调记录 Tab |
+| §3.13 需求项 | SHR-B/F 均为待开发 | 与本次梳理一致 |
+
+### N.5 数据模型建议（待开发时落地）
+
+**`medical_device` 新增/暴露字段（写 V1 + R__）**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `metrology_type_code` | VARCHAR(50) | 关联 `metrology_type.type_code` |
+| `is_shared_device` | BOOLEAN | 已有，前端暴露 |
+| `shared_fee_mode` | VARCHAR(20) | `per_use` / `time` |
+| `shared_fee_time_unit` | VARCHAR(10) | `month` / `day` / `hour`（`time` 时有效） |
+| `shared_fee_unit_price` | DECIMAL(12,2) | 单价 |
+
+**`shared_device_loan` 调整**
+
+| 字段 | 说明 |
+|------|------|
+| `device_id` | 唯一关联台账（**移除 `shared_device_id`**） |
+| `fee_mode` | 申请时计费方式快照 |
+| `fee_time_unit` | 申请时计时单位快照（`time` 时有效） |
+| `fee_unit_price` | 申请时单价快照 |
+| `billing_start_at` | 计时起点：借调**审批通过**时刻（写入 `approve`） |
+| `billing_end_at` | 计时终点：归还**审批通过**时刻（写入归还 `approve`） |
+
+**`shared_device` 表：废弃（N.8.1）**
+
+- 新功能不再读写 `shared_device`；公用属性与计费配置全部落在 `medical_device`。
+- 借调/归还/收费单据仅关联 `device_id`。
+- 存量租户：迁移脚本将 `shared_device` 中有效计费数据合并至 `medical_device` 后，表可保留空壳或后续版本删除（Flyway 不新增 V 脚本删表，仅停写）。
+
+**取消公用设备**：仅置 `medical_device.is_shared_device = false`（并清空计费配置可选）；无 `shared_device` 行需维护。
+
+### N.6 接口与页面改动清单（开发阶段）
+
+| 层级 | 改动 |
+|------|------|
+| 后端 | 废弃 `SharedDeviceController` 对 `shared_device` 的 CRUD；改查/改 `medical_device`；借调单去 `shared_device_id`；归还审批计费（N.8.2） |
+| 前端 | 移除 `shared_device` schema/引用；`SharedDevicePage` 台账列表；借调申请选 `medical_device`（`is_shared_device=true`） |
+| 字典 | `shared_fee_mode`、`shared_fee_time_unit`；扩展借调状态展示文案 |
+| 文档 | §3.13 勾选 SHR 子项；MET 台账联动 |
+
+1. **AST-01/02**：台账字段（计量类型、公用标志）+ schema/表单  
+2. **SHR-F-01~03**：计费字典与台账计费配置字段  
+3. **SHR-01~05**：公用设备页改台账列表 + 状态派生 + 取消公用；**停用 `shared_device` 读写**  
+4. **SHR-F-04**：借调申请写入计费快照（来自 `medical_device`）  
+5. **SHR-F-05~06 + AST-04**：归还自动计费（N.8.2）+ 台账借调/费用 Tab  
+6. **数据迁移**：`shared_device` → `medical_device` 一次性合并；代码清除 `shared_device_id` 引用
+
+### N.8 已确认规则（2026-07-12）
+
+#### N.8.1 表与公用设备登记
+
+| 决策 | 结论 |
+|------|------|
+| `shared_device` 表 | **已删除**（V1 去除建表；R__ 迁移后 DROP） |
+| 取消公用设备 | 仅 `is_shared_device = false`（借调中/归还审批中禁止） |
+| 新增公用设备 | 从非公用台账勾选 → 置 `is_shared_device = true` 并配置计费字段 |
+
+#### N.8.2 计费结算算法
+
+| 计费方式 | 规则 |
+|----------|------|
+| **按次** `per_use` | **一张借调单计 1 次**；`fee_amount = fee_unit_price`（快照单价，不乘天数） |
+| **计时** `time` | **起算**：借调单审批通过时刻（`shared_device_loan.approved_at`，写入 `billing_start_at`） |
+| | **止算**：归还单审批通过时刻（`shared_device_return.approved_at`，写入 `billing_end_at`） |
+| | **金额**：按快照 `fee_time_unit`（月/天/小时）折算时长 × `fee_unit_price`（不足 1 单位按 1 单位计，或向上取整——实现时固定一种并写入单元测试） |
+
+借调申请保存/提交时：从台账复制 `shared_fee_mode`、`shared_fee_time_unit`、`shared_fee_unit_price` 至借调单快照字段；审批通过后写入 `billing_start_at`；归还审批通过后写入 `billing_end_at` 并生成 `shared_device_fee`。
+
+#### N.8.3 原待确认问题 — 答复归档
+
+1. ~~`shared_device` 去留~~ → **直接废弃**  
+2. ~~按次如何计数~~ → **一张借调单据算一次**  
+3. ~~计时起止点~~ → **借调审核通过后开始，归还审核通过后结束**（不用 `lend` 操作时刻，不用申请单上的计划日期 `loan_start`/`loan_end` 计费）
+
+---
+
+**状态**：**已按 N.7 实施（2026-07-12）**。重启 meis-tenant + meis-special 后生效；`shared_device` 表已删除。
+
+---
+
+## 附录 O：运维设备主数据架构（巡检 / 保养 / 计量 / 预防性维护）
+
+> 来源：需求语音整理（2026-07-12）
+
+### O.1 核心原则
+
+| 原则 | 说明 |
+|------|------|
+| **主对象** | 巡检、保养、计量、预防性维护（PM）的设备主对象均为 **资产台账** `medical_device` |
+| **计量属性** | 计量检定类型（`metrology_type`）及 `is_metrology`、`metrology_type_code`、计量周期等属性维护在台账内 |
+| **多计划** | 同一设备可同时参与多个保养/巡检/PM 计划；业务以 **计划**（`*_plan`）承载，不以独立设备表重复建档 |
+| **标志位** | 台账布尔字段：`is_inspection_device`、`is_maintain_device`、`is_metrology`、`is_pm_device`（可选筛选，非第二套主数据） |
+
+### O.2 废弃项（与附录 N `shared_device` 同类）
+
+| 类别 | 处理 |
+|------|------|
+| `shared_device` 表 | **删除**（V1 去除建表；`R__tenant_schema_sync` 迁移后 `DROP`） |
+| `*DeviceController`（保养/巡检/计量/PM） | **删除**；执行单生成迁入 `*ExecutionGenerator` + `*PlanController` |
+| 前端 `*DevicePage.vue` 及菜单 `*_device` | **停用并移除**；设备标记与属性在台账表单维护 |
+| 独立设备表（保养/巡检/计量/PM） | **不存在**；无需删表 |
+
+### O.3 保留的业务表
+
+- **计划**：`inspection_plan`、`maintenance_plan`、`metrology_plan`、`pm_plan`
+- **执行**：对应 `*_execution` / `*_execution_item` / `*_execution_result`
+- **参数**：模板、类型、分级等参数表（各模块 `*_template`、`*_type` 等）
+
+### O.4 实施清单
+
+- [x] 删除 `shared_device` 建表及审计脚本引用
+- [x] `R__tenant_schema_sync`：存量迁移 + `DROP TABLE shared_device`
+- [x] 删除 4 个 `*DeviceController`，执行生成逻辑迁入 Generator
+- [x] 删除 4 个 `*DevicePage.vue`，移除 `ModulePage` / `pageRegistry` 路由
+- [x] 停用菜单：`maintain_device`、`inspect_device`、`metrology_device`、`pm_device`
+- [x] 台账 schema 补全 `is_pm_device`
+
+**状态**：**已按 O.4 实施（2026-07-12）**。重启 meis-tenant 后菜单与 `shared_device` 删表生效；重启 meis-qc、meis-maintain 后后端生效。

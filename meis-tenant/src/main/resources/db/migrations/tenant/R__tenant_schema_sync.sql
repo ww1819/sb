@@ -195,6 +195,95 @@ INSERT INTO metrology_category (category_code, category_name, sort_order, descri
 ('LENGTH', '长度计量', 4, '尺寸、量具等')
 ON CONFLICT (category_code) DO NOTHING;
 
+-- 计量检定类型（法规属性 / 实施时机 / 执行地点 / 分级管理）
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('metrology_classification_group', 'regulatory', '法规监管属性', 'regulatory', 1),
+('metrology_classification_group', 'timing', '实施时机', 'timing', 2),
+('metrology_classification_group', 'location', '执行地点', 'location', 3),
+('metrology_classification_group', 'grade', '分级管理', 'grade', 4),
+('metrology_classification_group', 'device_scope', '适用设备范围', 'device_scope', 5),
+('metrology_regulatory_attr', 'mandatory', '强制检定', 'mandatory', 1),
+('metrology_regulatory_attr', 'voluntary', '非强制检定', 'voluntary', 2),
+('metrology_traceability_mode', 'verification', '检定', 'verification', 1),
+('metrology_traceability_mode', 'calibration', '校准', 'calibration', 2),
+('metrology_timing_kind', 'first_only', '首次检定（失准报废）', 'first_only', 1),
+('metrology_timing_kind', 'periodic', '周期检定', 'periodic', 2),
+('metrology_timing_kind', 'after_repair', '修理后检定', 'after_repair', 3),
+('metrology_timing_kind', 'arbitration', '临时/仲裁检定', 'arbitration', 4),
+('metrology_timing_kind', 'interim', '期间核查', 'interim', 5),
+('metrology_location_kind', 'lab', '送检检定', 'lab', 1),
+('metrology_location_kind', 'onsite', '现场上门检定', 'onsite', 2),
+('metrology_location_kind', 'both', '送检或现场', 'both', 3),
+('metrology_management_grade', 'A', 'A级（强检类）', 'A', 1),
+('metrology_management_grade', 'B', 'B级（重要非强检）', 'B', 2),
+('metrology_management_grade', 'C', 'C级（一般辅助）', 'C', 3),
+('metrology_certificate_kind', 'verification_cert', '检定证书', 'verification_cert', 1),
+('metrology_certificate_kind', 'calibration_cert', '校准证书', 'calibration_cert', 2),
+('metrology_certificate_kind', 'none', '无法定证书', 'none', 3)
+ON CONFLICT (dict_type, dict_code) DO NOTHING;
+
+INSERT INTO metrology_type (type_code, type_name, classification_group, regulatory_attr, traceability_mode, certificate_kind, sort_order, legal_basis, executor_scope, cycle_rule, description) VALUES
+('MANDATORY', '强制检定（法定强制管理）', 'regulatory', 'mandatory', 'verification', 'verification_cert', 1,
+ '《计量法》及《实施强制管理的计量器具目录》', '仅限法定计量技术机构', '按检定规程固定周期，不可自行缩短或延长',
+ '用于医疗卫生且标注 V/P+V 的设备，必须按期送法定计量机构检定，超期/不合格严禁临床使用。'),
+('VOLUNTARY', '非强制检定（自主溯源）', 'regulatory', 'voluntary', 'calibration', 'calibration_cert', 2,
+ '医院自主管理', '法定机构或具备资质第三方校准实验室', '医院结合风险与使用频次自行制定',
+ '未列入强检目录但诊疗质控需保证量值准确的设备，可检定或校准，医院自行判定是否可用。')
+ON CONFLICT (type_code) DO NOTHING;
+
+INSERT INTO metrology_type (type_code, type_name, parent_id, classification_group, regulatory_attr, traceability_mode, timing_kind, certificate_kind, sort_order, cycle_rule, description)
+SELECT 'MAND_FIRST_ONCE', '首次检定（失准报废/到期轮换）', id, 'regulatory', 'mandatory', 'verification', 'first_only', 'verification_cert', 1,
+ '仅出厂/入库做一次检定，使用中不周期复检，失准直接报废',
+ '典型：玻璃水银体温计。'
+FROM metrology_type WHERE type_code = 'MANDATORY'
+ON CONFLICT (type_code) DO NOTHING;
+
+INSERT INTO metrology_type (type_code, type_name, parent_id, classification_group, regulatory_attr, traceability_mode, timing_kind, certificate_kind, sort_order, cycle_rule, description)
+SELECT 'MAND_PERIODIC', '周期强制检定', id, 'regulatory', 'mandatory', 'verification', 'periodic', 'verification_cert', 2,
+ '按检定规程每年/每半年送检，周期不可更改',
+ '绝大多数医用强检设备。出具检定证书（合格/不合格结论），带法定计量印记。'
+FROM metrology_type WHERE type_code = 'MANDATORY'
+ON CONFLICT (type_code) DO NOTHING;
+
+INSERT INTO metrology_type (type_code, type_name, parent_id, classification_group, regulatory_attr, traceability_mode, timing_kind, sort_order, description)
+SELECT v.code, v.name, p.id, 'device_scope', 'mandatory', 'verification', 'periodic', v.ord, v.desc
+FROM metrology_type p
+CROSS JOIN (VALUES
+ ('MAND_SCOPE_VITAL', '生命体征类', 1, '电子血压计、水银血压计、电子体温计、多参数监护仪、心电图机、脑电图机'),
+ ('MAND_SCOPE_ENT', '眼科耳鼻喉类', 2, '眼压计、纯音听力计、验光仪、验光镜片箱、焦度计'),
+ ('MAND_SCOPE_RAD', '放射/核医学类', 3, 'DR/CT/乳腺钼靶、医用诊断X射线机、放射治疗电离室剂量计、医用活度计')
+) AS v(code, name, ord, desc)
+WHERE p.type_code = 'MAND_PERIODIC'
+ON CONFLICT (type_code) DO NOTHING;
+
+INSERT INTO metrology_type (type_code, type_name, parent_id, classification_group, regulatory_attr, traceability_mode, sort_order, description)
+SELECT 'VOL_SCOPE_COMMON', '常见非强检设备', id, 'device_scope', 'voluntary', 'calibration', 1,
+ '呼吸机、麻醉机、注射泵/输液泵、除颤仪、高频电刀、B超/MRI、骨密度仪、肺功能仪、医用激光源、负压压力表、生化分析仪、理疗设备等。'
+FROM metrology_type WHERE type_code = 'VOLUNTARY'
+ON CONFLICT (type_code) DO NOTHING;
+
+INSERT INTO metrology_type (type_code, type_name, classification_group, timing_kind, traceability_mode, sort_order, description) VALUES
+('TIME_FIRST', '首次检定', 'timing', 'first_only', 'verification', 1, '新设备入库、维修后、更换核心传感器后首次计量，合格后方可投入临床。'),
+('TIME_PERIODIC', '周期检定（定期检定）', 'timing', 'periodic', 'verification', 2, '强检设备法定周期、非强检设备医院规定周期，到期统一送检/上门检。'),
+('TIME_AFTER_REPAIR', '修理后检定', 'timing', 'after_repair', 'verification', 3, '大修、更换探头/传感器、搬迁、故障维修后必须重新计量，合格再使用。'),
+('TIME_ARBITRATION', '临时检定（仲裁检定）', 'timing', 'arbitration', 'verification', 4, '医疗纠纷、数据争议、监管抽查异议时申请法定机构仲裁计量，具备法律效力。'),
+('TIME_INTERIM', '期间核查', 'timing', 'interim', 'calibration', 5, '两次周期检定之间医院内部简易比对与稳定性核查，仅内部质控，无法定证书。')
+ON CONFLICT (type_code) DO NOTHING;
+
+INSERT INTO metrology_type (type_code, type_name, classification_group, location_kind, sort_order, description) VALUES
+('LOC_LAB', '送检检定', 'location', 'lab', 1, '小型设备（血压计、体温计、验光镜片等）送至计量实验室检测。'),
+('LOC_ONSITE', '现场上门检定', 'location', 'onsite', 2, '大型固定设备（CT、DR、监护仪、直线加速器等）计量人员到院内现场检测。')
+ON CONFLICT (type_code) DO NOTHING;
+
+INSERT INTO metrology_type (type_code, type_name, classification_group, management_grade, regulatory_attr, traceability_mode, sort_order, cycle_rule, description) VALUES
+('GRADE_A', 'A级（强检类）', 'grade', 'A', 'mandatory', 'verification', 1, '法定周期，专人台账、证书存档',
+ '全部强制检定设备，专人台账、法定周期、证书存档。'),
+('GRADE_B', 'B级（重要非强检）', 'grade', 'B', 'voluntary', 'calibration', 2, '建议每年校准',
+ '生命支持、急救、影像设备（呼吸机、除颤仪、彩超等），每年校准。'),
+('GRADE_C', 'C级（一般辅助设备）', 'grade', 'C', 'voluntary', 'calibration', 3, '2~3年校准 + 内部期间核查',
+ '理疗、常规压力表、小型治疗设备等。')
+ON CONFLICT (type_code) DO NOTHING;
+
 -- ---------- 不良事件模块：字典种子 ----------
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('adverse_event_type', 'malfunction', '设备故障', 'malfunction', 1),
@@ -262,8 +351,39 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('urgency_level', 'critical', '特急', 'critical', 3)
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
 
--- ---------- 公用设备借调模块 ----------
+-- ---------- 公用设备借调模块（附录 N） ----------
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_shared_device BOOLEAN DEFAULT FALSE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS metrology_type_code VARCHAR(50);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS shared_fee_mode VARCHAR(20);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS shared_fee_time_unit VARCHAR(10);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS shared_fee_unit_price DECIMAL(12,2);
+
+ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS fee_mode VARCHAR(20);
+ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS fee_time_unit VARCHAR(10);
+ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS fee_unit_price DECIMAL(12,2);
+ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS billing_start_at TIMESTAMPTZ;
+ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS billing_end_at TIMESTAMPTZ;
+
+UPDATE shared_device_loan SET
+  fee_mode = COALESCE(fee_mode, 'time'),
+  fee_time_unit = COALESCE(fee_time_unit, 'day'),
+  fee_unit_price = COALESCE(fee_unit_price, fee_standard, 0)
+WHERE fee_unit_price IS NULL OR fee_mode IS NULL;
+
+-- 存量 shared_device 计费合并至台账后删表（附录 N/O）
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'shared_device') THEN
+    UPDATE medical_device d SET
+      is_shared_device = TRUE,
+      shared_fee_mode = COALESCE(d.shared_fee_mode, 'time'),
+      shared_fee_time_unit = COALESCE(d.shared_fee_time_unit, 'day'),
+      shared_fee_unit_price = COALESCE(d.shared_fee_unit_price, s.fee_standard, 0)
+    FROM shared_device s
+    WHERE s.device_id = d.id AND COALESCE(s.is_deleted, 0) = 0;
+  END IF;
+END $$;
+DROP TABLE IF EXISTS shared_device CASCADE;
 
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('shared_availability', 'available', '可借', 'available', 1),
@@ -280,7 +400,16 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('return_status', 'rejected', '已驳回', 'rejected', 3),
 ('paid_status', 'unpaid', '未收费', 'unpaid', 1),
 ('paid_status', 'paid', '已收费', 'paid', 2),
-('paid_status', 'waived', '已减免', 'waived', 3)
+('paid_status', 'waived', '已减免', 'waived', 3),
+('shared_fee_mode', 'per_use', '按次收费', 'per_use', 1),
+('shared_fee_mode', 'time', '计时收费', 'time', 2),
+('shared_fee_time_unit', 'month', '月', 'month', 1),
+('shared_fee_time_unit', 'day', '天', 'day', 2),
+('shared_fee_time_unit', 'hour', '小时', 'hour', 3),
+('shared_loan_display_status', 'in_stock', '在库', 'in_stock', 1),
+('shared_loan_display_status', 'loan_pending', '借调申请中', 'loan_pending', 2),
+('shared_loan_display_status', 'on_loan', '已借用', 'on_loan', 3),
+('shared_loan_display_status', 'return_pending', '归还申请中', 'return_pending', 4)
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
 
 INSERT INTO sys_approval_flow (flow_code, flow_name, business_type) VALUES

@@ -12,7 +12,7 @@ import java.util.Set;
 public class MetrologyDomainController extends GenericTableController {
     private final JdbcTemplate jdbcTemplate;
     private static final Set<String> TABLES = Set.of(
-            "metrology_category", "metrology_org", "metrology_template", "metrology_template_item",
+            "metrology_category", "metrology_type", "metrology_org", "metrology_template", "metrology_template_item",
             "metrology_plan", "metrology_record", "metrology_execution",
             "metrology_execution_item", "metrology_execution_result");
 

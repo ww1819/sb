@@ -2,6 +2,7 @@ package com.meis.saas.special.controller;
 
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -18,7 +19,9 @@ public class SharedRecordController {
     @GetMapping("/summary")
     public Result<Map<String, Object>> summary() {
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("device_count", jdbc.queryForObject("SELECT COUNT(*) FROM shared_device WHERE is_active = true", Long.class));
+        result.put("device_count", jdbc.queryForObject(
+                "SELECT COUNT(*) FROM medical_device WHERE is_shared_device = TRUE "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", null), Long.class));
         result.put("loan_total", jdbc.queryForObject("SELECT COUNT(*) FROM shared_device_loan", Long.class));
         result.put("on_loan_count", jdbc.queryForObject("SELECT COUNT(*) FROM shared_device_loan WHERE status = 'on_loan'", Long.class));
         result.put("pending_loan", jdbc.queryForObject("SELECT COUNT(*) FROM shared_device_loan WHERE status = 'pending'", Long.class));
@@ -38,8 +41,10 @@ public class SharedRecordController {
     }
 
     @GetMapping("/page")
-    public Result<PageResult<Map<String, Object>>> page(PageQuery query,
-            @RequestParam(required = false) String status) {
+    public Result<PageResult<Map<String, Object>>> page(
+            PageQuery query,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) UUID deviceId) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         List<Object> args = new ArrayList<>();
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
@@ -51,6 +56,10 @@ public class SharedRecordController {
         if (status != null && !status.isBlank()) {
             where.append(" AND l.status = ? ");
             args.add(status);
+        }
+        if (deviceId != null) {
+            where.append(" AND l.device_id = ?::uuid ");
+            args.add(deviceId);
         }
         String from = """
             FROM shared_device_loan l

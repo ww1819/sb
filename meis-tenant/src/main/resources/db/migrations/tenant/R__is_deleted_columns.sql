@@ -111,6 +111,8 @@ ALTER TABLE medical_device_category ADD COLUMN IF NOT EXISTS is_deleted SMALLINT
 UPDATE medical_device_category SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
 ALTER TABLE metrology_category ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
 UPDATE metrology_category SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE metrology_type ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE metrology_type SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
 ALTER TABLE metrology_execution ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
 UPDATE metrology_execution SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
 ALTER TABLE metrology_execution_item ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
@@ -185,8 +187,6 @@ ALTER TABLE repair_workorder_event ADD COLUMN IF NOT EXISTS is_deleted SMALLINT 
 UPDATE repair_workorder_event SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
 ALTER TABLE risk_assessment ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
 UPDATE risk_assessment SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
-ALTER TABLE shared_device ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
-UPDATE shared_device SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
 ALTER TABLE shared_device_fee ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
 UPDATE shared_device_fee SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
 ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;

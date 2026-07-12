@@ -148,12 +148,44 @@ function Stop-MeisServices {
     }
 
     $msg = if ($stillUp.Count -eq 0) { "all backend stopped ($count killed)" } else { "partial stop ($count killed), still up: $($stillUp -join ', ')" }
+    Clear-MeisListeningPortCache
     return @{ ok = ($stillUp.Count -eq 0); message = $msg; killed = $count; stillUp = $stillUp }
 }
 
+$script:MeisListeningPortCache = $null
+$script:MeisListeningPortCacheAt = [datetime]::MinValue
+$script:MeisListeningPortCacheTtlMs = 800
+
+function Clear-MeisListeningPortCache {
+    $script:MeisListeningPortCache = $null
+    $script:MeisListeningPortCacheAt = [datetime]::MinValue
+}
+
+# 单次 netstat 解析全部 LISTENING 端口，供状态轮询复用（避免每服务一次 netstat 导致 /api/status 阻塞数秒）。
+function Get-MeisListeningPortSet {
+    param([switch]$ForceRefresh)
+    if (-not $ForceRefresh -and $null -ne $script:MeisListeningPortCache) {
+        $ageMs = ((Get-Date) - $script:MeisListeningPortCacheAt).TotalMilliseconds
+        if ($ageMs -lt $script:MeisListeningPortCacheTtlMs) {
+            return $script:MeisListeningPortCache
+        }
+    }
+    $ports = New-Object 'System.Collections.Generic.HashSet[int]'
+    foreach ($line in (netstat -ano 2>$null)) {
+        if ($line -notmatch 'LISTENING') { continue }
+        if ($line -match ':(\d+)\s+\S+\s+LISTENING') {
+            [void]$ports.Add([int]$Matches[1])
+        }
+    }
+    $script:MeisListeningPortCache = $ports
+    $script:MeisListeningPortCacheAt = Get-Date
+    return $ports
+}
+
 function Test-MeisPortListening {
-    param([int]$Port)
-    return [bool](netstat -ano | Select-String ":\s*$Port\s+.*LISTENING")
+    param([int]$Port, [switch]$ForceRefresh)
+    $set = Get-MeisListeningPortSet -ForceRefresh:$ForceRefresh
+    return $set.Contains($Port)
 }
 
 function Test-MeisRedisAvailable {
@@ -360,6 +392,7 @@ function Start-MeisServices {
 
     $msg = "launched $($launched.Count), skipped $($skipped.Count)"
     if ($failed.Count -gt 0) { $msg += ", failed $($failed.Count)" }
+    Clear-MeisListeningPortCache
     return @{ ok = ($failed.Count -eq 0); message = $msg; skipped = $skipped; launched = $launched; failed = @($failed | ForEach-Object { $_.name }) }
 }
 
@@ -1025,11 +1058,12 @@ function Start-MeisServiceByNameWithBuild {
 }
 
 function Get-MeisServiceStatusList {
+    $ports = Get-MeisListeningPortSet
     $list = @()
     foreach ($s in $script:MeisServices) {
-        $httpUp = Test-MeisPortListening -Port $s.port
+        $httpUp = $ports.Contains($s.port)
         $debugUp = $false
-        if ($s.debugPort) { $debugUp = Test-MeisPortListening -Port $s.debugPort }
+        if ($s.debugPort) { $debugUp = $ports.Contains($s.debugPort) }
         $jar = Join-Path $script:MeisRoot "$($s.name)\target\$($s.name)-1.0.0-SNAPSHOT.jar"
         $classesDir = Join-Path $script:MeisRoot "$($s.name)\target\classes"
         $classesExists = Test-Path $classesDir
@@ -1240,9 +1274,12 @@ function Get-MeisPanelLogEntries {
 
     $entries = @()
     $logDir = Join-Path $script:MeisRoot 'logs'
-    $statusByName = @{}
-    foreach ($s in Get-MeisServiceStatusList) {
-        $statusByName[$s.name] = $s
+    $ports = Get-MeisListeningPortSet
+    $debugUpByName = @{}
+    foreach ($s in $script:MeisServices) {
+        if ($s.debugPort -and $ports.Contains($s.debugPort)) {
+            $debugUpByName[$s.name] = $true
+        }
     }
 
     $includePanel = (Test-MeisServiceInWatchList -Name 'panel' -Watched $Watched) -and (Test-MeisServiceInFilterList -Name 'panel' -Filtered $Filtered)
@@ -1267,10 +1304,7 @@ function Get-MeisPanelLogEntries {
             $name = $s.name
             if (-not (Test-MeisServiceInWatchList -Name $name -Watched $Watched)) { continue }
             if (-not (Test-MeisServiceInFilterList -Name $name -Filtered $Filtered)) { continue }
-            $preferDebug = $false
-            if ($statusByName.ContainsKey($name)) {
-                $preferDebug = [bool]$statusByName[$name].debugUp
-            }
+            $preferDebug = $debugUpByName.ContainsKey($name)
             $entries += Add-MeisServiceLogEntries -Name $name -LogDir $logDir -Lines $Lines -DebugLogs:$DebugLogs -PreferDebug:$preferDebug
         }
     }

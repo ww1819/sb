@@ -246,12 +246,6 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'maintenance_execution_item',
     listPageUrl: '/maintain/query/page'
   },
-  '/maintain/device': {
-    title: '保养设备管理',
-    apiBase: '/maintain',
-    table: 'medical_device',
-    listPageUrl: '/maintain/device/page'
-  },
   '/maintain/template': { title: '保养模板', apiBase: '/maintain', table: 'maintenance_template', saveUrl: '/maintain/template' },
   '/maintain/record': { title: '保养记录', apiBase: '/maintain', table: 'maintenance_record', saveUrl: '/maintain/record' },
   '/inspect/param': { title: '巡检参数设置', apiBase: '/inspect', table: 'inspection_type' },
@@ -268,12 +262,6 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'inspection_execution_item',
     listPageUrl: '/inspect/query/page'
   },
-  '/inspect/device': {
-    title: '巡检设备管理',
-    apiBase: '/inspect',
-    table: 'medical_device',
-    listPageUrl: '/inspect/device/page'
-  },
   '/metrology/param': { title: '计量参数设置', apiBase: '/metrology', table: 'metrology_category' },
   '/metrology/plan': { title: '计量计划', apiBase: '/metrology', table: 'metrology_plan', saveUrl: '/metrology/plan' },
   '/metrology/execution': {
@@ -287,12 +275,6 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/metrology',
     table: 'metrology_execution_item',
     listPageUrl: '/metrology/query/page'
-  },
-  '/metrology/device': {
-    title: '计量设备管理',
-    apiBase: '/metrology',
-    table: 'medical_device',
-    listPageUrl: '/metrology/device/page'
   },
   '/qc/risk': { title: '风险评估', apiBase: '/qc', table: 'risk_assessment' },
   '/qc/adverse': { title: '不良事件', apiBase: '/qc', table: 'adverse_event' },
@@ -413,7 +395,6 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/pm/execution/page'
   },
   '/pm/query': { title: '预防性维护记录', apiBase: '/pm', table: 'pm_execution_item' },
-  '/pm/device': { title: '预防性维护设备', apiBase: '/pm', table: 'medical_device', listPageUrl: '/pm/device/page' },
   '/analytics/mapping': {
     title: '对照管理',
     apiBase: '/analytics',

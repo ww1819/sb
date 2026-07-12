@@ -1,79 +1,27 @@
-package com.meis.saas.maintain.controller;
+package com.meis.saas.maintain.maintain;
 
-import com.meis.saas.common.audit.OperationLog;
-import com.meis.saas.common.page.PageQuery;
-import com.meis.saas.common.page.PageResult;
-import com.meis.saas.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.stereotype.Component;
 
 import java.util.*;
 
-@RestController
-@RequestMapping("/api/maintain/device")
+@Component
 @RequiredArgsConstructor
-public class MaintenanceDeviceController {
+public class MaintenanceExecutionGenerator {
     private final JdbcTemplate jdbc;
 
-    @GetMapping("/page")
-    public Result<PageResult<Map<String, Object>>> page(
-            PageQuery query,
-            @RequestParam(required = false) Boolean maintainOnly) {
-        StringBuilder where = new StringBuilder(" WHERE d.is_active = true ");
-        List<Object> args = new ArrayList<>();
-        if (Boolean.TRUE.equals(maintainOnly)) {
-            where.append(" AND d.is_maintain_device = true ");
-        }
-        if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
-            String kw = "%" + query.getKeyword().trim() + "%";
-            where.append(" AND (d.device_code ILIKE ? OR d.device_name ILIKE ?) ");
-            args.add(kw);
-            args.add(kw);
-        }
-        long total = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM medical_device d" + where, Long.class, args.toArray());
-        int offset = (query.getPage() - 1) * query.getSize();
-        args.add(query.getSize());
-        args.add(offset);
-        var rows = jdbc.queryForList("""
-                SELECT d.id, d.device_code, d.device_name, d.specification, d.is_maintain_device,
-                       dept.dept_name, p.id AS plan_id, p.plan_name, p.next_due_date, p.approval_status AS plan_approval_status
-                FROM medical_device d
-                LEFT JOIN department dept ON dept.id = d.dept_id
-                LEFT JOIN maintenance_plan p ON p.device_id = d.id AND p.status = 'active'
-                """ + where + " ORDER BY d.device_code LIMIT ? OFFSET ?", args.toArray());
-        return Result.ok(new PageResult<>(rows, total, query.getPage(), query.getSize()));
-    }
-
-    @PostMapping("/toggle")
-    @Transactional
-    @OperationLog(module = "maintain", description = "切换保养设备标记")
-    public Result<Void> toggle(@RequestBody Map<String, Object> body) {
-        @SuppressWarnings("unchecked")
-        List<String> deviceIds = (List<String>) body.getOrDefault("deviceIds", List.of());
-        boolean flag = Boolean.TRUE.equals(body.get("is_maintain_device"));
-        for (String deviceId : deviceIds) {
-            jdbc.update("UPDATE medical_device SET is_maintain_device=?, updated_at=NOW() WHERE id=?::uuid", flag, deviceId);
-        }
-        return Result.ok(null);
-    }
-
-    @PostMapping("/generate-execution")
-    @Transactional
-    @OperationLog(module = "maintain", description = "批量生成保养执行单")
-    public Result<List<Map<String, Object>>> generateExecution(@RequestBody Map<String, Object> body) {
+    public List<Map<String, Object>> generateBatch(Map<String, Object> body) {
         @SuppressWarnings("unchecked")
         List<String> planIds = (List<String>) body.getOrDefault("planIds", List.of());
         List<Map<String, Object>> created = new ArrayList<>();
         for (String planId : planIds) {
-            created.add(generateOneExecution(UUID.fromString(planId), body));
+            created.add(generateOne(UUID.fromString(planId), body));
         }
-        return Result.ok(created);
+        return created;
     }
 
-    private Map<String, Object> generateOneExecution(UUID planId, Map<String, Object> body) {
+    public Map<String, Object> generateOne(UUID planId, Map<String, Object> body) {
         var plan = jdbc.queryForList("""
                 SELECT p.*, t.template_name, t.maintenance_level_id
                 FROM maintenance_plan p
@@ -86,7 +34,7 @@ public class MaintenanceDeviceController {
             return Map.of("planId", planId, "error", "plan not approved");
         }
         UUID execId = UUID.randomUUID();
-        String execNo = MaintenanceExecutionController.nextNo();
+        String execNo = "ME" + System.currentTimeMillis();
         jdbc.update("""
                 INSERT INTO maintenance_execution (id, execution_no, plan_id, template_id, maintenance_level_id,
                     planned_date, assigned_engineer_id, status, created_by)

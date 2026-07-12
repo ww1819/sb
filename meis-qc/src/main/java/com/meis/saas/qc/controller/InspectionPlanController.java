@@ -3,6 +3,7 @@ package com.meis.saas.qc.controller;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.result.Result;
+import com.meis.saas.qc.inspect.InspectionExecutionGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,7 +17,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class InspectionPlanController {
     private final JdbcTemplate jdbc;
-    private final InspectionDeviceController deviceController;
+    private final InspectionExecutionGenerator executionGenerator;
 
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
@@ -85,7 +86,7 @@ public class InspectionPlanController {
     public Result<Map<String, Object>> generateExecution(@PathVariable UUID id, @RequestBody(required = false) Map<String, Object> body) {
         Map<String, Object> req = body != null ? new HashMap<>(body) : new HashMap<>();
         req.put("planIds", List.of(id.toString()));
-        var list = deviceController.generateExecution(req).getData();
+        var list = executionGenerator.generateBatch(req);
         if (list == null || list.isEmpty()) throw new BizException(400, "generate failed");
         Object err = list.get(0).get("error");
         if (err != null) throw new BizException(400, err.toString());

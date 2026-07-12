@@ -72,10 +72,31 @@ function Test-PanelClientDisconnectError {
     if ($msg -match 'network name|连接|已被关闭|aborted|reset|forcibly closed|transport|不再可用|broken pipe|远程主机') {
         return $true
     }
+    if ($msg -match 'OperationCanceled|cancelled|canceled') {
+        return $true
+    }
     if ($Ex.InnerException) {
         return Test-PanelClientDisconnectError $Ex.InnerException
     }
     return $false
+}
+
+function Invoke-PanelRequestSafe {
+    param([System.Net.HttpListenerContext]$Context)
+    try {
+        Handle-PanelRequest -Context $Context
+    } catch {
+        if (Test-PanelClientDisconnectError $_.Exception) {
+            Close-HttpResponseSafe $Context.Response
+            return
+        }
+        Write-Host "Request error: $($_.Exception.Message)" -ForegroundColor DarkYellow
+        try {
+            Write-JsonResponse -Response $Context.Response -StatusCode 500 -Data @{ ok = $false; message = $_.Exception.Message }
+        } catch {
+            Close-HttpResponseSafe $Context.Response
+        }
+    }
 }
 
 function Close-HttpResponseSafe {
@@ -764,20 +785,7 @@ try {
         } catch {
             break
         }
-        try {
-            Handle-PanelRequest -Context $ctx
-        } catch {
-            if (Test-PanelClientDisconnectError $_.Exception) {
-                Close-HttpResponseSafe $ctx.Response
-                continue
-            }
-            Write-Host "Request error: $($_.Exception.Message)" -ForegroundColor Red
-            try {
-                Write-JsonResponse -Response $ctx.Response -StatusCode 500 -Data @{ ok = $false; message = $_.Exception.Message }
-            } catch {
-                Close-HttpResponseSafe $ctx.Response
-            }
-        }
+        Invoke-PanelRequestSafe -Context $ctx
     }
 } finally {
     try { if ($listener.IsListening) { $listener.Stop() } } catch { }

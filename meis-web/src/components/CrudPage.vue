@@ -259,16 +259,28 @@ function openForm(row?: Record<string, unknown>) {
 }
 
 async function save() {
-  const id = form.value.id
-  if (props.config.saveUrl) {
-    await http.post(props.config.saveUrl, form.value)
-  } else if (id) {
-    await http.put(`${props.config.apiBase}/${props.config.table}/${id}`, form.value)
-  } else {
-    await http.post(`${props.config.apiBase}/${props.config.table}`, form.value)
+  const missing = formFields.value.filter(
+    (f) => f.required && (form.value[f.prop] === undefined || form.value[f.prop] === null || form.value[f.prop] === '')
+  )
+  if (missing.length) {
+    ElMessage.warning(`请填写：${missing.map((f) => f.label).join('、')}`)
+    return
   }
-  formVisible.value = false
-  load()
+  try {
+    const id = form.value.id
+    if (props.config.saveUrl) {
+      await http.post(props.config.saveUrl, form.value)
+    } else if (id) {
+      await http.put(`${props.config.apiBase}/${props.config.table}/${id}`, form.value)
+    } else {
+      await http.post(`${props.config.apiBase}/${props.config.table}`, form.value)
+    }
+    formVisible.value = false
+    ElMessage.success('保存成功')
+    load()
+  } catch {
+    ElMessage.error('保存失败')
+  }
 }
 
 function onAdd() {
