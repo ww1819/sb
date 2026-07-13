@@ -1,5 +1,6 @@
 package com.meis.saas.system.controller;
 
+import com.meis.saas.common.audit.EntityChangeLogService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.cache.MeisCacheEviction;
 import com.meis.saas.common.exception.BizException;
@@ -25,6 +26,7 @@ public class UserController {
     private final JdbcTemplate jdbc;
     private final PermissionService permissionService;
     private final MeisCacheEviction cacheEviction;
+    private final EntityChangeLogService changeLog;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
     @GetMapping
@@ -101,20 +103,25 @@ public class UserController {
                     body.get("employee_no"), body.get("phone"), body.get("email"), body.get("dept_id"), roleId);
             copyRolePermissions(id, roleId);
         }
-        return get(id);
+        Result<Map<String, Object>> created = get(id);
+        changeLog.recordCreate("sys_user", id, created.getData());
+        return created;
     }
 
     @PutMapping("/{id:" + UUID_PATH + "}")
     @OperationLog(module = "system", description = "更新用户")
     public Result<Map<String, Object>> update(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
-        if (jdbc.queryForList("SELECT 1 FROM sys_user WHERE id = ?::uuid", id).isEmpty()) {
+        Map<String, Object> before = changeLog.loadRow("sys_user", id);
+        if (before == null) {
             throw new BizException(404, "user not found");
         }
         jdbc.update(
                 "UPDATE sys_user SET real_name=?, employee_no=?, phone=?, email=?, dept_id=?::uuid, is_active=?, updated_at=NOW() WHERE id=?::uuid",
                 body.get("real_name"), body.get("employee_no"), body.get("phone"), body.get("email"),
                 body.get("dept_id"), body.getOrDefault("is_active", true), id);
-        return get(id);
+        Result<Map<String, Object>> after = get(id);
+        changeLog.recordUpdate("sys_user", id, before, changeLog.loadRow("sys_user", id));
+        return after;
     }
 
     @PutMapping("/{id:" + UUID_PATH + "}/role")

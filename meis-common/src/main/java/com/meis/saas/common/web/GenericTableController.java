@@ -1,6 +1,10 @@
 package com.meis.saas.common.web;
 
+import com.meis.saas.common.asset.MedicalDeviceDeleteGuard;
+import com.meis.saas.common.audit.EntityChangeLogService;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
+import com.meis.saas.common.persistence.TableColumnCache;
 import com.meis.saas.common.tenant.TenantContext;
 import com.meis.saas.common.excel.ExcelExportHelper;
 import com.meis.saas.common.excel.ExcelImportHelper;
@@ -27,6 +31,9 @@ public abstract class GenericTableController {
     @Autowired(required = false)
     private ImportProfileService importProfileService;
 
+    @Autowired(required = false)
+    private EntityChangeLogService changeLogService;
+
     protected void setImportProfileService(ImportProfileService service) {
         this.importProfileService = service;
     }
@@ -50,51 +57,73 @@ public abstract class GenericTableController {
     public Result<List<Map<String, Object>>> list(@PathVariable String table,
                                                    @RequestParam(defaultValue = "50") int limit) {
         check(table);
-        return Result.ok(jdbc().queryForList("SELECT * FROM " + table + " LIMIT " + Math.min(limit, 500)));
+        String where = " WHERE 1=1 " + SoftDeleteSupport.notDeletedClause(jdbc(), table, null);
+        return Result.ok(jdbc().queryForList("SELECT * FROM " + table + where + " LIMIT " + Math.min(limit, 500)));
     }
 
     @GetMapping("/{table}/{id}")
     public Result<Map<String, Object>> get(@PathVariable String table, @PathVariable String id) {
         check(table);
-        List<Map<String, Object>> rows = jdbc().queryForList("SELECT * FROM " + table + " WHERE id = ?::uuid", id);
+        String where = " WHERE id = ?::uuid " + SoftDeleteSupport.notDeletedClause(jdbc(), table, null);
+        List<Map<String, Object>> rows = jdbc().queryForList("SELECT * FROM " + table + where, id);
         return Result.ok(rows.isEmpty() ? null : rows.get(0));
     }
 
     @PostMapping("/{table}")
     public Result<Map<String, Object>> create(@PathVariable String table, @RequestBody Map<String, Object> body) {
         check(table);
+        denyRepairWorkorderBypass(table);
         if ("medical_device".equals(table)) {
             MedicalDeviceFieldHelper.applyDerivedFields(body);
         }
         prepareInsertDefaults(table, body);
         normalizeUuidFields(body);
+        SoftDeleteSupport.applyInsertAudit(jdbc(), table, body);
+        var cols = TableColumnCache.columns(jdbc(), table);
+        var softDeletedId = SoftDeleteSupport.findSoftDeletedId(jdbc(), table, body);
+        if (softDeletedId.isPresent()) {
+            String existingId = softDeletedId.get();
+            Map<String, Object> before = loadTracked(table, existingId);
+            body.put("id", existingId);
+            SoftDeleteSupport.prepareRestore(body, cols);
+            executeUpdate(table, existingId, body);
+            Map<String, Object> after = loadTracked(table, existingId);
+            if (changeLogService != null) {
+                changeLogService.recordUpdate(table, existingId, before, after);
+            }
+            return Result.ok(body);
+        }
         if (!body.containsKey("id") || isBlank(body.get("id"))) {
             body.put("id", UUID.randomUUID().toString());
         }
-        String cols = String.join(",", body.keySet());
+        String colNames = String.join(",", body.keySet());
         String vals = String.join(",", body.keySet().stream().map(GenericTableController::placeholder).toList());
-        jdbc().update("INSERT INTO " + table + " (" + cols + ") VALUES (" + vals + ")", body.values().toArray());
+        jdbc().update("INSERT INTO " + table + " (" + colNames + ") VALUES (" + vals + ")", body.values().toArray());
+        if (changeLogService != null) {
+            changeLogService.recordCreate(table, body.get("id"), body);
+        }
         return Result.ok(body);
     }
 
     @PutMapping("/{table}/{id}")
     public Result<Void> update(@PathVariable String table, @PathVariable String id, @RequestBody Map<String, Object> body) {
         check(table);
+        denyRepairWorkorderBypass(table);
         guardInventoryCheckMutable(table, id);
-        body.remove("id");
+        SoftDeleteSupport.stripClientUpdateFields(body);
         if ("medical_device".equals(table)) {
             MedicalDeviceFieldHelper.applyDerivedFields(body);
+            // 附录 P：设备编码创建后禁止修改
+            body.remove("device_code");
         }
         normalizeUuidFields(body);
         if (body.isEmpty()) return Result.ok();
-        List<String> sets = new ArrayList<>();
-        List<Object> args = new ArrayList<>();
-        body.forEach((k, v) -> {
-            sets.add(k + " = " + placeholder(k));
-            args.add(v);
-        });
-        args.add(id);
-        jdbc().update("UPDATE " + table + " SET " + String.join(",", sets) + " WHERE id = ?::uuid", args.toArray());
+        Map<String, Object> before = loadTracked(table, id);
+        executeUpdate(table, id, body);
+        Map<String, Object> after = loadTracked(table, id);
+        if (changeLogService != null) {
+            changeLogService.recordUpdate(table, id, before, after);
+        }
         return Result.ok();
     }
 
@@ -158,9 +187,31 @@ public abstract class GenericTableController {
     @DeleteMapping("/{table}/{id}")
     public Result<Void> delete(@PathVariable String table, @PathVariable String id) {
         check(table);
+        denyRepairWorkorderBypass(table);
         guardInventoryCheckMutable(table, id);
-        jdbc().update("DELETE FROM " + table + " WHERE id = ?::uuid", id);
+        if ("medical_device".equals(table)) {
+            MedicalDeviceDeleteGuard.assertDeletable(jdbc(), id);
+        }
+        Map<String, Object> before = loadTracked(table, id);
+        int n = SoftDeleteSupport.softDelete(jdbc(), table, id);
+        if (n == 0 && SoftDeleteSupport.supportsSoftDelete(jdbc(), table)) {
+            throw new BizException(404, "not found");
+        }
+        if (changeLogService != null && before != null) {
+            changeLogService.recordDelete(table, id, before);
+        }
         return Result.ok();
+    }
+
+    private Map<String, Object> loadTracked(String table, String id) {
+        if (changeLogService == null || !changeLogService.tracks(table)) return null;
+        return changeLogService.loadRow(table, id);
+    }
+
+    private static void denyRepairWorkorderBypass(String table) {
+        if ("repair_workorder".equals(table)) {
+            throw new BizException(400, "报修请使用 /api/repair/workorder 专用接口（草稿/提交/撤回）");
+        }
     }
 
     private void check(String table) {
@@ -204,7 +255,9 @@ public abstract class GenericTableController {
     }
 
     private static boolean isUuidColumn(String column) {
-        return "id".equals(column) || column.endsWith("_id");
+        return "id".equals(column)
+                || column.endsWith("_id")
+                || column.endsWith("_by");
     }
 
     private static String placeholder(String column) {
@@ -213,6 +266,22 @@ public abstract class GenericTableController {
 
     private static boolean isBlank(Object v) {
         return v == null || (v instanceof String s && s.isBlank());
+    }
+
+    /** 由 SoftDeleteSupport.appendUpdateAuditSets 统一写入，禁止进入 SET 以免列重复。 */
+    private void executeUpdate(String table, String id, Map<String, Object> body) {
+        var cols = TableColumnCache.columns(jdbc(), table);
+        List<String> sets = new ArrayList<>();
+        List<Object> args = new ArrayList<>();
+        body.forEach((k, v) -> {
+            if (!cols.contains(k) || SoftDeleteSupport.isUpdateSkipColumn(k)) return;
+            sets.add(k + " = " + placeholder(k));
+            args.add(v);
+        });
+        SoftDeleteSupport.appendUpdateAuditSets(cols, sets, args);
+        if (sets.isEmpty()) return;
+        args.add(id);
+        jdbc().update("UPDATE " + table + " SET " + String.join(",", sets) + " WHERE id = ?::uuid", args.toArray());
     }
 
     private void guardInventoryCheckMutable(String table, String id) {

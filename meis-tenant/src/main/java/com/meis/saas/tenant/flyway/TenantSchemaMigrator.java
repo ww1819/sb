@@ -17,13 +17,14 @@ import java.util.Map;
  * 各租户独立 schema 的 Flyway 迁移。
  * public schema 由 Spring Boot {@code spring.flyway.*} 自动执行，此处仅处理 tenant_*。
  *
- * <p>脚本约定：
- * <ul>
- *   <li>全量建表：{@code V1__tables.sql}；老租户更新时由 {@link SchemaTableEnsuring} 幂等执行（缺表则建）</li>
- *   <li>已有表补列：{@code R__tenant_schema_sync.sql}（每条 ALTER 只加一列；勿再新增 V20+）</li>
- *   <li>新增字段时：同时改 V1 建表语句 + 在 R__ 追加一条 ADD COLUMN</li>
- *   <li>空注释补全：{@link SchemaCommentFiller}（仅补空，不覆盖已有注释）</li>
- * </ul>
+ * <p>老租户启动顺序（每个 {@code tenant_*} schema）：
+ * <ol>
+ *   <li>{@link SchemaTableEnsuring}：幂等执行 V1/V2 建表与索引（先扩展，再 {@code CREATE TABLE IF NOT EXISTS}）</li>
+ *   <li>Flyway {@code migrate}：新租户跑 V1–V4；老租户主要跑 {@code R__tenant_schema_sync.sql} 逐列 {@code ADD COLUMN}</li>
+ *   <li>{@link SchemaCommentFiller}：仅补空注释</li>
+ *   <li>{@link TenantSchemaShadowGuard}：V1 缺表串写检测，仍缺表则启动失败</li>
+ * </ol>
+ * 对老租户执行建表语句<strong>没有问题</strong>：{@code IF NOT EXISTS} 不会覆盖已有表与数据；缺列由 R__ 在之后补全。
  */
 @Slf4j
 @Component
@@ -35,6 +36,7 @@ public class TenantSchemaMigrator {
     private final Environment environment;
     private final SchemaTableEnsuring schemaTableEnsuring;
     private final SchemaCommentFiller schemaCommentFiller;
+    private final TenantSchemaShadowGuard schemaShadowGuard;
 
     @Value("${meis.flyway.tenant-locations:classpath:db/migrations/tenant}")
     private String tenantLocations;
@@ -68,12 +70,14 @@ public class TenantSchemaMigrator {
             log.info("dev profile: Flyway repair + migrate (tenant schema {})", schemaName);
             flyway.repair();
         }
-        // 1) Flyway：新租户走 V1 建表；老租户走 R__ 逐列补字段
-        flyway.migrate();
-        // 2) 再幂等执行 V1/V2：老租户更新后 V1 新增的表在此创建（已有表不动）
+        // 1) 幂等建表：V1/V2 + R__ 建表段（老租户缺表时创建；已有表跳过）
         schemaTableEnsuring.ensureFromMigrations(schemaName);
+        // 2) Flyway 补列与数据修正：R__ 中 ALTER / INSERT / UPDATE
+        flyway.migrate();
         // 3) 仅补空注释
         schemaCommentFiller.fillEmptyComments(schemaName);
+        // 4) 缺表串写检测：租户无表但 public 有时，运行时 search_path 会写入 public
+        schemaShadowGuard.ensureNoShadowGaps(schemaName);
         log.info("Flyway migrated tenant schema {}", schemaName);
     }
 

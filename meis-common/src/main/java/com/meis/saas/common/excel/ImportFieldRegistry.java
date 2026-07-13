@@ -75,7 +75,10 @@ public final class ImportFieldRegistry {
                 f("model", "型号", "string", "model", false, 40),
                 f("specification", "规格", "string", "specification", false, 45),
                 f("serial_number", "序列号", "string", "serial_number", false, 50),
-                f("category_code", "分类编码", "lookup", null, false, 60),
+                f("category_code", "分类编码(68码)", "lookup", null, false, 60),
+                f("asset_category_code", "资产分类编码", "lookup", null, false, 62),
+                f("finance_category_code", "财务分类编码", "lookup", null, false, 64),
+                f("warehouse_code", "库房编码", "lookup", null, false, 66),
                 f("manufacturer_code", "生产厂商编码", "lookup", null, false, 70),
                 f("manufacturer_name", "生产厂家", "lookup", null, false, 75),
                 f("supplier_code", "供应商编码", "lookup", null, false, 80),
@@ -93,6 +96,9 @@ public final class ImportFieldRegistry {
                 f("production_date", "生产日期", "date", "production_date", false, 170),
                 f("service_life_years", "使用年限", "number", "service_life_years", false, 175),
                 f("enable_date", "启用日期", "date", "enable_date", false, 180),
+                f("is_metrology", "计量设备", "boolean", "is_metrology", false, 182),
+                f("is_maintain_device", "保养设备", "boolean", "is_maintain_device", false, 184),
+                f("is_inspection_device", "巡检设备", "boolean", "is_inspection_device", false, 186),
                 f("remark", "备注", "string", "remark", false, 190),
                 f("is_active", "启用", "boolean", "is_active", false, 200)
         ));

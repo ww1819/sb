@@ -25,6 +25,22 @@
         >
           审核
         </el-button>
+        <el-button
+          v-if="row.id && isApproved(row) && row.status === 'planning'"
+          link
+          type="primary"
+          @click="startRow(row)"
+        >
+          开始盘点
+        </el-button>
+        <el-button
+          v-if="row.id && row.status === 'in_progress'"
+          link
+          type="warning"
+          @click="completeRow(row)"
+        >
+          完成盘点
+        </el-button>
       </template>
     </CrudPage>
 
@@ -85,6 +101,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import CrudPage from '@/components/CrudPage.vue'
@@ -95,7 +112,9 @@ import DeviceLedgerPicker from '@/components/asset/DeviceLedgerPicker.vue'
 import { getPageConfig } from '@/config/pageRegistry'
 import { getDetailFields, getSchema } from '@/config/pageSchemas'
 
-const config = getPageConfig('/asset/inventory')!
+const route = useRoute()
+const path = computed(() => '/' + String(route.params.module) + '/' + String(route.params.page))
+const config = computed(() => getPageConfig(path.value)!)
 const crudRef = ref<InstanceType<typeof CrudPage> | null>(null)
 const visible = ref(false)
 const pickerVisible = ref(false)
@@ -197,6 +216,25 @@ async function approveRow(row: Record<string, unknown>) {
   } catch (e) {
     if (e !== 'cancel' && e !== 'close') {
       ElMessage.error('审核失败')
+    }
+  }
+}
+
+async function startRow(row: Record<string, unknown>) {
+  await http.post(`/asset/inventory/${row.id}/start`)
+  ElMessage.success('盘点已开始')
+  crudRef.value?.load()
+}
+
+async function completeRow(row: Record<string, unknown>) {
+  try {
+    await ElMessageBox.confirm('确认完成该盘点任务？', '完成盘点', { type: 'warning' })
+    await http.post(`/asset/inventory/${row.id}/complete`)
+    ElMessage.success('盘点已完成')
+    crudRef.value?.load()
+  } catch (e) {
+    if (e !== 'cancel' && e !== 'close') {
+      ElMessage.error('操作失败')
     }
   }
 }

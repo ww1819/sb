@@ -60,6 +60,12 @@ COMMENT ON INDEX idx_metrology_device IS '索引：metrology record.关联设备
 CREATE INDEX idx_metrology_due ON metrology_record(next_due_date);
 COMMENT ON INDEX idx_metrology_due IS '索引：metrology record.下次到期日';
 
+CREATE INDEX idx_metrology_type_parent ON metrology_type(parent_id);
+COMMENT ON INDEX idx_metrology_type_parent IS '索引：metrology type.上级类型';
+
+CREATE INDEX idx_metrology_type_group ON metrology_type(classification_group);
+COMMENT ON INDEX idx_metrology_type_group IS '索引：metrology type.分类维度';
+
 CREATE INDEX idx_perf_test_device ON performance_test(device_id);
 COMMENT ON INDEX idx_perf_test_device IS '索引：performance test.关联设备';
 
@@ -125,3 +131,12 @@ COMMENT ON INDEX idx_device_service_expiry IS '索引：医疗设备台账.使�
 
 CREATE INDEX IF NOT EXISTS idx_wo_event_wo ON repair_workorder_event(workorder_id, created_at);
 COMMENT ON INDEX idx_wo_event_wo IS '索引：维修工单事件.工单+时间';
+
+CREATE INDEX IF NOT EXISTS idx_power_reading_tag_read_at ON power_current_reading(tag_id, read_at DESC);
+COMMENT ON INDEX idx_power_reading_tag_read_at IS '索引：电流读数.标签+读取时间';
+
+CREATE INDEX IF NOT EXISTS idx_power_reading_station_read_at ON power_current_reading(station_id, read_at DESC);
+COMMENT ON INDEX idx_power_reading_station_read_at IS '索引：电流读数.基站+读取时间';
+
+CREATE INDEX IF NOT EXISTS idx_power_tag_bind_log_tag ON power_tag_bind_log(tag_id, bound_at DESC);
+COMMENT ON INDEX idx_power_tag_bind_log_tag IS '索引：标签绑定历史.标签+绑定时间';

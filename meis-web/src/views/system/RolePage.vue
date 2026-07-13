@@ -13,9 +13,10 @@
           <el-tag :type="row.is_active ? 'success' : 'info'" size="small">{{ row.is_active ? '是' : '否' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="220" fixed="right">
+      <el-table-column label="操作" width="280" fixed="right">
         <template #default="{ row }">
           <div class="table-actions">
+            <el-button link type="primary" @click="openChangeLog(row)">变更记录</el-button>
             <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
             <el-button link type="primary" @click="openPerm(row)">授权</el-button>
             <el-button link type="warning" @click="syncPerms(row)">同步到用户</el-button>
@@ -63,6 +64,7 @@
         </el-button>
       </template>
     </AppModal>
+    <EntityChangeHistoryDrawer v-model="changeLogVisible" entity-type="sys_role" :entity-id="changeLogId" />
   </SystemPageCard>
 </template>
 
@@ -73,6 +75,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
 import AppModal from '@/components/AppModal.vue'
+import EntityChangeHistoryDrawer from '@/components/EntityChangeHistoryDrawer.vue'
 import PermissionEditor, { type PermissionModel } from '@/components/PermissionEditor.vue'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
 
@@ -83,12 +86,18 @@ const keyword = ref('')
 const loading = ref(false)
 const formVisible = ref(false)
 const permVisible = ref(false)
+const changeLogVisible = ref(false)
+const changeLogId = ref('')
 const formTitle = ref('新建角色')
 const form = ref<any>({ is_active: true, sort_order: 0 })
 const currentRole = ref<any>(null)
 const permValue = ref<PermissionModel>()
 const permEditorRef = ref<InstanceType<typeof PermissionEditor>>()
 
+function openChangeLog(row: any) {
+  changeLogId.value = String(row.id)
+  changeLogVisible.value = true
+}
 const filteredRoles = computed(() => {
   const kw = keyword.value.trim().toLowerCase()
   if (!kw) return roles.value

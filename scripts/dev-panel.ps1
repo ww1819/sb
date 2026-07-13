@@ -31,6 +31,39 @@ $panelDir = Join-Path $PSScriptRoot 'dev-panel'
 $htmlPath = Join-Path $panelDir 'index.html'
 if (-not (Test-Path $htmlPath)) { throw "Missing panel UI: $htmlPath" }
 $script:PanelBuildPending = @{}
+$script:PanelHotReloadResults = @{}
+$script:PanelLibraryReloadResults = @{}
+$script:PanelBackgroundJobs = [ordered]@{}
+
+function Set-PanelLibraryReloadResult {
+    param(
+        [Parameter(Mandatory = $true)][string]$ModuleName,
+        [Parameter(Mandatory = $true)][hashtable]$Result
+    )
+    $script:PanelLibraryReloadResults[$ModuleName] = [ordered]@{
+        at        = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+        ok        = [bool]$Result.ok
+        message   = [string]$Result.message
+        steps     = @($Result.steps)
+        reloaded  = @($Result.reloaded)
+    }
+}
+
+function Set-PanelHotReloadResult {
+    param(
+        [Parameter(Mandatory = $true)][string]$ServiceName,
+        [Parameter(Mandatory = $true)][hashtable]$Result
+    )
+    $script:PanelHotReloadResults[$ServiceName] = [ordered]@{
+        at        = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+        ok        = [bool]$Result.ok
+        message   = [string]$Result.message
+        steps     = @($Result.steps)
+        httpUp    = [bool]$Result.httpUp
+        debugUp   = [bool]$Result.debugUp
+        fileCount = if ($null -ne $Result.fileCount) { [int]$Result.fileCount } else { 0 }
+    }
+}
 
 function Test-PanelClientDisconnectError {
     param([System.Exception]$Ex)
@@ -39,10 +72,31 @@ function Test-PanelClientDisconnectError {
     if ($msg -match 'network name|连接|已被关闭|aborted|reset|forcibly closed|transport|不再可用|broken pipe|远程主机') {
         return $true
     }
+    if ($msg -match 'OperationCanceled|cancelled|canceled') {
+        return $true
+    }
     if ($Ex.InnerException) {
         return Test-PanelClientDisconnectError $Ex.InnerException
     }
     return $false
+}
+
+function Invoke-PanelRequestSafe {
+    param([System.Net.HttpListenerContext]$Context)
+    try {
+        Handle-PanelRequest -Context $Context
+    } catch {
+        if (Test-PanelClientDisconnectError $_.Exception) {
+            Close-HttpResponseSafe $Context.Response
+            return
+        }
+        Write-Host "Request error: $($_.Exception.Message)" -ForegroundColor DarkYellow
+        try {
+            Write-JsonResponse -Response $Context.Response -StatusCode 500 -Data @{ ok = $false; message = $_.Exception.Message }
+        } catch {
+            Close-HttpResponseSafe $Context.Response
+        }
+    }
 }
 
 function Close-HttpResponseSafe {
@@ -100,15 +154,44 @@ function Write-JsonResponse {
     Write-HttpResponse -Response $Response -StatusCode $StatusCode -ContentType 'application/json; charset=utf-8' -Body $json
 }
 
+function Sync-PanelBackgroundJobs {
+    $running = [System.Collections.ArrayList]@()
+    foreach ($label in @($script:PanelBackgroundJobs.Keys)) {
+        $job = $script:PanelBackgroundJobs[$label]
+        if ($null -eq $job) {
+            $script:PanelBackgroundJobs.Remove($label) | Out-Null
+            continue
+        }
+        $state = $job.State
+        if ($state -eq 'Running') {
+            [void]$running.Add([string]$label)
+            continue
+        }
+        try {
+            $null = Receive-Job $job -ErrorAction SilentlyContinue
+            if ($state -eq 'Failed') {
+                Add-MeisPanelEvent ($label + ' FAILED (background job)')
+            } else {
+                Add-MeisPanelEvent ($label + ' -> done')
+            }
+        } catch {
+            Add-MeisPanelEvent ($label + ' FAILED: ' + $_.Exception.Message)
+        }
+        Remove-Job $job -Force -ErrorAction SilentlyContinue
+        $script:PanelBackgroundJobs.Remove($label) | Out-Null
+    }
+    return @($running)
+}
+
 function Start-PanelBackgroundJob {
     param(
         [Parameter(Mandatory = $true)][string]$Label,
-        [Parameter(Mandatory = $true)][ValidateSet('start-all', 'start-core', 'start-debug-all', 'start-debug-core', 'restart-all', 'stop-all', 'build-backend', 'build-install')]
+        [Parameter(Mandatory = $true)][ValidateSet('start-all', 'start-core', 'start-debug-all', 'start-debug-core', 'restart-all', 'stop-all', 'build-backend', 'build-install', 'build-compile', 'build-clean')]
         [string]$Action
     )
     $scriptsDir = $PSScriptRoot
     $root = $script:MeisRoot
-    $null = Start-Job -ScriptBlock {
+    $job = Start-Job -ScriptBlock {
         param($ActionName, $ScriptsDir, $Root)
         Set-Location $Root
         . (Join-Path $ScriptsDir 'meis-services.ps1')
@@ -123,20 +206,21 @@ function Start-PanelBackgroundJob {
                 Start-MeisServices -Profile 'dev'
             }
             'stop-all' { Stop-MeisServices | Out-Null }
+            'build-clean' {
+                Invoke-MeisMavenReactor -Goal clean -Quiet | Out-Null
+            }
+            'build-compile' {
+                Invoke-MeisMavenReactor -Goal compile -Quiet | Out-Null
+            }
             'build-backend' {
-                $mvn = Resolve-MeisMaven
-                $env:JAVA_HOME = Resolve-MeisJavaHome
-                & $mvn -q package -DskipTests
-                if ($LASTEXITCODE -ne 0) { throw 'Maven package failed' }
+                Invoke-MeisMavenReactor -Goal package -Quiet | Out-Null
             }
             'build-install' {
-                $mvn = Resolve-MeisMaven
-                $env:JAVA_HOME = Resolve-MeisJavaHome
-                & $mvn install -DskipTests
-                if ($LASTEXITCODE -ne 0) { throw 'Maven install failed' }
+                Invoke-MeisMavenReactor -Goal install | Out-Null
             }
         }
     } -ArgumentList $Action, $scriptsDir, $root
+    $script:PanelBackgroundJobs[$Label] = $job
     return @{ ok = $true; message = ($Label + ' started in background') }
 }
 
@@ -173,17 +257,17 @@ function Start-PanelServiceBackgroundJob {
                 'build' {
                     switch ($BuildMode) {
                         'clean-package' {
-                            Invoke-MeisMavenModule -Module $Name -Clean -Package | Out-Null
+                            Invoke-MeisMavenModule -Module $Name -Clean -Package -AlsoMake | Out-Null
                         }
                         'package' {
-                            Invoke-MeisMavenModule -Module $Name -Package | Out-Null
+                            Invoke-MeisMavenModule -Module $Name -Package -AlsoMake | Out-Null
                         }
                         'quick' {
                             $health = Test-MeisServiceJarHealthy $Name
                             if (-not $health.ok) {
-                                Invoke-MeisMavenModule -Module $Name -Package | Out-Null
+                                Invoke-MeisMavenModule -Module $Name -Package -AlsoMake | Out-Null
                             }
-                            Invoke-MeisMavenModule -Module $Name -Compile | Out-Null
+                            Invoke-MeisMavenModule -Module $Name -Compile -AlsoMake | Out-Null
                             Sync-MeisServiceClassesToJar -ServiceName $Name | Out-Null
                         }
                         default {
@@ -192,7 +276,7 @@ function Start-PanelServiceBackgroundJob {
                     }
                 }
                 'reload-classes' {
-                    Build-MeisServiceModule -ServiceName $Name -LoadClasses | Out-Null
+                    Invoke-MeisServiceHotReload -ServiceName $Name | Out-Null
                 }
             }
         } catch {
@@ -300,6 +384,25 @@ function Get-PanelFrontendStatus {
     return $fe
 }
 
+function Test-MeisClassesUpdatedSince {
+    param(
+        [Parameter(Mandatory = $true)][string]$ModuleName,
+        [Parameter(Mandatory = $true)][datetime]$Since
+    )
+    $classesDir = Join-Path $script:MeisRoot "$ModuleName\target\classes"
+    if (-not (Test-Path $classesDir)) { return $false }
+    $recent = Get-ChildItem $classesDir -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTime -ge $Since } |
+        Select-Object -First 1
+    return $null -ne $recent
+}
+
+function Clear-PanelBuildPending {
+    foreach ($key in @($script:PanelBuildPending.Keys)) {
+        $script:PanelBuildPending.Remove($key) | Out-Null
+    }
+}
+
 function Get-PanelServiceStatusList {
     $list = @(Get-MeisServiceStatusList)
     $now = Get-Date
@@ -310,13 +413,40 @@ function Get-PanelServiceStatusList {
             $started = $script:PanelBuildPending[$name]
             $elapsed = ($now - $started).TotalSeconds
             $jar = Join-Path $script:MeisRoot "$name\target\$name-1.0.0-SNAPSHOT.jar"
-            if ($elapsed -lt 300 -and -not (Test-Path $jar)) {
+            $classesReady = Test-MeisClassesUpdatedSince -ModuleName $name -Since $started
+            if ($elapsed -lt 300 -and -not (Test-Path $jar) -and -not $classesReady) {
                 $building = $true
             } else {
                 $script:PanelBuildPending.Remove($name) | Out-Null
             }
         }
         $item.buildInProgress = $building
+        if ($script:PanelHotReloadResults.ContainsKey($name)) {
+            $item.hotReload = $script:PanelHotReloadResults[$name]
+        }
+    }
+    return $list
+}
+
+function Get-PanelLibraryStatusList {
+    $list = @(Get-MeisLibraryModuleStatusList)
+    $now = Get-Date
+    foreach ($item in $list) {
+        $name = [string]$item.name
+        $building = $false
+        if ($script:PanelBuildPending.ContainsKey($name)) {
+            $started = $script:PanelBuildPending[$name]
+            $classesReady = Test-MeisClassesUpdatedSince -ModuleName $name -Since $started
+            if ($classesReady -or (($now - $started).TotalSeconds -ge 300)) {
+                $script:PanelBuildPending.Remove($name) | Out-Null
+            } else {
+                $building = $true
+            }
+        }
+        $item.buildInProgress = $building
+        if ($script:PanelLibraryReloadResults.ContainsKey($name)) {
+            $item.hotReload = $script:PanelLibraryReloadResults[$name]
+        }
     }
     return $list
 }
@@ -342,13 +472,16 @@ function Handle-PanelRequest {
     }
 
     if ($method -eq 'GET' -and $path -eq '/api/status') {
+        $backgroundJobs = Sync-PanelBackgroundJobs
         $payload = [ordered]@{
             timestamp = (Get-Date).ToString('o')
             gatewayUrl = 'http://localhost:8080'
             panelPort = $Port
             redisUp = Test-MeisRedisAvailable
+            backgroundJobs = $backgroundJobs
             frontend = Get-PanelFrontendStatus
             coreServices = @($script:MeisCoreServiceNames)
+            libraries = @(Get-PanelLibraryStatusList)
             services = @(Get-PanelServiceStatusList)
         }
         Write-JsonResponse -Response $res -Data $payload
@@ -459,8 +592,16 @@ function Handle-PanelRequest {
             Write-JsonResponse -Response $res -Data $r
             return
         }
+        if ($path -eq '/api/build/clean') {
+            Add-MeisPanelEvent 'MAVEN CLEAN ALL (background)'
+            Clear-PanelBuildPending
+            $r = Start-PanelBackgroundJob -Label 'reactor-clean' -Action 'build-clean'
+            Write-JsonResponse -Response $res -Data $r
+            return
+        }
         if ($path -eq '/api/build/backend') {
             Add-MeisPanelEvent 'BUILD backend (background)'
+            Clear-PanelBuildPending
             $r = Start-PanelBackgroundJob -Label 'build-backend' -Action 'build-backend'
             Write-JsonResponse -Response $res -Data $r
             return
@@ -485,6 +626,32 @@ function Handle-PanelRequest {
                 }
             } catch { }
             return
+        }
+
+        if ($path -match "^/api/library/([a-z0-9-]+)/(compile|reload-dependents)$") {
+            $name = $Matches[1]
+            $action = $Matches[2]
+            if ($action -eq 'compile') {
+                $script:PanelBuildPending[$name] = Get-Date
+                $r = Invoke-PanelAction {
+                    Invoke-MeisMavenModule -Module $name -Compile | Out-Null
+                    @{ ok = $true; message = ($name + ' compile OK') }
+                } -EventMessage ('COMPILE library ' + $name)
+                if (-not $r.ok) {
+                    $script:PanelBuildPending.Remove($name) | Out-Null
+                }
+                Write-JsonResponse -Response $res -Data $r
+                return
+            }
+            if ($action -eq 'reload-dependents') {
+                $r = Invoke-PanelAction {
+                    $result = Invoke-MeisLibraryHotReloadDependents -ModuleName $name
+                    Set-PanelLibraryReloadResult -ModuleName $name -Result $result
+                    $result
+                } -EventMessage ('RELOAD-DEPENDENTS ' + $name)
+                Write-JsonResponse -Response $res -Data $r
+                return
+            }
         }
 
         if ($path -match "^/api/service/([a-z0-9-]+)/(stop|start|restart|start-debug|build|reload-classes)$") {
@@ -512,8 +679,11 @@ function Handle-PanelRequest {
                     Start-PanelServiceBackgroundJob -ServiceName $name -Action 'build' -BuildMode $modeLabel
                 }
                 'reload-classes' {
-                    Add-MeisPanelEvent ('RELOAD-CLASSES ' + $name + ' (background)')
-                    Start-PanelServiceBackgroundJob -ServiceName $name -Action 'reload-classes'
+                    Invoke-PanelAction {
+                        $r = Invoke-MeisServiceHotReload -ServiceName $name
+                        Set-PanelHotReloadResult -ServiceName $name -Result $r
+                        $r
+                    } -EventMessage $eventLabel
                 }
             }
             Write-JsonResponse -Response $res -Data $r
@@ -615,20 +785,7 @@ try {
         } catch {
             break
         }
-        try {
-            Handle-PanelRequest -Context $ctx
-        } catch {
-            if (Test-PanelClientDisconnectError $_.Exception) {
-                Close-HttpResponseSafe $ctx.Response
-                continue
-            }
-            Write-Host "Request error: $($_.Exception.Message)" -ForegroundColor Red
-            try {
-                Write-JsonResponse -Response $ctx.Response -StatusCode 500 -Data @{ ok = $false; message = $_.Exception.Message }
-            } catch {
-                Close-HttpResponseSafe $ctx.Response
-            }
-        }
+        Invoke-PanelRequestSafe -Context $ctx
     }
 } finally {
     try { if ($listener.IsListening) { $listener.Stop() } } catch { }

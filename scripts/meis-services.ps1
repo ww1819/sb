@@ -57,6 +57,12 @@ $script:MeisCoreServiceNames = @(
     'meis-gateway'
 )
 
+# 公共库模块（无 HTTP 端口，classes 打入各微服务 JAR）
+$script:MeisLibraryModules = @(
+    @{ name = 'meis-common'; artifactId = 'meis-common' },
+    @{ name = 'meis-api'; artifactId = 'meis-api' }
+)
+
 $script:MeisServiceMetaCache = $null
 
 function Get-MeisServiceMetaMap {
@@ -142,12 +148,44 @@ function Stop-MeisServices {
     }
 
     $msg = if ($stillUp.Count -eq 0) { "all backend stopped ($count killed)" } else { "partial stop ($count killed), still up: $($stillUp -join ', ')" }
+    Clear-MeisListeningPortCache
     return @{ ok = ($stillUp.Count -eq 0); message = $msg; killed = $count; stillUp = $stillUp }
 }
 
+$script:MeisListeningPortCache = $null
+$script:MeisListeningPortCacheAt = [datetime]::MinValue
+$script:MeisListeningPortCacheTtlMs = 800
+
+function Clear-MeisListeningPortCache {
+    $script:MeisListeningPortCache = $null
+    $script:MeisListeningPortCacheAt = [datetime]::MinValue
+}
+
+# 单次 netstat 解析全部 LISTENING 端口，供状态轮询复用（避免每服务一次 netstat 导致 /api/status 阻塞数秒）。
+function Get-MeisListeningPortSet {
+    param([switch]$ForceRefresh)
+    if (-not $ForceRefresh -and $null -ne $script:MeisListeningPortCache) {
+        $ageMs = ((Get-Date) - $script:MeisListeningPortCacheAt).TotalMilliseconds
+        if ($ageMs -lt $script:MeisListeningPortCacheTtlMs) {
+            return $script:MeisListeningPortCache
+        }
+    }
+    $ports = New-Object 'System.Collections.Generic.HashSet[int]'
+    foreach ($line in (netstat -ano 2>$null)) {
+        if ($line -notmatch 'LISTENING') { continue }
+        if ($line -match ':(\d+)\s+\S+\s+LISTENING') {
+            [void]$ports.Add([int]$Matches[1])
+        }
+    }
+    $script:MeisListeningPortCache = $ports
+    $script:MeisListeningPortCacheAt = Get-Date
+    return $ports
+}
+
 function Test-MeisPortListening {
-    param([int]$Port)
-    return [bool](netstat -ano | Select-String ":\s*$Port\s+.*LISTENING")
+    param([int]$Port, [switch]$ForceRefresh)
+    $set = Get-MeisListeningPortSet -ForceRefresh:$ForceRefresh
+    return $set.Contains($Port)
 }
 
 function Test-MeisRedisAvailable {
@@ -354,6 +392,7 @@ function Start-MeisServices {
 
     $msg = "launched $($launched.Count), skipped $($skipped.Count)"
     if ($failed.Count -gt 0) { $msg += ", failed $($failed.Count)" }
+    Clear-MeisListeningPortCache
     return @{ ok = ($failed.Count -eq 0); message = $msg; skipped = $skipped; launched = $launched; failed = @($failed | ForEach-Object { $_.name }) }
 }
 
@@ -484,7 +523,8 @@ function Invoke-MeisMavenModule {
         [switch]$Clean,
         [switch]$Package,
         [switch]$Compile,
-        [switch]$Install
+        [switch]$Install,
+        [switch]$AlsoMake
     )
     $mvn = Resolve-MeisMaven
     $env:JAVA_HOME = Resolve-MeisJavaHome
@@ -499,10 +539,11 @@ function Invoke-MeisMavenModule {
     } elseif ($goals.Count -eq 0) {
         $goals += 'package'
     }
-    $mvnArgs = $goals + @('-DskipTests', '-pl', $Module, '-am')
+    $mvnArgs = $goals + @('-DskipTests', '-pl', $Module)
+    if ($AlsoMake) { $mvnArgs += '-am' }
     Push-Location $script:MeisRoot
     try {
-        & $mvn @mvnArgs
+        & $mvn -q @mvnArgs
         if ($LASTEXITCODE -ne 0) {
             throw "Maven $($goals -join ' ') failed: $Module"
         }
@@ -512,12 +553,148 @@ function Invoke-MeisMavenModule {
     return @{ ok = $true; message = ($Module + ': mvn ' + ($goals -join ' ') + ' OK') }
 }
 
+# 全量 reactor 构建（根 pom，编译/打包/安装全部模块）
+function Invoke-MeisMavenReactor {
+    param(
+        [Parameter(Mandatory = $true)][ValidateSet('clean', 'compile', 'package', 'install')]
+        [string]$Goal,
+        [switch]$Quiet
+    )
+    $mvn = Resolve-MeisMaven
+    $env:JAVA_HOME = Resolve-MeisJavaHome
+    $mvnArgs = @()
+    if ($Quiet) { $mvnArgs += '-q' }
+    $mvnArgs += $Goal
+    if ($Goal -ne 'clean') { $mvnArgs += '-DskipTests' }
+    Push-Location $script:MeisRoot
+    try {
+        & $mvn @mvnArgs
+        if ($LASTEXITCODE -ne 0) {
+            throw "Maven $Goal (reactor) failed"
+        }
+    } finally {
+        Pop-Location
+    }
+    return @{ ok = $true; message = ('reactor mvn ' + $Goal + ' OK') }
+}
+
 function Get-MeisServiceClassSourceModules {
     param([Parameter(Mandatory = $true)][string]$ServiceName)
     $modules = @('meis-common')
-    if ($ServiceName -eq 'meis-tenant') { $modules += 'meis-api' }
+    if ($ServiceName -in @('meis-tenant', 'meis-auth')) { $modules += 'meis-api' }
     $modules += $ServiceName
     return @($modules | Select-Object -Unique)
+}
+
+function Get-MeisLibraryModuleDefinition {
+    param([Parameter(Mandatory = $true)][string]$ModuleName)
+    foreach ($m in $script:MeisLibraryModules) {
+        if ($m.name -eq $ModuleName) { return $m }
+    }
+    throw "Unknown library module: $ModuleName"
+}
+
+function Get-MeisServicesForLibraryModule {
+    param([Parameter(Mandatory = $true)][string]$ModuleName)
+    $names = @()
+    foreach ($s in $script:MeisServices) {
+        $sources = Get-MeisServiceClassSourceModules $s.name
+        if ($sources -contains $ModuleName) {
+            $names += $s.name
+        }
+    }
+    return $names
+}
+
+function Get-MeisLibraryModuleStatusList {
+    $list = @()
+    foreach ($mod in $script:MeisLibraryModules) {
+        $name = $mod.name
+        $classesDir = Join-Path $script:MeisRoot "$name\target\classes"
+        $jar = Join-Path $script:MeisRoot "$name\target\$($mod.artifactId)-1.0.0-SNAPSHOT.jar"
+        $classesExists = Test-Path $classesDir
+        $jarExists = Test-Path $jar
+        $classesMtime = ''
+        if ($classesExists) {
+            $classesMtime = (Get-Item $classesDir).LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss')
+        }
+        $jarMtime = if ($jarExists) { (Get-Item $jar).LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
+        $jarSizeKb = if ($jarExists) { [math]::Round((Get-Item $jar).Length / 1KB) } else { 0 }
+        $dependents = @(Get-MeisServicesForLibraryModule $name)
+        $debugDependents = @()
+        foreach ($svcName in $dependents) {
+            $svc = Get-MeisServiceDefinition $svcName
+            $httpUp = Test-MeisPortListening -Port $svc.port
+            $debugUp = $svc.debugPort -and (Test-MeisPortListening -Port $svc.debugPort)
+            if ($httpUp -and $debugUp) { $debugDependents += $svcName }
+        }
+        $meta = Get-MeisServiceMetaEntry $name
+        $list += [ordered]@{
+            name                = $name
+            labelZh             = $meta.labelZh
+            descZh              = $meta.descZh
+            kind                = 'library'
+            classesExists       = $classesExists
+            classesMtime        = $classesMtime
+            jarExists           = $jarExists
+            jarMtime            = $jarMtime
+            jarSizeKb           = $jarSizeKb
+            dependentCount      = $dependents.Count
+            dependents          = $dependents
+            debugDependents     = $debugDependents
+            debugDependentCount = $debugDependents.Count
+        }
+    }
+    return $list
+}
+
+function Invoke-MeisLibraryHotReloadDependents {
+    param([Parameter(Mandatory = $true)][string]$ModuleName)
+
+    Get-MeisLibraryModuleDefinition $ModuleName | Out-Null
+    $steps = [System.Collections.ArrayList]@()
+    try {
+        Invoke-MeisMavenModule -Module $ModuleName -Compile | Out-Null
+        [void]$steps.Add(@{ step = 'compile'; ok = $true; message = ($ModuleName + ' mvn compile OK') })
+    } catch {
+        [void]$steps.Add(@{ step = 'compile'; ok = $false; message = $_.Exception.Message })
+        return @{ ok = $false; message = ($ModuleName + ' compile failed'); steps = @($steps); reloaded = @() }
+    }
+
+    $reloaded = [System.Collections.ArrayList]@()
+    foreach ($svcName in (Get-MeisServicesForLibraryModule $ModuleName)) {
+        $svc = Get-MeisServiceDefinition $svcName
+        $debugRunning = (Test-MeisPortListening -Port $svc.port) -and $svc.debugPort -and (Test-MeisPortListening -Port $svc.debugPort)
+        if (-not $debugRunning) {
+            [void]$reloaded.Add(@{ service = $svcName; ok = $true; skipped = $true; message = 'not in debug mode' })
+            continue
+        }
+        try {
+            $r = Invoke-MeisServiceHotReload -ServiceName $svcName
+            [void]$reloaded.Add(@{
+                service = $svcName
+                ok      = [bool]$r.ok
+                skipped = $false
+                message = [string]$r.message
+            })
+        } catch {
+            [void]$reloaded.Add(@{ service = $svcName; ok = $false; skipped = $false; message = $_.Exception.Message })
+        }
+    }
+
+    $failed = @($reloaded | Where-Object { -not $_.ok -and -not $_.skipped })
+    $done = @($reloaded | Where-Object { $_.ok -and -not $_.skipped })
+    $skipped = @($reloaded | Where-Object { $_.skipped })
+    $ok = $failed.Count -eq 0
+    $msg = $ModuleName + ': reloaded ' + $done.Count + ' service(s)'
+    if ($skipped.Count -gt 0) { $msg += ', skipped ' + $skipped.Count }
+    if ($failed.Count -gt 0) { $msg += ', failed ' + $failed.Count }
+    return @{
+        ok       = $ok
+        message  = $msg
+        steps    = @($steps)
+        reloaded = @($reloaded)
+    }
 }
 
 function Test-MeisServiceJarHealthy {
@@ -561,6 +738,18 @@ function Test-MeisServiceJarHealthy {
     return @{ ok = $true; message = 'ok' }
 }
 
+function Wait-MeisServicePortReleased {
+    param(
+        [Parameter(Mandatory = $true)][int]$Port,
+        [int]$TimeoutSec = 25
+    )
+    for ($i = 0; $i -lt $TimeoutSec; $i++) {
+        if (-not (Test-MeisPortListening -Port $Port)) { return $true }
+        Start-Sleep -Seconds 1
+    }
+    return $false
+}
+
 function Sync-MeisServiceClassesToJar {
     param([Parameter(Mandatory = $true)][string]$ServiceName)
 
@@ -569,31 +758,16 @@ function Sync-MeisServiceClassesToJar {
 
     $env:JAVA_HOME = Resolve-MeisJavaHome
     $jarExe = Join-Path $env:JAVA_HOME 'bin\jar.exe'
-    if (-not (Test-Path $jarExe)) { throw "jar.exe not found under JAVA_HOME" }
+    if (-not (Test-Path $jarExe)) { throw 'jar.exe not found under JAVA_HOME' }
 
     $root = $script:MeisRoot
     $jar = Join-Path $root "$ServiceName\target\$ServiceName-1.0.0-SNAPSHOT.jar"
     $sources = Get-MeisServiceClassSourceModules $ServiceName
-    $workDir = Join-Path $env:TEMP "meis-jar-sync-$ServiceName-$(Get-Random)"
-    New-Item -ItemType Directory -Path $workDir -Force | Out-Null
-    $jarNew = "$jar.new"
-    $jarBackup = "$jar.bak"
+    $updateRoot = Join-Path $env:TEMP "meis-jar-update-$ServiceName-$(Get-Random)"
+    $bootClasses = Join-Path $updateRoot 'BOOT-INF\classes'
+    New-Item -ItemType Directory -Path $bootClasses -Force | Out-Null
 
     try {
-        Push-Location $workDir
-        & $jarExe xf $jar
-        if ($LASTEXITCODE -ne 0) { throw "无法解压 JAR: $ServiceName" }
-
-        $manifest = Join-Path $workDir 'META-INF\MANIFEST.MF'
-        if (-not (Test-Path $manifest)) {
-            throw 'JAR missing MANIFEST.MF. Run full package build first.'
-        }
-
-        $bootClasses = Join-Path $workDir 'BOOT-INF\classes'
-        if (-not (Test-Path $bootClasses)) {
-            New-Item -ItemType Directory -Path $bootClasses -Force | Out-Null
-        }
-
         $fileCount = 0
         foreach ($mod in $sources) {
             $cls = Join-Path $root "$mod\target\classes"
@@ -609,28 +783,163 @@ function Sync-MeisServiceClassesToJar {
         }
 
         if ($fileCount -eq 0) {
-            throw "未找到可同步的 class/resource，请先执行 compile"
+            throw 'no compiled classes found; run mvn compile first'
         }
 
-        if (Test-Path $jarNew) { Remove-Item $jarNew -Force }
-        & $jarExe cfm $jarNew 'META-INF/MANIFEST.MF' .
-        if ($LASTEXITCODE -ne 0) { throw "JAR 重新打包失败: $ServiceName" }
-        Pop-Location
-
-        Copy-Item $jar $jarBackup -Force
+        Push-Location $updateRoot
         try {
-            Move-Item $jarNew $jar -Force
-            Remove-Item $jarBackup -Force -ErrorAction SilentlyContinue
-        } catch {
-            if (Test-Path $jarBackup) { Move-Item $jarBackup $jar -Force }
-            throw "JAR 替换失败: $ServiceName"
+            & $jarExe uf $jar 'BOOT-INF/classes'
+            if ($LASTEXITCODE -ne 0) {
+                throw ('jar uf failed for ' + $ServiceName)
+            }
+        } finally {
+            Pop-Location
         }
 
-        return @{ ok = $true; message = ($ServiceName + ": 已加载 $fileCount 个类/资源到 JAR") }
+        $verify = Test-MeisServiceJarHealthy $ServiceName
+        if (-not $verify.ok) {
+            throw ('JAR unhealthy after update: ' + $verify.message)
+        }
+
+        return @{ ok = $true; message = ($ServiceName + ': updated ' + $fileCount + ' classes/resources in JAR'); fileCount = $fileCount }
     } finally {
-        Pop-Location -ErrorAction SilentlyContinue
-        Remove-Item $workDir -Recurse -Force -ErrorAction SilentlyContinue
-        if (Test-Path $jarNew) { Remove-Item $jarNew -Force -ErrorAction SilentlyContinue }
+        Remove-Item $updateRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Invoke-MeisServiceHotReload {
+    param([Parameter(Mandatory = $true)][string]$ServiceName)
+
+    $steps = [System.Collections.ArrayList]@()
+    $svc = Get-MeisServiceDefinition $ServiceName
+    $wasRunning = Test-MeisPortListening -Port $svc.port
+    $useJdwp = $wasRunning -and $svc.debugPort -and (Test-MeisPortListening -Port $svc.debugPort)
+    $fileCount = 0
+    $stoppedForSync = $false
+
+    try {
+        $health = Test-MeisServiceJarHealthy $ServiceName
+        if (-not $health.ok) {
+            Invoke-MeisMavenModule -Module $ServiceName -Package -AlsoMake | Out-Null
+        }
+        Invoke-MeisMavenModule -Module $ServiceName -Compile -AlsoMake | Out-Null
+        [void]$steps.Add(@{ step = 'compile'; ok = $true; message = 'mvn compile OK' })
+    } catch {
+        [void]$steps.Add(@{ step = 'compile'; ok = $false; message = $_.Exception.Message })
+        return @{
+            ok      = $false
+            message = ($ServiceName + ' hot-reload failed at compile')
+            steps   = @($steps)
+            httpUp  = Test-MeisPortListening -Port $svc.port
+            debugUp = $useJdwp -and (Test-MeisPortListening -Port $svc.debugPort)
+        }
+    }
+
+    if ($wasRunning) {
+        try {
+            Stop-MeisServiceByName $ServiceName | Out-Null
+            $released = Wait-MeisServicePortReleased -Port $svc.port
+            if (-not $released) {
+                throw ('port :' + $svc.port + ' still listening after stop')
+            }
+            $stoppedForSync = $true
+            [void]$steps.Add(@{ step = 'stop'; ok = $true; message = 'stopped before JAR sync' })
+        } catch {
+            [void]$steps.Add(@{ step = 'stop'; ok = $false; message = $_.Exception.Message })
+            return @{
+                ok      = $false
+                message = ($ServiceName + ' hot-reload failed at stop')
+                steps   = @($steps)
+                httpUp  = Test-MeisPortListening -Port $svc.port
+                debugUp = $useJdwp -and (Test-MeisPortListening -Port $svc.debugPort)
+            }
+        }
+    }
+
+    try {
+        $sync = Sync-MeisServiceClassesToJar -ServiceName $ServiceName
+        $fileCount = if ($null -ne $sync.fileCount) { [int]$sync.fileCount } else { 0 }
+        [void]$steps.Add(@{
+            step      = 'sync'
+            ok        = $true
+            message   = [string]$sync.message
+            fileCount = $fileCount
+        })
+    } catch {
+        [void]$steps.Add(@{ step = 'sync'; ok = $false; message = $_.Exception.Message })
+        if ($stoppedForSync) {
+            try {
+                Start-MeisServiceByName -ServiceName $ServiceName -Profile 'dev' -EnableJdwp:$useJdwp | Out-Null
+                [void]$steps.Add(@{ step = 'restart'; ok = $true; message = 'restarted with previous JAR after sync failure' })
+            } catch {
+                [void]$steps.Add(@{ step = 'restart'; ok = $false; message = $_.Exception.Message })
+            }
+        }
+        return @{
+            ok        = $false
+            message   = ($ServiceName + ' hot-reload failed at JAR sync')
+            steps     = @($steps)
+            httpUp    = Test-MeisPortListening -Port $svc.port
+            debugUp   = $useJdwp -and (Test-MeisPortListening -Port $svc.debugPort)
+            fileCount = $fileCount
+        }
+    }
+
+    if (-not $wasRunning) {
+        [void]$steps.Add(@{ step = 'restart'; ok = $true; message = 'service not running, restart skipped' })
+        [void]$steps.Add(@{ step = 'health'; ok = $true; message = 'new classes will load on next start' })
+        return @{
+            ok        = $true
+            message   = ($ServiceName + ' compiled and synced to JAR (service not running)')
+            steps     = @($steps)
+            httpUp    = $false
+            debugUp   = $false
+            fileCount = $fileCount
+        }
+    }
+
+    try {
+        $start = Start-MeisServiceByName -ServiceName $ServiceName -Profile 'dev' -EnableJdwp:$useJdwp
+        [void]$steps.Add(@{ step = 'restart'; ok = $true; message = $start.message })
+    } catch {
+        [void]$steps.Add(@{ step = 'restart'; ok = $false; message = $_.Exception.Message })
+        [void]$steps.Add(@{ step = 'health'; ok = $false; message = 'service port not listening after restart' })
+        return @{
+            ok        = $false
+            message   = ($ServiceName + ' hot-reload failed at restart')
+            steps     = @($steps)
+            httpUp    = Test-MeisPortListening -Port $svc.port
+            debugUp   = $useJdwp -and (Test-MeisPortListening -Port $svc.debugPort)
+            fileCount = $fileCount
+        }
+    }
+
+    $httpUp = Test-MeisPortListening -Port $svc.port
+    $debugUp = (-not $useJdwp) -or (Test-MeisPortListening -Port $svc.debugPort)
+    $healthOk = $httpUp -and $debugUp
+    if ($healthOk) {
+        $healthMsg = 'HTTP :' + $svc.port + ' ready'
+        if ($useJdwp) { $healthMsg += ', JDWP :' + $svc.debugPort }
+    } else {
+        $healthMsg = 'port not ready, check logs'
+    }
+    [void]$steps.Add(@{ step = 'health'; ok = $healthOk; message = $healthMsg })
+
+    $failed = @($steps | Where-Object { -not $_.ok })
+    $allOk = $failed.Count -eq 0
+    if ($allOk) {
+        $summary = $ServiceName + ' hot-reload OK (' + $fileCount + ' classes/resources, service restarted)'
+    } else {
+        $failedSteps = ($failed | ForEach-Object { $_.step }) -join ', '
+        $summary = $ServiceName + ' hot-reload incomplete: ' + $failedSteps
+    }
+    return @{
+        ok        = $allOk
+        message   = $summary
+        steps     = @($steps)
+        httpUp    = $httpUp
+        debugUp   = $debugUp
+        fileCount = $fileCount
     }
 }
 
@@ -648,15 +957,15 @@ function Build-MeisServiceModule {
     if ($LoadClasses) {
         $health = Test-MeisServiceJarHealthy $ServiceName
         if (-not $health.ok) {
-            Invoke-MeisMavenModule -Module $ServiceName -Package | Out-Null
+            Invoke-MeisMavenModule -Module $ServiceName -Package -AlsoMake | Out-Null
         }
         if ($Clean) {
-            Invoke-MeisMavenModule -Module $ServiceName -Clean | Out-Null
+            Invoke-MeisMavenModule -Module $ServiceName -Clean -AlsoMake | Out-Null
         }
-        Invoke-MeisMavenModule -Module $ServiceName -Compile | Out-Null
+        Invoke-MeisMavenModule -Module $ServiceName -Compile -AlsoMake | Out-Null
         return Sync-MeisServiceClassesToJar -ServiceName $ServiceName
     }
-    return Invoke-MeisMavenModule -Module $ServiceName -Clean:$Clean -Package:$Package -Compile:$Compile
+    return Invoke-MeisMavenModule -Module $ServiceName -Clean:$Clean -Package:$Package -Compile:$Compile -AlsoMake
 }
 
 function Build-MeisFrontendProject {
@@ -749,25 +1058,30 @@ function Start-MeisServiceByNameWithBuild {
 }
 
 function Get-MeisServiceStatusList {
+    $ports = Get-MeisListeningPortSet
     $list = @()
     foreach ($s in $script:MeisServices) {
-        $httpUp = Test-MeisPortListening -Port $s.port
+        $httpUp = $ports.Contains($s.port)
         $debugUp = $false
-        if ($s.debugPort) { $debugUp = Test-MeisPortListening -Port $s.debugPort }
+        if ($s.debugPort) { $debugUp = $ports.Contains($s.debugPort) }
         $jar = Join-Path $script:MeisRoot "$($s.name)\target\$($s.name)-1.0.0-SNAPSHOT.jar"
+        $classesDir = Join-Path $script:MeisRoot "$($s.name)\target\classes"
+        $classesExists = Test-Path $classesDir
         $jarExists = Test-Path $jar
         $jarSizeKb = if ($jarExists) { [math]::Round((Get-Item $jar).Length / 1KB) } else { 0 }
         $jarHealthy = $jarExists -and $jarSizeKb -ge 1024
         $meta = Get-MeisServiceMetaEntry $s.name
         $list += [ordered]@{
-            name       = $s.name
-            labelZh    = $meta.labelZh
-            descZh     = $meta.descZh
-            port       = $s.port
-            debugPort  = $s.debugPort
-            httpUp     = $httpUp
-            debugUp    = $debugUp
-            jarExists  = $jarExists
+            name          = $s.name
+            labelZh       = $meta.labelZh
+            descZh        = $meta.descZh
+            port          = $s.port
+            debugPort     = $s.debugPort
+            httpUp        = $httpUp
+            debugUp       = $debugUp
+            classesExists = $classesExists
+            classesMtime  = if ($classesExists) { (Get-Item $classesDir).LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
+            jarExists     = $jarExists
             jarSizeKb  = $jarSizeKb
             jarHealthy = $jarHealthy
             jarMtime   = if ($jarExists) { (Get-Item $jar).LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
@@ -960,9 +1274,12 @@ function Get-MeisPanelLogEntries {
 
     $entries = @()
     $logDir = Join-Path $script:MeisRoot 'logs'
-    $statusByName = @{}
-    foreach ($s in Get-MeisServiceStatusList) {
-        $statusByName[$s.name] = $s
+    $ports = Get-MeisListeningPortSet
+    $debugUpByName = @{}
+    foreach ($s in $script:MeisServices) {
+        if ($s.debugPort -and $ports.Contains($s.debugPort)) {
+            $debugUpByName[$s.name] = $true
+        }
     }
 
     $includePanel = (Test-MeisServiceInWatchList -Name 'panel' -Watched $Watched) -and (Test-MeisServiceInFilterList -Name 'panel' -Filtered $Filtered)
@@ -987,10 +1304,7 @@ function Get-MeisPanelLogEntries {
             $name = $s.name
             if (-not (Test-MeisServiceInWatchList -Name $name -Watched $Watched)) { continue }
             if (-not (Test-MeisServiceInFilterList -Name $name -Filtered $Filtered)) { continue }
-            $preferDebug = $false
-            if ($statusByName.ContainsKey($name)) {
-                $preferDebug = [bool]$statusByName[$name].debugUp
-            }
+            $preferDebug = $debugUpByName.ContainsKey($name)
             $entries += Add-MeisServiceLogEntries -Name $name -LogDir $logDir -Lines $Lines -DebugLogs:$DebugLogs -PreferDebug:$preferDebug
         }
     }

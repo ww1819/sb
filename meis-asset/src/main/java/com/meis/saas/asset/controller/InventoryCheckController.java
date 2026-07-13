@@ -4,6 +4,7 @@ import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
@@ -113,19 +114,19 @@ public class InventoryCheckController {
             assertMutable(id);
             jdbc.update("""
                 UPDATE inventory_check SET check_name=?, check_year=?, check_type=?, campus_id=?::uuid, dept_id=?::uuid,
-                start_date=?, end_date=?, checker_id=?::uuid, supervisor_id=?::uuid, remark=?, total_count=?, updated_at=NOW()
+                warehouse_id=?::uuid, start_date=?, end_date=?, checker_id=?::uuid, supervisor_id=?::uuid, remark=?, total_count=?, updated_at=NOW()
                 WHERE id=?::uuid
                 """, body.get("check_name"), body.get("check_year"), body.get("check_type"), body.get("campus_id"),
-                    body.get("dept_id"), body.get("start_date"), body.get("end_date"), body.get("checker_id"),
+                    body.get("dept_id"), body.get("warehouse_id"), body.get("start_date"), body.get("end_date"), body.get("checker_id"),
                     body.get("supervisor_id"), body.get("remark"), items.size(), id);
         } else {
             jdbc.update("""
                 INSERT INTO inventory_check (id, check_no, check_name, check_year, check_type, campus_id, dept_id,
-                start_date, end_date, checker_id, supervisor_id, status, audit_status, total_count, created_by)
-                VALUES (?::uuid,?,?,?,?,?::uuid,?::uuid,?,?,?::uuid,?::uuid,?,?,?,?::uuid)
+                warehouse_id, start_date, end_date, checker_id, supervisor_id, status, audit_status, total_count, created_by)
+                VALUES (?::uuid,?,?,?,?,?::uuid,?::uuid,?::uuid,?,?,?::uuid,?::uuid,?,?,?,?::uuid)
                 """, id, body.getOrDefault("check_no", "IC" + System.currentTimeMillis()), body.get("check_name"),
                     body.get("check_year"), body.getOrDefault("check_type", "annual"), body.get("campus_id"),
-                    body.get("dept_id"), body.get("start_date"), body.get("end_date"), body.get("checker_id"),
+                    body.get("dept_id"), body.get("warehouse_id"), body.get("start_date"), body.get("end_date"), body.get("checker_id"),
                     body.get("supervisor_id"), body.getOrDefault("status", "planning"),
                     body.getOrDefault("audit_status", "pending"), items.size(),
                     userId != null ? UUID.fromString(userId) : null);
@@ -151,7 +152,7 @@ public class InventoryCheckController {
     public Result<Void> delete(@PathVariable UUID id) {
         assertMutable(id);
         jdbc.update("DELETE FROM inventory_check_item WHERE check_id = ?::uuid", id);
-        int n = jdbc.update("DELETE FROM inventory_check WHERE id = ?::uuid", id);
+        int n = SoftDeleteSupport.softDelete(jdbc, "inventory_check", id.toString());
         if (n == 0) throw new BizException(404, "not found");
         return Result.ok();
     }
@@ -185,13 +186,28 @@ public class InventoryCheckController {
     @PostMapping("/{id:" + UUID_PATH + "}/scan")
     @OperationLog(module = "asset", description = "扫码盘点")
     public Result<Map<String, Object>> scan(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
+        Object deviceId = body.get("device_id");
+        var existing = jdbc.queryForList(
+                "SELECT id FROM inventory_check_item WHERE check_id = ?::uuid AND device_id = ?::uuid", id, deviceId);
+        if (!existing.isEmpty()) {
+            jdbc.update("""
+                UPDATE inventory_check_item SET is_found = true, is_matched = ?,
+                actual_location = COALESCE(?, actual_location), check_date = NOW()
+                WHERE check_id = ?::uuid AND device_id = ?::uuid
+                """, body.getOrDefault("is_matched", true), body.get("actual_location"), id, deviceId);
+        } else {
+            jdbc.update("""
+                INSERT INTO inventory_check_item (id, check_id, device_id, device_code, device_name,
+                is_found, is_matched, actual_location, check_date)
+                VALUES (?::uuid,?::uuid,?::uuid,?,?,true,?,?,NOW())
+                """, UUID.randomUUID(), id, deviceId, body.get("device_code"), body.get("device_name"),
+                    body.getOrDefault("is_matched", true), body.get("actual_location"));
+        }
         jdbc.update("""
-            INSERT INTO inventory_check_item (id, check_id, device_id, device_code, book_status, actual_status, check_result)
-            VALUES (?::uuid,?::uuid,?::uuid,?,?,?,?)
-            ON CONFLICT DO NOTHING
-            """, UUID.randomUUID(), id, body.get("device_id"), body.get("device_code"),
-                body.getOrDefault("book_status", "normal"), body.getOrDefault("actual_status", "normal"), "matched");
-        jdbc.update("UPDATE inventory_check SET checked_count = COALESCE(checked_count,0)+1, updated_at = NOW() WHERE id = ?::uuid", id);
+            UPDATE inventory_check SET checked_count = (
+                SELECT COUNT(*) FROM inventory_check_item WHERE check_id = ?::uuid AND is_found = true
+            ), updated_at = NOW() WHERE id = ?::uuid
+            """, id, id);
         return get(id);
     }
 

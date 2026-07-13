@@ -34,19 +34,22 @@ public class AssetTransferController {
         if (exists) {
             jdbc.update("""
                 UPDATE asset_transfer SET transfer_type=?, device_id=?::uuid, from_dept_id=?::uuid, to_dept_id=?::uuid,
-                from_campus_id=?::uuid, to_campus_id=?::uuid, transfer_date=?, reason=?, remark=?, updated_at=NOW()
+                from_campus_id=?::uuid, to_campus_id=?::uuid, from_warehouse_id=?::uuid, to_warehouse_id=?::uuid,
+                transfer_date=?, reason=?, remark=?, updated_at=NOW()
                 WHERE id=?::uuid
                 """, body.get("transfer_type"), body.get("device_id"), body.get("from_dept_id"), body.get("to_dept_id"),
-                    body.get("from_campus_id"), body.get("to_campus_id"), body.get("transfer_date"),
+                    body.get("from_campus_id"), body.get("to_campus_id"), body.get("from_warehouse_id"),
+                    body.get("to_warehouse_id"), body.get("transfer_date"),
                     body.get("reason"), body.get("remark"), id);
         } else {
             jdbc.update("""
                 INSERT INTO asset_transfer (id, transfer_no, transfer_type, device_id, from_dept_id, to_dept_id,
-                from_campus_id, to_campus_id, transfer_date, reason, applicant_id, status, approval_status)
-                VALUES (?::uuid,?,?,?::uuid,?::uuid,?::uuid,?::uuid,?::uuid,?,?::uuid,?,?,?)
+                from_campus_id, to_campus_id, from_warehouse_id, to_warehouse_id, transfer_date, reason, applicant_id, status, approval_status)
+                VALUES (?::uuid,?,?,?::uuid,?::uuid,?::uuid,?::uuid,?::uuid,?::uuid,?::uuid,?,?::uuid,?,?,?)
                 """, id, body.getOrDefault("transfer_no", "TR" + System.currentTimeMillis()), body.get("transfer_type"),
                     body.get("device_id"), body.get("from_dept_id"), body.get("to_dept_id"),
-                    body.get("from_campus_id"), body.get("to_campus_id"), body.get("transfer_date"),
+                    body.get("from_campus_id"), body.get("to_campus_id"), body.get("from_warehouse_id"),
+                    body.get("to_warehouse_id"), body.get("transfer_date"),
                     body.get("reason"), body.get("applicant_id"), "pending", "draft");
         }
         return get(id);
@@ -68,8 +71,14 @@ public class AssetTransferController {
         var row = jdbc.queryForList("SELECT * FROM asset_transfer WHERE id = ?::uuid", id);
         if (row.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> t = row.get(0);
-        jdbc.update("UPDATE medical_device SET dept_id = ?::uuid, updated_at = NOW() WHERE id = ?::uuid",
-                t.get("to_dept_id"), t.get("device_id"));
+        if (t.get("to_dept_id") != null && t.get("device_id") != null) {
+            jdbc.update("UPDATE medical_device SET dept_id = ?::uuid, updated_at = NOW() WHERE id = ?::uuid",
+                    t.get("to_dept_id"), t.get("device_id"));
+        }
+        if (t.get("to_warehouse_id") != null && t.get("device_id") != null) {
+            jdbc.update("UPDATE medical_device SET warehouse_id = ?::uuid, updated_at = NOW() WHERE id = ?::uuid",
+                    t.get("to_warehouse_id"), t.get("device_id"));
+        }
         jdbc.update("UPDATE asset_transfer SET status = 'completed', updated_at = NOW() WHERE id = ?::uuid", id);
         return get(id);
     }

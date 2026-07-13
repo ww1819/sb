@@ -27,7 +27,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import CrudPage from '@/components/CrudPage.vue'
@@ -37,7 +38,9 @@ import FieldRenderer from '@/components/FieldRenderer.vue'
 import { getPageConfig } from '@/config/pageRegistry'
 import { getDetailFields } from '@/config/pageSchemas'
 
-const config = getPageConfig('/asset/entry')!
+const route = useRoute()
+const path = computed(() => '/' + String(route.params.module) + '/' + String(route.params.page))
+const config = computed(() => getPageConfig(path.value)!)
 const crudRef = ref<InstanceType<typeof CrudPage> | null>(null)
 const visible = ref(false)
 const entry = ref<Record<string, unknown> | null>(null)

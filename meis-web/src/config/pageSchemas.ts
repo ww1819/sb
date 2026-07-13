@@ -20,7 +20,7 @@ export interface FieldSchema {
   type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'textarea' | 'boolean' | 'json' | 'file'
   dictType?: string
   linkTable?: string
-  widget?: 'repairDevicePicker'
+  widget?: 'repairDevicePicker' | 'devicePicker' | 'stationPicker'
   group?: FieldGroup
   required?: boolean
   readonly?: boolean
@@ -53,6 +53,8 @@ export const tableSchemas: Record<string, FieldSchema[]> = {
     { prop: 'dept_code', label: '科室编码', list: true, required: true },
     { prop: 'dept_name', label: '科室名称', list: true, required: true },
     { prop: 'pinyin_code', label: '拼音简码', list: true },
+    { prop: 'campus_id', label: '院区', linkTable: 'campus' },
+    { prop: 'building_id', label: '建筑物', linkTable: 'building' },
     { prop: 'is_clinical', label: '临床科室', list: true },
     { prop: 'sort_order', label: '排序', type: 'number', list: true },
     { prop: 'is_active', label: '启用', list: true }
@@ -60,7 +62,12 @@ export const tableSchemas: Record<string, FieldSchema[]> = {
   warehouse: [
     { prop: 'warehouse_code', label: '库房编码', list: true, required: true },
     { prop: 'warehouse_name', label: '库房名称', list: true, required: true },
+    { prop: 'warehouse_type', label: '库房类型', dictType: 'warehouse_type', list: true },
+    { prop: 'campus_id', label: '院区', linkTable: 'campus', list: true },
+    { prop: 'dept_id', label: '归属科室', linkTable: 'department', list: true },
+    { prop: 'manager_id', label: '管理员', linkTable: 'sys_user' },
     { prop: 'address', label: '地址', list: true },
+    { prop: 'sort_order', label: '排序', type: 'number', list: true },
     { prop: 'is_active', label: '启用', list: true }
   ],
   sys_dict: [
@@ -80,6 +87,22 @@ export const tableSchemas: Record<string, FieldSchema[]> = {
 
 export function getSchema(table: string): FieldSchema[] {
   return tableSchemas[table] ?? []
+}
+
+/** 收集表 schema 中所有外键 linkTable，用于预加载显示名称 */
+export function collectLinkTables(...tables: string[]): string[] {
+  const set = new Set<string>()
+  for (const table of tables) {
+    if (!table) continue
+    for (const f of getSchema(table)) {
+      if (f.linkTable) set.add(f.linkTable)
+    }
+  }
+  return [...set]
+}
+
+export function fieldSchemaByProp(table: string, prop: string): FieldSchema {
+  return getSchema(table).find((f) => f.prop === prop) ?? { prop, label: prop }
 }
 
 export function getListFields(table: string): FieldSchema[] {

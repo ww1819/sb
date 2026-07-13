@@ -111,6 +111,31 @@
       border-color: #6b5520;
       color: #ffd88a;
     }
+    .actions button.hot-reload.loading {
+      opacity: 0.65;
+      cursor: wait;
+      color: var(--warn);
+    }
+    .actions button.hot-reload.ok-flash {
+      border-color: var(--ok);
+      color: #b8f5c8;
+    }
+    .actions button.hot-reload.fail-flash {
+      border-color: var(--err);
+      color: #ffb4b4;
+    }
+    .hot-reload-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.72rem;
+      margin-left: 2px;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+    .hot-reload-status.ok { color: var(--ok); }
+    .hot-reload-status.fail { color: var(--err); }
+    .hot-reload-status.running { color: var(--warn); }
     .log-watch {
       display: inline-flex;
       align-items: center;
@@ -429,7 +454,7 @@
   <header>
     <div>
       <h1>MEIS 开发控制面板</h1>
-      <div class="sub">构建与启停分离 · 前端 Vite 开发服自带热更新 · 后端调试运行中可用热加载</div>
+      <div class="sub">构建与启停分离 · 前端 Vite 开发服自带热更新 · 后端热加载：同步编译并重启，结果逐步反馈</div>
     </div>
     <div class="toolbar">
       <button class="primary" onclick="act('backend/start-all')" title="启动全部 15 个微服务，已运行的自动跳过">启动全部后端</button>
@@ -438,8 +463,9 @@
       <button class="warn" onclick="act('backend/start-debug-core')" title="核心后端以 JDWP 调试模式启动，已运行的自动跳过">调试核心后端</button>
       <button class="danger" onclick="act('backend/stop-all')">停止全部后端</button>
       <button class="warn" onclick="act('backend/restart-all')">重启全部后端</button>
-      <button onclick="act('build/install')">Maven Install</button>
-      <button onclick="act('build/backend')">打包后端</button>
+      <button class="danger" onclick="confirmClean()" title="mvn clean，清除全部模块 target（classes/JAR），之后需重新打包">整体 Clean</button>
+      <button class="primary" onclick="act('build/backend')" title="mvn package -DskipTests，打包全部微服务 JAR">打包后端</button>
+      <button onclick="act('build/install')" title="mvn install -DskipTests，安装到本地仓库">Maven Install</button>
       <button onclick="refresh()">刷新状态</button>
       <button class="danger" onclick="shutdownPanel()" title="关闭面板进程并释放 5099 端口，不影响已启动的前后端服务">关闭面板</button>
     </div>
@@ -456,6 +482,16 @@
         </tr>
       </thead>
       <tbody id="frontend-row"></tbody>
+    </table>
+
+    <div class="section-title">公共库模块</div>
+    <table>
+      <thead>
+        <tr>
+          <th>模块</th><th>说明</th><th>产物</th><th>依赖</th><th>构建</th><th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="library-rows"></tbody>
     </table>
 
     <div class="section-title">后端微服务</div>
@@ -527,6 +563,9 @@
     let timer = null
     let logTimer = null
     let refreshInFlight = false
+    let lastStatusAt = ''
+    let statusRefreshFailed = false
+    let lastStatusData = null
     let refreshLogsInFlight = false
     let logFollowBottom = true
     let pinnedService = 'all'
@@ -544,6 +583,10 @@
     let buildPendingUntil = {}
     let debugPendingUntil = {}
     let debugPendingSince = {}
+    let hotReloadPending = {}
+    let hotReloadFlash = {}
+    let libraryReloadPending = {}
+    let libraryReloadFlash = {}
 
     function isDebugRunning(svc) {
       return !!(svc && svc.debugUp && svc.httpUp)
@@ -596,10 +639,144 @@
       return '<span class="muted">—</span> ' + port
     }
 
+    function formatHotReloadSteps(steps) {
+      if (!Array.isArray(steps) || !steps.length) return ''
+      const labels = { compile: '编译', stop: '停止', sync: '写JAR', restart: '重启', health: '健康检查' }
+      return steps.map(st => {
+        const label = labels[st.step] || st.step
+        const mark = st.ok ? '✓' : '✗'
+        return mark + label
+      }).join(' → ')
+    }
+
+    function renderHotReloadStatus(s) {
+      const name = s.name
+      if (hotReloadPending[name]) {
+        return '<span class="hot-reload-status running" title="正在编译、写入 JAR 并重启…">⟳ 加载中</span>'
+      }
+      const hr = s.hotReload
+      if (!hr) return ''
+      const cls = hr.ok ? 'ok' : 'fail'
+      const stepTip = formatHotReloadSteps(hr.steps)
+      const title = escapeHtml((hr.message || '') + (stepTip ? '\n' + stepTip : ''))
+      const icon = hr.ok ? '✓' : '✗'
+      return `<span class="hot-reload-status ${cls}" title="${title}">${icon} ${escapeHtml(hr.at || '')}</span>`
+    }
+
+    function renderLibraryArtifact(lib) {
+      if (lib.buildInProgress || isBuildPending(lib.name)) {
+        return '<span style="color:var(--warn)">编译中…</span>'
+      }
+      const parts = []
+      if (lib.classesExists) {
+        parts.push('classes ' + escapeHtml(lib.classesMtime || ''))
+      } else {
+        parts.push('<span style="color:var(--err)">classes 缺失</span>')
+      }
+      if (lib.jarExists) {
+        parts.push('jar ' + lib.jarSizeKb + ' KB')
+      }
+      return parts.join('<div class="jar-meta"></div>')
+    }
+
+    function renderLibraryDependents(lib) {
+      const dbg = lib.debugDependentCount || 0
+      const total = lib.dependentCount || 0
+      const tip = (lib.dependents || []).join(', ')
+      return `<span title="${escapeHtml(tip)}">调试中 ${dbg} / 共 ${total}</span>`
+    }
+
+    function renderLibraryBuildOpts(lib) {
+      return `
+        <div class="build-opts">
+          <span class="build-section-label">仅编译</span>
+          <div class="build-opts-actions">
+            <button onclick="libraryCompile('${lib.name}')" title="仅编译本模块（约数秒），不含下游微服务">快速编译</button>
+          </div>
+        </div>
+      `
+    }
+
+    function renderLibraryHotReloadStatus(lib) {
+      const name = lib.name
+      if (libraryReloadPending[name]) {
+        return '<span class="hot-reload-status running" title="正在编译并热加载依赖服务…">⟳ 加载中</span>'
+      }
+      const hr = lib.hotReload
+      if (!hr) return ''
+      const cls = hr.ok ? 'ok' : 'fail'
+      const icon = hr.ok ? '✓' : '✗'
+      return `<span class="hot-reload-status ${cls}" title="${escapeHtml(hr.message || '')}">${icon} ${escapeHtml(hr.at || '')}</span>`
+    }
+
+    function renderLibraryActions(lib) {
+      const name = lib.name
+      const dbg = lib.debugDependentCount || 0
+      const busy = !!libraryReloadPending[name]
+      const flash = libraryReloadFlash[name]
+      const flashCls = flash === 'ok' ? ' ok-flash' : (flash === 'fail' ? ' fail-flash' : '')
+      const disabled = (dbg === 0 || busy) ? ' disabled' : ''
+      const title = dbg === 0
+        ? '无调试运行中的依赖服务；请先对相关微服务点「调试」'
+        : 'compile 本库 → 对调试中的依赖服务逐个热加载'
+      let html = `<button class="hot-reload${flashCls}${busy ? ' loading' : ''}"${disabled} onclick="libraryReloadDependents('${name}')" title="${escapeHtml(title)}">${busy ? '加载中…' : '热加载依赖'}</button>`
+      html += renderLibraryHotReloadStatus(lib)
+      return html
+    }
+
+    function renderLibraries(list) {
+      document.getElementById('library-rows').innerHTML = (list || []).map(lib => `
+        <tr>
+          <td class="mono">${lib.name}</td>
+          <td>${renderServiceInfo(lib)}</td>
+          <td>${renderLibraryArtifact(lib)}</td>
+          <td>${renderLibraryDependents(lib)}</td>
+          <td>${renderLibraryBuildOpts(lib)}</td>
+          <td class="actions">${renderLibraryActions(lib)}</td>
+        </tr>
+      `).join('')
+    }
+
+    async function libraryCompile(name) {
+      try {
+        markBuildPending(name, 180)
+        showToast(name + ': 编译中…', true)
+        const resp = await api('/api/library/' + name + '/compile', 'POST')
+        showToast(resp.message || (name + ': 编译已提交'), true)
+        pollServiceStatus()
+      } catch (e) {
+        showToast(name + ': 编译失败 — ' + e.message, false)
+      }
+    }
+
+    async function libraryReloadDependents(name) {
+      if (libraryReloadPending[name]) return
+      libraryReloadPending[name] = true
+      refresh()
+      try {
+        showToast(name + ': 正在热加载依赖服务（可能需数分钟）…', true)
+        const resp = await api('/api/library/' + name + '/reload-dependents', 'POST', 600000)
+        const result = resp.data || resp
+        const ok = resp.ok !== false && result.ok !== false
+        libraryReloadFlash[name] = ok ? 'ok' : 'fail'
+        setTimeout(() => { delete libraryReloadFlash[name] }, 4000)
+        showToast(name + ': ' + (resp.message || result.message || (ok ? '完成' : '失败')), ok)
+      } catch (e) {
+        libraryReloadFlash[name] = 'fail'
+        setTimeout(() => { delete libraryReloadFlash[name] }, 4000)
+        showToast(name + ': 热加载失败 — ' + e.message, false)
+      } finally {
+        delete libraryReloadPending[name]
+        refresh()
+      }
+    }
+
     function renderServiceActions(s) {
       const name = s.name
       const debugRunning = isDebugRunning(s)
       const debugPending = isDebugPending(name)
+      const reloadBusy = !!hotReloadPending[name]
+      const flash = hotReloadFlash[name]
       let html = ''
       if (!debugRunning) {
         html += `<button onclick="serviceAct('${name}','start')">启动</button>`
@@ -611,7 +788,11 @@
         html += `<span style="font-size:0.74rem;color:var(--warn);align-self:center">调试启动中…</span>`
       }
       if (debugRunning) {
-        html += `<button class="hot-reload" onclick="serviceReloadClasses('${name}')" title="调试运行中：compile + 写入 JAR，不重启进程">热加载</button>`
+        const flashCls = flash === 'ok' ? ' ok-flash' : (flash === 'fail' ? ' fail-flash' : '')
+        const btnLabel = reloadBusy ? '加载中…' : '热加载'
+        const disabled = reloadBusy ? ' disabled' : ''
+        html += `<button class="hot-reload${flashCls}${reloadBusy ? ' loading' : ''}"${disabled} onclick="serviceReloadClasses('${name}')" title="compile -> stop -> write JAR -> restart (brief downtime)">热加载</button>`
+        html += renderHotReloadStatus(s)
       }
       html += `<button onclick="serviceAct('${name}','restart')">重启</button>`
       html += `<button onclick="serviceAct('${name}','stop')">停止</button>`
@@ -688,7 +869,12 @@
           : ('<span style="color:var(--err)" title="JAR 异常，请点完整打包">' + s.jarSizeKb + ' KB 异常</span>')
         return size + (s.jarMtime ? '<div class="jar-meta">JAR ' + escapeHtml(s.jarMtime) + '</div>' : '')
       }
-      return '<span style="color:var(--err)">缺失</span>'
+      if (s.classesExists) {
+        return '<span style="color:var(--ok)">classes 就绪</span>'
+          + '<div class="jar-meta" style="color:var(--warn)">JAR 缺失 · 需「完整打包」或「打包后端」</div>'
+          + (s.classesMtime ? '<div class="jar-meta">classes ' + escapeHtml(s.classesMtime) + '</div>' : '')
+      }
+      return '<span style="color:var(--err)">缺失</span><div class="jar-meta">请先「打包后端」或单服务「完整打包」</div>'
     }
 
     function renderFrontendBuildOpts(fe) {
@@ -1092,6 +1278,11 @@
       }
     }
 
+    async function confirmClean() {
+      if (!confirm('整体 Clean 将删除全部模块的 target 目录（含 classes 与 JAR）。\n\n已启动的服务不会自动停止，但 JAR 将变为缺失，需再点「打包后端」。\n\n确认继续？')) return
+      await act('build/clean')
+    }
+
     async function act(path, buildQuery = '') {
       if (!tryAcquireBusy()) return
       try {
@@ -1211,14 +1402,33 @@
         return
       }
       if (!tryAcquireBusy()) return
+      hotReloadPending[name] = true
+      delete hotReloadFlash[name]
+      renderServices(lastServiceList)
+      selectOnlyLogFilter(name)
       try {
-        showToast(name + ': 正在热加载…', true)
-        const data = await api('/api/service/' + name + '/reload-classes', 'POST', 30000)
-        showToast((name + ': ') + (data.message || '热加载已提交'), data.ok !== false)
-        pollServiceStatus()
+        showToast(name + ': 热加载中（编译 → 写 JAR → 重启，约 1–2 分钟）…', true)
+        const resp = await api('/api/service/' + name + '/reload-classes', 'POST', 180000)
+        const result = resp.data || resp
+        const ok = resp.ok !== false && result.ok !== false
+        const stepText = formatHotReloadSteps(result.steps)
+        const summary = (resp.message || result.message || (ok ? '热加载成功' : '热加载失败'))
+        showToast(name + ': ' + summary + (stepText ? ' [' + stepText + ']' : ''), ok)
+        hotReloadFlash[name] = ok ? 'ok' : 'fail'
+        setTimeout(() => { delete hotReloadFlash[name]; renderServices(lastServiceList) }, 8000)
+        await refresh()
+        await refreshLogs()
+        if (!ok) {
+          showLog(name, true)
+        }
       } catch (e) {
-        showToast(e.message, false)
+        hotReloadFlash[name] = 'fail'
+        setTimeout(() => { delete hotReloadFlash[name]; renderServices(lastServiceList) }, 8000)
+        showToast(name + ': 热加载失败 — ' + e.message, false)
+        showLog(name, true)
       } finally {
+        delete hotReloadPending[name]
+        renderServices(lastServiceList)
         releaseBusy()
       }
     }
@@ -1244,7 +1454,7 @@
     }
 
     async function refreshLogs() {
-      if (document.hidden || refreshLogsInFlight) return
+      if (document.hidden || refreshLogsInFlight || refreshInFlight) return
       refreshLogsInFlight = true
       const errorsOnly = document.getElementById('log-errors-only').checked ? '1' : '0'
       const debug = document.getElementById('log-debug').checked ? '1' : '0'
@@ -1323,11 +1533,25 @@
       const up = (data.services || []).filter(s => s.httpUp).length
       const total = (data.services || []).length
       const fe = data.frontend?.httpUp ? 1 : 0
+      const bg = data.backgroundJobs || []
+      const buildLabels = {
+        'reactor-clean': '整体 Clean',
+        'maven-install': 'Maven Install',
+        'build-backend': '打包后端'
+      }
+      const buildHint = bg.length
+        ? bg.map(j => buildLabels[j] || j).join('、') + ' 进行中…'
+        : ''
+      const staleHint = statusRefreshFailed
+        ? '<div class="stat"><div class="label">状态</div><div class="value" style="font-size:0.9rem;color:var(--warn)">刷新失败，显示可能过期</div></div>'
+        : (lastStatusAt ? `<div class="stat"><div class="label">刷新</div><div class="value" style="font-size:0.85rem">${escapeHtml(lastStatusAt)}</div></div>` : '')
       document.getElementById('stats').innerHTML = `
         <div class="stat"><div class="label">后端在线</div><div class="value">${up}/${total}</div></div>
         <div class="stat"><div class="label">前端</div><div class="value">${fe ? '运行' : '停止'}</div></div>
         <div class="stat"><div class="label">Redis</div><div class="value">${data.redisUp ? 'OK' : '—'}</div></div>
         <div class="stat"><div class="label">网关</div><div class="value" style="font-size:0.95rem"><a href="${data.gatewayUrl}" target="_blank">:8080</a></div></div>
+        ${staleHint}
+        ${buildHint ? `<div class="stat"><div class="label">后台任务</div><div class="value" style="font-size:0.9rem;color:var(--warn)">${buildHint}</div></div>` : ''}
       `
     }
 
@@ -1379,21 +1603,33 @@
       refreshInFlight = true
       try {
         const data = await api('/api/status', 'GET', 20000)
+        lastStatusData = data
         coreServiceNames = data.coreServices || []
-        const names = ['meis-web', 'panel'].concat((data.services || []).map(s => s.name))
+        const names = ['meis-web', 'panel']
+          .concat((data.libraries || []).map(l => l.name))
+          .concat((data.services || []).map(s => s.name))
         loadLogWatch(names)
         loadLogFilter(names)
         loadBuildOpts(names)
         renderStats(data)
         renderFrontend(data.frontend)
         if (data.frontend?.httpUp) clearFrontendPending()
+        renderLibraries(data.libraries)
         renderServices(data.services)
         updateDebugPendingFromStatus(data.services)
+        statusRefreshFailed = false
+        lastStatusAt = new Date().toLocaleTimeString()
         for (const s of (data.services || [])) {
           if (s.jarExists && s.jarHealthy) delete buildPendingUntil[s.name]
+          else if (s.classesExists) delete buildPendingUntil[s.name]
           if (isDebugRunning(s)) clearDebugPending(s.name)
         }
+        for (const lib of (data.libraries || [])) {
+          if (lib.classesExists) delete buildPendingUntil[lib.name]
+        }
       } catch (e) {
+        statusRefreshFailed = true
+        if (lastStatusData) renderStats(lastStatusData)
         // 轮询失败不弹 toast，避免后台标签页刷屏
         if (!document.hidden) {
           console.warn('status refresh failed:', e.message)
@@ -1415,7 +1651,7 @@
     }
 
     function resumeAutoRefresh() {
-      if (!timer) timer = setInterval(refresh, 4000)
+      if (!timer) timer = setInterval(refresh, 5000)
       toggleLogAuto()
     }
 
@@ -1434,7 +1670,7 @@
 
     refresh()
     refreshLogs()
-    timer = setInterval(refresh, 4000)
+    timer = setInterval(refresh, 5000)
     toggleLogAuto()
 
     document.getElementById('log-console').addEventListener('scroll', (e) => {

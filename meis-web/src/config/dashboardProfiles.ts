@@ -101,7 +101,7 @@ export const DASHBOARD_PROFILES: Record<DashboardProfile, DashboardProfileConfig
     title: '维修工程师工作台',
     subtitle: '工单响应与保养执行',
     kpis: kpi('openWorkorders', 'activeMaintenancePlans', 'deviceCount'),
-    quickPaths: ['/repair/workorder', '/maintain/plan', '/maintain/record', '/asset/device'],
+    quickPaths: ['/repair/apply', '/repair/handle', '/repair/verify', '/repair/spare-archive'],
     charts: ['trend', 'status'],
     showTodos: true,
     showMessages: true
@@ -122,7 +122,7 @@ export const ALL_QUICK_ENTRIES = [
   {
     label: '快速报修',
     desc: '提交设备故障工单',
-    path: '/repair/workorder',
+    path: '/repair/apply',
     icon: WarningFilled,
     color: '#fa541c',
     bgColor: 'rgba(250, 84, 28, 0.08)'

@@ -3,27 +3,44 @@
     <el-tab-pane v-for="g in displayGroups" :key="g.key" :label="g.title" :name="g.key">
       <el-descriptions :column="2" border>
         <el-descriptions-item v-for="f in g.fields" :key="f.prop" :label="f.label">
-          {{ formatValue(f.prop, device[f.prop]) }}
+          <TableCellValue v-if="labelsReady" :field="fieldFor(f.prop)" :value="device[f.prop]" />
+          <span v-else>-</span>
         </el-descriptions-item>
       </el-descriptions>
     </el-tab-pane>
     <el-tab-pane label="维修记录" name="repair">
       <el-table :data="(device.repairs as unknown[]) ?? []" border>
         <el-table-column prop="wo_no" label="工单号" />
-        <el-table-column prop="status" label="状态" />
+        <el-table-column prop="status" label="状态">
+          <template #default="{ row }">
+            <TableCellValue :field="{ prop: 'status', dictType: 'wo_status' }" :value="row.status" />
+          </template>
+        </el-table-column>
         <el-table-column prop="report_time" label="报修时间" />
       </el-table>
     </el-tab-pane>
     <el-tab-pane label="保养记录" name="maintain">
       <el-table :data="(device.maintenance as unknown[]) ?? []" border>
         <el-table-column prop="record_no" label="记录号" />
-        <el-table-column prop="status" label="状态" />
+        <el-table-column prop="status" label="状态">
+          <template #default="{ row }">
+            <TableCellValue :field="{ prop: 'status', dictType: 'maintain_record_status' }" :value="row.status" />
+          </template>
+        </el-table-column>
       </el-table>
     </el-tab-pane>
     <el-tab-pane label="流转记录" name="transfer">
       <el-table :data="(device.transfers as unknown[]) ?? []" border>
-        <el-table-column prop="transfer_type" label="类型" />
-        <el-table-column prop="status" label="状态" />
+        <el-table-column prop="transfer_type" label="类型">
+          <template #default="{ row }">
+            <TableCellValue :field="{ prop: 'transfer_type', dictType: 'transfer_type' }" :value="row.transfer_type" />
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态">
+          <template #default="{ row }">
+            <TableCellValue :field="{ prop: 'status', dictType: 'transfer_status' }" :value="row.status" />
+          </template>
+        </el-table-column>
       </el-table>
     </el-tab-pane>
     <el-tab-pane label="质控记录" name="qc">
@@ -54,11 +71,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { deviceFieldLabels, deviceFieldGroups, groupTitles } from '@/config/fieldLabels'
+import { collectLinkTables, fieldSchemaByProp, getSchema } from '@/config/pageSchemas'
+import { preloadRefLabelMaps } from '@/composables/useRefLabelMap'
+import { useDict } from '@/composables/useDict'
+import TableCellValue from '@/components/table/TableCellValue.vue'
 
 const props = defineProps<{ device: Record<string, unknown> }>()
 const active = ref('basic')
+const labelsReady = ref(false)
+const { preloadDictTypes } = useDict()
 const skipKeys = new Set(['repairs', 'maintenance', 'transfers', 'qc', 'benefit', 'logs', 'id'])
 
 const displayGroups = computed(() => {
@@ -75,13 +98,21 @@ const displayGroups = computed(() => {
     .map((g) => ({ key: g, title: groupTitles[g] ?? g, fields: grouped.get(g)! }))
 })
 
-function formatValue(prop: string, val: unknown) {
-  if (val === null || val === undefined) return '-'
-  if (typeof val === 'boolean') return val ? '是' : '否'
-  return String(val)
+function fieldFor(prop: string) {
+  const schema = fieldSchemaByProp('medical_device', prop)
+  if (schema.label === prop && deviceFieldLabels[prop]) {
+    return { ...schema, label: deviceFieldLabels[prop] }
+  }
+  return schema
 }
 
 function printLabel() {
   window.print()
 }
+
+onMounted(async () => {
+  await preloadDictTypes((getSchema('medical_device') ?? []).map((f) => f.dictType))
+  await preloadRefLabelMaps(collectLinkTables('medical_device'))
+  labelsReady.value = true
+})
 </script>

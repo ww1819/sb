@@ -75,9 +75,17 @@
           <TableCellValue :field="f" :value="row[f.prop]" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" :width="viewEnabled ? 220 : 200" fixed="right">
         <template #default="{ row }">
           <div class="table-actions">
+            <el-button
+              v-if="viewEnabled && canViewRow(row)"
+              link
+              type="primary"
+              @click="onView(row)"
+            >
+              查看
+            </el-button>
             <el-button
               v-if="canEditRow(row)"
               link
@@ -104,13 +112,29 @@
       </template>
     </el-table>
 
-    <FormDrawer v-if="!detailMode" v-model="formVisible" :title="formTitle" size="lg" @save="save">
-      <slot name="form" :form="form" :fields="formFields">
-        <el-form label-width="120px">
+    <FormDrawer
+      v-if="!detailMode"
+      v-model="formVisible"
+      :title="formTitle"
+      size="lg"
+      :show-save="formMode !== 'view'"
+      @save="save"
+    >
+      <div v-if="formMode === 'view' && form.id && changeLogEnabled" class="change-log-bar">
+        <el-button @click="openChangeLog">变更记录</el-button>
+      </div>
+      <slot name="form" :form="form" :fields="formFields" :mode="formMode">
+        <el-form label-width="120px" :disabled="formMode === 'view'">
           <GroupedFormFields :table="config.table" :model="form" :fields="formFields" />
         </el-form>
       </slot>
     </FormDrawer>
+
+    <EntityChangeHistoryDrawer
+      v-model="changeLogVisible"
+      :entity-type="config.table"
+      :entity-id="changeLogEntityId"
+    />
 
     <ImportDialog
       v-if="showImport"
@@ -136,9 +160,10 @@ import PageFilterBar from './system/PageFilterBar.vue'
 import TableCellValue from './table/TableCellValue.vue'
 import PageEmpty from './table/PageEmpty.vue'
 import type { PageConfig } from '@/config/pageRegistry'
-import { getListFields, getSchema } from '@/config/pageSchemas'
+import { getListFields, getSchema, collectLinkTables } from '@/config/pageSchemas'
 import GroupedFormFields from './form/GroupedFormFields.vue'
 import ImportDialog from './ImportDialog.vue'
+import EntityChangeHistoryDrawer from './EntityChangeHistoryDrawer.vue'
 import { columnAlign } from '@/utils/tableCell'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
 import { useDict } from '@/composables/useDict'
@@ -151,11 +176,14 @@ const props = defineProps<{
   detailMode?: boolean
   hideAdd?: boolean
   deleteUrl?: string
+  /** 启用「查看」操作（编辑与删除之间） */
+  enableView?: boolean
   canEdit?: (row: Record<string, unknown>) => boolean
   canDelete?: (row: Record<string, unknown>) => boolean
+  canView?: (row: Record<string, unknown>) => boolean
 }>()
 const emit = defineEmits<{ detail: [row: Record<string, unknown>]; add: []; deleted: [row: Record<string, unknown>] }>()
-const { loadDict } = useDict()
+const { loadDict, preloadDictTypes } = useDict()
 
 const loading = ref(false)
 const rows = ref<Record<string, unknown>[]>([])
@@ -169,10 +197,16 @@ const formVisible = ref(false)
 const importVisible = ref(false)
 const form = ref<Record<string, unknown>>({})
 const formTitle = ref('新增')
+const formMode = ref<'create' | 'edit' | 'view'>('create')
 const tableRef = ref()
+const changeLogVisible = ref(false)
+const changeLogEntityId = ref<string>('')
 const { selectedCount, syncFromTable, selectedIds, clear: clearSelection } = useCrossPageSelection()
 
 const tableHeight = useSystemTableHeight()
+
+const viewEnabled = computed(() => props.enableView === true || props.config.enableView === true)
+const changeLogEnabled = computed(() => props.config.enableChangeLog !== false && viewEnabled.value)
 
 const schema = computed(() => getSchema(props.config.table))
 const listFields = computed(() => {
@@ -183,6 +217,11 @@ const listFields = computed(() => {
   return Object.keys(first).filter((k) => !['password_hash'].includes(k)).slice(0, 12).map((k) => ({ prop: k, label: k }))
 })
 const formFields = computed(() => {
+  if (formMode.value === 'view') {
+    const all = schema.value
+    if (all.length) return all
+    return listFields.value
+  }
   const s = schema.value.filter((f) => !f.readonly)
   if (s.length) return s
   return listFields.value
@@ -203,9 +242,14 @@ function canDeleteRow(row: Record<string, unknown>) {
   return props.canDelete ? props.canDelete(row) : true
 }
 
+function canViewRow(row: Record<string, unknown>) {
+  return props.canView ? props.canView(row) : true
+}
+
 async function loadRefLabels() {
-  const linkTables = listFields.value.filter((f) => f.linkTable).map((f) => f.linkTable!)
-  await preloadRefLabelMaps(linkTables)
+  const tables = [props.config.table]
+  if (props.config.detailTable) tables.push(props.config.detailTable)
+  await preloadRefLabelMaps(collectLinkTables(...tables))
 }
 
 async function load() {
@@ -217,9 +261,13 @@ async function load() {
       size: size.value
     }
     if (keyword.value) params.keyword = keyword.value
+    if (props.config.listMode) params.mode = props.config.listMode
     for (const f of props.config.listFilters ?? []) {
       const v = filterValues[f.key]
       if (v !== undefined && v !== null && v !== '') params[f.key] = v
+    }
+    for (const [k, v] of Object.entries(props.config.listParams ?? {})) {
+      if (v !== undefined && v !== null && v !== '') params[k] = v
     }
     const { data } = await http.get(url, { params })
     rows.value = data.data?.records ?? []
@@ -247,31 +295,56 @@ function onReset() {
   load()
 }
 
-function openForm(row?: Record<string, unknown>) {
+function openForm(row?: Record<string, unknown>, mode: 'create' | 'edit' | 'view' = 'create') {
   form.value = row ? { ...row } : {}
-  formTitle.value = row ? '编辑' : '新增'
+  formMode.value = mode
+  formTitle.value = mode === 'view' ? '查看' : mode === 'edit' ? '编辑' : '新增'
   formVisible.value = true
 }
 
 async function save() {
-  const id = form.value.id
-  if (id) {
-    await http.put(`${props.config.apiBase}/${props.config.table}/${id}`, form.value)
-  } else {
-    await http.post(`${props.config.apiBase}/${props.config.table}`, form.value)
+  if (formMode.value === 'view') return
+  const missing = formFields.value.filter(
+    (f) => f.required && (form.value[f.prop] === undefined || form.value[f.prop] === null || form.value[f.prop] === '')
+  )
+  if (missing.length) {
+    ElMessage.warning(`请填写：${missing.map((f) => f.label).join('、')}`)
+    return
   }
-  formVisible.value = false
-  load()
+  try {
+    const id = form.value.id
+    if (props.config.saveUrl) {
+      await http.post(props.config.saveUrl, form.value)
+    } else if (id) {
+      await http.put(`${props.config.apiBase}/${props.config.table}/${id}`, form.value)
+    } else {
+      await http.post(`${props.config.apiBase}/${props.config.table}`, form.value)
+    }
+    formVisible.value = false
+    ElMessage.success('保存成功')
+    load()
+  } catch {
+    ElMessage.error('保存失败')
+  }
 }
 
 function onAdd() {
   if (props.detailMode) emit('add')
-  else openForm()
+  else openForm(undefined, 'create')
 }
 
 function onEdit(row: Record<string, unknown>) {
   if (props.detailMode) emit('detail', row)
-  else openForm(row)
+  else openForm(row, 'edit')
+}
+
+function onView(row: Record<string, unknown>) {
+  openForm(row, 'view')
+}
+
+function openChangeLog() {
+  changeLogEntityId.value = String(form.value.id ?? '')
+  changeLogVisible.value = true
 }
 
 async function remove(row: Record<string, unknown>) {
@@ -284,9 +357,10 @@ async function remove(row: Record<string, unknown>) {
     emit('deleted', row)
     ElMessage.success('已删除')
     load()
-  } catch (e) {
+  } catch (e: unknown) {
     if (e !== 'cancel' && e !== 'close') {
-      ElMessage.error('删除失败')
+      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
+      ElMessage.error(msg || '删除失败')
     }
   }
 }
@@ -329,6 +403,10 @@ watch(() => props.config, load, { deep: true })
 
 let initialized = false
 onMounted(async () => {
+  const listDictTypes = (listFields.value ?? [])
+    .map((f) => f.dictType)
+    .concat((props.config.listFilters ?? []).map((f) => f.dictType))
+  await preloadDictTypes(listDictTypes)
   for (const f of props.config.listFilters ?? []) {
     if (f.dictType) filterOptions[f.key] = await loadDict(f.dictType)
   }

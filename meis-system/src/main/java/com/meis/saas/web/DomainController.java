@@ -13,7 +13,7 @@ import java.util.Set;
 @RequestMapping("/api/system")
 public class DomainController extends GenericTableController {
     private final JdbcTemplate jdbcTemplate;
-    private static final Set<String> TABLES = Set.of("campus","building","department","sys_user","sys_role","sys_operation_log","sys_config","sys_dict","medical_device_category","supplier","manufacturer","sys_approval_flow","sys_approval_node","warehouse");
+    private static final Set<String> TABLES = Set.of("campus","building","department","sys_user","sys_role","sys_operation_log","sys_config","sys_dict","medical_device_category","supplier","manufacturer","asset_category","finance_category","unit_dict","sys_approval_flow","sys_approval_node","warehouse");
     public DomainController(JdbcTemplate jdbcTemplate, ImportProfileService importProfileService) {
         this.jdbcTemplate = jdbcTemplate;
         setImportProfileService(importProfileService);

@@ -118,8 +118,32 @@ public class ApprovalInstanceService {
                 if ("approved".equals(status)) autoExecuteTransfer(businessId);
             }
             case "device_outbound" -> {
-                jdbc.update("UPDATE device_outbound SET doc_status = ? WHERE id = ?::uuid", status, businessId);
+                jdbc.update("UPDATE device_outbound SET doc_status = ?, approval_status = ? WHERE id = ?::uuid", status, status, businessId);
                 if ("approved".equals(status)) autoIssueOutbound(businessId);
+            }
+            case "device_return" -> {
+                jdbc.update("UPDATE device_return SET approval_status = ?, doc_status = ? WHERE id = ?::uuid", status, status, businessId);
+                if ("approved".equals(status)) autoCompleteReturn(businessId);
+            }
+            case "shared_device_loan" -> {
+                if ("approved".equals(status)) {
+                    jdbc.update("""
+                        UPDATE shared_device_loan SET approval_status = ?, status = ?,
+                        approved_at = COALESCE(approved_at, NOW()), billing_start_at = COALESCE(billing_start_at, NOW()),
+                        updated_at = NOW() WHERE id = ?::uuid
+                        """, status, "approved", businessId);
+                } else {
+                    jdbc.update("""
+                        UPDATE shared_device_loan SET approval_status = ?, status = ?, updated_at = NOW()
+                        WHERE id = ?::uuid
+                        """, status, status, businessId);
+                }
+            }
+            case "shared_device_return" -> {
+                jdbc.update("""
+                    UPDATE shared_device_return SET approval_status = ?, status = ? WHERE id = ?::uuid
+                    """, status, "approved".equals(status) ? "approved" : status, businessId);
+                if ("approved".equals(status)) autoCompleteSharedReturn(businessId);
             }
             default -> {}
         }
@@ -133,15 +157,79 @@ public class ApprovalInstanceService {
             jdbc.update("UPDATE medical_device SET dept_id = ?::uuid, updated_at = NOW() WHERE id = ?::uuid",
                     t.get("to_dept_id"), t.get("device_id"));
         }
+        if (t.get("to_warehouse_id") != null && t.get("device_id") != null) {
+            jdbc.update("UPDATE medical_device SET warehouse_id = ?::uuid, updated_at = NOW() WHERE id = ?::uuid",
+                    t.get("to_warehouse_id"), t.get("device_id"));
+        }
         jdbc.update("UPDATE asset_transfer SET status = 'completed', updated_at = NOW() WHERE id = ?::uuid", id);
+    }
+
+    private void autoCompleteReturn(UUID id) {
+        var row = jdbc.queryForList("SELECT warehouse_id FROM device_return WHERE id = ?::uuid", id);
+        if (row.isEmpty()) return;
+        Object warehouseId = row.get(0).get("warehouse_id");
+        var items = jdbc.queryForList("SELECT device_id FROM device_return_item WHERE return_id = ?::uuid", id);
+        for (Map<String, Object> item : items) {
+            if (item.get("device_id") != null) {
+                jdbc.update("""
+                    UPDATE medical_device SET device_status = 'normal', warehouse_id = ?::uuid, updated_at = NOW()
+                    WHERE id = ?::uuid
+                    """, warehouseId, item.get("device_id"));
+            }
+        }
+        jdbc.update("UPDATE device_return SET status = 'returned', doc_status = 'returned', updated_at = NOW() WHERE id = ?::uuid", id);
+    }
+
+    private void autoCompleteSharedReturn(UUID returnId) {
+        var ret = jdbc.queryForList("SELECT * FROM shared_device_return WHERE id = ?::uuid", returnId);
+        if (ret.isEmpty()) return;
+        var loans = jdbc.queryForList("SELECT * FROM shared_device_loan WHERE id = ?::uuid", ret.get(0).get("loan_id"));
+        if (loans.isEmpty()) return;
+        Map<String, Object> loan = loans.get(0);
+        java.time.Instant billingEnd = java.time.Instant.now();
+        jdbc.update("""
+            UPDATE shared_device_loan SET status='returned', return_time=NOW(),
+            billing_end_at=?, updated_at=NOW() WHERE id=?::uuid
+            """, java.sql.Timestamp.from(billingEnd), loan.get("id"));
+        if (loan.get("device_id") != null && loan.get("from_dept_id") != null) {
+            jdbc.update("UPDATE medical_device SET dept_id = ?::uuid, updated_at = NOW() WHERE id = ?::uuid",
+                    loan.get("from_dept_id"), loan.get("device_id"));
+        }
+        var existingFee = jdbc.queryForList(
+                "SELECT 1 FROM shared_device_fee WHERE loan_id = ?::uuid LIMIT 1", loan.get("id"));
+        if (existingFee.isEmpty()) {
+            java.time.Instant billingStart = toInstant(loan.get("billing_start_at"));
+            if (billingStart == null) billingStart = toInstant(loan.get("approved_at"));
+            java.math.BigDecimal unitPrice = loan.get("fee_unit_price") instanceof java.math.BigDecimal bd ? bd
+                    : loan.get("fee_unit_price") != null
+                    ? new java.math.BigDecimal(loan.get("fee_unit_price").toString()) : java.math.BigDecimal.ZERO;
+            java.math.BigDecimal amount = com.meis.saas.common.shared.SharedFeeCalculator.calculate(
+                    String.valueOf(loan.get("fee_mode")),
+                    loan.get("fee_time_unit") != null ? String.valueOf(loan.get("fee_time_unit")) : null,
+                    unitPrice, billingStart, billingEnd);
+            jdbc.update("""
+                INSERT INTO shared_device_fee (id, fee_no, loan_id, fee_amount, fee_date, paid_status, remark)
+                VALUES (?::uuid,?,?::uuid,?,?,?,?)
+                """, java.util.UUID.randomUUID(), "SF" + System.currentTimeMillis(), loan.get("id"), amount,
+                    java.time.LocalDate.now(), "unpaid", "归还审批自动生成");
+        }
+    }
+
+    private static java.time.Instant toInstant(Object value) {
+        if (value == null) return null;
+        if (value instanceof java.sql.Timestamp ts) return ts.toInstant();
+        if (value instanceof java.util.Date d) return d.toInstant();
+        return null;
     }
 
     private void autoIssueOutbound(UUID id) {
         var items = jdbc.queryForList("SELECT device_id FROM device_outbound_item WHERE outbound_id = ?::uuid", id);
         for (Map<String, Object> item : items) {
             if (item.get("device_id") != null) {
-                jdbc.update("UPDATE medical_device SET device_status = 'in_use', updated_at = NOW() WHERE id = ?::uuid",
-                        item.get("device_id"));
+                jdbc.update("""
+                    UPDATE medical_device SET device_status = 'in_use', warehouse_id = NULL, updated_at = NOW()
+                    WHERE id = ?::uuid
+                    """, item.get("device_id"));
             }
         }
         jdbc.update("UPDATE device_outbound SET status = 'issued', doc_status = 'approved', updated_at = NOW() WHERE id = ?::uuid", id);

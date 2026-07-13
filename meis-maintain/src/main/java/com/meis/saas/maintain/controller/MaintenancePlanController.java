@@ -3,6 +3,7 @@ package com.meis.saas.maintain.controller;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.result.Result;
+import com.meis.saas.maintain.maintain.MaintenanceExecutionGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,10 +17,18 @@ import java.util.*;
 @RequiredArgsConstructor
 public class MaintenancePlanController {
     private final JdbcTemplate jdbc;
+    private final MaintenanceExecutionGenerator executionGenerator;
 
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
-        var rows = jdbc.queryForList("SELECT * FROM maintenance_plan WHERE id = ?::uuid", id);
+        var rows = jdbc.queryForList("""
+                SELECT p.*, t.template_name, d.device_name, d.device_code, dept.dept_name
+                FROM maintenance_plan p
+                LEFT JOIN maintenance_template t ON t.id = p.template_id
+                LEFT JOIN medical_device d ON d.id = p.device_id
+                LEFT JOIN department dept ON dept.id = p.dept_id
+                WHERE p.id = ?::uuid
+                """, id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         return Result.ok(rows.get(0));
     }
@@ -33,22 +42,54 @@ public class MaintenancePlanController {
         if (exists) {
             jdbc.update("""
                 UPDATE maintenance_plan SET plan_name=?, template_id=?::uuid, device_id=?::uuid, dept_id=?::uuid,
-                maintenance_level=?, cycle_type=?, cycle_value=?, next_due_date=?, last_maintained_at=?, status=?, remark=?, updated_at=NOW()
+                maintenance_level=?, cycle_type=?, cycle_value=?, cycle_days=?, next_due_date=?, last_maintained_at=?,
+                status=?, approval_status=?, remark=?, updated_at=NOW()
                 WHERE id=?::uuid
                 """, body.get("plan_name"), body.get("template_id"), body.get("device_id"), body.get("dept_id"),
                     body.get("maintenance_level"), body.get("cycle_type"), body.get("cycle_value"),
-                    body.get("next_due_date"), body.get("last_maintained_at"), body.getOrDefault("status", "active"),
+                    body.get("cycle_days"), body.get("next_due_date"), body.get("last_maintained_at"),
+                    body.getOrDefault("status", "active"), body.getOrDefault("approval_status", "draft"),
                     body.get("remark"), id);
         } else {
             jdbc.update("""
                 INSERT INTO maintenance_plan (id, plan_code, plan_name, template_id, device_id, dept_id, maintenance_level,
-                cycle_type, cycle_value, next_due_date, status) VALUES (?::uuid,?,?,?::uuid,?::uuid,?::uuid,?,?,?,?,?)
+                cycle_type, cycle_value, cycle_days, next_due_date, status, approval_status, created_by, remark)
+                VALUES (?::uuid,?,?,?::uuid,?::uuid,?::uuid,?,?,?,?,?,?,?,?,?)
                 """, id, body.getOrDefault("plan_code", "MP" + System.currentTimeMillis()), body.get("plan_name"),
                     body.get("template_id"), body.get("device_id"), body.get("dept_id"),
-                    body.getOrDefault("maintenance_level", "daily"), body.get("cycle_type"), body.get("cycle_value"),
-                    body.get("next_due_date"), body.getOrDefault("status", "active"));
+                    body.getOrDefault("maintenance_level", "L1"), body.get("cycle_type"), body.get("cycle_value"),
+                    body.get("cycle_days"), body.get("next_due_date"), body.getOrDefault("status", "active"),
+                    body.getOrDefault("approval_status", "draft"), body.get("created_by"), body.get("remark"));
         }
         return get(id);
+    }
+
+    @PostMapping("/{id}/approve")
+    @Transactional
+    @OperationLog(module = "maintain", description = "审核保养计划")
+    public Result<Map<String, Object>> approve(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
+        String action = String.valueOf(body.getOrDefault("action", "approve"));
+        String status = "reject".equals(action) ? "rejected" : "approved";
+        jdbc.update("""
+                UPDATE maintenance_plan SET approval_status=?, approved_by=?::uuid, approved_at=NOW(),
+                status=CASE WHEN ?='approved' THEN 'active' ELSE status END, updated_at=NOW()
+                WHERE id=?::uuid
+                """, status, body.get("approved_by"), status, id);
+        return get(id);
+    }
+
+    @PostMapping("/{id}/generate-execution")
+    @Transactional
+    @OperationLog(module = "maintain", description = "从计划生成保养执行")
+    public Result<Map<String, Object>> generateExecution(@PathVariable UUID id, @RequestBody(required = false) Map<String, Object> body) {
+        Map<String, Object> req = body != null ? body : Map.of();
+        req = new HashMap<>(req);
+        req.put("planIds", List.of(id.toString()));
+        var list = executionGenerator.generateBatch(req);
+        if (list == null || list.isEmpty()) throw new BizException(400, "generate failed");
+        Object err = list.get(0).get("error");
+        if (err != null) throw new BizException(400, err.toString());
+        return Result.ok(list.get(0));
     }
 
     @PostMapping("/generate")
@@ -64,12 +105,15 @@ public class MaintenancePlanController {
         for (String deviceId : deviceIds) {
             UUID id = UUID.randomUUID();
             jdbc.update("""
-                INSERT INTO maintenance_plan (id, plan_code, plan_name, template_id, device_id, maintenance_level, cycle_type, cycle_value, next_due_date, status)
-                VALUES (?::uuid,?,?,?::uuid,?::uuid,?,?,?,?,?)
+                INSERT INTO maintenance_plan (id, plan_code, plan_name, template_id, device_id, maintenance_level,
+                    cycle_type, cycle_value, cycle_days, next_due_date, status, approval_status, created_by)
+                VALUES (?::uuid,?,?,?::uuid,?::uuid,?,?,?,?,?,?,?,?)
                 """, id, "MP" + System.nanoTime(), template.get(0).get("template_name") + "计划",
                     templateId, deviceId, template.get(0).get("maintenance_level"),
                     body.getOrDefault("cycle_type", "month"), body.getOrDefault("cycle_value", 1),
-                    body.getOrDefault("next_due_date", LocalDate.now().plusMonths(1)), "active");
+                    body.getOrDefault("cycle_days", 30),
+                    body.getOrDefault("next_due_date", LocalDate.now().plusMonths(1)),
+                    "active", "draft", body.get("created_by"));
             created.add(jdbc.queryForList("SELECT * FROM maintenance_plan WHERE id = ?::uuid", id).get(0));
         }
         return Result.ok(created);
@@ -84,7 +128,13 @@ public class MaintenancePlanController {
 
     @GetMapping("/due")
     public Result<List<Map<String, Object>>> due() {
-        return Result.ok(jdbc.queryForList(
-                "SELECT * FROM maintenance_plan WHERE status = 'active' AND next_due_date <= CURRENT_DATE + 7 ORDER BY next_due_date"));
+        return Result.ok(jdbc.queryForList("""
+                SELECT p.*, d.device_name, d.device_code
+                FROM maintenance_plan p
+                LEFT JOIN medical_device d ON d.id = p.device_id
+                WHERE p.status = 'active' AND p.approval_status = 'approved'
+                  AND p.next_due_date <= CURRENT_DATE + 7
+                ORDER BY p.next_due_date
+                """));
     }
 }

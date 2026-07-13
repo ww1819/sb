@@ -26,18 +26,36 @@ spring:
         - id: meis-maintain
           uri: http://localhost:8087
           predicates: [Path=/api/maintain/**]
+        - id: meis-pm
+          uri: http://localhost:8087
+          predicates: [Path=/api/pm/**]
         - id: meis-qc
           uri: http://localhost:8088
           predicates: [Path=/api/qc/**]
+        - id: meis-inspect
+          uri: http://localhost:8088
+          predicates: [Path=/api/inspect/**]
+        - id: meis-metrology
+          uri: http://localhost:8088
+          predicates: [Path=/api/metrology/**]
         - id: meis-maintenance-contract
           uri: http://localhost:8089
           predicates: [Path=/api/maintenance-contract/**]
         - id: meis-special
           uri: http://localhost:8090
           predicates: [Path=/api/special/**]
+        - id: meis-shared
+          uri: http://localhost:8090
+          predicates: [Path=/api/shared/**]
         - id: meis-analytics
           uri: http://localhost:8091
           predicates: [Path=/api/analytics/**]
+        - id: meis-power
+          uri: http://localhost:8091
+          predicates: [Path=/api/power/**]
+        - id: meis-screen
+          uri: http://localhost:8091
+          predicates: [Path=/api/screen/**]
         - id: meis-file
           uri: http://localhost:8092
           predicates: [Path=/api/file/**]

@@ -1,5 +1,6 @@
 package com.meis.saas.common.page;
 
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.ArrayList;
@@ -11,6 +12,7 @@ public final class PageableJdbc {
 
     public static PageResult<Map<String, Object>> query(JdbcTemplate jdbc, String table, PageQuery q) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, table, null));
         List<Object> args = new ArrayList<>();
         if (q.getKeyword() != null && !q.getKeyword().isBlank()) {
             where.append(" AND (CAST(id AS TEXT) ILIKE ?) ");

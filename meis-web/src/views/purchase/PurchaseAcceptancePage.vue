@@ -1,6 +1,6 @@
 <template>
   <div class="workflow-crud">
-    <CrudPage ref="crudRef" :config="config" @detail="openDetail">
+    <CrudPage ref="crudRef" :config="config" hide-add @detail="openDetail">
       <template #toolbar-extra>
         <el-button v-if="acceptance?.id" type="primary" @click="submitApproval">提交验收审批</el-button>
         <el-button
@@ -10,6 +10,7 @@
         >
           验收通过并生成入库单
         </el-button>
+        <el-button v-if="acceptance?.entry_id" type="primary" @click="goEntry">查看入库单</el-button>
         <el-button v-if="acceptance?.id" @click="printDoc">打印验收单</el-button>
       </template>
     </CrudPage>
@@ -81,6 +82,13 @@
           :business-id="String(acceptance.id)"
           @changed="reload"
         />
+        <el-alert
+          v-if="acceptance.entry_no"
+          :title="`已关联入库单：${acceptance.entry_no}（${acceptance.entry_status ?? ''}）`"
+          type="success"
+          show-icon
+          class="entry-alert"
+        />
       </template>
       <template #footer>
         <el-button @click="visible = false">关闭</el-button>
@@ -93,6 +101,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
@@ -105,6 +114,7 @@ import { getPageConfig } from '@/config/pageRegistry'
 import { printAcceptanceDoc } from '@/utils/printDoc'
 
 const auth = useAuthStore()
+const router = useRouter()
 const config = getPageConfig('/purchase/acceptance')!
 const crudRef = ref<InstanceType<typeof CrudPage> | null>(null)
 const visible = ref(false)
@@ -157,6 +167,11 @@ async function passAcceptance() {
   crudRef.value?.load()
 }
 
+function goEntry() {
+  if (!acceptance.value?.entry_id) return
+  router.push('/asset/entry')
+}
+
 async function reload() {
   if (!acceptance.value?.id) return
   const { data } = await http.get(`/purchase/acceptance/${acceptance.value.id}`)
@@ -175,3 +190,7 @@ function printDoc() {
   })
 }
 </script>
+
+<style scoped>
+.entry-alert { margin-top: 12px; }
+</style>

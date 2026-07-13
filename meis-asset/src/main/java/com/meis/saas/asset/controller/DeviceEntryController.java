@@ -68,12 +68,17 @@ public class DeviceEntryController {
         boolean exists = !jdbc.queryForList("SELECT 1 FROM device_entry WHERE id = ?::uuid", id).isEmpty();
         if (!exists) {
             jdbc.update("""
-                INSERT INTO device_entry (id, entry_no, contract_id, supplier_id, entry_date, entry_type, status, trace_no)
-                VALUES (?::uuid,?,?::uuid,?::uuid,?,?,?,?)
+                INSERT INTO device_entry (id, entry_no, contract_id, supplier_id, entry_date, entry_type, status, trace_no, warehouse_id)
+                VALUES (?::uuid,?,?::uuid,?::uuid,?,?,?,?,?::uuid)
                 """,
                     id, body.getOrDefault("entry_no", "EN" + System.currentTimeMillis()),
                     body.get("contract_id"), body.get("supplier_id"), body.get("entry_date"),
-                    body.getOrDefault("entry_type", "purchase"), "draft", body.get("trace_no"));
+                    body.getOrDefault("entry_type", "purchase"), "draft", body.get("trace_no"), body.get("warehouse_id"));
+        } else {
+            jdbc.update("""
+                UPDATE device_entry SET warehouse_id=?::uuid, entry_date=?, entry_type=?, remark=?, updated_at=NOW()
+                WHERE id=?::uuid
+                """, body.get("warehouse_id"), body.get("entry_date"), body.get("entry_type"), body.get("remark"), id);
         }
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> items = (List<Map<String, Object>>) body.getOrDefault("items", List.of());
@@ -106,6 +111,8 @@ public class DeviceEntryController {
             if (!c.isEmpty()) supplierId = c.get(0).get("supplier_id");
         }
 
+        Object warehouseId = body.get("warehouse_id") != null ? body.get("warehouse_id") : entry.get("warehouse_id");
+
         var items = jdbc.queryForList("SELECT * FROM device_entry_item WHERE entry_id = ?::uuid", id);
         List<UUID> deviceIds = new ArrayList<>();
         for (Map<String, Object> item : items) {
@@ -117,11 +124,11 @@ public class DeviceEntryController {
                 UUID deviceId = UUID.randomUUID();
                 jdbc.update("""
                     INSERT INTO medical_device (id, device_code, device_name, brand, model, dept_id, supplier_id,
-                    device_status, purchase_price, contract_id)
-                    VALUES (?::uuid,?,?,?,?::uuid,?::uuid,'normal',?,?::uuid)
+                    device_status, purchase_price, contract_id, warehouse_id)
+                    VALUES (?::uuid,?,?,?,?::uuid,?::uuid,'normal',?,?::uuid,?::uuid)
                     """,
                         deviceId, code, item.get("device_name"), item.get("brand"), item.get("model"),
-                        deptId, supplierId, item.get("unit_price"), entry.get("contract_id"));
+                        deptId, supplierId, item.get("unit_price"), entry.get("contract_id"), warehouseId);
                 deviceIds.add(deviceId);
             }
         }
