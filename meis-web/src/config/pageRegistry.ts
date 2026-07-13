@@ -44,6 +44,8 @@ export interface PageConfig {
   enableView?: boolean
   /** 是否提供变更记录（默认跟随 enableView） */
   enableChangeLog?: boolean
+  /** 列表首列显示分页序号 */
+  showRowIndex?: boolean
 }
 
 export const pageRegistry: Record<string, PageConfig> = {
@@ -156,6 +158,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/asset',
     table: 'medical_device',
     listPageUrl: '/asset/device/page',
+    showRowIndex: true,
   enableView: true
 },
   '/asset/entry': {

@@ -228,6 +228,10 @@ body {
   font-weight: 600;
 }
 
+.system-table .el-table__header th .cell {
+  white-space: nowrap;
+}
+
 .system-table .el-table__row {
   height: var(--meis-table-row-height);
   transition: background 0.15s ease, box-shadow 0.15s ease;
@@ -243,10 +247,20 @@ body {
 
 .system-table-wrap .system-table {
   border-radius: var(--meis-card-radius);
+  width: 100%;
 }
 
 .system-table-wrap .el-table {
   --el-table-border-color: var(--meis-border-light);
+}
+
+.system-table-wrap .el-table__inner-wrapper {
+  height: 100% !important;
+}
+
+.system-table-wrap .el-table__body-wrapper {
+  flex: 1;
+  min-height: 0;
 }
 
 .system-empty {

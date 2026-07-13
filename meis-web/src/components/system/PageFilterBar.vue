@@ -14,6 +14,10 @@
       <slot name="filters" />
       <el-button type="primary" :icon="Search" @click="$emit('search')">查询</el-button>
       <el-button :icon="RefreshLeft" @click="$emit('reset')">重置</el-button>
+      <slot name="trailing" />
+    </div>
+    <div v-if="$slots.actions" class="filter-actions">
+      <slot name="actions" />
     </div>
   </div>
 </template>
@@ -38,18 +42,23 @@ defineEmits<{
 
 <style scoped>
 .page-filter-bar {
-  padding: var(--meis-space-md);
+  padding: 12px var(--meis-space-md);
   background: var(--meis-surface-muted);
   border: 1px solid var(--meis-border-light);
   border-radius: var(--meis-card-radius);
-  margin-bottom: var(--meis-space-md);
+  margin-bottom: 0;
 }
 
-.filter-fields {
+.filter-fields,
+.filter-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
+}
+
+.filter-actions {
+  margin-top: 8px;
 }
 
 .filter-keyword {
