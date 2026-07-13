@@ -86,7 +86,7 @@
           <TableCellValue :field="f" :value="row[f.prop]" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" :width="viewEnabled ? 220 : 200" fixed="right">
+      <el-table-column label="操作" :width="operationWidth" fixed="right">
         <template #default="{ row }">
           <div class="table-actions">
             <el-button
@@ -192,6 +192,8 @@ const props = defineProps<{
   canEdit?: (row: Record<string, unknown>) => boolean
   canDelete?: (row: Record<string, unknown>) => boolean
   canView?: (row: Record<string, unknown>) => boolean
+  /** 操作列宽度（含自定义 row-actions 时可加大） */
+  operationColumnWidth?: number
 }>()
 const emit = defineEmits<{ detail: [row: Record<string, unknown>]; add: []; deleted: [row: Record<string, unknown>] }>()
 const { loadDict, preloadDictTypes } = useDict()
@@ -221,6 +223,10 @@ watch(tableHeight, () => {
 })
 
 const viewEnabled = computed(() => props.enableView === true || props.config.enableView === true)
+const operationWidth = computed(() => {
+  if (props.operationColumnWidth) return props.operationColumnWidth
+  return viewEnabled.value ? 220 : 200
+})
 const changeLogEnabled = computed(() => props.config.enableChangeLog !== false && viewEnabled.value)
 const showRowIndex = computed(() => props.config.showRowIndex === true)
 

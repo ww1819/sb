@@ -206,12 +206,30 @@ stateDiagram-v2
 
 ---
 
+## 5.5 流程业务表 `repair_workorder_process`
+
+派工、接单、转派、子状态、完工、验收、挂起/恢复、取消等 **流程业务数据** 写入 `repair_workorder_process`；`repair_workorder` 主单仅同步 `status`、`repair_sub_status`、`assigned_engineer_id`。
+
+| 字段组 | 说明 |
+|--------|------|
+| 状态变迁 | `action_type`、`from_status` / `to_status`、`from_sub_status` / `to_sub_status` |
+| 人员 | `engineer_id`、`from_engineer_id` / `to_engineer_id`、`operator_id` |
+| 完工 | `solution_description`、`labor_cost`、`parts_cost`、`total_cost`、`skip_verify` |
+| 验收 | `verify_result`、`verify_comment`、`satisfaction_rating`、`satisfaction_comment` |
+
+详情/列表 API 通过 `RepairWorkorderProcessService.enrichWorkorder` 将最新完工、验收、派工/接单时间等 **展示字段** 回填到主单 Map，前端无需改契约。`repair_workorder_event` 继续双写，供时间轴审计。
+
+建表：`V1__tables.sql`；索引：`V2__extensions.sql` → `idx_wo_process_wo`。
+
+---
+
 ## 6. API 一览
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/repair/workorder/devices/candidates` | 可选报修设备（排除维修中/待验收等） |
-| GET | `/api/repair/workorder/{id}` | 工单详情 |
+| GET | `/api/repair/workorder/{id}` | 工单详情（流程字段由 `repair_workorder_process` enrich 回填） |
+| GET | `/api/repair/workorder/{id}/process` | 流程业务记录列表（按时间升序） |
 | GET | `/api/repair/workorder/{id}/timeline` | 时间轴（摘要+里程碑+事件） |
 | POST | `/api/repair/workorder` | 创建报修 |
 | POST | `/api/repair/workorder/{id}/dispatch` | 派单/指派 |
@@ -256,6 +274,8 @@ stateDiagram-v2
 | 变更 | 位置 |
 |------|------|
 | `repair_workorder` 新字段、`repair_workorder_event` 建表 | `V1__tables.sql` |
+| `repair_workorder_process` 流程业务表 | `V1__tables.sql` |
+| 流程表索引 `idx_wo_process_wo` | `V2__extensions.sql` |
 | 老租户 `ADD COLUMN` / `CREATE TABLE IF NOT EXISTS`、状态与字典同步 | `R__tenant_schema_sync.sql` |
 | 新租户字典种子 | `V3__seed_data.sql` |
 
@@ -286,3 +306,4 @@ stateDiagram-v2
 | 日期 | 说明 |
 |------|------|
 | 2026-07-10 | 初版：状态定稿、时间轴设计、与实现同步 |
+| 2026-07-13 | BACKLOG-REP-01：流程业务表 `repair_workorder_process`，主单仅同步状态 |

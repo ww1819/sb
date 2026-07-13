@@ -1123,6 +1123,42 @@ COMMENT ON COLUMN repair_workorder_event.remark IS '备注';
 COMMENT ON COLUMN repair_workorder_event.extra_json IS '扩展JSON';
 COMMENT ON COLUMN repair_workorder_event.created_at IS '事件时间';
 
+-- 5.3.2 维修工单流程业务记录
+CREATE TABLE IF NOT EXISTS repair_workorder_process (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workorder_id UUID NOT NULL REFERENCES repair_workorder(id) ON DELETE CASCADE,
+    action_type VARCHAR(40) NOT NULL,
+    from_status VARCHAR(30),
+    to_status VARCHAR(30),
+    from_sub_status VARCHAR(30),
+    to_sub_status VARCHAR(30),
+    engineer_id UUID,
+    from_engineer_id UUID,
+    to_engineer_id UUID,
+    operator_id UUID,
+    solution_description TEXT,
+    labor_cost DECIMAL(10,2),
+    parts_cost DECIMAL(10,2),
+    total_cost DECIMAL(10,2),
+    verify_result VARCHAR(20),
+    verify_comment TEXT,
+    satisfaction_rating INTEGER,
+    satisfaction_comment TEXT,
+    skip_verify BOOLEAN,
+    remark TEXT,
+    extra_json JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID
+);
+COMMENT ON TABLE repair_workorder_process IS '维修工单流程业务记录（派工/维修/验收等操作明细）';
+COMMENT ON COLUMN repair_workorder_process.workorder_id IS '关联维修工单';
+COMMENT ON COLUMN repair_workorder_process.action_type IS '操作类型';
+
 -- 5.4 备件库表
 CREATE TABLE IF NOT EXISTS spare_part (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
