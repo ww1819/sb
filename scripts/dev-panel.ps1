@@ -139,7 +139,9 @@ function ConvertTo-PanelJsonData {
         return [PSCustomObject]$obj
     }
     if ($Value -is [System.Collections.IEnumerable] -and $Value -isnot [string]) {
-        return @($Value | ForEach-Object { ConvertTo-PanelJsonData $_ })
+        $items = @($Value | ForEach-Object { ConvertTo-PanelJsonData $_ })
+        # 单元素数组在赋给 PSCustomObject 属性时会被 PowerShell 展平为标量，导致 JSON 不是数组
+        return ,$items
     }
     return $Value
 }

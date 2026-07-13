@@ -725,7 +725,7 @@
     }
 
     function renderLibraries(list) {
-      document.getElementById('library-rows').innerHTML = (list || []).map(lib => `
+      document.getElementById('library-rows').innerHTML = asArray(list).map(lib => `
         <tr>
           <td class="mono">${lib.name}</td>
           <td>${renderServiceInfo(lib)}</td>
@@ -1077,6 +1077,13 @@
 
     function escapeHtml(s) {
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    }
+
+    /** PowerShell ConvertTo-Json 可能把单元素数组展平为字符串，统一转数组 */
+    function asArray(value) {
+      if (Array.isArray(value)) return value
+      if (value == null || value === '') return []
+      return [value]
     }
 
     function logEntryText(e) {
@@ -1533,7 +1540,7 @@
       const up = (data.services || []).filter(s => s.httpUp).length
       const total = (data.services || []).length
       const fe = data.frontend?.httpUp ? 1 : 0
-      const bg = data.backgroundJobs || []
+      const bg = asArray(data.backgroundJobs)
       const buildLabels = {
         'reactor-clean': '整体 Clean',
         'maven-install': 'Maven Install',
@@ -1578,7 +1585,7 @@
     }
 
     function renderServices(list) {
-      lastServiceList = list || []
+      lastServiceList = asArray(list)
       document.getElementById('service-rows').innerHTML = lastServiceList.map(s => `
         <tr>
           <td class="mono">${s.name}</td>
@@ -1606,16 +1613,16 @@
         lastStatusData = data
         coreServiceNames = data.coreServices || []
         const names = ['meis-web', 'panel']
-          .concat((data.libraries || []).map(l => l.name))
-          .concat((data.services || []).map(s => s.name))
+          .concat(asArray(data.libraries).map(l => l.name))
+          .concat(asArray(data.services).map(s => s.name))
         loadLogWatch(names)
         loadLogFilter(names)
         loadBuildOpts(names)
         renderStats(data)
         renderFrontend(data.frontend)
         if (data.frontend?.httpUp) clearFrontendPending()
-        renderLibraries(data.libraries)
-        renderServices(data.services)
+        renderLibraries(asArray(data.libraries))
+        renderServices(asArray(data.services))
         updateDebugPendingFromStatus(data.services)
         statusRefreshFailed = false
         lastStatusAt = new Date().toLocaleTimeString()
