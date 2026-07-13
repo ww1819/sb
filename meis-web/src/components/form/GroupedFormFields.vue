@@ -2,8 +2,27 @@
   <div class="grouped-form">
     <template v-if="groups.length">
       <FormSection v-for="g in groups" :key="g.group" :title="sectionTitle(g.group)">
+        <div v-if="groupColumns(g.group) && groupFieldRows(g).length" class="form-grid-stack">
+          <div
+            v-for="(row, rowIdx) in groupFieldRows(g)"
+            :key="rowIdx"
+            class="form-grid"
+            :style="{ gridTemplateColumns: `repeat(${groupColumns(g.group)}, minmax(0, 1fr))` }"
+          >
+            <el-form-item
+              v-for="f in row"
+              :key="f.prop"
+              :label="f.label"
+              :required="f.required"
+            >
+              <slot :name="`field-${f.prop}`" :field="f" :model="model">
+                <FieldRenderer v-model="model[f.prop]" :field="f" :model="model" />
+              </slot>
+            </el-form-item>
+          </div>
+        </div>
         <div
-          v-if="groupColumns(g.group)"
+          v-else-if="groupColumns(g.group)"
           class="form-grid"
           :style="{ gridTemplateColumns: `repeat(${groupColumns(g.group)}, minmax(0, 1fr))` }"
         >
@@ -63,7 +82,18 @@ const props = defineProps<{
   groupColumns?: Partial<Record<FieldGroup, number>>
   /** 覆盖分组标题 */
   groupTitles?: Partial<Record<FieldGroup, string>>
+  /** 指定分组内字段分行（每行一组 prop，配合 groupColumns 使用） */
+  groupRows?: Partial<Record<FieldGroup, string[][]>>
 }>()
+
+function groupFieldRows(group: { group: FieldGroup; fields: FieldSchema[] }) {
+  const rows = props.groupRows?.[group.group]
+  if (!rows?.length) return [] as FieldSchema[][]
+  const map = new Map(group.fields.map((f) => [f.prop, f]))
+  return rows
+    .map((row) => row.map((prop) => map.get(prop)).filter((f): f is FieldSchema => !!f))
+    .filter((row) => row.length > 0)
+}
 
 function sectionTitle(group: FieldGroup) {
   return props.groupTitles?.[group] ?? groupTitle(group)
@@ -87,6 +117,12 @@ const flatFields = computed(() => props.fields ?? getSchema(props.table).filter(
 </script>
 
 <style scoped>
+.form-grid-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .form-grid {
   display: grid;
   gap: 4px 16px;
