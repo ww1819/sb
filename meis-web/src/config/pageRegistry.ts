@@ -539,7 +539,19 @@ export const pageRegistry: Record<string, PageConfig> = {
 },
   '/system/dict': { title: '数据字典', apiBase: '/system', table: 'sys_dict' },
   '/system/log': { title: '操作日志', apiBase: '/system', table: 'sys_operation_log' },
-  '/system/approval': { title: '审批配置', apiBase: '/system', table: 'sys_approval_flow' }
+  '/system/approval': { title: '审批配置', apiBase: '/system', table: 'sys_approval_flow' },
+  '/system/supplier': { title: '供应商管理', apiBase: '/system', table: 'supplier', importable: true, pinyinCode: true,
+  enableView: true
+},
+  '/system/category': { title: '设备分类', apiBase: '/system', table: 'medical_device_category',
+  enableView: true
+},
+  '/system/manufacturer': { title: '生产厂商', apiBase: '/system', table: 'manufacturer', importable: true, pinyinCode: true,
+  enableView: true
+},
+  '/system/config': { title: '系统配置', apiBase: '/system', table: 'sys_config',
+  enableView: true
+}
 }
 
 export function getPageConfig(path: string): PageConfig | undefined {
