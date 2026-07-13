@@ -4,7 +4,31 @@
       <FormSection v-for="g in groups" :key="g.group" :title="sectionTitle(g.group)">
         <template v-if="groupPanel(g.group)">
           <div
-            v-if="panelOuterFields(g).length"
+            v-if="groupColumns(g.group) && panelOuterFieldRows(g).length"
+            class="form-grid-stack"
+          >
+            <div
+              v-for="(row, rowIdx) in panelOuterFieldRows(g)"
+              :key="rowIdx"
+              class="form-grid"
+              :style="panelOuterGridStyle(g.group)"
+            >
+              <el-form-item
+                v-for="f in row"
+                :key="f.prop"
+                :label="f.label"
+                :required="f.required"
+                :class="formItemClass(f.prop)"
+                :style="gridItemStyle(f, g.group)"
+              >
+                <slot :name="`field-${f.prop}`" :field="f" :model="model">
+                  <FieldRenderer v-model="model[f.prop]" :field="f" :model="model" />
+                </slot>
+              </el-form-item>
+            </div>
+          </div>
+          <div
+            v-else-if="panelOuterFields(g).length"
             class="form-grid"
             :style="panelOuterGridStyle(g.group)"
           >
@@ -13,6 +37,7 @@
               :key="f.prop"
               :label="f.label"
               :required="f.required"
+              :class="formItemClass(f.prop)"
               :style="gridItemStyle(f, g.group)"
             >
               <slot :name="`field-${f.prop}`" :field="f" :model="model">
@@ -27,7 +52,7 @@
                 :key="f.prop"
                 :label="f.label"
                 :required="f.required"
-                class="form-group-panel__item"
+                :class="['form-group-panel__item', formItemClass(f.prop)]"
               >
                 <slot :name="`field-${f.prop}`" :field="f" :model="model">
                   <FieldRenderer v-model="model[f.prop]" :field="f" :model="model" />
@@ -49,6 +74,7 @@
             :key="f.prop"
             :label="f.label"
             :required="f.required"
+            :class="formItemClass(f.prop)"
             :style="gridItemStyle(f, g.group)"
           >
               <slot :name="`field-${f.prop}`" :field="f" :model="model">
@@ -67,6 +93,7 @@
             :key="f.prop"
             :label="f.label"
             :required="f.required"
+            :class="formItemClass(f.prop)"
             :style="gridItemStyle(f, g.group)"
           >
             <slot :name="`field-${f.prop}`" :field="f" :model="model">
@@ -76,7 +103,7 @@
         </div>
         <el-row v-else :gutter="16">
           <el-col v-for="f in g.fields" :key="f.prop" :span="fieldSpan(f, g.group)">
-            <el-form-item :label="f.label" :required="f.required">
+            <el-form-item :label="f.label" :required="f.required" :class="formItemClass(f.prop)">
               <slot :name="`field-${f.prop}`" :field="f" :model="model">
                 <FieldRenderer v-model="model[f.prop]" :field="f" :model="model" />
               </slot>
@@ -124,7 +151,13 @@ const props = defineProps<{
   groupRows?: Partial<Record<FieldGroup, string[][]>>
   /** 分组内嵌面板：outer 为面板外字段，inner 为面板内字段 */
   groupPanels?: Partial<Record<FieldGroup, { outer?: string[]; inner: string[] }>>
+  /** 标签高亮显示的字段 prop */
+  highlightLabels?: string[]
 }>()
+
+function formItemClass(prop: string) {
+  return props.highlightLabels?.includes(prop) ? 'form-item--highlight-label' : undefined
+}
 
 function groupPanel(group: FieldGroup) {
   return props.groupPanels?.[group]
@@ -152,6 +185,15 @@ function panelInnerFields(group: { group: FieldGroup; fields: FieldSchema[] }) {
 function panelOuterGridStyle(group: FieldGroup) {
   const cols = groupColumns(group) ?? 2
   return { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }
+}
+
+function panelOuterFieldRows(group: { group: FieldGroup; fields: FieldSchema[] }) {
+  const rows = props.groupRows?.[group.group]
+  if (!rows?.length) return [] as FieldSchema[][]
+  const map = new Map(panelOuterFields(group).map((f) => [f.prop, f]))
+  return rows
+    .map((row) => row.map((prop) => map.get(prop)).filter((f): f is FieldSchema => !!f))
+    .filter((row) => row.length > 0)
 }
 
 function groupFieldRows(group: { group: FieldGroup; fields: FieldSchema[] }) {
@@ -262,5 +304,9 @@ const flatFields = computed(() => props.fields ?? getSchema(props.table).filter(
 
 .form-group-panel__item {
   margin-bottom: 0;
+}
+
+:deep(.form-item--highlight-label .el-form-item__label) {
+  color: #d03030 !important;
 }
 </style>

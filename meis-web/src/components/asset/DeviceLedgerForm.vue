@@ -9,8 +9,9 @@
         :model="model"
         :fields="basicFields"
         :group-columns="{ basic: 5, finance: 5, location: 5, vendor: 5, time: 5, accounting: 5, status: 5, compliance: 5, other: 5 }"
-        :group-rows="{ vendor: vendorFormRows, accounting: accountingFormRows, location: locationFormRows }"
-        :group-panels="{ status: statusFormPanel }"
+        :group-rows="{ basic: basicFormRows, vendor: vendorFormRows, accounting: accountingFormRows, location: locationFormRows }"
+        :group-panels="{ basic: basicFormPanel, status: statusFormPanel }"
+        :highlight-labels="highlightLabels"
         :group-titles="{ finance: '折旧信息', time: '合同信息', accounting: '财务信息', status: '设备属性', compliance: '动态监测' }"
       />
 
@@ -96,6 +97,7 @@ import DeviceRecordTablePanel from '@/components/asset/tabs/DeviceRecordTablePan
 import DeviceLabelPanel from '@/components/asset/tabs/DeviceLabelPanel.vue'
 import type { RecordColumn } from '@/components/asset/tabs/DeviceRecordTablePanel.vue'
 import { getSchema, type FieldSchema } from '@/config/pageSchemas'
+import { toPinyinShortCode } from '@/utils/pinyinCode'
 
 const props = withDefaults(
   defineProps<{
@@ -143,6 +145,20 @@ watch(
 
 const basicGroupKeys = new Set(['basic', 'finance', 'location', 'vendor', 'time', 'accounting', 'status', 'compliance', 'other', 'attachment'])
 
+const basicFormRows = [
+  ['device_code', 'card_code', 'device_name', 'pinyin_code', 'brand'],
+  ['specification', 'model', 'serial_number', 'device_unit'],
+  ['asset_category_id', 'finance_category_id', 'standby_current_max_ma', 'standby_current_min_ma'],
+  ['country_of_origin', 'use_dept_head', 'dept_id', 'manage_dept_head', 'manage_dept_id'],
+  ['registration_no', 'category_id']
+]
+
+const basicFormPanel = {
+  inner: ['is_imported']
+}
+
+const highlightLabels = ['device_code', 'device_name', 'device_unit', 'dept_id']
+
 const vendorFormRows = [
   ['supplier_uscc', 'supplier_id', 'supplier_contact', 'supplier_phone'],
   ['maintenance_uscc', 'maintenance_company', 'maintenance_engineer', 'maintenance_phone'],
@@ -172,6 +188,24 @@ const statusFormPanel = {
     'is_pm_device'
   ]
 }
+
+watch(
+  () => props.model.device_name,
+  (name, oldName) => {
+    if (isView.value) return
+    const next = toPinyinShortCode(String(name ?? ''))
+    if (!next) return
+    const current = String(props.model.pinyin_code ?? '').trim()
+    // 初次加载或名称未变：仅当简码为空时按设备名称回填
+    if (oldName === undefined || oldName === name) {
+      if (!current) props.model.pinyin_code = next
+      return
+    }
+    // 用户修改设备名称时同步更新简码
+    props.model.pinyin_code = next
+  },
+  { immediate: true }
+)
 
 const basicFields = computed(() => {
   const source = props.fields?.length ? props.fields : getSchema('medical_device')

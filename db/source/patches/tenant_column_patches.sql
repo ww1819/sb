@@ -217,6 +217,9 @@ ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS device_unit VARCHAR(30);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS manage_dept_id UUID;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS location_floor VARCHAR(50);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS room_number VARCHAR(50);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS card_code VARCHAR(50);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS use_dept_head VARCHAR(100);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS manage_dept_head VARCHAR(100);
 ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS device_code VARCHAR(20);
 ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
 
