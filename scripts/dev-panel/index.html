@@ -292,6 +292,7 @@
     .hot-reload-status.ok { color: var(--ok); }
     .hot-reload-status.fail { color: var(--err); }
     .hot-reload-status.running { color: var(--warn); }
+    .hot-reload-status.recovered { color: var(--muted); }
     .log-watch {
       display: inline-flex;
       align-items: center;
@@ -867,7 +868,7 @@
     function renderHotReloadTimeCell(s) {
       const name = s.name
       if (hotReloadPending[name] || s.hotReloadInProgress) {
-        return '<span style="color:var(--warn)">⟳ 热加载中…</span>'
+        return '<span class="hot-reload-status running" title="正在编译、写入 JAR 并重启…">⟳ 热加载中…</span>'
       }
       const hr = s.hotReload
       if (!hr || !hr.at) {
@@ -875,13 +876,18 @@
       }
       const hints = []
       if (s.sourceMtime && hr.at && String(s.sourceMtime) > String(hr.at)) {
-        hints.push('<span style="color:var(--warn)" title="源码变更晚于上次热加载，可能待自动/手动同步">待同步</span>')
+        hints.push('<span class="hot-reload-status running" title="源码变更晚于上次热加载，可能待自动/手动同步">待同步</span>')
       }
-      const cls = hr.ok ? 'var(--ok)' : 'var(--err)'
-      const icon = hr.ok ? '✓' : '✗'
       const stepTip = formatHotReloadSteps(hr.steps)
       const title = escapeHtml((hr.message || '') + (stepTip ? '\n' + stepTip : ''))
-      return `<span style="color:${cls}" title="${title}">${icon} ${escapeHtml(hr.at)}</span>`
+      if (hr.recovered) {
+        return `<span class="hot-reload-status recovered" title="${title}">○ ${escapeHtml(hr.at)}</span>`
+          + '<div class="jar-meta">已恢复</div>'
+          + (hints.length ? '<div class="jar-meta">' + hints.join(' · ') + '</div>' : '')
+      }
+      const statusCls = hr.ok ? 'ok' : 'fail'
+      const icon = hr.ok ? '✓' : '✗'
+      return `<span class="hot-reload-status ${statusCls}" title="${title}">${icon} ${escapeHtml(hr.at)}</span>`
         + (hints.length ? '<div class="jar-meta">' + hints.join(' · ') + '</div>' : '')
     }
 

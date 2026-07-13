@@ -51,6 +51,7 @@ const pageMap: Record<string, ReturnType<typeof defineAsyncComponent>> = {
   '/repair/engineer': defineAsyncComponent(() => import('@/views/repair/EngineerPage.vue')),
   '/repair/spare-archive': defineAsyncComponent(() => import('@/views/repair/SparePartPage.vue')),
   '/repair/fault': defineAsyncComponent(() => import('@/views/repair/FaultTypePage.vue')),
+  '/repair/process-type': defineAsyncComponent(() => import('@/views/repair/ProcessTypePage.vue')),
   '/maintain/param': defineAsyncComponent(() => import('@/views/maintain/MaintainParamPage.vue')),
   '/maintain/plan': defineAsyncComponent(() => import('@/views/maintain/MaintainPlanPage.vue')),
   '/maintain/execution': defineAsyncComponent(() => import('@/views/maintain/MaintainExecutionPage.vue')),

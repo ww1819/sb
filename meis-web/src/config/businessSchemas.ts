@@ -577,7 +577,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'fault_description', label: '故障描述', type: 'textarea', list: true, group: 'basic', required: true },
     { prop: 'urgency_level', label: '紧急程度', dictType: 'urgency', list: true, group: 'basic' },
     { prop: 'fault_type_id', label: '故障类型', linkTable: 'fault_type_dict', group: 'basic' },
-    { prop: 'assigned_engineer_id', label: '工程师', linkTable: 'engineer', list: true, group: 'workflow' },
+    { prop: 'assigned_user_id', label: '工程师', linkTable: 'repair_engineer', list: true, group: 'workflow' },
     { prop: 'assigned_at', label: '派工时间', type: 'datetime', group: 'workflow' },
     { prop: 'response_time', label: '响应时间', type: 'datetime', group: 'workflow' },
     { prop: 'arrival_time', label: '到场时间', type: 'datetime', group: 'workflow' },
@@ -627,6 +627,15 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'fault_name', label: '故障名称', list: true, required: true },
     { prop: 'level', label: '层级', type: 'number', list: true },
     { prop: 'is_active', label: '启用', type: 'boolean', list: true }
+  ],
+  repair_process_type: [
+    { prop: 'type_code', label: '类型编码', list: true, required: true },
+    { prop: 'type_name', label: '类型名称', list: true, required: true },
+    { prop: 'sort_order', label: '排序', type: 'number', list: true },
+    { prop: 'is_active', label: '启用', type: 'boolean', list: true },
+    { prop: 'can_add_parts', label: '允许配件', type: 'boolean', list: true },
+    { prop: 'can_engineer_add', label: '工程师可新增', type: 'boolean', list: true },
+    { prop: 'engineer_add_rule', label: '新增规则', list: true }
   ],
   maintenance_level: [
     { prop: 'level_code', label: '级别编码', list: true, required: true },

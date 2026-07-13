@@ -22,6 +22,10 @@ public final class TableColumnCache {
         return columns(jdbc, table).contains(column);
     }
 
+    public static boolean hasTable(JdbcTemplate jdbc, String table) {
+        return !columns(jdbc, table).isEmpty();
+    }
+
     public static void invalidate() {
         CACHE.clear();
     }

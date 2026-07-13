@@ -1,6 +1,7 @@
 package com.meis.saas.repair.service;
 
 import com.meis.saas.common.persistence.SoftDeleteSupport;
+import com.meis.saas.common.persistence.TableColumnCache;
 import com.meis.saas.common.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -17,17 +18,24 @@ import java.util.*;
 public class RepairWorkorderProcessService {
 
     private static final Set<String> WORKFLOW_STARTED_ACTIONS = Set.of(
-            "dispatch", "accept", "start_repair", "transfer");
+            "dispatch", "accept", "grab", "start_repair", "transfer");
 
     private final JdbcTemplate jdbc;
 
+    private boolean processTableReady() {
+        return TableColumnCache.hasTable(jdbc, "repair_workorder_process");
+    }
+
     public UUID insertProcess(UUID workorderId, ProcessRecord record) {
+        if (!processTableReady()) {
+            throw new IllegalStateException("repair_workorder_process 表不存在，请重启 meis-tenant 完成租户迁移");
+        }
         UUID id = UUID.randomUUID();
         String userId = TenantContext.getUserId();
         jdbc.update("""
                 INSERT INTO repair_workorder_process
                 (id, workorder_id, action_type, from_status, to_status, from_sub_status, to_sub_status,
-                 engineer_id, from_engineer_id, to_engineer_id, operator_id,
+                 user_id, from_user_id, to_user_id, operator_id,
                  solution_description, labor_cost, parts_cost, total_cost,
                  verify_result, verify_comment, satisfaction_rating, satisfaction_comment,
                  skip_verify, remark, extra_json, created_by, updated_by)
@@ -40,8 +48,8 @@ public class RepairWorkorderProcessService {
                 id, workorderId, record.actionType(),
                 blankToNull(record.fromStatus()), blankToNull(record.toStatus()),
                 blankToNull(record.fromSubStatus()), blankToNull(record.toSubStatus()),
-                blankToNull(record.engineerId()), blankToNull(record.fromEngineerId()),
-                blankToNull(record.toEngineerId()), blankToNull(record.operatorId()),
+                blankToNull(record.userId()), blankToNull(record.fromUserId()),
+                blankToNull(record.toUserId()), blankToNull(record.operatorId()),
                 record.solutionDescription(), record.laborCost(), record.partsCost(), record.totalCost(),
                 blankToNull(record.verifyResult()), record.verifyComment(),
                 record.satisfactionRating(), record.satisfactionComment(),
@@ -53,7 +61,7 @@ public class RepairWorkorderProcessService {
     /**
      * 主单仅更新当前流程状态（不写费用/方案/验收明细等业务字段）。
      */
-    public void syncWorkorderState(UUID workorderId, String status, String repairSubStatus, Object engineerId) {
+    public void syncWorkorderState(UUID workorderId, String status, String repairSubStatus, Object userId) {
         List<String> sets = new ArrayList<>();
         List<Object> args = new ArrayList<>();
         if (status != null && !status.isBlank()) {
@@ -63,12 +71,12 @@ public class RepairWorkorderProcessService {
         if (repairSubStatus != null) {
             sets.add("repair_sub_status = ?");
             args.add(repairSubStatus.isBlank() ? null : repairSubStatus);
-        } else if (status != null && !Set.of("repairing", "suspended").contains(status)) {
+        } else if (status != null && !Set.of("repairing", "suspended", "verify_rejected").contains(status)) {
             sets.add("repair_sub_status = NULL");
         }
-        if (engineerId != null) {
-            sets.add("assigned_engineer_id = ?::uuid");
-            args.add(blankToNull(engineerId));
+        if (userId != null) {
+            sets.add("assigned_user_id = ?::uuid");
+            args.add(blankToNull(userId));
         }
         sets.add("updated_at = NOW()");
         args.add(workorderId);
@@ -80,15 +88,17 @@ public class RepairWorkorderProcessService {
     }
 
     public boolean hasWorkflowStarted(UUID workorderId) {
+        if (!processTableReady()) return false;
         String clause = SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_process", null);
         Long count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM repair_workorder_process WHERE workorder_id = ?::uuid"
-                        + " AND action_type IN ('dispatch','accept','start_repair','transfer')" + clause,
+                        + " AND action_type IN ('dispatch','accept','grab','start_repair','transfer')" + clause,
                 Long.class, workorderId);
         return count != null && count > 0;
     }
 
     public List<Map<String, Object>> listByWorkorder(UUID workorderId) {
+        if (!processTableReady()) return List.of();
         String clause = SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_process", null);
         return jdbc.queryForList(
                 "SELECT * FROM repair_workorder_process WHERE workorder_id = ?::uuid" + clause
@@ -110,12 +120,18 @@ public class RepairWorkorderProcessService {
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
     }
 
-    public Optional<Object> firstActionAt(UUID workorderId, String actionType) {
+    public Optional<Object> firstActionAt(UUID workorderId, String... actionTypes) {
+        if (actionTypes == null || actionTypes.length == 0) return Optional.empty();
         String clause = SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_process", null);
+        String placeholders = String.join(",", Collections.nCopies(actionTypes.length, "?"));
+        List<Object> args = new ArrayList<>();
+        args.add(workorderId);
+        args.addAll(Arrays.asList(actionTypes));
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT created_at FROM repair_workorder_process WHERE workorder_id = ?::uuid"
-                        + " AND action_type = ?" + clause + " ORDER BY created_at ASC LIMIT 1",
-                workorderId, actionType);
+                        + " AND action_type IN (" + placeholders + ")" + clause
+                        + " ORDER BY created_at ASC LIMIT 1",
+                args.toArray());
         return rows.isEmpty() ? Optional.empty() : Optional.ofNullable(rows.get(0).get("created_at"));
     }
 
@@ -130,7 +146,7 @@ public class RepairWorkorderProcessService {
     }
 
     public void enrichWorkorder(Map<String, Object> wo) {
-        if (wo == null || wo.get("id") == null) return;
+        if (!processTableReady() || wo == null || wo.get("id") == null) return;
         UUID id = UUID.fromString(String.valueOf(wo.get("id")));
 
         latestByAction(id, "complete").ifPresent(p -> {
@@ -150,8 +166,8 @@ public class RepairWorkorderProcessService {
             putIfPresent(wo, "verifier_id", p.get("operator_id"));
         });
 
-        firstActionAt(id, "dispatch").ifPresent(at -> putIfPresent(wo, "dispatch_started_at", at));
-        firstActionAt(id, "dispatch").ifPresent(at -> putIfPresent(wo, "assigned_at", at));
+        firstActionAt(id, "dispatch", "grab").ifPresent(at -> putIfPresent(wo, "dispatch_started_at", at));
+        firstActionAt(id, "dispatch", "grab").ifPresent(at -> putIfPresent(wo, "assigned_at", at));
         firstActionAt(id, "accept").ifPresent(at -> putIfPresent(wo, "accepted_at", at));
         firstActionAt(id, "start_repair").ifPresent(at -> {
             putIfPresent(wo, "repair_start_time", at);
@@ -183,9 +199,9 @@ public class RepairWorkorderProcessService {
             String toStatus,
             String fromSubStatus,
             String toSubStatus,
-            Object engineerId,
-            Object fromEngineerId,
-            Object toEngineerId,
+            Object userId,
+            Object fromUserId,
+            Object toUserId,
             Object operatorId,
             String solutionDescription,
             Object laborCost,
@@ -209,9 +225,9 @@ public class RepairWorkorderProcessService {
             private String toStatus;
             private String fromSubStatus;
             private String toSubStatus;
-            private Object engineerId;
-            private Object fromEngineerId;
-            private Object toEngineerId;
+            private Object userId;
+            private Object fromUserId;
+            private Object toUserId;
             private Object operatorId;
             private String solutionDescription;
             private Object laborCost;
@@ -233,9 +249,15 @@ public class RepairWorkorderProcessService {
             public Builder toStatus(String v) { this.toStatus = v; return this; }
             public Builder fromSubStatus(String v) { this.fromSubStatus = v; return this; }
             public Builder toSubStatus(String v) { this.toSubStatus = v; return this; }
-            public Builder engineerId(Object v) { this.engineerId = v; return this; }
-            public Builder fromEngineerId(Object v) { this.fromEngineerId = v; return this; }
-            public Builder toEngineerId(Object v) { this.toEngineerId = v; return this; }
+            public Builder userId(Object v) { this.userId = v; return this; }
+            public Builder fromUserId(Object v) { this.fromUserId = v; return this; }
+            public Builder toUserId(Object v) { this.toUserId = v; return this; }
+            /** @deprecated 兼容旧参数名 */
+            public Builder engineerId(Object v) { return userId(v); }
+            /** @deprecated 兼容旧参数名 */
+            public Builder fromEngineerId(Object v) { return fromUserId(v); }
+            /** @deprecated 兼容旧参数名 */
+            public Builder toEngineerId(Object v) { return toUserId(v); }
             public Builder operatorId(Object v) { this.operatorId = v; return this; }
             public Builder solutionDescription(String v) { this.solutionDescription = v; return this; }
             public Builder laborCost(Object v) { this.laborCost = v; return this; }
@@ -251,7 +273,7 @@ public class RepairWorkorderProcessService {
 
             public ProcessRecord build() {
                 return new ProcessRecord(actionType, fromStatus, toStatus, fromSubStatus, toSubStatus,
-                        engineerId, fromEngineerId, toEngineerId, operatorId,
+                        userId, fromUserId, toUserId, operatorId,
                         solutionDescription, laborCost, partsCost, totalCost,
                         verifyResult, verifyComment, satisfactionRating, satisfactionComment,
                         skipVerify, remark, extraJson);

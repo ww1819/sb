@@ -1,8 +1,21 @@
+export interface ListFilterOption {
+  value: string
+  label: string
+}
+
 export interface ListFilter {
   key: string
   label: string
   dictType?: string
-  type?: 'select' | 'number'
+  type?: 'select' | 'number' | 'daterange'
+  /** 字典多选（如状态） */
+  multiple?: boolean
+  /** 外键下拉（RefSelect） */
+  linkTable?: string
+  /** 静态选项（与 dictType 二选一） */
+  options?: ListFilterOption[]
+  /** 字典子集：仅展示这些 value */
+  dictValues?: string[]
 }
 
 export interface PageConfig {
@@ -262,13 +275,12 @@ export const pageRegistry: Record<string, PageConfig> = {
     saveUrl: '/repair/workorder',
     listFilters: [{ key: 'status', label: '状态', dictType: 'wo_status' }]
   },
-  '/repair/engineer': { title: '工程师', apiBase: '/repair', table: 'engineer',
-  enableView: true
-},
+  '/repair/engineer': { title: '维修工程师管理', apiBase: '/repair', table: 'sys_user' },
   '/repair/spare-archive': { title: '配件档案管理', apiBase: '/repair', table: 'spare_part' },
   '/repair/fault': { title: '故障库', apiBase: '/repair', table: 'fault_type_dict',
   enableView: true
 },
+  '/repair/process-type': { title: '维修进程类型', apiBase: '/repair', table: 'repair_process_type', enableView: true },
   '/maintain/param': { title: '保养参数设置', apiBase: '/maintain', table: 'maintenance_level' },
   '/maintain/plan': { title: '保养计划', apiBase: '/maintain', table: 'maintenance_plan', saveUrl: '/maintain/plan' },
   '/maintain/execution': {

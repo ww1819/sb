@@ -21,11 +21,43 @@
               v-if="f.dictType"
               v-model="filterValues[f.key]"
               :placeholder="f.label"
+              :multiple="f.multiple"
+              collapse-tags
+              collapse-tags-tooltip
               clearable
               class="filter-item"
               @change="onSearch"
             >
               <el-option v-for="o in filterOptions[f.key] ?? []" :key="o.value" :label="o.label" :value="o.value" />
+            </el-select>
+            <RefSelect
+              v-else-if="f.linkTable"
+              v-model="filterValues[f.key]"
+              :link-table="f.linkTable"
+              :placeholder="f.label"
+              class="filter-item filter-ref"
+              @update:model-value="onSearch"
+            />
+            <el-date-picker
+              v-else-if="f.type === 'daterange'"
+              v-model="filterValues[f.key]"
+              type="daterange"
+              range-separator="至"
+              start-placeholder="开始"
+              end-placeholder="结束"
+              value-format="YYYY-MM-DD"
+              class="filter-item filter-daterange"
+              @change="onSearch"
+            />
+            <el-select
+              v-else-if="f.options?.length"
+              v-model="filterValues[f.key]"
+              :placeholder="f.label"
+              clearable
+              class="filter-item"
+              @change="onSearch"
+            >
+              <el-option v-for="o in f.options" :key="o.value" :label="o.label" :value="o.value" />
             </el-select>
             <el-input-number
               v-else-if="f.type === 'number'"
@@ -181,6 +213,7 @@ import { useDict } from '@/composables/useDict'
 import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
 import { executePinyinGenerate, promptPinyinScope } from '@/composables/usePinyinGenerate'
 import { preloadRefLabelMaps } from '@/composables/useRefLabelMap'
+import RefSelect from './form/RefSelect.vue'
 
 const props = defineProps<{
   config: PageConfig
@@ -204,7 +237,7 @@ const total = ref(0)
 const page = ref(1)
 const size = ref(20)
 const keyword = ref('')
-const filterValues = reactive<Record<string, string | number | undefined>>({})
+const filterValues = reactive<Record<string, string | number | string[] | undefined>>({})
 const filterOptions = reactive<Record<string, { label: string; value: string }[]>>({})
 const formVisible = ref(false)
 const importVisible = ref(false)
@@ -290,7 +323,17 @@ async function load() {
     if (props.config.listMode) params.mode = props.config.listMode
     for (const f of props.config.listFilters ?? []) {
       const v = filterValues[f.key]
-      if (v !== undefined && v !== null && v !== '') params[f.key] = v
+      if (f.type === 'daterange') {
+        const range = v as string[] | undefined
+        if (Array.isArray(range) && range[0]) params[`${f.key}From`] = range[0]
+        if (Array.isArray(range) && range[1]) params[`${f.key}To`] = range[1]
+        continue
+      }
+      if (f.multiple && Array.isArray(v) && v.length) {
+        params[f.key] = v.join(',')
+        continue
+      }
+      if (v !== undefined && v !== null && v !== '') params[f.key] = v as string | number
     }
     for (const [k, v] of Object.entries(props.config.listParams ?? {})) {
       if (v !== undefined && v !== null && v !== '') params[k] = v
@@ -434,7 +477,14 @@ onMounted(async () => {
     .concat((props.config.listFilters ?? []).map((f) => f.dictType))
   await preloadDictTypes(listDictTypes)
   for (const f of props.config.listFilters ?? []) {
-    if (f.dictType) filterOptions[f.key] = await loadDict(f.dictType)
+    if (f.dictType) {
+      const all = await loadDict(f.dictType)
+      filterOptions[f.key] = f.dictValues?.length
+        ? all.filter((o) => f.dictValues!.includes(o.value))
+        : all
+    } else if (f.options?.length) {
+      filterOptions[f.key] = f.options
+    }
   }
   await loadRefLabels()
   await load()
@@ -446,3 +496,15 @@ onActivated(() => {
 
 defineExpose({ load })
 </script>
+
+<style scoped>
+:deep(.filter-item) {
+  width: 160px;
+}
+:deep(.filter-ref) {
+  width: 180px;
+}
+:deep(.filter-daterange) {
+  width: 260px;
+}
+</style>
