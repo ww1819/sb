@@ -8,16 +8,6 @@
     :total="total"
     @page-change="load"
   >
-    <template #actions>
-      <el-button v-if="!hideAdd" v-permission="'add'" type="primary" @click="onAdd">新增</el-button>
-      <el-button v-if="showImport" @click="importVisible = true">导入</el-button>
-      <el-button @click="exportCsv">导出</el-button>
-      <template v-if="showPinyinCode">
-        <el-button @click="openPinyinDialog">生成简码</el-button>
-      </template>
-      <slot name="toolbar-extra" />
-    </template>
-
     <template #filterBar>
       <PageFilterBar
         v-model:keyword="keyword"
@@ -47,6 +37,17 @@
             />
           </template>
         </template>
+        <template #trailing>
+          <el-button v-if="showImport" @click="importVisible = true">导入</el-button>
+          <template v-if="showPinyinCode">
+            <el-button @click="openPinyinDialog">生成简码</el-button>
+          </template>
+          <slot name="toolbar-extra" />
+        </template>
+        <template #actions>
+          <el-button v-if="!hideAdd" v-permission="'add'" type="primary" @click="onAdd">新增</el-button>
+          <el-button @click="exportCsv">导出</el-button>
+        </template>
       </PageFilterBar>
     </template>
 
@@ -63,12 +64,22 @@
     >
       <el-table-column v-if="showPinyinCode" type="selection" width="48" fixed="left" reserve-selection />
       <el-table-column
+        v-if="showRowIndex"
+        label="序号"
+        width="64"
+        fixed="left"
+        align="center"
+        class-name="col-row-index"
+      >
+        <template #default="{ $index }">{{ rowSerial($index) }}</template>
+      </el-table-column>
+      <el-table-column
         v-for="f in listFields"
         :key="f.prop"
         :prop="f.prop"
         :label="f.label"
         :align="columnAlign(f.prop, f.type)"
-        min-width="120"
+        :min-width="f.width ?? 120"
         show-overflow-tooltip
       >
         <template #default="{ row }">
@@ -149,7 +160,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import { downloadApiFile } from '@/utils/fileDownload'
@@ -205,8 +216,17 @@ const { selectedCount, syncFromTable, selectedIds, clear: clearSelection } = use
 
 const tableHeight = useSystemTableHeight()
 
+watch(tableHeight, () => {
+  nextTick(() => tableRef.value?.doLayout?.())
+})
+
 const viewEnabled = computed(() => props.enableView === true || props.config.enableView === true)
 const changeLogEnabled = computed(() => props.config.enableChangeLog !== false && viewEnabled.value)
+const showRowIndex = computed(() => props.config.showRowIndex === true)
+
+function rowSerial(index: number) {
+  return (page.value - 1) * size.value + index + 1
+}
 
 const schema = computed(() => getSchema(props.config.table))
 const listFields = computed(() => {

@@ -160,6 +160,26 @@ ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS billing_end_at TIMESTAMP
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_pm_device BOOLEAN DEFAULT FALSE;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS standby_current_max_ma DECIMAL(10,2);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS standby_current_min_ma DECIMAL(10,2);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS residual_rate DECIMAL(5,2);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS accrued_disposal_cost DECIMAL(15,2);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS depreciation_start_date DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS depreciated_months INTEGER;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS estimated_useful_life_months INTEGER;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS monthly_depreciation_rate DECIMAL(8,4);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS depreciation_status VARCHAR(20);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS contract_name VARCHAR(200);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS contract_sign_date DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS contract_price DECIMAL(15,2);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS contract_submit_time TIMESTAMPTZ;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS bid_win_date DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS supply_notice_date DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS delivery_deadline DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS first_acceptance_date DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS second_acceptance_date DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS warranty_expiry_date DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS maintenance_company VARCHAR(200);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS maintenance_phone VARCHAR(50);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS supplier_phone VARCHAR(50);
 ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS device_code VARCHAR(20);
 ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
 

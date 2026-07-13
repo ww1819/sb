@@ -86,6 +86,26 @@ ALTER TABLE asset_category ADD COLUMN IF NOT EXISTS depreciation_years INTEGER;
 ALTER TABLE asset_category ADD COLUMN IF NOT EXISTS residual_rate DECIMAL(5,2);
 ALTER TABLE finance_category ADD COLUMN IF NOT EXISTS account_subject VARCHAR(50);
 ALTER TABLE finance_category ADD COLUMN IF NOT EXISTS fund_source VARCHAR(50);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS residual_rate DECIMAL(5,2);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS accrued_disposal_cost DECIMAL(15,2);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS depreciation_start_date DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS depreciated_months INTEGER;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS estimated_useful_life_months INTEGER;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS monthly_depreciation_rate DECIMAL(8,4);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS depreciation_status VARCHAR(20);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS contract_name VARCHAR(200);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS contract_sign_date DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS contract_price DECIMAL(15,2);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS contract_submit_time TIMESTAMPTZ;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS bid_win_date DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS supply_notice_date DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS delivery_deadline DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS first_acceptance_date DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS second_acceptance_date DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS warranty_expiry_date DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS maintenance_company VARCHAR(200);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS maintenance_phone VARCHAR(50);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS supplier_phone VARCHAR(50);
 
 -- 历史库 finance_category 误用 asset 列名 category_code/category_name，纠正为 finance_code/finance_name
 DO $finance_cat_fix$
@@ -109,6 +129,13 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('unit_type', 'quantity', '数量', 'quantity', 1),
 ('unit_type', 'weight', '重量', 'weight', 2),
 ('unit_type', 'volume', '体积', 'volume', 3)
+ON CONFLICT (dict_type, dict_code) DO NOTHING;
+
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('depreciation_status', 'not_started', '未开始', 'not_started', 1),
+('depreciation_status', 'depreciating', '折旧中', 'depreciating', 2),
+('depreciation_status', 'completed', '已提足', 'completed', 3),
+('depreciation_status', 'suspended', '暂停折旧', 'suspended', 4)
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
 
 INSERT INTO unit_dict (unit_code, unit_name, unit_type, sort_order) VALUES

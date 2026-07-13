@@ -8,7 +8,8 @@
         table="medical_device"
         :model="model"
         :fields="basicFields"
-        :group-span="{ basic: 6, finance: 6 }"
+        :group-columns="{ basic: 5, finance: 5, vendor: 5, time: 5 }"
+        :group-titles="{ finance: '折旧信息', time: '合同信息' }"
       />
 
       <div v-show="activeTab === 'card'" class="device-ledger-form__card-pane">
@@ -138,7 +139,7 @@ watch(
   }
 )
 
-const basicGroupKeys = new Set(['basic', 'finance', 'location', 'time', 'status', 'compliance', 'attachment', 'remark', 'other'])
+const basicGroupKeys = new Set(['basic', 'finance', 'location', 'vendor', 'time', 'status', 'compliance', 'attachment', 'remark', 'other'])
 
 const basicFields = computed(() => {
   const source = props.fields?.length ? props.fields : getSchema('medical_device')
