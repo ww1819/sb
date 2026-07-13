@@ -59,17 +59,25 @@ public class AssetDeviceController {
         appendUuidEq(where, args, "d.manufacturer_id", manufacturer_id);
         appendUuidEq(where, args, "d.dept_id", dept_id);
         appendUuidEq(where, args, "d.manage_dept_id", manage_dept_id);
-        boolean needSupplier = hasText(supplier_name);
-        boolean needManufacturer = hasText(manufacturer_name);
-        boolean needUseDept = hasText(dept_name) || "dept_id".equals(query.getSortBy());
-        boolean needManageDept = hasText(manage_dept_name);
-        appendSupplierSearch(where, args, supplier_name);
-        appendNameOrPinyin(where, args, "mfr.manufacturer_name", "mfr.pinyin_code", manufacturer_name);
+        boolean needSupplier = hasText(supplier_name) && !hasText(supplier_id);
+        boolean needManufacturer = hasText(manufacturer_name) && !hasText(manufacturer_id);
+        boolean needUseDept = (hasText(dept_name) && !hasText(dept_id)) || "dept_id".equals(query.getSortBy());
+        boolean needManageDept = hasText(manage_dept_name) && !hasText(manage_dept_id);
+        if (!hasText(supplier_id)) {
+            appendSupplierSearch(where, args, supplier_name);
+        }
+        if (!hasText(manufacturer_id)) {
+            appendNameOrPinyin(where, args, "mfr.manufacturer_name", "mfr.pinyin_code", manufacturer_name);
+        }
         appendNameOrPinyin(where, args, "d.device_name", "d.pinyin_code", device_name);
         appendLike(where, args, "d.specification", specification);
         appendLike(where, args, "d.model", model);
-        appendNameOrPinyin(where, args, "use_dept.dept_name", "use_dept.pinyin_code", dept_name);
-        appendNameOrPinyin(where, args, "mgr_dept.dept_name", "mgr_dept.pinyin_code", manage_dept_name);
+        if (!hasText(dept_id)) {
+            appendNameOrPinyin(where, args, "use_dept.dept_name", "use_dept.pinyin_code", dept_name);
+        }
+        if (!hasText(manage_dept_id)) {
+            appendNameOrPinyin(where, args, "mgr_dept.dept_name", "mgr_dept.pinyin_code", manage_dept_name);
+        }
         appendLike(where, args, "d.serial_number", serial_number);
         if (enable_dateFrom != null && !enable_dateFrom.isBlank()) {
             where.append(" AND d.enable_date >= ?::date ");

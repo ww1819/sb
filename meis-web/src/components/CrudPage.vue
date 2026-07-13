@@ -19,6 +19,7 @@
           <MoreSearchPanel
             :fields="moreSearchFields"
             v-model="moreSearchValues"
+            v-model:labels="moreSearchLabels"
             v-model:selected="selectedMoreSearchKeys"
             @search="onSearch"
           />
@@ -236,6 +237,7 @@ const page = ref(1)
 const size = ref(20)
 const keyword = ref('')
 const moreSearchValues = ref<Record<string, string>>({})
+const moreSearchLabels = ref<Record<string, string>>({})
 const selectedMoreSearchKeys = ref<string[]>([])
 const filterValues = reactive<Record<string, string | number | string[] | undefined>>({})
 const filterOptions = reactive<Record<string, { label: string; value: string }[]>>({})
@@ -356,9 +358,20 @@ async function load() {
       size: size.value
     }
     if (!moreSearchFields.value.length && keyword.value) params.keyword = keyword.value
-    for (const f of moreSearchFields.value) {
-      const v = moreSearchValues.value[f.key]?.trim()
-      if (v) params[f.key] = v
+    for (const key of selectedMoreSearchKeys.value) {
+      const f = moreSearchFields.value.find((item) => item.key === key)
+      if (!f) continue
+      const v = moreSearchValues.value[key]?.trim()
+      if (!v) continue
+      params[key] = v
+      if (f.linkTable && key.endsWith('_id')) {
+        const nameKey = key.replace(/_id$/, '_name')
+        const label = moreSearchLabels.value[key]?.trim()
+        if (label) {
+          const name = label.replace(/\s*\([^)]*\)\s*$/, '').trim()
+          if (name) params[nameKey] = name
+        }
+      }
     }
     if (props.config.listMode) params.mode = props.config.listMode
     for (const f of props.config.listFilters ?? []) {
@@ -404,6 +417,7 @@ function onSearch() {
 function onReset() {
   keyword.value = ''
   selectedMoreSearchKeys.value = []
+  moreSearchLabels.value = {}
   for (const f of moreSearchFields.value) {
     moreSearchValues.value[f.key] = ''
   }

@@ -22,7 +22,8 @@
         :link-table="fieldMeta(key)!.linkTable!"
         :placeholder="fieldMeta(key)?.placeholder ?? `请输入${fieldMeta(key)?.label ?? ''}`"
         @update:model-value="onFieldChange(key, $event)"
-        @search="$emit('search')"
+        @update:label="onLabelChange(key, $event)"
+        @search="onRefSearch"
       />
       <el-input
         v-else
@@ -39,18 +40,20 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick } from 'vue'
 import type { MoreSearchField } from '@/config/pageRegistry'
 import MoreSearchRefSelect from './MoreSearchRefSelect.vue'
 
 const props = defineProps<{
   fields: MoreSearchField[]
   modelValue: Record<string, string>
+  labels: Record<string, string>
   selected: string[]
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: Record<string, string>]
+  'update:labels': [value: Record<string, string>]
   'update:selected': [value: string[]]
   search: []
 }>()
@@ -61,8 +64,13 @@ const selectedKeys = computed({
     const removed = props.selected.filter((k) => !keys.includes(k))
     if (removed.length) {
       const next = { ...props.modelValue }
-      for (const key of removed) next[key] = ''
+      const nextLabels = { ...props.labels }
+      for (const key of removed) {
+        next[key] = ''
+        nextLabels[key] = ''
+      }
       emit('update:modelValue', next)
+      emit('update:labels', nextLabels)
     }
     emit('update:selected', keys)
   }
@@ -76,8 +84,18 @@ function onFieldChange(key: string, value: string) {
   emit('update:modelValue', { ...props.modelValue, [key]: value })
 }
 
+function onLabelChange(key: string, label: string) {
+  emit('update:labels', { ...props.labels, [key]: label })
+}
+
+async function onRefSearch() {
+  await nextTick()
+  emit('search')
+}
+
 function onFieldClear(key: string) {
   onFieldChange(key, '')
+  onLabelChange(key, '')
   emit('search')
 }
 </script>

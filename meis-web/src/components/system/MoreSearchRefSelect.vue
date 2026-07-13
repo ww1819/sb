@@ -17,7 +17,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { nextTick, onMounted, ref, watch } from 'vue'
 import http from '@/api/http'
 import { refSelectConfig, type RefSelectMeta } from '@/config/refSelectConfig'
 
@@ -29,6 +29,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
+  'update:label': [value: string]
   search: []
 }>()
 
@@ -123,20 +124,27 @@ async function ensureSelectedOption() {
     const { data } = await http.get(detailUrl)
     const row = data.data
     if (!row) return
-    options.value = [{ label: formatLabel(row, meta), value: props.modelValue }]
+    const label = formatLabel(row, meta)
+    options.value = [{ label, value: props.modelValue }]
+    emit('update:label', label)
   } catch {
     // ignore
   }
 }
 
 function onSelect(value: string) {
+  const option = options.value.find((o) => o.value === value)
   emit('update:modelValue', value ?? '')
-  if (value) emit('search')
+  emit('update:label', option?.label ?? '')
+  if (value) {
+    void nextTick(() => emit('search'))
+  }
 }
 
 function onClear() {
   emit('update:modelValue', '')
-  emit('search')
+  emit('update:label', '')
+  void nextTick(() => emit('search'))
 }
 
 onMounted(() => {
