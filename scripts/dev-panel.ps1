@@ -1,4 +1,4 @@
-# MEIS local dev control panel - http://localhost:5099
+﻿# MEIS local dev control panel - http://localhost:5099
 param(
     [int]$Port = 5099,
     [switch]$NoBrowser,
@@ -134,6 +134,59 @@ function Set-PanelHotReloadResult {
     }
 }
 
+function Convert-PanelDateTime {
+    param([string]$Text)
+    if ([string]::IsNullOrWhiteSpace($Text)) { return $null }
+    try {
+        return [DateTime]::ParseExact($Text.Trim(), 'yyyy-MM-dd HH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture)
+    } catch {
+        try { return [datetime]$Text } catch { return $null }
+    }
+}
+
+function Resolve-PanelHotReloadDisplay {
+    param(
+        [Parameter(Mandatory = $true)][string]$ServiceName,
+        [Parameter(Mandatory = $true)]$ServiceItem
+    )
+    if (-not $script:PanelHotReloadResults.ContainsKey($ServiceName)) { return $null }
+    $hr = $script:PanelHotReloadResults[$ServiceName]
+    if ($hr.ok) { return $hr }
+
+    $httpUp = $false
+    $jarHealthy = $false
+    $jarMtime = ''
+    if ($ServiceItem -is [System.Collections.IDictionary]) {
+        $httpUp = [bool]$ServiceItem['httpUp']
+        $jarHealthy = [bool]$ServiceItem['jarHealthy']
+        $jarMtime = [string]$ServiceItem['jarMtime']
+    } else {
+        $httpUp = [bool]$ServiceItem.httpUp
+        $jarHealthy = [bool]$ServiceItem.jarHealthy
+        $jarMtime = [string]$ServiceItem.jarMtime
+    }
+
+    if ($httpUp -and $jarHealthy) {
+        $hrAt = Convert-PanelDateTime ([string]$hr.at)
+        $jarAt = Convert-PanelDateTime $jarMtime
+        if ($jarAt -and $hrAt -and $jarAt -gt $hrAt) {
+            $script:PanelHotReloadResults.Remove($ServiceName) | Out-Null
+            return $null
+        }
+        return [ordered]@{
+            at        = $hr.at
+            ok        = $false
+            recovered = $true
+            message   = '上次热加载失败，当前服务与 JAR 已恢复'
+            steps     = @($hr.steps)
+            httpUp    = $httpUp
+            debugUp   = [bool]$hr.debugUp
+            fileCount = if ($null -ne $hr.fileCount) { [int]$hr.fileCount } else { 0 }
+        }
+    }
+    return $hr
+}
+
 function Test-PanelClientDisconnectError {
     param([System.Exception]$Ex)
     if (-not $Ex) { return $false }
@@ -257,6 +310,15 @@ function Sync-PanelBackgroundJobs {
                 Add-MeisPanelEvent ($label + ' FAILED (background job)')
             } else {
                 Add-MeisPanelEvent ($label + ' -> done')
+                if ($label -match '^(.+)\s+restarting$') {
+                    $svcName = $Matches[1]
+                    if ($script:PanelHotReloadResults.ContainsKey($svcName)) {
+                        $prev = $script:PanelHotReloadResults[$svcName]
+                        if (-not $prev.ok) {
+                            $script:PanelHotReloadResults.Remove($svcName) | Out-Null
+                        }
+                    }
+                }
             }
         } catch {
             Add-MeisPanelEvent ($label + ' FAILED: ' + $_.Exception.Message)
@@ -367,9 +429,9 @@ function Start-PanelServiceBackgroundJob {
                             Invoke-MeisMavenModule -Module $Name -Package -AlsoMake | Out-Null
                         }
                         'quick' {
-                            $health = Test-MeisServiceJarHealthy $Name
-                            if (-not $health.ok) {
-                                Invoke-MeisMavenModule -Module $Name -Package -AlsoMake | Out-Null
+                            $repair = Repair-MeisServiceJarIfNeeded -ServiceName $Name -StopIfRunning
+                            if ($repair.stopped) {
+                                Add-MeisPanelEvent ('BUILD ' + $Name + ': stopped for JAR repack')
                             }
                             Invoke-MeisMavenModule -Module $Name -Compile -AlsoMake | Out-Null
                             Sync-MeisServiceClassesToJar -ServiceName $Name | Out-Null
@@ -553,7 +615,7 @@ function Get-PanelServiceStatusList {
             }
         }
         if ($script:PanelHotReloadResults.ContainsKey($name)) {
-            $item.hotReload = $script:PanelHotReloadResults[$name]
+            $item.hotReload = Resolve-PanelHotReloadDisplay -ServiceName $name -ServiceItem $item
         }
     }
     return @($list | Sort-Object { Get-PanelServiceSourceSortKey $_ } -Descending)

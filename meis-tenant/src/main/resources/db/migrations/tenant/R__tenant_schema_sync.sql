@@ -54,16 +54,18 @@ WHERE w.device_id = d.id
 
 DELETE FROM sys_dict WHERE dict_type = 'wo_status';
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('wo_status', 'draft', '未提交', 'draft', 0),
 ('wo_status', 'reported', '报修中', 'reported', 1),
 ('wo_status', 'dispatching', '派单中', 'dispatching', 2),
 ('wo_status', 'pending_accept', '待接单', 'pending_accept', 3),
 ('wo_status', 'accepted', '已接单', 'accepted', 4),
 ('wo_status', 'repairing', '维修中', 'repairing', 5),
 ('wo_status', 'pending_verify', '已维修待验收', 'pending_verify', 6),
-('wo_status', 'verified', '已验收', 'verified', 7),
-('wo_status', 'closed', '已关闭', 'closed', 8),
-('wo_status', 'cancelled', '已取消', 'cancelled', 9),
-('wo_status', 'suspended', '已挂起', 'suspended', 10);
+('wo_status', 'verify_rejected', '拒绝验收', 'verify_rejected', 7),
+('wo_status', 'verified', '已验收', 'verified', 8),
+('wo_status', 'closed', '已关闭', 'closed', 9),
+('wo_status', 'cancelled', '已取消', 'cancelled', 10),
+('wo_status', 'suspended', '已挂起', 'suspended', 11);
 
 DELETE FROM sys_dict WHERE dict_type = 'repair_sub_status';
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
@@ -502,3 +504,187 @@ CREATE TABLE IF NOT EXISTS sys_entity_change_log (
 );
 CREATE INDEX IF NOT EXISTS idx_sys_entity_change_log_entity
     ON sys_entity_change_log (entity_type, entity_id, created_at DESC);
+
+-- ---------- REP-03：维修工程师 sys_user + assigned_user_id ----------
+ALTER TABLE sys_user ADD COLUMN IF NOT EXISTS is_repair_engineer BOOLEAN NOT NULL DEFAULT FALSE;
+
+UPDATE sys_user u
+SET is_repair_engineer = TRUE
+FROM engineer e
+WHERE e.user_id = u.id
+  AND COALESCE(u.is_repair_engineer, FALSE) = FALSE;
+
+ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS assigned_user_id UUID;
+
+UPDATE repair_workorder w
+SET assigned_user_id = e.user_id
+FROM engineer e
+WHERE w.assigned_engineer_id = e.id
+  AND w.assigned_user_id IS NULL;
+
+UPDATE repair_workorder w
+SET assigned_user_id = w.assigned_engineer_id
+WHERE w.assigned_user_id IS NULL
+  AND w.assigned_engineer_id IS NOT NULL
+  AND EXISTS (SELECT 1 FROM sys_user u WHERE u.id = w.assigned_engineer_id);
+
+DO $rep03_drop_wo_eng$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'repair_workorder' AND column_name = 'assigned_engineer_id'
+    ) AND EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'repair_workorder' AND column_name = 'assigned_user_id'
+    ) THEN
+        ALTER TABLE repair_workorder DROP CONSTRAINT IF EXISTS repair_workorder_assigned_engineer_id_fkey;
+        ALTER TABLE repair_workorder DROP COLUMN assigned_engineer_id;
+    END IF;
+END $rep03_drop_wo_eng$;
+
+DO $rep03_rename_process$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_process' AND column_name = 'engineer_id')
+       AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_process' AND column_name = 'user_id')
+    THEN
+        ALTER TABLE repair_workorder_process RENAME COLUMN engineer_id TO user_id;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_process' AND column_name = 'from_engineer_id')
+       AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_process' AND column_name = 'from_user_id')
+    THEN
+        ALTER TABLE repair_workorder_process RENAME COLUMN from_engineer_id TO from_user_id;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_process' AND column_name = 'to_engineer_id')
+       AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_process' AND column_name = 'to_user_id')
+    THEN
+        ALTER TABLE repair_workorder_process RENAME COLUMN to_engineer_id TO to_user_id;
+    END IF;
+END $rep03_rename_process$;
+
+UPDATE repair_workorder_process p
+SET user_id = e.user_id
+FROM engineer e
+WHERE p.user_id = e.id
+  AND NOT EXISTS (SELECT 1 FROM sys_user u WHERE u.id = p.user_id);
+
+UPDATE repair_workorder_process p
+SET from_user_id = e.user_id
+FROM engineer e
+WHERE p.from_user_id = e.id
+  AND NOT EXISTS (SELECT 1 FROM sys_user u WHERE u.id = p.from_user_id);
+
+UPDATE repair_workorder_process p
+SET to_user_id = e.user_id
+FROM engineer e
+WHERE p.to_user_id = e.id
+  AND NOT EXISTS (SELECT 1 FROM sys_user u WHERE u.id = p.to_user_id);
+
+DO $rep03_rename_event$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_event' AND column_name = 'engineer_id')
+       AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_event' AND column_name = 'user_id')
+    THEN
+        ALTER TABLE repair_workorder_event RENAME COLUMN engineer_id TO user_id;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_event' AND column_name = 'from_engineer_id')
+       AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_event' AND column_name = 'from_user_id')
+    THEN
+        ALTER TABLE repair_workorder_event RENAME COLUMN from_engineer_id TO from_user_id;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_event' AND column_name = 'to_engineer_id')
+       AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_event' AND column_name = 'to_user_id')
+    THEN
+        ALTER TABLE repair_workorder_event RENAME COLUMN to_engineer_id TO to_user_id;
+    END IF;
+END $rep03_rename_event$;
+
+UPDATE repair_workorder_event ev
+SET user_id = e.user_id
+FROM engineer e
+WHERE ev.user_id = e.id
+  AND NOT EXISTS (SELECT 1 FROM sys_user u WHERE u.id = ev.user_id);
+
+UPDATE repair_workorder_event ev
+SET from_user_id = e.user_id
+FROM engineer e
+WHERE ev.from_user_id = e.id
+  AND NOT EXISTS (SELECT 1 FROM sys_user u WHERE u.id = ev.from_user_id);
+
+UPDATE repair_workorder_event ev
+SET to_user_id = e.user_id
+FROM engineer e
+WHERE ev.to_user_id = e.id
+  AND NOT EXISTS (SELECT 1 FROM sys_user u WHERE u.id = ev.to_user_id);
+
+CREATE INDEX IF NOT EXISTS idx_wo_assigned_user ON repair_workorder(assigned_user_id);
+
+-- ---------- REP-05：维修进程类型 + 工单进程段 ----------
+CREATE TABLE IF NOT EXISTS repair_process_type (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    type_code VARCHAR(40) NOT NULL UNIQUE,
+    type_name VARCHAR(100) NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    can_add_parts BOOLEAN NOT NULL DEFAULT FALSE,
+    can_engineer_add BOOLEAN NOT NULL DEFAULT FALSE,
+    engineer_add_rule VARCHAR(40),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMPTZ,
+    deleted_by UUID
+);
+
+CREATE TABLE IF NOT EXISTS repair_workorder_segment (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workorder_id UUID NOT NULL REFERENCES repair_workorder(id) ON DELETE CASCADE,
+    process_type_id UUID NOT NULL REFERENCES repair_process_type(id),
+    user_id UUID REFERENCES sys_user(id),
+    started_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ended_at TIMESTAMPTZ,
+    remark TEXT,
+    verify_comment TEXT,
+    auto_created BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMPTZ,
+    deleted_by UUID
+);
+
+CREATE INDEX IF NOT EXISTS idx_wo_segment_wo ON repair_workorder_segment(workorder_id, started_at);
+
+CREATE TABLE IF NOT EXISTS repair_workorder_segment_part (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    segment_id UUID NOT NULL REFERENCES repair_workorder_segment(id) ON DELETE CASCADE,
+    spare_part_id UUID REFERENCES spare_part(id),
+    quantity INTEGER NOT NULL DEFAULT 1,
+    unit_price DECIMAL(10,2),
+    total_price DECIMAL(10,2),
+    remark TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMPTZ,
+    deleted_by UUID
+);
+
+CREATE INDEX IF NOT EXISTS idx_wo_segment_part_seg ON repair_workorder_segment_part(segment_id);
+
+INSERT INTO repair_process_type (type_code, type_name, sort_order, can_add_parts, can_engineer_add, engineer_add_rule)
+SELECT v.type_code, v.type_name, v.sort_order, v.can_add_parts, v.can_engineer_add, v.engineer_add_rule
+FROM (VALUES
+    ('internal', '院内维修中', 1, true, true, NULL),
+    ('external', '院外维修中', 2, true, true, NULL),
+    ('waiting_parts', '等待配件中', 3, true, true, NULL),
+    ('verify_rejected', '拒绝验收', 4, false, false, 'system_only'),
+    ('pending_verify', '已维修待验收', 5, false, true, 'verify_rejected_only'),
+    ('verified', '已验收', 6, false, false, 'system_only')
+) AS v(type_code, type_name, sort_order, can_add_parts, can_engineer_add, engineer_add_rule)
+WHERE NOT EXISTS (SELECT 1 FROM repair_process_type LIMIT 1);

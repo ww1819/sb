@@ -807,6 +807,38 @@ function Sync-MeisServiceClassesToJar {
     }
 }
 
+function Repair-MeisServiceJarIfNeeded {
+    param(
+        [Parameter(Mandatory = $true)][string]$ServiceName,
+        [switch]$StopIfRunning
+    )
+
+    $health = Test-MeisServiceJarHealthy $ServiceName
+    if ($health.ok) {
+        return @{ ok = $true; stopped = $false; message = 'JAR healthy' }
+    }
+
+    $stopped = $false
+    if ($StopIfRunning) {
+        $svc = Get-MeisServiceDefinition $ServiceName
+        if (Test-MeisPortListening -Port $svc.port) {
+            Stop-MeisServiceByName $ServiceName | Out-Null
+            $released = Wait-MeisServicePortReleased -Port $svc.port
+            if (-not $released) {
+                throw ('port :' + $svc.port + ' still listening; cannot repackage JAR')
+            }
+            $stopped = $true
+        }
+    }
+
+    Invoke-MeisMavenModule -Module $ServiceName -Package -AlsoMake | Out-Null
+    $health = Test-MeisServiceJarHealthy $ServiceName
+    if (-not $health.ok) {
+        throw $health.message
+    }
+    return @{ ok = $true; stopped = $stopped; message = 'full package OK' }
+}
+
 function Invoke-MeisServiceHotReload {
     param([Parameter(Mandatory = $true)][string]$ServiceName)
 
@@ -820,7 +852,9 @@ function Invoke-MeisServiceHotReload {
     try {
         $health = Test-MeisServiceJarHealthy $ServiceName
         if (-not $health.ok) {
-            Invoke-MeisMavenModule -Module $ServiceName -Package -AlsoMake | Out-Null
+            $repair = Repair-MeisServiceJarIfNeeded -ServiceName $ServiceName -StopIfRunning
+            if ($repair.stopped) { $stoppedForSync = $true }
+            [void]$steps.Add(@{ step = 'repack'; ok = $true; message = [string]$repair.message })
         }
         Invoke-MeisMavenModule -Module $ServiceName -Compile -AlsoMake | Out-Null
         [void]$steps.Add(@{ step = 'compile'; ok = $true; message = 'mvn compile OK' })
@@ -835,7 +869,7 @@ function Invoke-MeisServiceHotReload {
         }
     }
 
-    if ($wasRunning) {
+    if ($wasRunning -and -not $stoppedForSync) {
         try {
             Stop-MeisServiceByName $ServiceName | Out-Null
             $released = Wait-MeisServicePortReleased -Port $svc.port

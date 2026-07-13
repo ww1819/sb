@@ -25,7 +25,7 @@ INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_o
 ('asset_scrap', 'mod_asset', '设备报废', 'menu', '/asset/scrap', 6),
 ('mod_ops', NULL, '运维管理', 'module', NULL, 8),
 ('repair_workorder', 'mod_ops', '维修工单', 'menu', '/repair/workorder', 1),
-('repair_engineer', 'mod_ops', '工程师', 'menu', '/repair/engineer', 2),
+('repair_engineer', 'mod_ops', '维修工程师管理', 'menu', '/repair/engineer', 2),
 ('repair_spare', 'mod_ops', '备件管理', 'menu', '/repair/spare', 3),
 ('maintain_template', 'mod_ops', '保养模板', 'menu', '/maintain/template', 4),
 ('maintain_plan', 'mod_ops', '保养计划', 'menu', '/maintain/plan', 5),
@@ -172,7 +172,8 @@ INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_o
 ('repair_spare_archive', 'mod_ops', '配件档案管理', 'menu', '/repair/spare-archive', 3),
 ('repair_verify', 'mod_ops', '维修验收', 'menu', '/repair/verify', 4),
 ('repair_fault', 'mod_ops', '故障库', 'menu', '/repair/fault', 5),
-('repair_engineer', 'mod_ops', '工程师', 'menu', '/repair/engineer', 6)
+('repair_process_type', 'mod_ops', '维修进程类型', 'menu', '/repair/process-type', 6),
+('repair_engineer', 'mod_ops', '维修工程师管理', 'menu', '/repair/engineer', 7)
 ON CONFLICT (menu_code) DO UPDATE SET
     parent_code = EXCLUDED.parent_code,
     menu_name = EXCLUDED.menu_name,

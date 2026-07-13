@@ -46,6 +46,7 @@
 | `accepted` | 已接单 | 工程师已确认接单 | `maintenance` |
 | `repairing` | 维修中 | 工程师已介入处理 | `maintenance` |
 | `pending_verify` | 已维修待验收 | 维修完工，等待科室确认 | **`pending_verify`** |
+| `verify_rejected` | 拒绝验收 | 科室验收驳回，待工程师返修 | `maintenance` |
 | `verified` | 已验收 | 科室验收通过 | `normal` |
 | `closed` | 已关闭 | 工单归档（含跳过验收结案） | `normal` |
 | `cancelled` | 已取消 | 误报、撤回、重复单 | 恢复为 `normal` |
@@ -85,13 +86,23 @@
 报修中 → 派单中 → 待接单 → 已接单 → 维修中 → 已维修待验收 → 已验收 → 已关闭
 ```
 
-### 4.2 跳过派单（工程师直修）
+### 4.2 工程师抢单（跳过派单）
+
+```
+报修中 / 派单中（无负责人）→ 工程师抢单 → 维修中
+```
+
+- 仅 **维修工程师** 可抢单；工单须 **未指派负责人**
+- 抢单使用条件更新防并发：`status IN ('reported','dispatching') AND assigned_user_id IS NULL`
+- 抢单后直接 `repairing` + 子状态「院内维修」
+
+### 4.3 跳过派单（派工直修）
 
 ```
 报修中 → 维修中 → 已维修待验收 → 已验收 → 已关闭
 ```
 
-### 4.3 完工直接结案（跳过验收）
+### 4.4 完工直接结案（跳过验收）
 
 ```
 … → 维修中 → 已关闭
@@ -99,28 +110,33 @@
 
 设备台账直接恢复 `normal`，不经过 `pending_verify`。
 
-### 4.4 验收不通过（返修）
+### 4.5 验收不通过（拒绝验收 / 返修）
 
 ```
-已维修待验收 → 维修中 → …
+已维修待验收 → 拒绝验收（verify_rejected）→ …返修… → 已维修待验收 → …
 ```
 
-### 4.5 转派
+- 主状态新增 **`verify_rejected`（拒绝验收）**，与「维修中」区分，便于列表筛选与审计
+- 拒绝时必填 **拒绝验收原因**；设备台账保持 **`maintenance`**
+- 工程师可在维修处理中继续更新子状态（院内维修、等待配件等），主状态保持 `verify_rejected`
+- 返修完成后通过 **完工提交验收**（或等价「已维修待验收」进程段，见附录 U）→ `pending_verify`，可再次验收
 
-允许在 `dispatching` / `pending_accept` / `accepted` / `repairing` 转派：
+### 4.6 转派
+
+允许在 `dispatching` / `pending_accept` / `accepted` / `repairing` 转派（**仅当前负责人**）：
 
 - 转派后通常回到 `pending_accept`（新工程师需接单）
 - 也可选择「转派并继续维修」（保持 `repairing`，更换负责人）
-- 每次转派写入事件表，主表仅保留当前 `assigned_engineer_id`
+- 每次转派写入事件表，主表仅保留当前 `assigned_user_id`
 
-### 4.6 状态流转图
+### 4.7 状态流转图
 
 ```mermaid
 stateDiagram-v2
     [*] --> reported: 报修
 
     reported --> dispatching: 派单
-    reported --> repairing: 跳过派单直修
+    reported --> repairing: 抢单/直修
     reported --> cancelled: 取消
 
     dispatching --> pending_accept: 指派工程师
@@ -136,7 +152,8 @@ stateDiagram-v2
     suspended --> repairing: 恢复
 
     pending_verify --> verified: 验收通过
-    pending_verify --> repairing: 验收不通过
+    pending_verify --> verify_rejected: 拒绝验收
+    verify_rejected --> pending_verify: 返修后再次提交验收
     verified --> closed: 归档
 
     closed --> [*]
@@ -206,9 +223,59 @@ stateDiagram-v2
 
 ---
 
-## 5.5 流程业务表 `repair_workorder_process`
+## 5.6 维修进程段（REP-05）
 
-派工、接单、转派、子状态、完工、验收、挂起/恢复、取消等 **流程业务数据** 写入 `repair_workorder_process`；`repair_workorder` 主单仅同步 `status`、`repair_sub_status`、`assigned_engineer_id`。
+除子状态事件外，工单详情展示 **进程段** `repair_workorder_segment`，用于划清院内/院外/等待配件/待验收/拒绝验收等 **业务阶段** 与配件归属。
+
+### 主数据 `repair_process_type`
+
+维护入口：`/repair/process-type`（通用 CRUD）。种子类型：
+
+| type_code | 名称 | 允许配件 | 工程师可新增 |
+|-----------|------|----------|--------------|
+| `internal` | 院内维修中 | 是 | 是 |
+| `external` | 院外维修中 | 是 | 是 |
+| `waiting_parts` | 等待配件中 | 是 | 是 |
+| `verify_rejected` | 拒绝验收 | 否 | 否（验收驳回时系统自动写入） |
+| `pending_verify` | 已维修待验收 | 否 | **仅 `verify_rejected` 时可由工程师主动添加** |
+| `verified` | 已验收 | 否 | 否（验收通过时系统自动写入） |
+
+### 工单进程段 `repair_workorder_segment`
+
+- 关联工单、进程类型、负责人（`user_id`）、开始/结束时间
+- 工程师 **新增可编辑段** 时自动结束上一段（`ended_at`）
+- **待派单**（`reported`）可直接添加首段，不必先派工；通常同步主状态 → `repairing`
+- 派工开工、抢单、接单等动作也会自动开启对应进程段（如「院内维修中」）
+
+### 配件明细 `repair_workorder_segment_part`
+
+- 仅 `can_add_parts = true` 且 **未结束** 的进程段可挂配件
+- 库存扣减与费用汇总见 REP-F-02（本轮不做）
+
+### 与验收/返修联动
+
+| 动作 | 进程段行为 |
+|------|------------|
+| 完工提交验收 | 系统自动开启「已维修待验收」段 |
+| 验收通过 | 系统自动开启「已验收」段 |
+| 拒绝验收 | 结束待验收段；系统自动写入「拒绝验收」段（含原因） |
+| 返修后再待验收 | 工程师添加「已维修待验收」段 → 主状态 `pending_verify` |
+
+### API
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/repair/process-type/list` | 全部启用进程类型 |
+| GET | `/api/repair/process-type/addable` | 当前工单可新增的进程类型 |
+| GET | `/api/repair/workorder/{id}/segments` | 工单进程段列表（含配件） |
+| POST | `/api/repair/workorder/{id}/segments` | 工程师添加进程段 |
+| POST | `/api/repair/workorder/{id}/segments/{segmentId}/parts` | 进程段添加配件 |
+
+---
+
+## 5.7 流程业务表 `repair_workorder_process`
+
+派工、接单、转派、子状态、完工、验收、挂起/恢复、取消等 **流程业务数据** 写入 `repair_workorder_process`；`repair_workorder` 主单仅同步 `status`、`repair_sub_status`、`assigned_user_id`。
 
 | 字段组 | 说明 |
 |--------|------|
@@ -231,6 +298,10 @@ stateDiagram-v2
 | GET | `/api/repair/workorder/{id}` | 工单详情（流程字段由 `repair_workorder_process` enrich 回填） |
 | GET | `/api/repair/workorder/{id}/process` | 流程业务记录列表（按时间升序） |
 | GET | `/api/repair/workorder/{id}/timeline` | 时间轴（摘要+里程碑+事件） |
+| GET | `/api/repair/workorder/{id}/segments` | 进程段列表（含配件） |
+| GET | `/api/repair/process-type/addable` | 当前工单可新增进程类型 |
+| POST | `/api/repair/workorder/{id}/segments` | 添加进程段 |
+| POST | `/api/repair/workorder/{id}/segments/{segmentId}/parts` | 进程段添加配件 |
 | POST | `/api/repair/workorder` | 创建报修 |
 | POST | `/api/repair/workorder/{id}/dispatch` | 派单/指派 |
 | POST | `/api/repair/workorder/{id}/start-repair` | 跳过派单直修 / 开始维修 |
@@ -254,7 +325,8 @@ stateDiagram-v2
 | 报修中 | 派工、开始维修（直修）、取消 |
 | 派单中 / 待接单 | 改派、接单、开始维修、取消 |
 | 已接单 | 开始维修、转派 |
-| 维修中 | 更新子状态、转派、完工、挂起 |
+| 维修中 | 更新子状态、**添加进程**、转派、完工、挂起 |
+| 拒绝验收 | **添加进程**（返修/再次待验收）、转派、更新子状态 |
 | 已挂起 | 恢复、取消 |
 | 已维修待验收 | 验收通过、验收不通过 |
 | 已验收 | 关闭（若未自动关闭） |
