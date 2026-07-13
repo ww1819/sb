@@ -17,11 +17,6 @@
     :disabled="field.readonly"
     @update:model-value="onPickerModel"
   />
-  <RefDisplay
-    v-else-if="field.linkTable && field.readonly"
-    :link-table="field.linkTable"
-    :value="model"
-  />
   <RefSelect
     v-else-if="field.linkTable"
     v-model="model"
@@ -40,7 +35,14 @@
     :placeholder="field.label"
     :disabled="field.readonly"
   />
-  <component v-else :is="inputComponent" v-model="model" v-bind="attrs" :disabled="field.readonly">
+  <component
+    v-else
+    :is="inputComponent"
+    v-model="model"
+    v-bind="attrs"
+    :disabled="field.readonly && !useNativeReadonly"
+    :readonly="field.readonly && useNativeReadonly"
+  >
     <template v-if="useDictSelect && options.length">
       <el-option v-for="o in options" :key="o.value" :label="o.label" :value="o.value" />
     </template>
@@ -52,7 +54,6 @@ import { computed, onMounted, ref } from 'vue'
 import type { FieldSchema } from '@/config/pageSchemas'
 import { useDict } from '@/composables/useDict'
 import RefSelect from '@/components/form/RefSelect.vue'
-import RefDisplay from '@/components/form/RefDisplay.vue'
 import FileUploadField from '@/components/form/FileUploadField.vue'
 import RepairDevicePickerField from '@/components/repair/RepairDevicePickerField.vue'
 import AssetDevicePickerField from '@/components/form/AssetDevicePickerField.vue'
@@ -79,6 +80,12 @@ const fileModel = computed({
 })
 
 const useDictSelect = computed(() => !!props.field.dictType)
+
+const useNativeReadonly = computed(() => {
+  if (props.field.dictType || props.field.type === 'select') return false
+  if (props.field.type === 'number' || props.field.type === 'date' || props.field.type === 'datetime') return false
+  return true
+})
 
 const inputComponent = computed(() => {
   if (props.field.dictType) return 'el-select'

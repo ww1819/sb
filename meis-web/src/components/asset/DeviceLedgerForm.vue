@@ -1,5 +1,5 @@
 <template>
-  <el-form label-width="96px" class="device-ledger-form" :disabled="isView">
+  <el-form label-width="96px" class="device-ledger-form" :class="{ 'device-ledger-form--view': isView }">
     <FormTabNav v-model="activeTab" :tabs="visibleTabs" />
 
     <div class="device-ledger-form__panel">
@@ -311,5 +311,27 @@ const adverseColumns: RecordColumn[] = [
 
 .device-ledger-form__card-pane {
   padding-top: 4px;
+}
+
+.device-ledger-form--view :deep(.el-input__wrapper),
+.device-ledger-form--view :deep(.el-select__wrapper),
+.device-ledger-form--view :deep(.el-input-number .el-input__wrapper),
+.device-ledger-form--view :deep(.el-date-editor .el-input__wrapper),
+.device-ledger-form :deep(.el-input.is-disabled .el-input__wrapper),
+.device-ledger-form :deep(.el-select__wrapper.is-disabled),
+.device-ledger-form :deep(.el-input-number.is-disabled .el-input__wrapper),
+.device-ledger-form :deep(.el-date-editor.is-disabled .el-input__wrapper) {
+  background-color: #fff !important;
+  cursor: default;
+}
+
+.device-ledger-form--view :deep(.el-input__inner),
+.device-ledger-form--view :deep(.el-select__selected-item),
+.device-ledger-form--view :deep(.el-input-number .el-input__inner),
+.device-ledger-form :deep(.el-input.is-disabled .el-input__inner),
+.device-ledger-form :deep(.el-select__wrapper.is-disabled .el-select__selected-item),
+.device-ledger-form :deep(.el-input-number.is-disabled .el-input__inner) {
+  color: var(--el-text-color-regular) !important;
+  -webkit-text-fill-color: var(--el-text-color-regular);
 }
 </style>

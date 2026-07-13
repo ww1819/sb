@@ -421,6 +421,52 @@ body {
   margin-left: 0;
 }
 
+.table-sort-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.table-sort-header__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table-sort-header__btns {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.table-sort-header__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 12px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--el-text-color-placeholder);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.table-sort-header__btn:hover {
+  color: var(--el-color-primary);
+}
+
+.table-sort-header__btn.active {
+  color: var(--el-color-primary);
+}
+
+.table-sort-header__btn .el-icon {
+  font-size: 12px;
+}
+
 .cell-number {
   font-variant-numeric: tabular-nums;
 }

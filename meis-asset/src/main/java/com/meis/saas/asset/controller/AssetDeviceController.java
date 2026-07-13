@@ -40,17 +40,41 @@ public class AssetDeviceController {
             args.add(kw);
             args.add(kw);
         }
+        boolean sortByDept = "dept_id".equals(query.getSortBy());
+        String from = " FROM medical_device d ";
+        if (sortByDept) {
+            from += " LEFT JOIN department dept ON d.dept_id = dept.id ";
+        }
         long total = Optional.ofNullable(jdbc.queryForObject(
-                "SELECT COUNT(*) FROM medical_device d" + where, Long.class, args.toArray())).orElse(0L);
+                "SELECT COUNT(*) " + from + where, Long.class, args.toArray())).orElse(0L);
         int offset = (query.getPage() - 1) * query.getSize();
         args.add(query.getSize());
         args.add(offset);
         var rows = jdbc.queryForList("""
                 SELECT d.*
-                FROM medical_device d
-                """ + where + " ORDER BY d.created_at DESC NULLS LAST, d.device_code LIMIT ? OFFSET ?", args.toArray());
+                """ + from + where + buildOrderBy(query) + " LIMIT ? OFFSET ?", args.toArray());
         MedicalDeviceDeleteGuard.enrichCanDelete(jdbc, rows);
         return Result.ok(new PageResult<>(rows, total, query.getPage(), query.getSize()));
+    }
+
+    private static String buildOrderBy(PageQuery query) {
+        String sortBy = query.getSortBy();
+        String sortOrder = query.getSortOrder();
+        if (sortBy == null || sortBy.isBlank() || sortOrder == null || sortOrder.isBlank()) {
+            return " ORDER BY d.created_at DESC NULLS LAST, d.device_code ASC";
+        }
+        String dir = "desc".equalsIgnoreCase(sortOrder) ? "DESC" : "ASC";
+        String column = switch (sortBy) {
+            case "device_code" -> "d.device_code";
+            case "device_name" -> "d.device_name";
+            case "specification" -> "d.specification";
+            case "dept_id" -> "dept.dept_name";
+            default -> null;
+        };
+        if (column == null) {
+            return " ORDER BY d.created_at DESC NULLS LAST, d.device_code ASC";
+        }
+        return " ORDER BY " + column + " " + dir + " NULLS LAST, d.device_code ASC";
     }
 
     @GetMapping("/{id}/detail")

@@ -46,6 +46,10 @@ export interface PageConfig {
   enableChangeLog?: boolean
   /** 列表首列显示分页序号 */
   showRowIndex?: boolean
+  /** 序号列前显示多选框 */
+  showRowSelection?: boolean
+  /** 支持表头升序/降序的列 prop */
+  sortableColumns?: string[]
 }
 
 export const pageRegistry: Record<string, PageConfig> = {
@@ -159,8 +163,10 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'medical_device',
     listPageUrl: '/asset/device/page',
     showRowIndex: true,
-  enableView: true
-},
+    showRowSelection: true,
+    sortableColumns: ['device_code', 'device_name', 'specification', 'dept_id'],
+    enableView: true
+  },
   '/asset/entry': {
     title: '设备入库',
     apiBase: '/asset',

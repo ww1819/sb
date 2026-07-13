@@ -94,7 +94,8 @@
       @row-dblclick="onRowDblClick"
       @selection-change="onSelectionChange"
     >
-      <el-table-column v-if="showPinyinCode" type="selection" width="48" fixed="left" reserve-selection />
+      <el-table-column v-if="showRowSelection" type="selection" width="48" fixed="left" reserve-selection />
+      <el-table-column v-else-if="showPinyinCode" type="selection" width="48" fixed="left" reserve-selection />
       <el-table-column
         v-if="showRowIndex"
         label="序号"
@@ -114,11 +115,20 @@
         :min-width="f.width ?? 120"
         show-overflow-tooltip
       >
+        <template v-if="isSortable(f.prop)" #header>
+          <TableColumnSortHeader
+            :label="f.label"
+            :field="f.prop"
+            :sort-field="sortField"
+            :sort-order="sortOrder"
+            @sort="setSort"
+          />
+        </template>
         <template #default="{ row }">
           <TableCellValue :field="f" :value="row[f.prop]" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" :width="operationWidth" fixed="right">
+      <el-table-column label="操作" header-align="center" :width="operationWidth" fixed="right">
         <template #default="{ row }">
           <div class="table-actions">
             <el-button
@@ -201,6 +211,7 @@ import FieldRenderer from './FieldRenderer.vue'
 import SystemPageCard from './system/SystemPageCard.vue'
 import PageFilterBar from './system/PageFilterBar.vue'
 import TableCellValue from './table/TableCellValue.vue'
+import TableColumnSortHeader from './table/TableColumnSortHeader.vue'
 import PageEmpty from './table/PageEmpty.vue'
 import type { PageConfig } from '@/config/pageRegistry'
 import { getListFields, getSchema, collectLinkTables } from '@/config/pageSchemas'
@@ -247,6 +258,8 @@ const formMode = ref<'create' | 'edit' | 'view'>('create')
 const tableRef = ref()
 const changeLogVisible = ref(false)
 const changeLogEntityId = ref<string>('')
+const sortField = ref<string | null>(null)
+const sortOrder = ref<'asc' | 'desc' | null>(null)
 const { selectedCount, syncFromTable, selectedIds, clear: clearSelection } = useCrossPageSelection()
 
 const tableHeight = useSystemTableHeight()
@@ -262,6 +275,23 @@ const operationWidth = computed(() => {
 })
 const changeLogEnabled = computed(() => props.config.enableChangeLog !== false && viewEnabled.value)
 const showRowIndex = computed(() => props.config.showRowIndex === true)
+const showRowSelection = computed(() => props.config.showRowSelection === true)
+
+function isSortable(prop: string) {
+  return props.config.sortableColumns?.includes(prop) ?? false
+}
+
+function setSort(prop: string, order: 'asc' | 'desc') {
+  if (sortField.value === prop && sortOrder.value === order) {
+    sortField.value = null
+    sortOrder.value = null
+  } else {
+    sortField.value = prop
+    sortOrder.value = order
+  }
+  page.value = 1
+  void load()
+}
 
 function rowSerial(index: number) {
   return (page.value - 1) * size.value + index + 1
@@ -338,6 +368,10 @@ async function load() {
     for (const [k, v] of Object.entries(props.config.listParams ?? {})) {
       if (v !== undefined && v !== null && v !== '') params[k] = v
     }
+    if (sortField.value && sortOrder.value) {
+      params.sortBy = sortField.value
+      params.sortOrder = sortOrder.value
+    }
     const { data } = await http.get(url, { params })
     rows.value = data.data?.records ?? []
     total.value = data.data?.total ?? 0
@@ -358,6 +392,8 @@ function onReset() {
   for (const f of props.config.listFilters ?? []) {
     filterValues[f.key] = undefined
   }
+  sortField.value = null
+  sortOrder.value = null
   page.value = 1
   clearSelection()
   tableRef.value?.clearSelection()
