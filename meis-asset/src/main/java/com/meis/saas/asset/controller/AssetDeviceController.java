@@ -26,20 +26,20 @@ public class AssetDeviceController {
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(
             PageQuery query,
-            @RequestParam(required = false) String enable_dateFrom,
-            @RequestParam(required = false) String enable_dateTo,
-            @RequestParam(required = false) String supplier_id,
-            @RequestParam(required = false) String manufacturer_id,
-            @RequestParam(required = false) String supplier_name,
-            @RequestParam(required = false) String manufacturer_name,
-            @RequestParam(required = false) String device_name,
-            @RequestParam(required = false) String specification,
-            @RequestParam(required = false) String model,
-            @RequestParam(required = false) String dept_id,
-            @RequestParam(required = false) String manage_dept_id,
-            @RequestParam(required = false) String dept_name,
-            @RequestParam(required = false) String manage_dept_name,
-            @RequestParam(required = false) String serial_number) {
+            @RequestParam(value = "enable_dateFrom", required = false) String enable_dateFrom,
+            @RequestParam(value = "enable_dateTo", required = false) String enable_dateTo,
+            @RequestParam(value = "supplier_id", required = false) String supplier_id,
+            @RequestParam(value = "manufacturer_id", required = false) String manufacturer_id,
+            @RequestParam(value = "supplier_name", required = false) String supplier_name,
+            @RequestParam(value = "manufacturer_name", required = false) String manufacturer_name,
+            @RequestParam(value = "device_name", required = false) String device_name,
+            @RequestParam(value = "specification", required = false) String specification,
+            @RequestParam(value = "model", required = false) String model,
+            @RequestParam(value = "dept_id", required = false) String dept_id,
+            @RequestParam(value = "manage_dept_id", required = false) String manage_dept_id,
+            @RequestParam(value = "dept_name", required = false) String dept_name,
+            @RequestParam(value = "manage_dept_name", required = false) String manage_dept_name,
+            @RequestParam(value = "serial_number", required = false) String serial_number) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d"));
         List<Object> args = new ArrayList<>();
@@ -59,11 +59,11 @@ public class AssetDeviceController {
         appendUuidEq(where, args, "d.manufacturer_id", manufacturer_id);
         appendUuidEq(where, args, "d.dept_id", dept_id);
         appendUuidEq(where, args, "d.manage_dept_id", manage_dept_id);
-        boolean needSupplier = hasText(supplier_name) && !hasText(supplier_id);
+        boolean needSupplier = hasText(supplier_name);
         boolean needManufacturer = hasText(manufacturer_name) && !hasText(manufacturer_id);
-        boolean needUseDept = (hasText(dept_name) && !hasText(dept_id)) || "dept_id".equals(query.getSortBy());
+        boolean needUseDept = hasText(dept_name) || "dept_id".equals(query.getSortBy());
         boolean needManageDept = hasText(manage_dept_name) && !hasText(manage_dept_id);
-        if (!hasText(supplier_id)) {
+        if (hasText(supplier_name)) {
             appendSupplierSearch(where, args, supplier_name);
         }
         if (!hasText(manufacturer_id)) {

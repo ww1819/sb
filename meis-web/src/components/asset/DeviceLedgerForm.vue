@@ -129,11 +129,13 @@ const allTabs = [
   { key: 'adverse', label: '不良事件' }
 ]
 
-/** 编辑：基本信息+图片+档案；查看：全部（含标签与业务 Sheet） */
+/** 新增：仅基本信息/档案/图片；编辑与查看：全部 Tab */
 const visibleTabs = computed(() => {
-  if (isView.value) return allTabs
-  const editKeys = new Set(['basic', 'archive', 'images'])
-  return allTabs.filter((t) => editKeys.has(t.key))
+  if (isCreate.value) {
+    const createKeys = new Set(['basic', 'archive', 'images'])
+    return allTabs.filter((t) => createKeys.has(t.key))
+  }
+  return allTabs
 })
 
 watch(

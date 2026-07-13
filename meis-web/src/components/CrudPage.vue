@@ -358,15 +358,13 @@ async function load() {
       size: size.value
     }
     if (!moreSearchFields.value.length && keyword.value) params.keyword = keyword.value
-    for (const key of selectedMoreSearchKeys.value) {
-      const f = moreSearchFields.value.find((item) => item.key === key)
-      if (!f) continue
-      const v = moreSearchValues.value[key]?.trim()
+    for (const f of moreSearchFields.value) {
+      const v = moreSearchValues.value[f.key]?.trim()
       if (!v) continue
-      params[key] = v
-      if (f.linkTable && key.endsWith('_id')) {
-        const nameKey = key.replace(/_id$/, '_name')
-        const label = moreSearchLabels.value[key]?.trim()
+      params[f.key] = v
+      if (f.linkTable && f.key.endsWith('_id')) {
+        const nameKey = f.key.replace(/_id$/, '_name')
+        const label = moreSearchLabels.value[f.key]?.trim()
         if (label) {
           const name = label.replace(/\s*\([^)]*\)\s*$/, '').trim()
           if (name) params[nameKey] = name
@@ -408,10 +406,12 @@ async function load() {
 }
 
 function onSearch() {
-  page.value = 1
-  clearSelection()
-  tableRef.value?.clearSelection()
-  load()
+  void nextTick().then(() => {
+    page.value = 1
+    clearSelection()
+    tableRef.value?.clearSelection()
+    load()
+  })
 }
 
 function onReset() {
