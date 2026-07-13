@@ -13,7 +13,7 @@ set "APP_PASSWORD=med123456"
 
 REM 超级用户（仅还原时删库/建库需要）
 set "SUPER_USER=postgres"
-set "SUPER_PASSWORD=aspt"
+set "SUPER_PASSWORD=root"
 
 REM 备份文件存放目录
 set "BACKUP_DIR=D:\DBBACKUP\meis"
