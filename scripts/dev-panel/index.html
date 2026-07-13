@@ -855,6 +855,23 @@
       return '<span class="muted">—</span> ' + port
     }
 
+    function parsePanelDateTime(text) {
+      if (!text) return null
+      const m = String(text).trim().match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/)
+      if (!m) return null
+      return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6]))
+    }
+
+    function isSourceNewerThanHotReload(s) {
+      const hr = s.hotReload
+      if (!hr || !hr.at) return false
+      if (hr.atSort) return Number(s.sourceMtimeSort || 0) > Number(hr.atSort)
+      const hrAt = parsePanelDateTime(hr.at)
+      const srcAt = parsePanelDateTime(s.sourceMtime)
+      if (hrAt && srcAt) return srcAt.getTime() > hrAt.getTime()
+      return String(s.sourceMtime) > String(hr.at)
+    }
+
     function formatHotReloadSteps(steps) {
       if (!Array.isArray(steps) || !steps.length) return ''
       const labels = { compile: '编译', stop: '停止', sync: '写JAR', restart: '重启', health: '健康检查' }
@@ -875,8 +892,14 @@
         return '<span class="jar-meta" title="尚未执行过热加载">—</span>'
       }
       const hints = []
-      if (s.sourceMtime && hr.at && String(s.sourceMtime) > String(hr.at)) {
-        hints.push('<span class="hot-reload-status running" title="源码变更晚于上次热加载，可能待自动/手动同步">待同步</span>')
+      if (isSourceNewerThanHotReload(s)) {
+        if (s.sourceDirtyPending && s.autoReloadEligible) {
+          hints.push('<span class="hot-reload-status running" title="源码已变更，等待自动热加载（约 2s 防抖）">排队热加载</span>')
+        } else if (s.sourceDirtyPending && !s.autoReloadEligible) {
+          hints.push('<span class="hot-reload-status running" title="已记录源码变更，但服务未处于调试模式（HTTP+JDWP），不会自动热加载">待调试热加载</span>')
+        } else {
+          hints.push('<span class="hot-reload-status running" title="源码变更晚于上次热加载，可能待自动/手动同步">待同步</span>')
+        }
       }
       const stepTip = formatHotReloadSteps(hr.steps)
       const title = escapeHtml((hr.message || '') + (stepTip ? '\n' + stepTip : ''))
@@ -1123,12 +1146,21 @@
       if (!s.sourceMtime) {
         return '<span class="jar-meta" title="未找到 src 目录">—</span>'
       }
+      if (hotReloadPending[s.name] || s.hotReloadInProgress) {
+        return escapeHtml(s.sourceMtime)
+          + '<div class="jar-meta"><span class="hot-reload-status running">同步中…</span></div>'
+      }
       const hints = []
       if (s.needsCompile) {
         hints.push('<span style="color:var(--warn)" title="源码晚于 classes，需快速编译或热加载">待编译</span>')
       }
       if (s.needsJarSync) {
         hints.push('<span style="color:var(--warn)" title="classes 晚于 JAR，热加载前需写 JAR 或完整打包">JAR 落后</span>')
+      }
+      if (s.sourceDirtyPending && s.autoReloadEligible) {
+        hints.push('<span class="hot-reload-status running" title="等待自动热加载">排队热加载</span>')
+      } else if (s.sourceDirtyPending && !s.autoReloadEligible) {
+        hints.push('<span class="hot-reload-status running" title="非调试模式不会自动热加载">待调试热加载</span>')
       }
       return escapeHtml(s.sourceMtime)
         + (hints.length ? '<div class="jar-meta">' + hints.join(' · ') + '</div>' : '')

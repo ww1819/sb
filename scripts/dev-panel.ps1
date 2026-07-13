@@ -52,16 +52,23 @@ function Initialize-PanelSourceWatchers {
         $watcher.IncludeSubdirectories = $true
         $watcher.NotifyFilter = [IO.NotifyFilters]'FileName, LastWrite, CreationTime, Size'
         $watcher.EnableRaisingEvents = $true
-        $reg = Register-ObjectEvent -InputObject $watcher -EventName Changed -SourceIdentifier ("meis-src-changed-$svcName") -MessageData $svcName -Action {
-            $name = [string]$Event.MessageData
-            $rel = [string]$Event.SourceEventArgs.Name
-            if ([string]::IsNullOrWhiteSpace($rel)) { return }
-            $ext = [IO.Path]::GetExtension($rel).ToLowerInvariant()
-            $allowed = @('.java', '.xml', '.yml', '.yaml', '.properties', '.sql', '.kt')
-            if ($ext -and $allowed -notcontains $ext) { return }
-            $Global:MeisPanelSourceDirty[$name] = Get-Date
+        # Changed / Created / Renamed：覆盖本机保存与 git pull 新增/覆盖/改名；不依赖文件 mtime 早晚
+        foreach ($evtName in @('Changed', 'Created', 'Renamed')) {
+            $sid = "meis-src-$($evtName.ToLowerInvariant())-$svcName"
+            $reg = Register-ObjectEvent -InputObject $watcher -EventName $evtName -SourceIdentifier $sid -MessageData $svcName -Action {
+                $name = [string]$Event.MessageData
+                $rel = [string]$Event.SourceEventArgs.Name
+                if ([string]::IsNullOrWhiteSpace($rel) -and $Event.SourceEventArgs.ChangeType -eq [IO.WatcherChangeTypes]::Renamed) {
+                    $rel = [string]$Event.SourceEventArgs.FullPath
+                }
+                if ([string]::IsNullOrWhiteSpace($rel)) { return }
+                $ext = [IO.Path]::GetExtension($rel).ToLowerInvariant()
+                $allowed = @('.java', '.xml', '.yml', '.yaml', '.properties', '.sql', '.kt')
+                if ($ext -and $allowed -notcontains $ext) { return }
+                $Global:MeisPanelSourceDirty[$name] = Get-Date
+            }
+            $script:PanelSourceWatcherRegistrations += $reg
         }
-        $script:PanelSourceWatcherRegistrations += $reg
     }
 }
 
@@ -91,13 +98,17 @@ function Invoke-PanelAutoHotReloadTick {
     foreach ($name in @($Global:MeisPanelSourceDirty.Keys)) {
         $dirtyAt = $Global:MeisPanelSourceDirty[$name]
         if (($now - $dirtyAt).TotalSeconds -lt 2) { continue }
-        $Global:MeisPanelSourceDirty.Remove($name) | Out-Null
         if ($script:PanelBuildPending.ContainsKey($name)) { continue }
         if (-not (Test-PanelServiceDebugRunning -ServiceName $name)) { continue }
+        if ($script:PanelBackgroundJobs.ContainsKey("hotreload-$name")) {
+            $hrJob = $script:PanelBackgroundJobs["hotreload-$name"]
+            if ($null -ne $hrJob -and $hrJob.State -eq 'Running') { continue }
+        }
         if ($script:PanelAutoReloadCooldown.ContainsKey($name)) {
             $last = $script:PanelAutoReloadCooldown[$name]
             if (($now - $last).TotalSeconds -lt 20) { continue }
         }
+        $Global:MeisPanelSourceDirty.Remove($name) | Out-Null
         $script:PanelAutoReloadCooldown[$name] = $now
         Add-MeisPanelEvent ("AUTO HOT-RELOAD " + $name + " (source changed)")
         Start-PanelServiceBackgroundJob -ServiceName $name -Action 'reload-classes'
@@ -123,14 +134,19 @@ function Set-PanelHotReloadResult {
         [Parameter(Mandatory = $true)][string]$ServiceName,
         [Parameter(Mandatory = $true)][hashtable]$Result
     )
+    $at = (Get-Date)
     $script:PanelHotReloadResults[$ServiceName] = [ordered]@{
-        at        = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
-        ok        = [bool]$Result.ok
-        message   = [string]$Result.message
-        steps     = @($Result.steps)
-        httpUp    = [bool]$Result.httpUp
-        debugUp   = [bool]$Result.debugUp
-        fileCount = if ($null -ne $Result.fileCount) { [int]$Result.fileCount } else { 0 }
+        at            = $at.ToString('yyyy-MM-dd HH:mm:ss')
+        atSort        = [DateTimeOffset]::new($at).ToUnixTimeMilliseconds()
+        ok            = [bool]$Result.ok
+        message       = [string]$Result.message
+        steps         = @($Result.steps)
+        httpUp        = [bool]$Result.httpUp
+        debugUp       = [bool]$Result.debugUp
+        fileCount     = if ($null -ne $Result.fileCount) { [int]$Result.fileCount } else { 0 }
+    }
+    if ([bool]$Result.ok) {
+        Clear-MeisModuleMtimeCache -ModuleName $ServiceName
     }
 }
 
@@ -617,6 +633,8 @@ function Get-PanelServiceStatusList {
         if ($script:PanelHotReloadResults.ContainsKey($name)) {
             $item.hotReload = Resolve-PanelHotReloadDisplay -ServiceName $name -ServiceItem $item
         }
+        $item.sourceDirtyPending = $Global:MeisPanelSourceDirty.ContainsKey($name)
+        $item.autoReloadEligible = Test-PanelServiceDebugRunning -ServiceName $name
     }
     return @($list | Sort-Object { Get-PanelServiceSourceSortKey $_ } -Descending)
 }

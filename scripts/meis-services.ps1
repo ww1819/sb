@@ -1138,6 +1138,29 @@ function Get-MeisModuleSourceLastWrite {
     return $val
 }
 
+function Clear-MeisModuleMtimeCache {
+    param([string]$ModuleName = '')
+    if (-not $script:MeisTreeMtimeCache) { $script:MeisTreeMtimeCache = @{} }
+    if (-not $script:MeisTreeMtimeCacheExpiry) { $script:MeisTreeMtimeCacheExpiry = @{} }
+    if (-not $script:MeisSourceMtimeCache) { $script:MeisSourceMtimeCache = @{} }
+    if (-not $script:MeisSourceMtimeCacheExpiry) { $script:MeisSourceMtimeCacheExpiry = @{} }
+    if ([string]::IsNullOrWhiteSpace($ModuleName)) {
+        $script:MeisTreeMtimeCache = @{}
+        $script:MeisTreeMtimeCacheExpiry = @{}
+        $script:MeisSourceMtimeCache = @{}
+        $script:MeisSourceMtimeCacheExpiry = @{}
+        return
+    }
+    $classesDir = Join-Path $script:MeisRoot "$ModuleName\target\classes"
+    $script:MeisTreeMtimeCache.Remove($classesDir) | Out-Null
+    $script:MeisTreeMtimeCacheExpiry.Remove($classesDir) | Out-Null
+    $jar = Join-Path $script:MeisRoot "$ModuleName\target\$ModuleName-1.0.0-SNAPSHOT.jar"
+    $script:MeisTreeMtimeCache.Remove($jar) | Out-Null
+    $script:MeisTreeMtimeCacheExpiry.Remove($jar) | Out-Null
+    $script:MeisSourceMtimeCache.Remove($ModuleName) | Out-Null
+    $script:MeisSourceMtimeCacheExpiry.Remove($ModuleName) | Out-Null
+}
+
 function Get-MeisServiceStatusList {
     $ports = Get-MeisListeningPortSet
     $list = @()
