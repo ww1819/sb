@@ -5,6 +5,7 @@ export type FieldGroup =
   | 'finance'
   | 'location'
   | 'vendor'
+  | 'accounting'
   | 'approval'
   | 'attachment'
   | 'remark'
@@ -127,7 +128,7 @@ export function getGroupedFields(table: string): { group: FieldGroup; fields: Fi
     if (!groups.has(g)) groups.set(g, [])
     groups.get(g)!.push(f)
   }
-  const order: FieldGroup[] = ['basic', 'finance', 'location', 'vendor', 'time', 'status', 'workflow', 'approval', 'compliance', 'attachment', 'remark', 'other']
+  const order: FieldGroup[] = ['basic', 'finance', 'location', 'vendor', 'time', 'accounting', 'status', 'workflow', 'approval', 'compliance', 'other', 'attachment', 'remark']
   return order.filter((g) => groups.has(g)).map((g) => ({ group: g, fields: groups.get(g)! }))
 }
 
@@ -137,6 +138,7 @@ const groupTitleMap: Record<FieldGroup, string> = {
   location: '位置信息',
   vendor: '厂家信息',
   time: '合同信息',
+  accounting: '财务信息',
   status: '状态信息',
   workflow: '流程信息',
   approval: '审批信息',

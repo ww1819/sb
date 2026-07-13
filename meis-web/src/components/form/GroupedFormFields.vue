@@ -2,6 +2,41 @@
   <div class="grouped-form">
     <template v-if="groups.length">
       <FormSection v-for="g in groups" :key="g.group" :title="sectionTitle(g.group)">
+        <template v-if="groupPanel(g.group)">
+          <div
+            v-if="panelOuterFields(g).length"
+            class="form-grid"
+            :style="panelOuterGridStyle(g.group)"
+          >
+            <el-form-item
+              v-for="f in panelOuterFields(g)"
+              :key="f.prop"
+              :label="f.label"
+              :required="f.required"
+              :style="gridItemStyle(f, g.group)"
+            >
+              <slot :name="`field-${f.prop}`" :field="f" :model="model">
+                <FieldRenderer v-model="model[f.prop]" :field="f" :model="model" />
+              </slot>
+            </el-form-item>
+          </div>
+          <div v-if="panelInnerFields(g).length" class="form-group-panel">
+            <div class="form-group-panel__row">
+              <el-form-item
+                v-for="f in panelInnerFields(g)"
+                :key="f.prop"
+                :label="f.label"
+                :required="f.required"
+                class="form-group-panel__item"
+              >
+                <slot :name="`field-${f.prop}`" :field="f" :model="model">
+                  <FieldRenderer v-model="model[f.prop]" :field="f" :model="model" />
+                </slot>
+              </el-form-item>
+            </div>
+          </div>
+        </template>
+        <template v-else>
         <div v-if="groupColumns(g.group) && groupFieldRows(g).length" class="form-grid-stack">
           <div
             v-for="(row, rowIdx) in groupFieldRows(g)"
@@ -9,12 +44,13 @@
             class="form-grid"
             :style="{ gridTemplateColumns: `repeat(${groupColumns(g.group)}, minmax(0, 1fr))` }"
           >
-            <el-form-item
-              v-for="f in row"
-              :key="f.prop"
-              :label="f.label"
-              :required="f.required"
-            >
+          <el-form-item
+            v-for="f in row"
+            :key="f.prop"
+            :label="f.label"
+            :required="f.required"
+            :style="gridItemStyle(f, g.group)"
+          >
               <slot :name="`field-${f.prop}`" :field="f" :model="model">
                 <FieldRenderer v-model="model[f.prop]" :field="f" :model="model" />
               </slot>
@@ -31,6 +67,7 @@
             :key="f.prop"
             :label="f.label"
             :required="f.required"
+            :style="gridItemStyle(f, g.group)"
           >
             <slot :name="`field-${f.prop}`" :field="f" :model="model">
               <FieldRenderer v-model="model[f.prop]" :field="f" :model="model" />
@@ -46,6 +83,7 @@
             </el-form-item>
           </el-col>
         </el-row>
+        </template>
       </FormSection>
     </template>
     <template v-else>
@@ -69,7 +107,7 @@ function buildGroups(schema: FieldSchema[]) {
     if (!groups.has(g)) groups.set(g, [])
     groups.get(g)!.push(f)
   }
-  const order = ['basic', 'finance', 'location', 'vendor', 'time', 'status', 'workflow', 'approval', 'compliance', 'attachment', 'remark', 'other']
+  const order = ['basic', 'finance', 'location', 'vendor', 'time', 'accounting', 'status', 'workflow', 'approval', 'compliance', 'other', 'attachment', 'remark']
   return order.filter((g) => groups.has(g)).map((g) => ({ group: g as FieldSchema['group'], fields: groups.get(g)! }))
 }
 
@@ -84,7 +122,37 @@ const props = defineProps<{
   groupTitles?: Partial<Record<FieldGroup, string>>
   /** 指定分组内字段分行（每行一组 prop，配合 groupColumns 使用） */
   groupRows?: Partial<Record<FieldGroup, string[][]>>
+  /** 分组内嵌面板：outer 为面板外字段，inner 为面板内字段 */
+  groupPanels?: Partial<Record<FieldGroup, { outer?: string[]; inner: string[] }>>
 }>()
+
+function groupPanel(group: FieldGroup) {
+  return props.groupPanels?.[group]
+}
+
+function panelOuterFields(group: { group: FieldGroup; fields: FieldSchema[] }) {
+  const panel = groupPanel(group.group)
+  if (!panel) return []
+  const innerSet = new Set(panel.inner)
+  const outerSet = panel.outer ? new Set(panel.outer) : null
+  return group.fields.filter((f) => {
+    if (innerSet.has(f.prop)) return false
+    if (outerSet) return outerSet.has(f.prop)
+    return true
+  })
+}
+
+function panelInnerFields(group: { group: FieldGroup; fields: FieldSchema[] }) {
+  const panel = groupPanel(group.group)
+  if (!panel) return []
+  const map = new Map(group.fields.map((f) => [f.prop, f]))
+  return panel.inner.map((prop) => map.get(prop)).filter((f): f is FieldSchema => !!f)
+}
+
+function panelOuterGridStyle(group: FieldGroup) {
+  const cols = groupColumns(group) ?? 2
+  return { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }
+}
 
 function groupFieldRows(group: { group: FieldGroup; fields: FieldSchema[] }) {
   const rows = props.groupRows?.[group.group]
@@ -101,6 +169,14 @@ function sectionTitle(group: FieldGroup) {
 
 function groupColumns(group: FieldGroup) {
   return props.groupColumns?.[group]
+}
+
+function gridItemStyle(field: FieldSchema, group: FieldGroup) {
+  const cols = groupColumns(group)
+  if (!cols) return undefined
+  if (field.span && field.span >= 24) return { gridColumn: '1 / -1' }
+  if (field.type === 'textarea') return { gridColumn: '1 / -1' }
+  return undefined
 }
 
 function fieldSpan(field: FieldSchema, group: FieldGroup) {
@@ -149,5 +225,42 @@ const flatFields = computed(() => props.fields ?? getSchema(props.table).filter(
 .form-grid :deep(.el-input),
 .form-grid :deep(.el-input-number) {
   width: 100%;
+}
+
+.form-group-panel {
+  margin-top: 4px;
+  padding: 12px 16px 4px;
+  background: var(--meis-surface-muted);
+  border: 1px solid var(--meis-border-light);
+  border-radius: var(--meis-card-radius);
+}
+
+.form-group-panel__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px 20px;
+}
+
+.form-group-panel__row :deep(.el-form-item) {
+  margin-bottom: 8px;
+  flex: 0 0 auto;
+  width: auto;
+}
+
+.form-group-panel__row :deep(.el-form-item__label) {
+  width: auto !important;
+  padding-right: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.form-group-panel__row :deep(.el-form-item__content) {
+  flex: 0 0 auto;
+}
+
+.form-group-panel__item {
+  margin-bottom: 0;
 }
 </style>

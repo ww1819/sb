@@ -8,9 +8,10 @@
         table="medical_device"
         :model="model"
         :fields="basicFields"
-        :group-columns="{ basic: 5, finance: 5, vendor: 5, time: 5 }"
-        :group-rows="{ vendor: vendorFormRows }"
-        :group-titles="{ finance: '折旧信息', time: '合同信息' }"
+        :group-columns="{ basic: 5, finance: 5, location: 5, vendor: 5, time: 5, accounting: 5, status: 5, compliance: 5, other: 5 }"
+        :group-rows="{ vendor: vendorFormRows, accounting: accountingFormRows, location: locationFormRows }"
+        :group-panels="{ status: statusFormPanel }"
+        :group-titles="{ finance: '折旧信息', time: '合同信息', accounting: '财务信息', status: '设备属性', compliance: '动态监测' }"
       />
 
       <div v-show="activeTab === 'card'" class="device-ledger-form__card-pane">
@@ -140,13 +141,37 @@ watch(
   }
 )
 
-const basicGroupKeys = new Set(['basic', 'finance', 'location', 'vendor', 'time', 'status', 'compliance', 'attachment', 'remark', 'other'])
+const basicGroupKeys = new Set(['basic', 'finance', 'location', 'vendor', 'time', 'accounting', 'status', 'compliance', 'other', 'attachment'])
 
 const vendorFormRows = [
-  ['supplier_id', 'supplier_phone'],
-  ['maintenance_company', 'maintenance_phone'],
-  ['manufacturer_id']
+  ['supplier_uscc', 'supplier_id', 'supplier_contact', 'supplier_phone'],
+  ['maintenance_uscc', 'maintenance_company', 'maintenance_engineer', 'maintenance_phone'],
+  ['manufacturer_uscc', 'manufacturer_id']
 ]
+
+const accountingFormRows = [
+  ['material_category_code', 'material_group', 'asset_class_code', 'asset_class_name', 'acceptance_date'],
+  ['kingdee_asset_code', 'invoice_no', 'invoice_date', 'expense_item_code', 'expense_item_name'],
+  ['fund_source', 'lease_fee_per_use', 'lease_fee_per_day']
+]
+
+const locationFormRows = [
+  ['campus_id', 'building_id', 'warehouse_id', 'location_floor', 'room_number'],
+  ['location_detail']
+]
+
+const statusFormPanel = {
+  outer: ['device_status', 'risk_level'],
+  inner: [
+    'is_life_support',
+    'is_emergency',
+    'is_metrology',
+    'is_shared_device',
+    'is_maintain_device',
+    'is_inspection_device',
+    'is_pm_device'
+  ]
+}
 
 const basicFields = computed(() => {
   const source = props.fields?.length ? props.fields : getSchema('medical_device')
