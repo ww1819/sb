@@ -33,7 +33,7 @@ if (-not (Test-Path $htmlPath)) { throw "Missing panel UI: $htmlPath" }
 $script:PanelBuildPending = @{}
 $script:PanelHotReloadResults = @{}
 $script:PanelLibraryReloadResults = @{}
-$script:PanelBackgroundJobs = [ordered]@{}
+$script:PanelBackgroundJobs = @{}
 $script:PanelAutoHotReloadEnabled = $true
 $script:PanelAutoReloadCooldown = @{}
 $Global:MeisPanelSourceDirty = @{}
@@ -239,14 +239,33 @@ function Sync-PanelBackgroundJobs {
             continue
         }
         try {
-            $null = Receive-Job $job -ErrorAction SilentlyContinue
-            if ($state -eq 'Failed') {
+            $output = Receive-Job $job -ErrorAction SilentlyContinue
+            if ($label -like 'hotreload-*') {
+                $svcName = $label.Substring(10)
+                if ($state -eq 'Failed') {
+                    Add-MeisPanelEvent ($label + ' FAILED (background job)')
+                    Set-PanelHotReloadResult -ServiceName $svcName -Result @{
+                        ok = $false; message = 'hot-reload failed'; steps = @()
+                    }
+                } else {
+                    Add-MeisPanelEvent ($label + ' -> done')
+                    if ($output) {
+                        Set-PanelHotReloadResult -ServiceName $svcName -Result $output
+                    }
+                }
+            } elseif ($state -eq 'Failed') {
                 Add-MeisPanelEvent ($label + ' FAILED (background job)')
             } else {
                 Add-MeisPanelEvent ($label + ' -> done')
             }
         } catch {
             Add-MeisPanelEvent ($label + ' FAILED: ' + $_.Exception.Message)
+            if ($label -like 'hotreload-*') {
+                $svcName = $label.Substring(10)
+                Set-PanelHotReloadResult -ServiceName $svcName -Result @{
+                    ok = $false; message = $_.Exception.Message; steps = @()
+                }
+            }
         }
         Remove-Job $job -Force -ErrorAction SilentlyContinue
         $script:PanelBackgroundJobs.Remove($label) | Out-Null
@@ -322,7 +341,7 @@ function Start-PanelServiceBackgroundJob {
     if ($Action -eq 'build') {
         $script:PanelBuildPending[$ServiceName] = (Get-Date)
     }
-    $null = Start-Job -ScriptBlock {
+    $job = Start-Job -ScriptBlock {
         param($ActionName, $Name, $ScriptsDir, $Root, $BuildMode, $DoEnableJdwp)
         Set-Location $Root
         . (Join-Path $ScriptsDir 'meis-services.ps1')
@@ -361,7 +380,7 @@ function Start-PanelServiceBackgroundJob {
                     }
                 }
                 'reload-classes' {
-                    Invoke-MeisServiceHotReload -ServiceName $Name | Out-Null
+                    return Invoke-MeisServiceHotReload -ServiceName $Name
                 }
             }
         } catch {
@@ -369,6 +388,9 @@ function Start-PanelServiceBackgroundJob {
             throw
         }
     } -ArgumentList $Action, $ServiceName, $scriptsDir, $root, $BuildMode, [bool]$DoEnableJdwp
+    if ($Action -eq 'reload-classes') {
+        $script:PanelBackgroundJobs["hotreload-$ServiceName"] = $job
+    }
     $verb = switch ($Action) {
         'start' { 'starting' }
         'start-debug' { 'starting (debug)' }
@@ -522,6 +544,14 @@ function Get-PanelServiceStatusList {
             }
         }
         $item.buildInProgress = $building
+        $item.hotReloadInProgress = $false
+        $hrLabel = "hotreload-$name"
+        if ($script:PanelBackgroundJobs.ContainsKey($hrLabel)) {
+            $hrJob = $script:PanelBackgroundJobs[$hrLabel]
+            if ($null -ne $hrJob -and $hrJob.State -eq 'Running') {
+                $item.hotReloadInProgress = $true
+            }
+        }
         if ($script:PanelHotReloadResults.ContainsKey($name)) {
             $item.hotReload = $script:PanelHotReloadResults[$name]
         }
