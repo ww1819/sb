@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import router from '@/router'
+import { useAuthStore } from '@/stores/auth'
 import { useTabsStore } from '@/stores/tabs'
 
 const http = axios.create({ baseURL: '/api', timeout: 30000 })
@@ -36,8 +37,7 @@ http.interceptors.response.use(
       const onLoginPage = router.currentRoute.value.path === '/login'
       if (!handling401 && !onLoginPage) {
         handling401 = true
-        localStorage.removeItem('meis_token')
-        localStorage.removeItem('meis_user')
+        useAuthStore().clearSession()
         useTabsStore().reset()
         ElMessageBox.alert(message || '登录已过期，请重新登录', '提示', {
           confirmButtonText: '确定',
@@ -47,7 +47,7 @@ http.interceptors.response.use(
           closeOnPressEscape: false
         }).finally(() => {
           handling401 = false
-          router.push('/login')
+          void router.replace('/login')
         })
       }
       return Promise.reject(error)

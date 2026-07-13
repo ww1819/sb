@@ -1239,6 +1239,69 @@ COMMENT ON COLUMN repair_workorder_event.remark IS '备注';
 COMMENT ON COLUMN repair_workorder_event.extra_json IS '扩展JSON';
 COMMENT ON COLUMN repair_workorder_event.created_at IS '事件时间';
 
+-- 5.3.2 维修工单流程业务记录（派工/接单/转派/维修/验收等操作明细，主单仅维护状态）
+CREATE TABLE repair_workorder_process (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workorder_id UUID NOT NULL REFERENCES repair_workorder(id) ON DELETE CASCADE,
+    action_type VARCHAR(40) NOT NULL,
+    from_status VARCHAR(30),
+    to_status VARCHAR(30),
+    from_sub_status VARCHAR(30),
+    to_sub_status VARCHAR(30),
+    engineer_id UUID,
+    from_engineer_id UUID,
+    to_engineer_id UUID,
+    operator_id UUID,
+    solution_description TEXT,
+    labor_cost DECIMAL(10,2),
+    parts_cost DECIMAL(10,2),
+    total_cost DECIMAL(10,2),
+    verify_result VARCHAR(20),
+    verify_comment TEXT,
+    satisfaction_rating INTEGER,
+    satisfaction_comment TEXT,
+    skip_verify BOOLEAN,
+    remark TEXT,
+    extra_json JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID
+);
+COMMENT ON TABLE repair_workorder_process IS '维修工单流程业务记录（派工/维修/验收等操作明细）';
+COMMENT ON COLUMN repair_workorder_process.id IS '主键';
+COMMENT ON COLUMN repair_workorder_process.workorder_id IS '关联维修工单';
+COMMENT ON COLUMN repair_workorder_process.action_type IS '操作类型：dispatch/accept/transfer/start_repair/sub_status/complete/verify_pass/verify_fail/suspend/resume/cancel';
+COMMENT ON COLUMN repair_workorder_process.from_status IS '操作前主状态';
+COMMENT ON COLUMN repair_workorder_process.to_status IS '操作后主状态';
+COMMENT ON COLUMN repair_workorder_process.from_sub_status IS '操作前子状态';
+COMMENT ON COLUMN repair_workorder_process.to_sub_status IS '操作后子状态';
+COMMENT ON COLUMN repair_workorder_process.engineer_id IS '相关工程师';
+COMMENT ON COLUMN repair_workorder_process.from_engineer_id IS '转派前工程师';
+COMMENT ON COLUMN repair_workorder_process.to_engineer_id IS '转派后工程师';
+COMMENT ON COLUMN repair_workorder_process.operator_id IS '操作人';
+COMMENT ON COLUMN repair_workorder_process.solution_description IS '处理方案（完工）';
+COMMENT ON COLUMN repair_workorder_process.labor_cost IS '人工费';
+COMMENT ON COLUMN repair_workorder_process.parts_cost IS '配件费';
+COMMENT ON COLUMN repair_workorder_process.total_cost IS '总费用';
+COMMENT ON COLUMN repair_workorder_process.verify_result IS '验收结果';
+COMMENT ON COLUMN repair_workorder_process.verify_comment IS '验收意见';
+COMMENT ON COLUMN repair_workorder_process.satisfaction_rating IS '满意度';
+COMMENT ON COLUMN repair_workorder_process.satisfaction_comment IS '满意度备注';
+COMMENT ON COLUMN repair_workorder_process.skip_verify IS '是否跳过验收直接结案';
+COMMENT ON COLUMN repair_workorder_process.remark IS '备注';
+COMMENT ON COLUMN repair_workorder_process.extra_json IS '扩展JSON';
+COMMENT ON COLUMN repair_workorder_process.created_at IS '操作时间';
+COMMENT ON COLUMN repair_workorder_process.updated_at IS '更新时间';
+COMMENT ON COLUMN repair_workorder_process.created_by IS '创建者';
+COMMENT ON COLUMN repair_workorder_process.updated_by IS '更新者';
+COMMENT ON COLUMN repair_workorder_process.is_deleted IS '删除标志';
+COMMENT ON COLUMN repair_workorder_process.deleted_at IS '删除时间';
+COMMENT ON COLUMN repair_workorder_process.deleted_by IS '删除者';
+
 -- 5.4 备件库表
 CREATE TABLE spare_part (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

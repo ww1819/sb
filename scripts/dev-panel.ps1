@@ -34,6 +34,75 @@ $script:PanelBuildPending = @{}
 $script:PanelHotReloadResults = @{}
 $script:PanelLibraryReloadResults = @{}
 $script:PanelBackgroundJobs = [ordered]@{}
+$script:PanelAutoHotReloadEnabled = $true
+$script:PanelAutoReloadCooldown = @{}
+$Global:MeisPanelSourceDirty = @{}
+$script:PanelSourceWatcherRegistrations = @()
+
+function Initialize-PanelSourceWatchers {
+    $Global:MeisPanelSourceDirty = @{}
+    $script:PanelSourceWatcherRegistrations = @()
+    foreach ($s in $script:MeisServices) {
+        $src = Join-Path $script:MeisRoot "$($s.name)\src"
+        if (-not (Test-Path $src)) { continue }
+        $svcName = [string]$s.name
+        $watcher = New-Object System.IO.FileSystemWatcher
+        $watcher.Path = $src
+        $watcher.Filter = '*'
+        $watcher.IncludeSubdirectories = $true
+        $watcher.NotifyFilter = [IO.NotifyFilters]'FileName, LastWrite, CreationTime, Size'
+        $watcher.EnableRaisingEvents = $true
+        $reg = Register-ObjectEvent -InputObject $watcher -EventName Changed -SourceIdentifier ("meis-src-changed-$svcName") -MessageData $svcName -Action {
+            $name = [string]$Event.MessageData
+            $rel = [string]$Event.SourceEventArgs.Name
+            if ([string]::IsNullOrWhiteSpace($rel)) { return }
+            $ext = [IO.Path]::GetExtension($rel).ToLowerInvariant()
+            $allowed = @('.java', '.xml', '.yml', '.yaml', '.properties', '.sql', '.kt')
+            if ($ext -and $allowed -notcontains $ext) { return }
+            $Global:MeisPanelSourceDirty[$name] = Get-Date
+        }
+        $script:PanelSourceWatcherRegistrations += $reg
+    }
+}
+
+function Stop-PanelSourceWatchers {
+    foreach ($reg in @($script:PanelSourceWatcherRegistrations)) {
+        if ($null -eq $reg) { continue }
+        try { Unregister-Event -SubscriptionId $reg.SubscriptionId -ErrorAction SilentlyContinue } catch { }
+        try { Remove-Event -SubscriptionId $reg.SubscriptionId -ErrorAction SilentlyContinue } catch { }
+    }
+    $script:PanelSourceWatcherRegistrations = @()
+    $Global:MeisPanelSourceDirty = @{}
+}
+
+function Test-PanelServiceDebugRunning {
+    param([Parameter(Mandatory = $true)][string]$ServiceName)
+    $svc = $script:MeisServices | Where-Object { $_.name -eq $ServiceName } | Select-Object -First 1
+    if ($null -eq $svc) { return $false }
+    $httpUp = Test-MeisPortListening -Port $svc.port
+    $debugUp = $svc.debugPort -and (Test-MeisPortListening -Port $svc.debugPort)
+    return $httpUp -and $debugUp
+}
+
+function Invoke-PanelAutoHotReloadTick {
+    if (-not $script:PanelAutoHotReloadEnabled) { return }
+    if ($null -eq $Global:MeisPanelSourceDirty) { return }
+    $now = Get-Date
+    foreach ($name in @($Global:MeisPanelSourceDirty.Keys)) {
+        $dirtyAt = $Global:MeisPanelSourceDirty[$name]
+        if (($now - $dirtyAt).TotalSeconds -lt 2) { continue }
+        $Global:MeisPanelSourceDirty.Remove($name) | Out-Null
+        if ($script:PanelBuildPending.ContainsKey($name)) { continue }
+        if (-not (Test-PanelServiceDebugRunning -ServiceName $name)) { continue }
+        if ($script:PanelAutoReloadCooldown.ContainsKey($name)) {
+            $last = $script:PanelAutoReloadCooldown[$name]
+            if (($now - $last).TotalSeconds -lt 20) { continue }
+        }
+        $script:PanelAutoReloadCooldown[$name] = $now
+        Add-MeisPanelEvent ("AUTO HOT-RELOAD " + $name + " (source changed)")
+        Start-PanelServiceBackgroundJob -ServiceName $name -Action 'reload-classes'
+    }
+}
 
 function Set-PanelLibraryReloadResult {
     param(
@@ -181,8 +250,22 @@ function Sync-PanelBackgroundJobs {
         }
         Remove-Job $job -Force -ErrorAction SilentlyContinue
         $script:PanelBackgroundJobs.Remove($label) | Out-Null
+        if ($label -like 'frontend-build-*') {
+            $script:PanelBuildPending.Remove('meis-web') | Out-Null
+        }
     }
     return @($running)
+}
+
+function Test-PanelFrontendBuildRunning {
+    foreach ($label in @($script:PanelBackgroundJobs.Keys)) {
+        if ($label -notlike 'frontend-build-*') { continue }
+        $job = $script:PanelBackgroundJobs[$label]
+        if ($null -ne $job -and $job.State -eq 'Running') {
+            return $true
+        }
+    }
+    return $false
 }
 
 function Start-PanelBackgroundJob {
@@ -307,7 +390,12 @@ function Start-PanelFrontendBackgroundJob {
     if ($Action -eq 'build') {
         $script:PanelBuildPending['meis-web'] = Get-Date
     }
-    $null = Start-Job -ScriptBlock {
+    $jobLabel = switch ($Action) {
+        'build' { 'frontend-build-' + $(if ([string]::IsNullOrWhiteSpace($BuildMode)) { 'typecheck' } else { $BuildMode }) }
+        'start' { 'frontend-start' }
+        'restart' { 'frontend-restart' }
+    }
+    $job = Start-Job -ScriptBlock {
         param($ActionName, $Mode, $ScriptsDir, $Root)
         Set-Location $Root
         . (Join-Path $ScriptsDir 'meis-services.ps1')
@@ -343,6 +431,9 @@ function Start-PanelFrontendBackgroundJob {
             throw
         }
     } -ArgumentList $Action, $BuildMode, $scriptsDir, $root
+    if ($Action -eq 'build') {
+        $script:PanelBackgroundJobs[$jobLabel] = $job
+    }
     $verb = switch ($Action) {
         'start' { 'starting dev server' }
         'restart' { 'restarting dev server' }
@@ -373,14 +464,9 @@ function Invoke-PanelAction {
 
 function Get-PanelFrontendStatus {
     $fe = Get-MeisFrontendStatus
-    $building = $false
-    if ($script:PanelBuildPending.ContainsKey('meis-web')) {
-        $started = $script:PanelBuildPending['meis-web']
-        if (((Get-Date) - $started).TotalSeconds -lt 600) {
-            $building = $true
-        } else {
-            $script:PanelBuildPending.Remove('meis-web') | Out-Null
-        }
+    $building = Test-PanelFrontendBuildRunning
+    if (-not $building -and $script:PanelBuildPending.ContainsKey('meis-web')) {
+        $script:PanelBuildPending.Remove('meis-web') | Out-Null
     }
     $fe.buildInProgress = $building
     return $fe
@@ -405,6 +491,19 @@ function Clear-PanelBuildPending {
     }
 }
 
+function Get-PanelServiceSourceSortKey {
+    param($Item)
+    if ($null -eq $Item) { return [long]0 }
+    $v = $null
+    if ($Item -is [System.Collections.IDictionary]) {
+        $v = $Item['sourceMtimeSort']
+    } else {
+        $v = $Item.sourceMtimeSort
+    }
+    if ($null -eq $v -or [string]::IsNullOrWhiteSpace([string]$v)) { return [long]0 }
+    return [long]$v
+}
+
 function Get-PanelServiceStatusList {
     $list = @(Get-MeisServiceStatusList)
     $now = Get-Date
@@ -427,7 +526,7 @@ function Get-PanelServiceStatusList {
             $item.hotReload = $script:PanelHotReloadResults[$name]
         }
     }
-    return $list
+    return @($list | Sort-Object { Get-PanelServiceSourceSortKey $_ } -Descending)
 }
 
 function Get-PanelLibraryStatusList {
@@ -475,12 +574,14 @@ function Handle-PanelRequest {
 
     if ($method -eq 'GET' -and $path -eq '/api/status') {
         $backgroundJobs = Sync-PanelBackgroundJobs
+        Invoke-PanelAutoHotReloadTick
         $payload = [ordered]@{
             timestamp = (Get-Date).ToString('o')
             gatewayUrl = 'http://localhost:8080'
             panelPort = $Port
             redisUp = Test-MeisRedisAvailable
             backgroundJobs = $backgroundJobs
+            autoHotReload = [bool]$script:PanelAutoHotReloadEnabled
             frontend = Get-PanelFrontendStatus
             coreServices = @($script:MeisCoreServiceNames)
             libraries = @(Get-PanelLibraryStatusList)
@@ -613,6 +714,27 @@ function Handle-PanelRequest {
             $r = Start-PanelBackgroundJob -Label 'maven-install' -Action 'build-install'
             Write-JsonResponse -Response $res -Data $r
             return
+        }
+        if ($path -eq '/api/panel/auto-hot-reload') {
+            if ($method -eq 'GET') {
+                Write-JsonResponse -Response $res -Data @{ enabled = [bool]$script:PanelAutoHotReloadEnabled }
+                return
+            }
+            if ($method -eq 'POST') {
+                $enabled = [string]$req.QueryString.Get('enabled')
+                $script:PanelAutoHotReloadEnabled = ($enabled -eq '1' -or $enabled -eq 'true' -or $enabled -eq 'on')
+                Add-MeisPanelEvent ('AUTO HOT-RELOAD ' + $(if ($script:PanelAutoHotReloadEnabled) { 'ON' } else { 'OFF' }))
+                Write-JsonResponse -Response $res -Data @{
+                    ok = $true
+                    enabled = [bool]$script:PanelAutoHotReloadEnabled
+                    message = if ($script:PanelAutoHotReloadEnabled) {
+                        '已开启：保存源码后自动热加载（仅调试中服务）'
+                    } else {
+                        '已关闭自动热加载'
+                    }
+                }
+                return
+            }
         }
         if ($path -eq '/api/panel/shutdown') {
             Add-MeisPanelEvent 'SHUTDOWN panel'
@@ -771,6 +893,7 @@ try {
 }
 
 $script:DevPanelListener = $listener
+Initialize-PanelSourceWatchers
 
 Write-Host "MEIS Dev Panel: $prefix" -ForegroundColor Cyan
 Write-Host 'Press Ctrl+C to stop the panel server.' -ForegroundColor DarkGray
@@ -790,6 +913,7 @@ try {
         Invoke-PanelRequestSafe -Context $ctx
     }
 } finally {
+    Stop-PanelSourceWatchers
     try { if ($listener.IsListening) { $listener.Stop() } } catch { }
     try { $listener.Close() } catch { }
     $script:DevPanelListener = $null

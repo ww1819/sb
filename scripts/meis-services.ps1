@@ -1057,6 +1057,53 @@ function Start-MeisServiceByNameWithBuild {
     return Start-MeisServiceByName -ServiceName $ServiceName -Profile $Profile -EnableJdwp:$EnableJdwp
 }
 
+function Get-MeisModuleTreeLastWrite {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    if (-not (Test-Path $Path)) { return $null }
+    $max = $null
+    foreach ($file in (Get-ChildItem $Path -Recurse -File -ErrorAction SilentlyContinue)) {
+        if ($null -eq $max -or $file.LastWriteTime -gt $max) {
+            $max = $file.LastWriteTime
+        }
+    }
+    return $max
+}
+
+function Get-MeisModuleTreeLastWriteCached {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [int]$TtlSeconds = 5
+    )
+    if (-not $script:MeisTreeMtimeCache) { $script:MeisTreeMtimeCache = @{} }
+    if (-not $script:MeisTreeMtimeCacheExpiry) { $script:MeisTreeMtimeCacheExpiry = @{} }
+    $now = Get-Date
+    if ($script:MeisTreeMtimeCacheExpiry.ContainsKey($Path) -and $now -lt $script:MeisTreeMtimeCacheExpiry[$Path]) {
+        return $script:MeisTreeMtimeCache[$Path]
+    }
+    $val = Get-MeisModuleTreeLastWrite -Path $Path
+    $script:MeisTreeMtimeCache[$Path] = $val
+    $script:MeisTreeMtimeCacheExpiry[$Path] = $now.AddSeconds($TtlSeconds)
+    return $val
+}
+
+function Get-MeisModuleSourceLastWrite {
+    param(
+        [Parameter(Mandatory = $true)][string]$ModuleName,
+        [int]$TtlSeconds = 5
+    )
+    if (-not $script:MeisSourceMtimeCache) { $script:MeisSourceMtimeCache = @{} }
+    if (-not $script:MeisSourceMtimeCacheExpiry) { $script:MeisSourceMtimeCacheExpiry = @{} }
+    $now = Get-Date
+    if ($script:MeisSourceMtimeCacheExpiry.ContainsKey($ModuleName) -and $now -lt $script:MeisSourceMtimeCacheExpiry[$ModuleName]) {
+        return $script:MeisSourceMtimeCache[$ModuleName]
+    }
+    $srcRoot = Join-Path $script:MeisRoot "$ModuleName\src"
+    $val = Get-MeisModuleTreeLastWrite -Path $srcRoot
+    $script:MeisSourceMtimeCache[$ModuleName] = $val
+    $script:MeisSourceMtimeCacheExpiry[$ModuleName] = $now.AddSeconds($TtlSeconds)
+    return $val
+}
+
 function Get-MeisServiceStatusList {
     $ports = Get-MeisListeningPortSet
     $list = @()
@@ -1071,20 +1118,37 @@ function Get-MeisServiceStatusList {
         $jarSizeKb = if ($jarExists) { [math]::Round((Get-Item $jar).Length / 1KB) } else { 0 }
         $jarHealthy = $jarExists -and $jarSizeKb -ge 1024
         $meta = Get-MeisServiceMetaEntry $s.name
+        $classesFileAt = if ($classesExists) { Get-MeisModuleTreeLastWriteCached -Path $classesDir } else { $null }
+        $jarAt = if ($jarExists) { (Get-Item $jar).LastWriteTime } else { $null }
+        $sourceAt = Get-MeisModuleSourceLastWrite -ModuleName $s.name
+        $builtAt = $null
+        foreach ($t in @($classesFileAt, $jarAt)) {
+            if ($null -eq $t) { continue }
+            if ($null -eq $builtAt -or $t -gt $builtAt) { $builtAt = $t }
+        }
+        $needsCompile = $null -ne $sourceAt -and ($null -eq $builtAt -or $sourceAt -gt $builtAt)
+        $needsJarSync = $null -ne $classesFileAt -and $null -ne $jarAt -and $classesFileAt -gt $jarAt
         $list += [ordered]@{
             name          = $s.name
             labelZh       = $meta.labelZh
             descZh        = $meta.descZh
+            isCore        = ($script:MeisCoreServiceNames -contains $s.name)
             port          = $s.port
             debugPort     = $s.debugPort
             httpUp        = $httpUp
             debugUp       = $debugUp
             classesExists = $classesExists
-            classesMtime  = if ($classesExists) { (Get-Item $classesDir).LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
+            classesMtime  = if ($classesFileAt) { $classesFileAt.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
+            classesMtimeSort = if ($classesFileAt) { [DateTimeOffset]::new($classesFileAt).ToUnixTimeMilliseconds() } else { 0 }
             jarExists     = $jarExists
             jarSizeKb  = $jarSizeKb
             jarHealthy = $jarHealthy
-            jarMtime   = if ($jarExists) { (Get-Item $jar).LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
+            jarMtime   = if ($jarAt) { $jarAt.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
+            jarMtimeSort = if ($jarAt) { [DateTimeOffset]::new($jarAt).ToUnixTimeMilliseconds() } else { 0 }
+            sourceMtime     = if ($sourceAt) { $sourceAt.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
+            sourceMtimeSort = if ($sourceAt) { [DateTimeOffset]::new($sourceAt).ToUnixTimeMilliseconds() } else { 0 }
+            needsCompile    = $needsCompile
+            needsJarSync    = $needsJarSync
         }
     }
     return $list

@@ -39,7 +39,22 @@ export const useAuthStore = defineStore('auth', {
     },
     restore() {
       const raw = localStorage.getItem('meis_user')
-      if (raw) this.user = JSON.parse(raw)
+      const token = localStorage.getItem('meis_token')
+      if (!raw || !token) {
+        this.clearSession()
+        return
+      }
+      try {
+        this.user = JSON.parse(raw)
+      } catch {
+        this.clearSession()
+      }
+    },
+    /** 清除本地登录态（401 / 登出共用） */
+    clearSession() {
+      this.user = null
+      localStorage.removeItem('meis_token')
+      localStorage.removeItem('meis_user')
     },
     async logout() {
       try {
@@ -47,9 +62,7 @@ export const useAuthStore = defineStore('auth', {
       } catch {
         /* 网络失败仍本地登出 */
       }
-      this.user = null
-      localStorage.removeItem('meis_token')
-      localStorage.removeItem('meis_user')
+      this.clearSession()
     }
   }
 })

@@ -77,6 +77,55 @@
       text-transform: uppercase;
       letter-spacing: 0.06em;
     }
+    .section-hint {
+      font-size: 0.72rem;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+      color: var(--muted);
+      opacity: 0.85;
+    }
+    th.sortable {
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    th.sortable:hover { color: var(--text, #e8eaed); }
+    .sort-ind {
+      font-size: 0.72rem;
+      opacity: 0.85;
+      margin-left: 2px;
+    }
+    .service-filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px 16px;
+      margin: 0 0 10px;
+      padding: 10px 12px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 0.82rem;
+    }
+    .service-filter-bar label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+    }
+    .service-filter-bar select,
+    .service-filter-bar input[type="search"] {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: inherit;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 0.82rem;
+      min-width: 120px;
+    }
+    .service-filter-bar input[type="search"] { min-width: 200px; }
+    .service-filter-count { margin-left: auto; }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -494,11 +543,34 @@
       <tbody id="library-rows"></tbody>
     </table>
 
-    <div class="section-title">后端微服务</div>
-    <table>
+    <div class="section-title">后端微服务 <span class="section-hint">默认按源码变更倒序 · 点击表头可切换排序 · 编译状态每 5s 自动刷新</span></div>
+    <div class="service-filter-bar">
+      <label>服务类型
+        <select id="svc-filter-type" onchange="applyServiceFilter()">
+          <option value="all">全部</option>
+          <option value="core">核心服务</option>
+          <option value="non-core">非核心服务</option>
+        </select>
+      </label>
+      <label>名称或功能
+        <input type="search" id="svc-filter-text" placeholder="服务名 / 中文名 / 说明…" oninput="applyServiceFilter()" />
+      </label>
+      <label title="保存 .java/.xml 等后，对调试中服务自动触发热加载（约 2s 防抖）">
+        <input type="checkbox" id="svc-auto-hot-reload" checked onchange="toggleAutoHotReload(this.checked)" />
+        保存即热加载（仅调试中）
+      </label>
+      <span id="svc-filter-count" class="section-hint service-filter-count"></span>
+    </div>
+    <table id="service-table">
       <thead>
         <tr>
-          <th>服务</th><th>说明</th><th>HTTP</th><th>JDWP</th><th>JAR</th><th>构建</th><th>操作</th><th>汇入日志</th>
+          <th class="sortable" onclick="setServiceSort('name')">服务<span id="sort-ind-name" class="sort-ind"></span></th>
+          <th>说明</th>
+          <th>HTTP</th>
+          <th>JDWP</th>
+          <th class="sortable" onclick="setServiceSort('sourceMtime')">源码变更<span id="sort-ind-sourceMtime" class="sort-ind"></span></th>
+          <th class="sortable" onclick="setServiceSort('jarMtime')">JAR<span id="sort-ind-jarMtime" class="sort-ind"></span></th>
+          <th>构建</th><th>操作</th><th>汇入日志</th>
         </tr>
       </thead>
       <tbody id="service-rows"></tbody>
@@ -557,6 +629,12 @@
     const LOG_WATCH_KEY = 'meis-dev-panel-log-watch'
     const LOG_FILTER_KEY = 'meis-dev-panel-log-filter'
     const BUILD_OPTS_KEY = 'meis-dev-panel-build-opts'
+    const SERVICE_SORT_KEY = 'meis-dev-panel-service-sort'
+    const SERVICE_FILTER_KEY = 'meis-dev-panel-service-filter'
+    let serviceSort = { field: 'sourceMtime', dir: 'desc' }
+    let serviceFilter = { type: 'all', text: '' }
+    let lastServiceListRaw = []
+    let autoHotReloadEnabled = false
     let busy = false
     let busySince = 0
     let busySafetyTimer = null
@@ -868,6 +946,7 @@
           ? (s.jarSizeKb + ' KB')
           : ('<span style="color:var(--err)" title="JAR 异常，请点完整打包">' + s.jarSizeKb + ' KB 异常</span>')
         return size + (s.jarMtime ? '<div class="jar-meta">JAR ' + escapeHtml(s.jarMtime) + '</div>' : '')
+          + (s.classesMtime ? '<div class="jar-meta">classes ' + escapeHtml(s.classesMtime) + '</div>' : '')
       }
       if (s.classesExists) {
         return '<span style="color:var(--ok)">classes 就绪</span>'
@@ -877,13 +956,30 @@
       return '<span style="color:var(--err)">缺失</span><div class="jar-meta">请先「打包后端」或单服务「完整打包」</div>'
     }
 
+    function renderSourceMtimeCell(s) {
+      if (!s.sourceMtime) {
+        return '<span class="jar-meta" title="未找到 src 目录">—</span>'
+      }
+      const hints = []
+      if (s.needsCompile) {
+        hints.push('<span style="color:var(--warn)" title="源码晚于 classes，需快速编译或热加载">待编译</span>')
+      }
+      if (s.needsJarSync) {
+        hints.push('<span style="color:var(--warn)" title="classes 晚于 JAR，热加载前需写 JAR 或完整打包">JAR 落后</span>')
+      }
+      return escapeHtml(s.sourceMtime)
+        + (hints.length ? '<div class="jar-meta">' + hints.join(' · ') + '</div>' : '')
+    }
+
     function renderFrontendBuildOpts(fe) {
       const buttons = Object.entries(FRONTEND_BUILD_ACTIONS).map(([mode, meta]) =>
         `<button onclick="frontendBuild('${mode}')" title="${escapeHtml(meta.hint)}">${meta.label}</button>`
       ).join('')
       const hint = fe?.buildInProgress || isBuildPending('meis-web')
         ? '<div class="build-mode-hint" style="color:var(--warn)">构建中…</div>'
-        : '<div class="build-mode-hint">仅构建，不启动 Vite</div>'
+        : (fe?.httpUp
+          ? '<div class="build-mode-hint" style="color:var(--ok)">开发服已运行：保存代码自动热更新（HMR），日常无需构建</div>'
+          : '<div class="build-mode-hint">启动开发服后改代码自动热更新；下列按钮仅用于安装依赖 / 类型检查 / 生产包验证</div>')
       return `
         <div class="build-opts">
           <span class="build-section-label">仅构建，不启停</span>
@@ -1584,14 +1680,145 @@
       `
     }
 
+    function sortServicesBySource(list) {
+      return sortServices(list)
+    }
+
+    function loadServiceFilter() {
+      try {
+        const raw = localStorage.getItem(SERVICE_FILTER_KEY)
+        if (!raw) return
+        const parsed = JSON.parse(raw)
+        if (parsed) {
+          serviceFilter = {
+            type: parsed.type || 'all',
+            text: parsed.text || ''
+          }
+        }
+      } catch (_) { /* ignore */ }
+      const typeEl = document.getElementById('svc-filter-type')
+      const textEl = document.getElementById('svc-filter-text')
+      if (typeEl) typeEl.value = serviceFilter.type
+      if (textEl) textEl.value = serviceFilter.text
+    }
+
+    function applyServiceFilter() {
+      const typeEl = document.getElementById('svc-filter-type')
+      const textEl = document.getElementById('svc-filter-text')
+      serviceFilter = {
+        type: typeEl ? typeEl.value : 'all',
+        text: textEl ? textEl.value : ''
+      }
+      try {
+        localStorage.setItem(SERVICE_FILTER_KEY, JSON.stringify(serviceFilter))
+      } catch (_) { /* ignore */ }
+      if (lastServiceListRaw.length) renderServices(lastServiceListRaw)
+    }
+
+    function matchesServiceFilter(s) {
+      const isCore = s.isCore === true || coreServiceNames.includes(s.name)
+      if (serviceFilter.type === 'core' && !isCore) return false
+      if (serviceFilter.type === 'non-core' && isCore) return false
+      const q = (serviceFilter.text || '').trim().toLowerCase()
+      if (!q) return true
+      const hay = [s.name, s.labelZh, s.descZh].filter(Boolean).join(' ').toLowerCase()
+      return hay.includes(q)
+    }
+
+    function updateServiceFilterCount() {
+      const el = document.getElementById('svc-filter-count')
+      if (!el) return
+      const total = lastServiceListRaw.length
+      const shown = lastServiceList.length
+      el.textContent = shown === total ? ('共 ' + total + ' 个服务') : ('显示 ' + shown + ' / ' + total)
+    }
+
+    async function toggleAutoHotReload(enabled) {
+      try {
+        const data = await api('/api/panel/auto-hot-reload?enabled=' + (enabled ? '1' : '0'), 'POST', 10000)
+        autoHotReloadEnabled = data.enabled === true || data.data?.enabled === true
+        const cb = document.getElementById('svc-auto-hot-reload')
+        if (cb) cb.checked = autoHotReloadEnabled
+        showToast(data.message || data.data?.message || (autoHotReloadEnabled ? '已开启自动热加载' : '已关闭自动热加载'), true)
+      } catch (e) {
+        showToast(e.message, false)
+        const cb = document.getElementById('svc-auto-hot-reload')
+        if (cb) cb.checked = autoHotReloadEnabled
+      }
+    }
+
+    function syncAutoHotReloadCheckbox() {
+      const cb = document.getElementById('svc-auto-hot-reload')
+      if (cb) cb.checked = autoHotReloadEnabled
+    }
+
+    function loadServiceSort() {
+      try {
+        const raw = localStorage.getItem(SERVICE_SORT_KEY)
+        if (!raw) return
+        const parsed = JSON.parse(raw)
+        if (parsed && parsed.field) {
+          serviceSort = {
+            field: String(parsed.field),
+            dir: parsed.dir === 'asc' ? 'asc' : 'desc'
+          }
+        }
+      } catch (_) { /* ignore */ }
+    }
+
+    function setServiceSort(field) {
+      if (serviceSort.field === field) {
+        serviceSort.dir = serviceSort.dir === 'desc' ? 'asc' : 'desc'
+      } else {
+        serviceSort.field = field
+        serviceSort.dir = field === 'name' ? 'asc' : 'desc'
+      }
+      try {
+        localStorage.setItem(SERVICE_SORT_KEY, JSON.stringify(serviceSort))
+      } catch (_) { /* ignore */ }
+      updateServiceSortIndicators()
+      if (lastServiceListRaw.length) renderServices(lastServiceListRaw)
+    }
+
+    function updateServiceSortIndicators() {
+      for (const f of ['name', 'sourceMtime', 'jarMtime']) {
+        const el = document.getElementById('sort-ind-' + f)
+        if (!el) continue
+        el.textContent = serviceSort.field === f ? (serviceSort.dir === 'desc' ? ' ↓' : ' ↑') : ''
+      }
+    }
+
+    function sortServices(list) {
+      const dir = serviceSort.dir === 'asc' ? 1 : -1
+      const field = serviceSort.field || 'sourceMtime'
+      return asArray(list).slice().sort((a, b) => {
+        let cmp = 0
+        if (field === 'name') {
+          cmp = String(a.name || '').localeCompare(String(b.name || ''))
+        } else if (field === 'jarMtime') {
+          cmp = Number(a.jarMtimeSort || 0) - Number(b.jarMtimeSort || 0)
+          if (cmp === 0) cmp = String(a.jarMtime || '').localeCompare(String(b.jarMtime || ''))
+        } else {
+          cmp = Number(a.sourceMtimeSort || 0) - Number(b.sourceMtimeSort || 0)
+          if (cmp === 0) cmp = String(a.sourceMtime || '').localeCompare(String(b.sourceMtime || ''))
+        }
+        if (cmp !== 0) return cmp * dir
+        return String(a.name || '').localeCompare(String(b.name || ''))
+      })
+    }
+
     function renderServices(list) {
-      lastServiceList = asArray(list)
+      lastServiceListRaw = asArray(list)
+      lastServiceList = sortServices(lastServiceListRaw.filter(matchesServiceFilter))
+      updateServiceSortIndicators()
+      updateServiceFilterCount()
       document.getElementById('service-rows').innerHTML = lastServiceList.map(s => `
         <tr>
           <td class="mono">${s.name}</td>
           <td>${renderServiceInfo(s)}</td>
           <td>${statusDot(s.httpUp)} <span class="mono">:${s.port}</span></td>
           <td>${renderJdwpCell(s)}</td>
+          <td>${renderSourceMtimeCell(s)}</td>
           <td>${renderJarCell(s)}</td>
           <td>${renderBackendBuildOpts(s)}</td>
           <td class="actions">${renderServiceActions(s)}</td>
@@ -1621,8 +1848,11 @@
         renderStats(data)
         renderFrontend(data.frontend)
         if (data.frontend?.httpUp) clearFrontendPending()
+        if (!data.frontend?.buildInProgress) delete buildPendingUntil['meis-web']
         renderLibraries(asArray(data.libraries))
         renderServices(asArray(data.services))
+        autoHotReloadEnabled = data.autoHotReload === true
+        syncAutoHotReloadCheckbox()
         updateDebugPendingFromStatus(data.services)
         statusRefreshFailed = false
         lastStatusAt = new Date().toLocaleTimeString()
@@ -1675,6 +1905,9 @@
       refreshLogs()
     })
 
+    loadServiceSort()
+    loadServiceFilter()
+    updateServiceSortIndicators()
     refresh()
     refreshLogs()
     timer = setInterval(refresh, 5000)
