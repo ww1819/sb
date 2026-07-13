@@ -52,16 +52,23 @@ function Initialize-PanelSourceWatchers {
         $watcher.IncludeSubdirectories = $true
         $watcher.NotifyFilter = [IO.NotifyFilters]'FileName, LastWrite, CreationTime, Size'
         $watcher.EnableRaisingEvents = $true
-        $reg = Register-ObjectEvent -InputObject $watcher -EventName Changed -SourceIdentifier ("meis-src-changed-$svcName") -MessageData $svcName -Action {
-            $name = [string]$Event.MessageData
-            $rel = [string]$Event.SourceEventArgs.Name
-            if ([string]::IsNullOrWhiteSpace($rel)) { return }
-            $ext = [IO.Path]::GetExtension($rel).ToLowerInvariant()
-            $allowed = @('.java', '.xml', '.yml', '.yaml', '.properties', '.sql', '.kt')
-            if ($ext -and $allowed -notcontains $ext) { return }
-            $Global:MeisPanelSourceDirty[$name] = Get-Date
+        # Changed / Created / Renamed：覆盖本机保存与 git pull 新增/覆盖/改名；不依赖文件 mtime 早晚
+        foreach ($evtName in @('Changed', 'Created', 'Renamed')) {
+            $sid = "meis-src-$($evtName.ToLowerInvariant())-$svcName"
+            $reg = Register-ObjectEvent -InputObject $watcher -EventName $evtName -SourceIdentifier $sid -MessageData $svcName -Action {
+                $name = [string]$Event.MessageData
+                $rel = [string]$Event.SourceEventArgs.Name
+                if ([string]::IsNullOrWhiteSpace($rel) -and $Event.SourceEventArgs.ChangeType -eq [IO.WatcherChangeTypes]::Renamed) {
+                    $rel = [string]$Event.SourceEventArgs.FullPath
+                }
+                if ([string]::IsNullOrWhiteSpace($rel)) { return }
+                $ext = [IO.Path]::GetExtension($rel).ToLowerInvariant()
+                $allowed = @('.java', '.xml', '.yml', '.yaml', '.properties', '.sql', '.kt')
+                if ($ext -and $allowed -notcontains $ext) { return }
+                $Global:MeisPanelSourceDirty[$name] = Get-Date
+            }
+            $script:PanelSourceWatcherRegistrations += $reg
         }
-        $script:PanelSourceWatcherRegistrations += $reg
     }
 }
 
