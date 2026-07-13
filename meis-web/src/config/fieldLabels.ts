@@ -6,7 +6,7 @@ export const deviceFieldLabels: Record<string, string> = {
   device_name: '设备名称',
   brand: '品牌',
   model: '型号',
-  serial_number: '序列号',
+  serial_number: '序列号(SN)',
   registration_no: '医疗器械注册证号',
   category_id: '医疗器械分类',
   supplier_id: '供应商',

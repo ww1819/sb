@@ -198,7 +198,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'specification', label: '规格', list: true, group: 'basic' },
     { prop: 'model', label: '型号', list: true, group: 'basic' },
     { prop: 'registration_no', label: '医疗器械注册证号', group: 'basic' },
-    { prop: 'serial_number', label: '序列号', group: 'basic' },
+    { prop: 'serial_number', label: '序列号(SN)', group: 'basic' },
     { prop: 'device_unit', label: '单位', group: 'basic' },
     { prop: 'category_id', label: '医疗器械分类', linkTable: 'medical_device_category', group: 'basic' },
     { prop: 'asset_category_id', label: '资产分类', linkTable: 'asset_category', group: 'basic' },
