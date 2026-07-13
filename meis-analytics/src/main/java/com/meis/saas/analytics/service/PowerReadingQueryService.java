@@ -27,6 +27,11 @@ public class PowerReadingQueryService {
         return pageInternal("r.tag_id = ?::uuid", List.of(tagId), query, readAtFrom, readAtTo, sortOrder);
     }
 
+    public PageResult<Map<String, Object>> pageByDevice(UUID deviceId, PageQuery query,
+            LocalDateTime readAtFrom, LocalDateTime readAtTo, String sortOrder) {
+        return pageInternal("r.device_id = ?::uuid", List.of(deviceId), query, readAtFrom, readAtTo, sortOrder);
+    }
+
     private PageResult<Map<String, Object>> pageInternal(String scopeSql, List<Object> scopeArgs, PageQuery query,
             LocalDateTime readAtFrom, LocalDateTime readAtTo, String sortOrder) {
         StringBuilder where = new StringBuilder(" WHERE ").append(scopeSql).append(' ');
@@ -53,9 +58,11 @@ public class PowerReadingQueryService {
         pageArgs.add(query.getSize());
         pageArgs.add(offset);
         var rows = jdbc.queryForList("""
-                SELECT r.id, r.tag_id, r.tag_code, r.station_id, r.station_code, r.device_id, r.device_code,
-                       r.current_ma, r.read_at, r.created_at
+                SELECT r.id, r.tag_id, r.tag_code, r.station_id, r.station_code,
+                       COALESCE(s.station_name, r.station_code) AS station_name,
+                       r.device_id, r.device_code, r.current_ma, r.read_at, r.created_at
                 FROM power_current_reading r
+                LEFT JOIN power_base_station s ON s.id = r.station_id
                 """ + where + " ORDER BY r.read_at " + order + " LIMIT ? OFFSET ?", pageArgs.toArray());
         return new PageResult<>(rows, total, query.getPage(), query.getSize());
     }

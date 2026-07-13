@@ -583,17 +583,40 @@ WHERE e.user_id = u.id
 
 ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS assigned_user_id UUID;
 
-UPDATE repair_workorder w
-SET assigned_user_id = e.user_id
-FROM engineer e
-WHERE w.assigned_engineer_id = e.id
-  AND w.assigned_user_id IS NULL;
+DO $rep03_backfill_assigned_user$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'repair_workorder'
+          AND column_name = 'assigned_engineer_id'
+    ) THEN
+        UPDATE repair_workorder w
+        SET assigned_user_id = e.user_id
+        FROM engineer e
+        WHERE w.assigned_engineer_id = e.id
+          AND w.assigned_user_id IS NULL;
 
-UPDATE repair_workorder w
-SET assigned_user_id = w.assigned_engineer_id
-WHERE w.assigned_user_id IS NULL
-  AND w.assigned_engineer_id IS NOT NULL
-  AND EXISTS (SELECT 1 FROM sys_user u WHERE u.id = w.assigned_engineer_id);
+        UPDATE repair_workorder w
+        SET assigned_user_id = w.assigned_engineer_id
+        WHERE w.assigned_user_id IS NULL
+          AND w.assigned_engineer_id IS NOT NULL
+          AND EXISTS (SELECT 1 FROM sys_user u WHERE u.id = w.assigned_engineer_id);
+    END IF;
+END $rep03_backfill_assigned_user$;
+
+-- ---------- 系统配置：分类 + 编号/名称 + 值1~值6 ----------
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS category_code VARCHAR(20);
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS category_name VARCHAR(100);
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS item_code VARCHAR(20);
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS item_name VARCHAR(200);
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS value1 TEXT;
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS value2 TEXT;
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS value3 TEXT;
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS value4 TEXT;
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS value5 TEXT;
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS value6 TEXT;
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
 
 DO $rep03_drop_wo_eng$
 BEGIN

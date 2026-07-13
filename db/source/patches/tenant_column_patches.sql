@@ -223,4 +223,18 @@ ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS manage_dept_head VARCHAR(100
 ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS device_code VARCHAR(20);
 ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
 
--- 杞垹闄や笌瀹¤瀛楁琛ュ垪瑙?tenant/R__audit_columns.sql锛堥潪浜嬪姟閫愯〃 ALTER锛?
+-- ---------- 系统配置：分类 + 编号/名称 + 值1~值6 ----------
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS category_code VARCHAR(20);
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS category_name VARCHAR(100);
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS item_code VARCHAR(20);
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS item_name VARCHAR(200);
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS value1 TEXT;
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS value2 TEXT;
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS value3 TEXT;
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS value4 TEXT;
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS value5 TEXT;
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS value6 TEXT;
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+-- 软删除与审计字段补列见 tenant/R__audit_columns.sql（非业务逐表 ALTER）
+

@@ -76,6 +76,10 @@
         load-url="/qc/adverse/page"
         :device-id="String(model.id ?? '')"
       />
+      <DeviceCurrentReadingPanel
+        v-show="activeTab === 'current'"
+        :device-id="String(model.id ?? '')"
+      />
       <DeviceLabelPanel
         v-show="activeTab === 'label'"
         :device-id="String(model.id ?? '')"
@@ -94,6 +98,7 @@ import DeviceAssetCard from '@/components/asset/DeviceAssetCard.vue'
 import DeviceArchivePanel from '@/components/asset/tabs/DeviceArchivePanel.vue'
 import DeviceImagePanel from '@/components/asset/tabs/DeviceImagePanel.vue'
 import DeviceRecordTablePanel from '@/components/asset/tabs/DeviceRecordTablePanel.vue'
+import DeviceCurrentReadingPanel from '@/components/asset/tabs/DeviceCurrentReadingPanel.vue'
 import DeviceLabelPanel from '@/components/asset/tabs/DeviceLabelPanel.vue'
 import type { RecordColumn } from '@/components/asset/tabs/DeviceRecordTablePanel.vue'
 import { getSchema, type FieldSchema } from '@/config/pageSchemas'
@@ -126,7 +131,8 @@ const allTabs = [
   { key: 'shared_loan', label: '借调记录' },
   { key: 'shared_fee', label: '借调费用' },
   { key: 'inventory', label: '盘点记录' },
-  { key: 'adverse', label: '不良事件' }
+  { key: 'adverse', label: '不良事件' },
+  { key: 'current', label: '电流度数' }
 ]
 
 /** 新增：仅基本信息/档案/图片；编辑与查看：全部 Tab */

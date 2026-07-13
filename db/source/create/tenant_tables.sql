@@ -1915,6 +1915,17 @@ CREATE TABLE IF NOT EXISTS sys_config (
     config_type VARCHAR(20),
     description TEXT,
     is_system BOOLEAN DEFAULT FALSE,
+    category_code VARCHAR(20),
+    category_name VARCHAR(100),
+    item_code VARCHAR(20),
+    item_name VARCHAR(200),
+    value1 TEXT,
+    value2 TEXT,
+    value3 TEXT,
+    value4 TEXT,
+    value5 TEXT,
+    value6 TEXT,
+    sort_order INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
