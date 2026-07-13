@@ -1,16 +1,19 @@
 <template>
   <div class="page-filter-bar">
     <div class="filter-fields">
-      <el-input
-        :model-value="keyword"
-        :placeholder="placeholder"
-        clearable
-        class="filter-keyword"
-        :prefix-icon="Search"
-        @update:model-value="$emit('update:keyword', $event)"
-        @clear="$emit('search')"
-        @keyup.enter="$emit('search')"
-      />
+      <slot name="prepend" />
+      <slot name="keyword">
+        <el-input
+          :model-value="keyword"
+          :placeholder="placeholder"
+          clearable
+          class="filter-keyword"
+          :prefix-icon="Search"
+          @update:model-value="$emit('update:keyword', $event)"
+          @clear="$emit('search')"
+          @keyup.enter="$emit('search')"
+        />
+      </slot>
       <slot name="filters" />
       <el-button type="primary" :icon="Search" @click="$emit('search')">查询</el-button>
       <el-button :icon="RefreshLeft" @click="$emit('reset')">重置</el-button>

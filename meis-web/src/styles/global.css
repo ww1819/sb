@@ -411,10 +411,22 @@ body {
 }
 
 .table-actions {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
+  justify-content: center;
+  flex-wrap: nowrap;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.system-table :deep(.col-operations .cell) {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.system-table :deep(.col-operations .table-actions .el-button) {
+  padding-left: 4px;
+  padding-right: 4px;
 }
 
 .table-actions :deep(.el-button + .el-button) {

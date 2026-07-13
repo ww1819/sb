@@ -39,7 +39,20 @@ async function resolveHospitalName(): Promise<string> {
   return '医疗机构'
 }
 
-function buildLabelHtml(data: AssetLabelPrintData, qrDataUrl: string) {
+async function rowToLabelData(row: Record<string, unknown>, hospitalName: string): Promise<AssetLabelPrintData> {
+  const deviceCode = String(row.device_code ?? '').trim()
+  return {
+    hospitalName,
+    serialNumber: String(row.serial_number ?? ''),
+    deviceName: String(row.device_name ?? ''),
+    specModel: formatSpecModel(row),
+    recordDate: formatDate(row.enable_date ?? row.acceptance_date ?? row.purchase_date),
+    useDept: resolveRefLabel('department', row.dept_id) || '',
+    deviceCode
+  }
+}
+
+function buildLabelFragment(data: AssetLabelPrintData, qrDataUrl: string) {
   const hospital = esc(data.hospitalName || '医疗机构')
   const rows: [string, string][] = [
     ['序列号：', data.serialNumber || ''],
@@ -55,6 +68,19 @@ function buildLabelHtml(data: AssetLabelPrintData, qrDataUrl: string) {
     )
     .join('')
 
+  return `<div class="asset-label">
+    <div class="asset-label__title">${hospital}</div>
+    <div class="asset-label__body">
+      <div class="asset-label__fields">${fieldsHtml}</div>
+      <div class="asset-label__qr">
+        ${qrDataUrl ? `<img src="${qrDataUrl}" alt="二维码" />` : ''}
+      </div>
+    </div>
+  </div>`
+}
+
+function buildPrintDocument(labelFragments: string[]) {
+  const labelsHtml = labelFragments.join('')
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -84,10 +110,17 @@ function buildLabelHtml(data: AssetLabelPrintData, qrDataUrl: string) {
     .print-btn:hover {
       background: #fff5f5;
     }
+    .labels {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
     .asset-label {
       width: 520px;
       border: 1px solid #000;
       background: #fff;
+      break-inside: avoid;
+      page-break-inside: avoid;
     }
     .asset-label__title {
       text-align: center;
@@ -144,7 +177,16 @@ function buildLabelHtml(data: AssetLabelPrintData, qrDataUrl: string) {
     @media print {
       body { padding: 0; }
       .toolbar { display: none; }
-      .asset-label { width: 100%; max-width: 520px; }
+      .labels { gap: 0; }
+      .asset-label {
+        width: 100%;
+        max-width: 520px;
+        margin-bottom: 12px;
+        page-break-after: always;
+      }
+      .asset-label:last-child {
+        page-break-after: auto;
+      }
     }
   </style>
 </head>
@@ -152,50 +194,46 @@ function buildLabelHtml(data: AssetLabelPrintData, qrDataUrl: string) {
   <div class="toolbar">
     <button type="button" class="print-btn" onclick="window.print()">打印</button>
   </div>
-  <div class="asset-label">
-    <div class="asset-label__title">${hospital}</div>
-    <div class="asset-label__body">
-      <div class="asset-label__fields">${fieldsHtml}</div>
-      <div class="asset-label__qr">
-        ${qrDataUrl ? `<img src="${qrDataUrl}" alt="二维码" />` : ''}
-      </div>
-    </div>
-  </div>
+  <div class="labels">${labelsHtml}</div>
 </body>
 </html>`
 }
 
-export async function printAssetLabelFromRow(row: Record<string, unknown>) {
-  const deviceCode = String(row.device_code ?? '').trim()
-  if (!deviceCode) {
-    throw new Error('设备编码为空，无法打印标签')
+async function recordPrintLog(deviceId: unknown) {
+  if (!deviceId) return
+  try {
+    await http.post(`/asset/device/${deviceId}/label/print`, { template_code: 'asset_sticker' })
+  } catch {
+    // 打印预览已打开，记录失败不阻断
+  }
+}
+
+export async function printAssetLabelsBatch(rows: Record<string, unknown>[]) {
+  if (!rows.length) {
+    throw new Error('请先选择要打印的设备')
+  }
+
+  const invalid = rows.filter((row) => !String(row.device_code ?? '').trim())
+  if (invalid.length) {
+    throw new Error('所选设备中存在无设备编码的记录，无法打印')
   }
 
   await ensureRefLabelMap('department')
   const hospitalName = await resolveHospitalName()
-  const useDept = resolveRefLabel('department', row.dept_id) || ''
-  const recordDate = formatDate(row.enable_date ?? row.acceptance_date ?? row.purchase_date)
 
-  let qrDataUrl = ''
-  try {
-    qrDataUrl = await QRCode.toDataURL(deviceCode, { width: 200, margin: 1 })
-  } catch {
-    qrDataUrl = ''
+  const fragments: string[] = []
+  for (const row of rows) {
+    const data = await rowToLabelData(row, hospitalName)
+    let qrDataUrl = ''
+    try {
+      qrDataUrl = await QRCode.toDataURL(data.deviceCode!, { width: 200, margin: 1 })
+    } catch {
+      qrDataUrl = ''
+    }
+    fragments.push(buildLabelFragment(data, qrDataUrl))
   }
 
-  const html = buildLabelHtml(
-    {
-      hospitalName,
-      serialNumber: String(row.serial_number ?? ''),
-      deviceName: String(row.device_name ?? ''),
-      specModel: formatSpecModel(row),
-      recordDate,
-      useDept,
-      deviceCode
-    },
-    qrDataUrl
-  )
-
+  const html = buildPrintDocument(fragments)
   const win = window.open('', '_blank', 'width=640,height=720')
   if (!win) {
     throw new Error('请允许弹出窗口以打印标签')
@@ -204,12 +242,11 @@ export async function printAssetLabelFromRow(row: Record<string, unknown>) {
   win.document.close()
   win.focus()
 
-  const deviceId = row.id
-  if (deviceId) {
-    try {
-      await http.post(`/asset/device/${deviceId}/label/print`, { template_code: 'asset_sticker' })
-    } catch {
-      // 打印预览已打开，记录失败不阻断
-    }
+  for (const row of rows) {
+    await recordPrintLog(row.id)
   }
+}
+
+export async function printAssetLabelFromRow(row: Record<string, unknown>) {
+  await printAssetLabelsBatch([row])
 }

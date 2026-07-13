@@ -51,6 +51,27 @@ public class DepartmentController {
                                 + " ORDER BY d.sort_order, d.dept_code")));
     }
 
+    @GetMapping("/lookup")
+    public Result<List<Map<String, Object>>> lookup(@RequestParam(required = false) String keyword,
+                                                   @RequestParam(defaultValue = "20") int limit) {
+        StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "department", "d"));
+        List<Object> args = new ArrayList<>();
+        if (keyword != null && !keyword.isBlank()) {
+            String kw = "%" + keyword.trim() + "%";
+            where.append(" AND (d.dept_name ILIKE ? OR d.dept_code ILIKE ? OR COALESCE(d.pinyin_code, '') ILIKE ?) ");
+            args.add(kw);
+            args.add(kw);
+            args.add(kw);
+        }
+        int lim = Math.min(Math.max(limit, 1), 50);
+        args.add(lim);
+        return Result.ok(jdbc.queryForList(
+                "SELECT d.id, d.dept_code, d.dept_name, d.pinyin_code FROM department d "
+                        + where + " ORDER BY d.dept_name ASC LIMIT ?",
+                args.toArray()));
+    }
+
     @GetMapping("/tree")
     public Result<List<Map<String, Object>>> tree() {
         String schema = schema();

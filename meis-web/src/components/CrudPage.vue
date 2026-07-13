@@ -15,59 +15,35 @@
         @search="onSearch"
         @reset="onReset"
       >
-        <template v-if="config.listFilters?.length" #filters>
-          <template v-for="f in config.listFilters" :key="f.key">
-            <el-select
-              v-if="f.dictType"
-              v-model="filterValues[f.key]"
-              :placeholder="f.label"
-              :multiple="f.multiple"
-              collapse-tags
-              collapse-tags-tooltip
-              clearable
-              class="filter-item"
-              @change="onSearch"
-            >
-              <el-option v-for="o in filterOptions[f.key] ?? []" :key="o.value" :label="o.label" :value="o.value" />
-            </el-select>
-            <RefSelect
-              v-else-if="f.linkTable"
-              v-model="filterValues[f.key]"
-              :link-table="f.linkTable"
-              :placeholder="f.label"
-              class="filter-item filter-ref"
-              @update:model-value="onSearch"
-            />
-            <el-date-picker
-              v-else-if="f.type === 'daterange'"
-              v-model="filterValues[f.key]"
-              type="daterange"
-              range-separator="至"
-              start-placeholder="开始"
-              end-placeholder="结束"
-              value-format="YYYY-MM-DD"
-              class="filter-item filter-daterange"
-              @change="onSearch"
-            />
-            <el-select
-              v-else-if="f.options?.length"
-              v-model="filterValues[f.key]"
-              :placeholder="f.label"
-              clearable
-              class="filter-item"
-              @change="onSearch"
-            >
-              <el-option v-for="o in f.options" :key="o.value" :label="o.label" :value="o.value" />
-            </el-select>
-            <el-input-number
-              v-else-if="f.type === 'number'"
-              v-model="filterValues[f.key]"
-              :placeholder="f.label"
-              controls-position="right"
-              class="filter-item filter-number"
-              @change="onSearch"
-            />
-          </template>
+        <template v-if="moreSearchFields.length" #keyword>
+          <MoreSearchPanel
+            :fields="moreSearchFields"
+            v-model="moreSearchValues"
+            v-model:selected="selectedMoreSearchKeys"
+            @search="onSearch"
+          />
+        </template>
+        <template v-if="prependFilters.length" #prepend>
+          <CrudListFilterField
+            v-for="f in prependFilters"
+            :key="f.key"
+            :filter="f"
+            v-model="filterValues[f.key]"
+            :options="filterOptions[f.key] ?? []"
+            start-placeholder="起"
+            end-placeholder="止"
+            @change="onSearch"
+          />
+        </template>
+        <template v-if="normalFilters.length" #filters>
+          <CrudListFilterField
+            v-for="f in normalFilters"
+            :key="f.key"
+            :filter="f"
+            v-model="filterValues[f.key]"
+            :options="filterOptions[f.key] ?? []"
+            @change="onSearch"
+          />
         </template>
         <template #trailing>
           <el-button v-if="showImport" @click="importVisible = true">导入</el-button>
@@ -77,8 +53,17 @@
           <slot name="toolbar-extra" />
         </template>
         <template #actions>
+          <CrudListFilterField
+            v-for="f in actionBarFilters"
+            :key="f.key"
+            :filter="f"
+            v-model="filterValues[f.key]"
+            :options="filterOptions[f.key] ?? []"
+            @change="onSearch"
+          />
           <el-button v-if="!hideAdd" v-permission="'add'" type="primary" @click="onAdd">新增</el-button>
           <el-button @click="exportCsv">导出</el-button>
+          <slot name="actions-after" />
         </template>
       </PageFilterBar>
     </template>
@@ -128,7 +113,7 @@
           <TableCellValue :field="f" :value="row[f.prop]" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" header-align="center" :width="operationWidth" fixed="right">
+      <el-table-column label="操作" header-align="center" align="center" :width="operationWidth" fixed="right" class-name="col-operations">
         <template #default="{ row }">
           <div class="table-actions">
             <el-button
@@ -202,14 +187,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onActivated, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onMounted, reactive, ref, useSlots, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import { downloadApiFile } from '@/utils/fileDownload'
+import CrudListFilterField from './CrudListFilterField.vue'
 import FormDrawer from './FormDrawer.vue'
 import FieldRenderer from './FieldRenderer.vue'
 import SystemPageCard from './system/SystemPageCard.vue'
 import PageFilterBar from './system/PageFilterBar.vue'
+import MoreSearchPanel from './system/MoreSearchPanel.vue'
 import TableCellValue from './table/TableCellValue.vue'
 import TableColumnSortHeader from './table/TableColumnSortHeader.vue'
 import PageEmpty from './table/PageEmpty.vue'
@@ -224,7 +211,6 @@ import { useDict } from '@/composables/useDict'
 import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
 import { executePinyinGenerate, promptPinyinScope } from '@/composables/usePinyinGenerate'
 import { preloadRefLabelMaps } from '@/composables/useRefLabelMap'
-import RefSelect from './form/RefSelect.vue'
 
 const props = defineProps<{
   config: PageConfig
@@ -240,6 +226,7 @@ const props = defineProps<{
   operationColumnWidth?: number
 }>()
 const emit = defineEmits<{ detail: [row: Record<string, unknown>]; add: []; deleted: [row: Record<string, unknown>] }>()
+const slots = useSlots()
 const { loadDict, preloadDictTypes } = useDict()
 
 const loading = ref(false)
@@ -248,6 +235,8 @@ const total = ref(0)
 const page = ref(1)
 const size = ref(20)
 const keyword = ref('')
+const moreSearchValues = ref<Record<string, string>>({})
+const selectedMoreSearchKeys = ref<string[]>([])
 const filterValues = reactive<Record<string, string | number | string[] | undefined>>({})
 const filterOptions = reactive<Record<string, { label: string; value: string }[]>>({})
 const formVisible = ref(false)
@@ -260,6 +249,7 @@ const changeLogVisible = ref(false)
 const changeLogEntityId = ref<string>('')
 const sortField = ref<string | null>(null)
 const sortOrder = ref<'asc' | 'desc' | null>(null)
+const selectedRows = ref<Record<string, unknown>[]>([])
 const { selectedCount, syncFromTable, selectedIds, clear: clearSelection } = useCrossPageSelection()
 
 const tableHeight = useSystemTableHeight()
@@ -271,11 +261,27 @@ watch(tableHeight, () => {
 const viewEnabled = computed(() => props.enableView === true || props.config.enableView === true)
 const operationWidth = computed(() => {
   if (props.operationColumnWidth) return props.operationColumnWidth
-  return viewEnabled.value ? 220 : 200
+  const hasRowPrint = !!slots['row-actions']
+  if (viewEnabled.value) return hasRowPrint ? 236 : 200
+  return hasRowPrint ? 200 : 168
 })
 const changeLogEnabled = computed(() => props.config.enableChangeLog !== false && viewEnabled.value)
 const showRowIndex = computed(() => props.config.showRowIndex === true)
 const showRowSelection = computed(() => props.config.showRowSelection === true)
+
+const prependFilters = computed(() => props.config.listFilters?.filter((f) => f.prepend) ?? [])
+const actionBarFilters = computed(() => props.config.listFilters?.filter((f) => f.actionBar) ?? [])
+const normalFilters = computed(() => props.config.listFilters?.filter((f) => !f.prepend && !f.actionBar) ?? [])
+const moreSearchFields = computed(() => props.config.moreSearchFields ?? [])
+
+function initMoreSearchValues() {
+  for (const f of moreSearchFields.value) {
+    if (!(f.key in moreSearchValues.value)) {
+      moreSearchValues.value[f.key] = ''
+    }
+  }
+}
+watch(moreSearchFields, initMoreSearchValues, { immediate: true })
 
 function isSortable(prop: string) {
   return props.config.sortableColumns?.includes(prop) ?? false
@@ -349,7 +355,11 @@ async function load() {
       page: page.value,
       size: size.value
     }
-    if (keyword.value) params.keyword = keyword.value
+    if (!moreSearchFields.value.length && keyword.value) params.keyword = keyword.value
+    for (const f of moreSearchFields.value) {
+      const v = moreSearchValues.value[f.key]?.trim()
+      if (v) params[f.key] = v
+    }
     if (props.config.listMode) params.mode = props.config.listMode
     for (const f of props.config.listFilters ?? []) {
       const v = filterValues[f.key]
@@ -357,6 +367,10 @@ async function load() {
         const range = v as string[] | undefined
         if (Array.isArray(range) && range[0]) params[`${f.key}From`] = range[0]
         if (Array.isArray(range) && range[1]) params[`${f.key}To`] = range[1]
+        continue
+      }
+      if (f.type === 'date') {
+        if (v !== undefined && v !== null && v !== '') params[f.key] = v as string
         continue
       }
       if (f.multiple && Array.isArray(v) && v.length) {
@@ -389,6 +403,10 @@ function onSearch() {
 
 function onReset() {
   keyword.value = ''
+  selectedMoreSearchKeys.value = []
+  for (const f of moreSearchFields.value) {
+    moreSearchValues.value[f.key] = ''
+  }
   for (const f of props.config.listFilters ?? []) {
     filterValues[f.key] = undefined
   }
@@ -471,6 +489,7 @@ async function remove(row: Record<string, unknown>) {
 }
 
 function onSelectionChange(selection: Record<string, unknown>[]) {
+  selectedRows.value = selection
   syncFromTable(selection)
 }
 
@@ -530,7 +549,11 @@ onActivated(() => {
   if (initialized) load()
 })
 
-defineExpose({ load })
+function getSelectedRows() {
+  return selectedRows.value
+}
+
+defineExpose({ load, getSelectedRows, selectedCount, selectedIds })
 </script>
 
 <style scoped>
@@ -542,5 +565,8 @@ defineExpose({ load })
 }
 :deep(.filter-daterange) {
   width: 260px;
+}
+:deep(.filter-date) {
+  width: 140px;
 }
 </style>

@@ -3,11 +3,19 @@ export interface ListFilterOption {
   label: string
 }
 
+export interface MoreSearchField {
+  key: string
+  label: string
+  placeholder?: string
+  /** 关联表：输入时远程下拉联想，选中后以 ID 查询 */
+  linkTable?: string
+}
+
 export interface ListFilter {
   key: string
   label: string
   dictType?: string
-  type?: 'select' | 'number' | 'daterange'
+  type?: 'select' | 'number' | 'date' | 'daterange'
   /** 字典多选（如状态） */
   multiple?: boolean
   /** 外键下拉（RefSelect） */
@@ -16,6 +24,10 @@ export interface ListFilter {
   options?: ListFilterOption[]
   /** 字典子集：仅展示这些 value */
   dictValues?: string[]
+  /** 显示在关键词搜索框之前 */
+  prepend?: boolean
+  /** 显示在操作栏（新增按钮前） */
+  actionBar?: boolean
 }
 
 export interface PageConfig {
@@ -28,6 +40,8 @@ export interface PageConfig {
   foreignKey?: string
   listPageUrl?: string
   listFilters?: ListFilter[]
+  /** 更多搜索字段（替换关键词搜索，支持组合查询） */
+  moreSearchFields?: MoreSearchField[]
   importable?: boolean
   importUrl?: string
   importTemplateUrl?: string
@@ -165,6 +179,20 @@ export const pageRegistry: Record<string, PageConfig> = {
     showRowIndex: true,
     showRowSelection: true,
     sortableColumns: ['device_code', 'device_name', 'specification', 'dept_id'],
+    listFilters: [
+      { key: 'enable_dateFrom', label: '起', type: 'date', actionBar: true },
+      { key: 'enable_dateTo', label: '止', type: 'date', actionBar: true }
+    ],
+    moreSearchFields: [
+      { key: 'supplier_id', label: '供应商', placeholder: '供应商名称/编码', linkTable: 'supplier' },
+      { key: 'manufacturer_id', label: '生产厂家', placeholder: '生产厂家名称/编码', linkTable: 'manufacturer' },
+      { key: 'device_name', label: '设备名称', placeholder: '设备名称/简码' },
+      { key: 'specification', label: '规格', placeholder: '规格模糊' },
+      { key: 'model', label: '型号', placeholder: '型号模糊' },
+      { key: 'dept_id', label: '领用科室', placeholder: '科室名称/编码', linkTable: 'department' },
+      { key: 'manage_dept_id', label: '管理科室', placeholder: '科室名称/编码', linkTable: 'department' },
+      { key: 'serial_number', label: '序列号(SN)', placeholder: '序列号模糊' }
+    ],
     enableView: true
   },
   '/asset/entry': {
