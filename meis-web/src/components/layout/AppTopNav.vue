@@ -260,7 +260,7 @@ onUnmounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 24px;
-  z-index: 300;
+  z-index: 5000;
 }
 
 .dropdown-panel--fixed {

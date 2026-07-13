@@ -9,6 +9,7 @@
         :model="model"
         :fields="basicFields"
         :group-columns="{ basic: 5, finance: 5, vendor: 5, time: 5 }"
+        :group-rows="{ vendor: vendorFormRows }"
         :group-titles="{ finance: '折旧信息', time: '合同信息' }"
       />
 
@@ -140,6 +141,12 @@ watch(
 )
 
 const basicGroupKeys = new Set(['basic', 'finance', 'location', 'vendor', 'time', 'status', 'compliance', 'attachment', 'remark', 'other'])
+
+const vendorFormRows = [
+  ['supplier_id', 'supplier_phone'],
+  ['maintenance_company', 'maintenance_phone'],
+  ['manufacturer_id']
+]
 
 const basicFields = computed(() => {
   const source = props.fields?.length ? props.fields : getSchema('medical_device')
