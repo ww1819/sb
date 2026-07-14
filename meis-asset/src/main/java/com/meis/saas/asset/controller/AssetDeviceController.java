@@ -39,7 +39,8 @@ public class AssetDeviceController {
             @RequestParam(value = "manage_dept_id", required = false) String manage_dept_id,
             @RequestParam(value = "dept_name", required = false) String dept_name,
             @RequestParam(value = "manage_dept_name", required = false) String manage_dept_name,
-            @RequestParam(value = "serial_number", required = false) String serial_number) {
+            @RequestParam(value = "serial_number", required = false) String serial_number,
+            @RequestParam(value = "warehouse_id", required = false) String warehouse_id) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d"));
         List<Object> args = new ArrayList<>();
@@ -59,6 +60,7 @@ public class AssetDeviceController {
         appendUuidEq(where, args, "d.manufacturer_id", manufacturer_id);
         appendUuidEq(where, args, "d.dept_id", dept_id);
         appendUuidEq(where, args, "d.manage_dept_id", manage_dept_id);
+        appendUuidEq(where, args, "d.warehouse_id", warehouse_id);
         boolean needSupplier = hasText(supplier_name);
         boolean needManufacturer = hasText(manufacturer_name) && !hasText(manufacturer_id);
         boolean needUseDept = hasText(dept_name) || "dept_id".equals(query.getSortBy());

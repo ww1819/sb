@@ -33,10 +33,16 @@
     <el-table
       v-if="rows.length || loading"
       :data="rows"
+      row-key="id"
       stripe
-      class="system-table"
+      class="system-table user-table"
+      style="width: 100%"
       :height="tableHeight"
     >
+      <el-table-column type="selection" width="48" fixed="left" reserve-selection />
+      <el-table-column label="序号" width="64" fixed="left" align="center">
+        <template #default="{ $index }">{{ (page - 1) * size + $index + 1 }}</template>
+      </el-table-column>
       <el-table-column label="用户" min-width="180" fixed="left">
         <template #default="{ row }">
           <div class="user-cell">
@@ -65,7 +71,7 @@
           <span class="text-muted">{{ row.dept_name || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="role_name" label="角色" width="120" show-overflow-tooltip>
+      <el-table-column prop="role_name" label="角色" min-width="120" show-overflow-tooltip>
         <template #default="{ row }">
           <span class="text-muted">{{ row.role_name || '-' }}</span>
         </template>
@@ -89,12 +95,19 @@
           </span>
         </template>
       </el-table-column>
-      <el-table-column prop="last_login_at" label="最后登录" width="160">
+      <el-table-column prop="last_login_at" label="最后登录" min-width="160">
         <template #default="{ row }">
           <span class="text-time">{{ formatTime(row.last_login_at) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="240" fixed="right">
+      <el-table-column
+        label="操作"
+        width="300"
+        fixed="right"
+        header-align="center"
+        align="center"
+        class-name="col-operations"
+      >
         <template #default="{ row }">
           <div class="table-actions">
             <el-button link type="primary" @click="openChangeLog(row)">变更记录</el-button>
@@ -475,7 +488,21 @@ function onUserAction(cmd: string, row: any) {
 </script>
 
 <style scoped>
-.table-actions {
-  gap: 8px;
+.user-table :deep(.col-operations .cell) {
+  overflow: visible;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.user-table .table-actions {
+  gap: 0;
+  width: 100%;
+  justify-content: center;
+}
+
+.user-table .table-actions :deep(.el-button) {
+  padding-left: 4px;
+  padding-right: 4px;
+  margin-left: 0;
 }
 </style>

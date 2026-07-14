@@ -12,6 +12,7 @@
       <PageFilterBar
         v-model:keyword="keyword"
         placeholder="关键词搜索"
+        :show-search-buttons="false"
         @search="onSearch"
         @reset="onReset"
       >
@@ -62,6 +63,8 @@
             :options="filterOptions[f.key] ?? []"
             @change="onSearch"
           />
+          <el-button type="primary" :icon="Search" @click="onSearch">查询</el-button>
+          <el-button :icon="RefreshLeft" @click="onReset">重置</el-button>
           <el-button v-if="!hideAdd" v-permission="'add'" type="primary" @click="onAdd">新增</el-button>
           <el-button @click="exportCsv">导出</el-button>
           <slot name="actions-after" />
@@ -190,6 +193,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onMounted, reactive, ref, useSlots, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { RefreshLeft, Search } from '@element-plus/icons-vue'
 import http from '@/api/http'
 import { downloadApiFile } from '@/utils/fileDownload'
 import CrudListFilterField from './CrudListFilterField.vue'

@@ -15,8 +15,8 @@
         />
       </slot>
       <slot name="filters" />
-      <el-button type="primary" :icon="Search" @click="$emit('search')">查询</el-button>
-      <el-button :icon="RefreshLeft" @click="$emit('reset')">重置</el-button>
+      <el-button v-if="showSearchButtons" type="primary" :icon="Search" @click="$emit('search')">查询</el-button>
+      <el-button v-if="showSearchButtons" :icon="RefreshLeft" @click="$emit('reset')">重置</el-button>
       <slot name="trailing" />
     </div>
     <div v-if="$slots.actions" class="filter-actions">
@@ -32,8 +32,10 @@ withDefaults(
   defineProps<{
     keyword?: string
     placeholder?: string
+    /** 是否在筛选区显示查询/重置（可改由 actions 槽自行放置） */
+    showSearchButtons?: boolean
   }>(),
-  { placeholder: '用户名 / 姓名 / 工号 / 手机' }
+  { placeholder: '用户名 / 姓名 / 工号 / 手机', showSearchButtons: true }
 )
 
 defineEmits<{

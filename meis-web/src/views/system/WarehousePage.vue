@@ -1,11 +1,14 @@
 <template>
-  <SystemPageCard title="库房管理" subtitle="维护库房与院区、科室关联" :loading="loading" show-search @search="applyFilter" @reset="resetFilter" v-model:keyword="keyword">
+  <SystemPageCard title="仓库维护" subtitle="维护仓库与院区、科室关联" :loading="loading" show-search @search="applyFilter" @reset="resetFilter" v-model:keyword="keyword">
     <template #actions>
-      <el-button type="primary" @click="openForm()">新增库房</el-button>
+      <el-button type="primary" @click="openForm()">新增仓库</el-button>
     </template>
     <el-table :data="filteredList" border stripe class="system-table" :height="tableHeight">
-      <el-table-column prop="warehouse_code" label="编码" width="100" />
-      <el-table-column prop="warehouse_name" label="名称" />
+      <el-table-column label="序号" width="64" align="center">
+        <template #default="{ $index }">{{ $index + 1 }}</template>
+      </el-table-column>
+      <el-table-column prop="warehouse_code" label="仓库编码" width="120" />
+      <el-table-column prop="warehouse_name" label="仓库名称" />
       <el-table-column prop="campus_name" label="院区" width="120" />
       <el-table-column prop="dept_name" label="科室" width="120" />
       <el-table-column prop="address" label="地址" show-overflow-tooltip />
@@ -14,7 +17,7 @@
           <el-tag :type="row.is_active ? 'success' : 'info'" size="small">{{ row.is_active ? '是' : '否' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="140">
+      <el-table-column label="操作" width="200">
         <template #default="{ row }">
           <div class="table-actions">
             <el-button link type="primary" @click="openForm(row)">编辑</el-button>
@@ -23,16 +26,16 @@
         </template>
       </el-table-column>
     </el-table>
-    <el-dialog v-model="visible" title="库房" width="520px" destroy-on-close>
+    <el-dialog v-model="visible" :title="form.id ? '编辑仓库' : '新增仓库'" width="520px" destroy-on-close>
       <el-form :model="form" label-width="90px">
-        <el-form-item label="编码" required><el-input v-model="form.warehouse_code" /></el-form-item>
-        <el-form-item label="名称" required><el-input v-model="form.warehouse_name" /></el-form-item>
-        <el-form-item label="院区">
-          <el-select v-model="form.campus_id" clearable style="width:100%">
+        <el-form-item label="仓库编码" required><el-input v-model="form.warehouse_code" /></el-form-item>
+        <el-form-item label="仓库名称" required><el-input v-model="form.warehouse_name" /></el-form-item>
+        <el-form-item label="所属院区">
+          <el-select v-model="form.campus_id" clearable filterable style="width:100%">
             <el-option v-for="c in campuses" :key="c.id" :label="c.campus_name" :value="c.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="科室">
+        <el-form-item label="所属科室">
           <el-select v-model="form.dept_id" clearable filterable style="width:100%">
             <el-option v-for="d in depts" :key="d.id" :label="d.dept_name" :value="d.id" />
           </el-select>

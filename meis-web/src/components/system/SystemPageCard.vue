@@ -237,13 +237,14 @@ const showHeader = computed(
   height: 100%;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  /* 避免 overflow:hidden 干扰 el-table 固定列 sticky */
+  overflow: clip;
 }
 
 .system-table-wrap :deep(.system-table) {
   flex: 1;
   min-height: 0;
-  height: 100% !important;
+  width: 100%;
 }
 
 .system-pager {

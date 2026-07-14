@@ -254,13 +254,32 @@ body {
   --el-table-border-color: var(--meis-border-light);
 }
 
-.system-table-wrap .el-table__inner-wrapper {
-  height: 100% !important;
-}
-
 .system-table-wrap .el-table__body-wrapper {
   flex: 1;
   min-height: 0;
+}
+
+/* 固定列（左右滑动时操作列贴右侧）背景不透明，避免底部内容透出 */
+.system-table .el-table__header th.el-table-fixed-column--left,
+.system-table .el-table__header th.el-table-fixed-column--right,
+.system-table .el-table__body td.el-table-fixed-column--left,
+.system-table .el-table__body td.el-table-fixed-column--right {
+  background-color: #fff !important;
+}
+
+.system-table .el-table__header th.el-table-fixed-column--left,
+.system-table .el-table__header th.el-table-fixed-column--right {
+  background: var(--meis-surface-header) !important;
+}
+
+.system-table .el-table__body tr.el-table__row--striped td.el-table-fixed-column--left,
+.system-table .el-table__body tr.el-table__row--striped td.el-table-fixed-column--right {
+  background-color: var(--el-fill-color-lighter) !important;
+}
+
+.system-table .el-table__body tr:hover > td.el-table-fixed-column--left,
+.system-table .el-table__body tr:hover > td.el-table-fixed-column--right {
+  background: var(--meis-table-hover) !important;
 }
 
 .system-empty {
@@ -419,12 +438,13 @@ body {
   white-space: nowrap;
 }
 
-.system-table :deep(.col-operations .cell) {
-  padding-left: 10px;
-  padding-right: 10px;
+.system-table .col-operations .cell {
+  overflow: visible;
+  padding-left: 8px;
+  padding-right: 8px;
 }
 
-.system-table :deep(.col-operations .table-actions .el-button) {
+.system-table .col-operations .table-actions .el-button {
   padding-left: 4px;
   padding-right: 4px;
 }

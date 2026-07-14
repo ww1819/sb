@@ -31,7 +31,7 @@ export interface BreadcrumbItem {
 }
 
 export function normalizeNavModules(modules: NavModule[]): NavModule[] {
-  return relocateMenusToSystem(modules.map((mod) => {
+  return ensureExtraMenus(relocateMenusToSystem(modules.map((mod) => {
     const items = (mod.groups ?? []).flatMap((group) => group.items)
     if (items.length !== 1) return mod
 
@@ -50,7 +50,7 @@ export function normalizeNavModules(modules: NavModule[]): NavModule[] {
     }
 
     return mod
-  }))
+  })))
 }
 
 const SYSTEM_MENU_RELOCATIONS: Array<{ match: (item: NavMenuItem) => boolean; target: NavMenuItem }> = [
@@ -124,6 +124,48 @@ export function relocateMenusToSystem(modules: NavModule[]): NavModule[] {
 
   trimmed[systemIdx] = { ...system, groups }
   return trimmed
+}
+
+/** 补齐库存查询、仓库维护菜单（兼容数据库未迁移） */
+export function ensureExtraMenus(modules: NavModule[]): NavModule[] {
+  const result = modules.map((m) => ({
+    ...m,
+    groups: (m.groups ?? []).map((g) => ({ ...g, items: [...g.items] }))
+  }))
+
+  const assetIdx = result.findIndex((m) => m.id === 'asset')
+  if (assetIdx >= 0) {
+    const asset = result[assetIdx]
+    const groups = asset.groups?.length ? [...asset.groups] : [{ title: '', items: [] as NavMenuItem[] }]
+    const items = [...groups[0].items]
+    const hasStock = items.some((i) => i.path === '/asset/stock' || i.title === '库存查询')
+    if (!hasStock) {
+      const entryIdx = items.findIndex((i) => i.path === '/asset/entry' || i.title.includes('设备入库'))
+      const stockItem: NavMenuItem = { id: 'asset-stock-query', title: '库存查询', path: '/asset/stock' }
+      if (entryIdx >= 0) items.splice(entryIdx + 1, 0, stockItem)
+      else items.push(stockItem)
+      groups[0] = { ...groups[0], items }
+      result[assetIdx] = { ...asset, groups }
+    }
+  }
+
+  const systemIdx = result.findIndex((m) => m.id === 'system')
+  if (systemIdx >= 0) {
+    const system = result[systemIdx]
+    const groups = system.groups?.length ? [...system.groups] : [{ title: '', items: [] as NavMenuItem[] }]
+    const items = [...groups[0].items]
+    const hasWh = items.some((i) => i.path === '/system/warehouse' || i.title === '仓库维护')
+    if (!hasWh) {
+      const campusIdx = items.findIndex((i) => i.path === '/system/campus' || i.title.includes('院区'))
+      const whItem: NavMenuItem = { id: 'system-warehouse', title: '仓库维护', path: '/system/warehouse' }
+      if (campusIdx >= 0) items.splice(campusIdx + 1, 0, whItem)
+      else items.unshift(whItem)
+      groups[0] = { ...groups[0], items }
+      result[systemIdx] = { ...system, groups }
+    }
+  }
+
+  return result
 }
 
 export function flattenMenus(modules: NavModule[]): FlatMenuItem[] {

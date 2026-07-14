@@ -76,6 +76,8 @@ export const pageRegistry: Record<string, PageConfig> = {
     foreignKey: 'plan_id',
     listPageUrl: '/purchase/plan/page',
     saveUrl: '/purchase/plan',
+    showRowIndex: true,
+    showRowSelection: true,
     listFilters: [
       { key: 'approval_status', label: '审批状态', dictType: 'approval_status' },
       { key: 'plan_year', label: '计划年度', type: 'number' }
@@ -90,6 +92,8 @@ export const pageRegistry: Record<string, PageConfig> = {
     foreignKey: 'plan_id',
     listPageUrl: '/purchase/plan/page',
     saveUrl: '/purchase/plan',
+    showRowIndex: true,
+    showRowSelection: true,
     listFilters: [
       { key: 'approval_status', label: '审批状态', dictType: 'approval_status' },
       { key: 'plan_year', label: '计划年度', type: 'number' }
@@ -206,6 +210,31 @@ export const pageRegistry: Record<string, PageConfig> = {
     saveUrl: '/asset/entry',
     listFilters: [{ key: 'status', label: '状态', dictType: 'entry_status' }]
   },
+  '/asset/stock': {
+    title: '库存查询',
+    apiBase: '/asset',
+    table: 'medical_device',
+    listPageUrl: '/asset/device/page',
+    showRowIndex: true,
+    showRowSelection: true,
+    sortableColumns: ['device_code', 'device_name', 'specification', 'dept_id'],
+    listFilters: [
+      { key: 'warehouse_id', label: '仓库', linkTable: 'warehouse', prepend: true },
+      { key: 'enable_dateFrom', label: '起', type: 'date', actionBar: true },
+      { key: 'enable_dateTo', label: '止', type: 'date', actionBar: true }
+    ],
+    moreSearchFields: [
+      { key: 'supplier_id', label: '供应商', placeholder: '供应商名称/编码', linkTable: 'supplier' },
+      { key: 'manufacturer_id', label: '生产厂家', placeholder: '生产厂家名称/编码', linkTable: 'manufacturer' },
+      { key: 'device_name', label: '设备名称', placeholder: '设备名称/简码' },
+      { key: 'specification', label: '规格', placeholder: '规格模糊' },
+      { key: 'model', label: '型号', placeholder: '型号模糊' },
+      { key: 'dept_id', label: '领用科室', placeholder: '科室名称/编码', linkTable: 'department' },
+      { key: 'manage_dept_id', label: '管理科室', placeholder: '科室名称/编码', linkTable: 'department' },
+      { key: 'serial_number', label: '序列号(SN)', placeholder: '序列号模糊' }
+    ],
+    enableView: true
+  },
   '/asset/outbound': {
     title: '设备出库',
     apiBase: '/asset',
@@ -316,7 +345,14 @@ export const pageRegistry: Record<string, PageConfig> = {
 },
   '/repair/process-type': { title: '维修进程类型', apiBase: '/repair', table: 'repair_process_type', enableView: true },
   '/maintain/param': { title: '保养参数设置', apiBase: '/maintain', table: 'maintenance_level' },
-  '/maintain/plan': { title: '保养计划', apiBase: '/maintain', table: 'maintenance_plan', saveUrl: '/maintain/plan' },
+  '/maintain/plan': {
+    title: '保养计划',
+    apiBase: '/maintain',
+    table: 'maintenance_plan',
+    saveUrl: '/maintain/plan',
+    showRowIndex: true,
+    showRowSelection: true
+  },
   '/maintain/execution': {
     title: '保养执行',
     apiBase: '/maintain',
@@ -332,7 +368,14 @@ export const pageRegistry: Record<string, PageConfig> = {
   '/maintain/template': { title: '保养模板', apiBase: '/maintain', table: 'maintenance_template', saveUrl: '/maintain/template' },
   '/maintain/record': { title: '保养记录', apiBase: '/maintain', table: 'maintenance_record', saveUrl: '/maintain/record' },
   '/inspect/param': { title: '巡检参数设置', apiBase: '/inspect', table: 'inspection_type' },
-  '/inspect/plan': { title: '巡检计划', apiBase: '/inspect', table: 'inspection_plan', saveUrl: '/inspect/plan' },
+  '/inspect/plan': {
+    title: '巡检计划',
+    apiBase: '/inspect',
+    table: 'inspection_plan',
+    saveUrl: '/inspect/plan',
+    showRowIndex: true,
+    showRowSelection: true
+  },
   '/inspect/execution': {
     title: '巡检执行',
     apiBase: '/inspect',
@@ -346,7 +389,14 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/inspect/query/page'
   },
   '/metrology/param': { title: '计量参数设置', apiBase: '/metrology', table: 'metrology_category' },
-  '/metrology/plan': { title: '计量计划', apiBase: '/metrology', table: 'metrology_plan', saveUrl: '/metrology/plan' },
+  '/metrology/plan': {
+    title: '计量计划',
+    apiBase: '/metrology',
+    table: 'metrology_plan',
+    saveUrl: '/metrology/plan',
+    showRowIndex: true,
+    showRowSelection: true
+  },
   '/metrology/execution': {
     title: '计量执行',
     apiBase: '/metrology',
@@ -526,6 +576,9 @@ export const pageRegistry: Record<string, PageConfig> = {
   },
   '/screen/equipment': { title: '设备运营大屏', apiBase: '/screen', table: 'medical_device' },
   '/system/campus': { title: '院区管理', apiBase: '/system', table: 'campus',
+  enableView: true
+},
+  '/system/warehouse': { title: '仓库维护', apiBase: '/system', table: 'warehouse',
   enableView: true
 },
   '/system/dept': { title: '科室管理', apiBase: '/system', table: 'department',
