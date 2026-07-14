@@ -31,7 +31,7 @@ export interface BreadcrumbItem {
 }
 
 export function normalizeNavModules(modules: NavModule[]): NavModule[] {
-  return modules.map((mod) => {
+  return relocateMenusToSystem(modules.map((mod) => {
     const items = (mod.groups ?? []).flatMap((group) => group.items)
     if (items.length !== 1) return mod
 
@@ -50,7 +50,80 @@ export function normalizeNavModules(modules: NavModule[]): NavModule[] {
     }
 
     return mod
+  }))
+}
+
+const SYSTEM_MENU_RELOCATIONS: Array<{ match: (item: NavMenuItem) => boolean; target: NavMenuItem }> = [
+  {
+    match: (item) => /supplier/.test(item.path) || item.title.includes('供应商'),
+    target: { id: 'system-supplier', title: '供应商管理', path: '/system/supplier' }
+  },
+  {
+    match: (item) => /category/.test(item.path) || item.title.includes('设备分类') || item.title.includes('设备68'),
+    target: { id: 'system-category', title: '设备分类', path: '/system/category' }
+  },
+  {
+    match: (item) => /manufacturer/.test(item.path) || item.title.includes('生产厂商') || item.title.includes('生产厂家'),
+    target: { id: 'system-manufacturer', title: '生产厂商', path: '/system/manufacturer' }
+  }
+]
+
+const SYSTEM_CONFIG_MENU: NavMenuItem = {
+  id: 'system-config',
+  title: '系统配置',
+  path: '/system/config'
+}
+
+/** 将供应商/设备分类/生产厂商从采购管理等模块归并到系统管理（兼容数据库未迁移场景） */
+export function relocateMenusToSystem(modules: NavModule[]): NavModule[] {
+  const relocated: NavMenuItem[] = []
+  const sourceModuleIds = new Set(['purchase', 'dict'])
+
+  const trimmed = modules.map((mod) => {
+    if (!sourceModuleIds.has(mod.id)) return mod
+    const groups = (mod.groups ?? [])
+      .map((group) => {
+        const kept: NavMenuItem[] = []
+        for (const item of group.items) {
+          const rule = SYSTEM_MENU_RELOCATIONS.find((r) => r.match(item))
+          if (rule) relocated.push({ ...rule.target })
+          else kept.push(item)
+        }
+        return { ...group, items: kept }
+      })
+      .filter((group) => group.items.length > 0)
+    return { ...mod, groups }
+  }).filter((mod) => {
+    if (!sourceModuleIds.has(mod.id)) return true
+    return (mod.groups ?? []).some((group) => group.items.length > 0)
   })
+
+  const deduped = new Map<string, NavMenuItem>()
+  for (const item of relocated) deduped.set(item.path, item)
+
+  let systemIdx = trimmed.findIndex((m) => m.id === 'system')
+  if (systemIdx < 0 && deduped.size === 0) return trimmed
+  if (systemIdx < 0) {
+    trimmed.push({
+      id: 'system',
+      title: '系统管理',
+      groups: [{ title: '', items: [...deduped.values()] }]
+    })
+    systemIdx = trimmed.length - 1
+  }
+
+  const system = trimmed[systemIdx]
+  const existingPaths = new Set((system.groups ?? []).flatMap((g) => g.items.map((i) => i.path)))
+  const toAdd = [...deduped.values()].filter((item) => !existingPaths.has(item.path))
+  if (!existingPaths.has(SYSTEM_CONFIG_MENU.path)) toAdd.push(SYSTEM_CONFIG_MENU)
+  if (!toAdd.length) return trimmed
+
+  const groups = [...(system.groups ?? [])]
+  if (!groups.length) groups.push({ title: '', items: toAdd })
+  else groups[0] = { ...groups[0], items: [...groups[0].items, ...toAdd] }
+
+  trimmed[systemIdx] = { ...system, groups }
+  return trimmed
 }
 
 export function flattenMenus(modules: NavModule[]): FlatMenuItem[] {

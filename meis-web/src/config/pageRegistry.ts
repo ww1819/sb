@@ -1,8 +1,33 @@
+export interface ListFilterOption {
+  value: string
+  label: string
+}
+
+export interface MoreSearchField {
+  key: string
+  label: string
+  placeholder?: string
+  /** 关联表：输入时远程下拉联想，选中后以 ID 查询 */
+  linkTable?: string
+}
+
 export interface ListFilter {
   key: string
   label: string
   dictType?: string
-  type?: 'select' | 'number'
+  type?: 'select' | 'number' | 'date' | 'daterange'
+  /** 字典多选（如状态） */
+  multiple?: boolean
+  /** 外键下拉（RefSelect） */
+  linkTable?: string
+  /** 静态选项（与 dictType 二选一） */
+  options?: ListFilterOption[]
+  /** 字典子集：仅展示这些 value */
+  dictValues?: string[]
+  /** 显示在关键词搜索框之前 */
+  prepend?: boolean
+  /** 显示在操作栏（新增按钮前） */
+  actionBar?: boolean
 }
 
 export interface PageConfig {
@@ -15,6 +40,8 @@ export interface PageConfig {
   foreignKey?: string
   listPageUrl?: string
   listFilters?: ListFilter[]
+  /** 更多搜索字段（替换关键词搜索，支持组合查询） */
+  moreSearchFields?: MoreSearchField[]
   importable?: boolean
   importUrl?: string
   importTemplateUrl?: string
@@ -31,6 +58,12 @@ export interface PageConfig {
   enableView?: boolean
   /** 是否提供变更记录（默认跟随 enableView） */
   enableChangeLog?: boolean
+  /** 列表首列显示分页序号 */
+  showRowIndex?: boolean
+  /** 序号列前显示多选框 */
+  showRowSelection?: boolean
+  /** 支持表头升序/降序的列 prop */
+  sortableColumns?: string[]
 }
 
 export const pageRegistry: Record<string, PageConfig> = {
@@ -143,8 +176,25 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/asset',
     table: 'medical_device',
     listPageUrl: '/asset/device/page',
-  enableView: true
-},
+    showRowIndex: true,
+    showRowSelection: true,
+    sortableColumns: ['device_code', 'device_name', 'specification', 'dept_id'],
+    listFilters: [
+      { key: 'enable_dateFrom', label: '起', type: 'date', actionBar: true },
+      { key: 'enable_dateTo', label: '止', type: 'date', actionBar: true }
+    ],
+    moreSearchFields: [
+      { key: 'supplier_id', label: '供应商', placeholder: '供应商名称/编码', linkTable: 'supplier' },
+      { key: 'manufacturer_id', label: '生产厂家', placeholder: '生产厂家名称/编码', linkTable: 'manufacturer' },
+      { key: 'device_name', label: '设备名称', placeholder: '设备名称/简码' },
+      { key: 'specification', label: '规格', placeholder: '规格模糊' },
+      { key: 'model', label: '型号', placeholder: '型号模糊' },
+      { key: 'dept_id', label: '领用科室', placeholder: '科室名称/编码', linkTable: 'department' },
+      { key: 'manage_dept_id', label: '管理科室', placeholder: '科室名称/编码', linkTable: 'department' },
+      { key: 'serial_number', label: '序列号(SN)', placeholder: '序列号模糊' }
+    ],
+    enableView: true
+  },
   '/asset/entry': {
     title: '设备入库',
     apiBase: '/asset',
@@ -259,13 +309,12 @@ export const pageRegistry: Record<string, PageConfig> = {
     saveUrl: '/repair/workorder',
     listFilters: [{ key: 'status', label: '状态', dictType: 'wo_status' }]
   },
-  '/repair/engineer': { title: '工程师', apiBase: '/repair', table: 'engineer',
-  enableView: true
-},
+  '/repair/engineer': { title: '维修工程师管理', apiBase: '/repair', table: 'sys_user' },
   '/repair/spare-archive': { title: '配件档案管理', apiBase: '/repair', table: 'spare_part' },
   '/repair/fault': { title: '故障库', apiBase: '/repair', table: 'fault_type_dict',
   enableView: true
 },
+  '/repair/process-type': { title: '维修进程类型', apiBase: '/repair', table: 'repair_process_type', enableView: true },
   '/maintain/param': { title: '保养参数设置', apiBase: '/maintain', table: 'maintenance_level' },
   '/maintain/plan': { title: '保养计划', apiBase: '/maintain', table: 'maintenance_plan', saveUrl: '/maintain/plan' },
   '/maintain/execution': {
@@ -490,7 +539,19 @@ export const pageRegistry: Record<string, PageConfig> = {
 },
   '/system/dict': { title: '数据字典', apiBase: '/system', table: 'sys_dict' },
   '/system/log': { title: '操作日志', apiBase: '/system', table: 'sys_operation_log' },
-  '/system/approval': { title: '审批配置', apiBase: '/system', table: 'sys_approval_flow' }
+  '/system/approval': { title: '审批配置', apiBase: '/system', table: 'sys_approval_flow' },
+  '/system/supplier': { title: '供应商管理', apiBase: '/system', table: 'supplier', importable: true, pinyinCode: true,
+  enableView: true
+},
+  '/system/category': { title: '设备分类', apiBase: '/system', table: 'medical_device_category',
+  enableView: true
+},
+  '/system/manufacturer': { title: '生产厂商', apiBase: '/system', table: 'manufacturer', importable: true, pinyinCode: true,
+  enableView: true
+},
+  '/system/config': { title: '系统配置', apiBase: '/system', table: 'sys_config',
+  enableView: true
+}
 }
 
 export function getPageConfig(path: string): PageConfig | undefined {

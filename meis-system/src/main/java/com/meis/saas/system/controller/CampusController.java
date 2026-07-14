@@ -1,12 +1,8 @@
 package com.meis.saas.system.controller;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.meis.saas.common.audit.EntityChangeLogService;
 import com.meis.saas.common.audit.OperationLog;
-import com.meis.saas.common.cache.CacheKeys;
 import com.meis.saas.common.cache.MeisCacheEviction;
-import com.meis.saas.common.cache.MeisCacheProperties;
-import com.meis.saas.common.cache.RedisJsonCache;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
@@ -21,19 +17,13 @@ import java.util.*;
 @RequiredArgsConstructor
 public class CampusController {
     private final JdbcTemplate jdbc;
-    private final RedisJsonCache cache;
-    private final MeisCacheProperties cacheProps;
     private final MeisCacheEviction cacheEviction;
     private final EntityChangeLogService changeLog;
 
     @GetMapping
     public Result<List<Map<String, Object>>> list() {
-        String schema = schema();
-        return Result.ok(cache.getOrLoad(
-                CacheKeys.campuses(schema),
-                cacheProps.getOrgTtl(),
-                new TypeReference<List<Map<String, Object>>>() {},
-                () -> jdbc.queryForList("SELECT * FROM campus WHERE 1=1 " + SoftDeleteSupport.notDeletedClause(jdbc, "campus", null) + " ORDER BY campus_code")));
+        return Result.ok(jdbc.queryForList(
+                "SELECT * FROM campus WHERE 1=1 " + SoftDeleteSupport.notDeletedClause(jdbc, "campus", null) + " ORDER BY campus_code"));
     }
 
     @PostMapping

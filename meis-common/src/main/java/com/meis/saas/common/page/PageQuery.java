@@ -11,6 +11,9 @@ public class PageQuery {
     private String keyword;
     private Map<String, String> filters = new HashMap<>();
 
+    private String sortBy;
+    private String sortOrder;
+
     public int offset() {
         return Math.max(0, (page - 1) * size);
     }

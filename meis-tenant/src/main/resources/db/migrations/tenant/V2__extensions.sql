@@ -33,8 +33,8 @@ COMMENT ON INDEX idx_wo_status IS '索引：维修工单.状态';
 CREATE INDEX idx_wo_report_time ON repair_workorder(report_time DESC);
 COMMENT ON INDEX idx_wo_report_time IS '索引：维修工单.报修时间';
 
-CREATE INDEX idx_wo_engineer ON repair_workorder(assigned_engineer_id);
-COMMENT ON INDEX idx_wo_engineer IS '索引：维修工单.指派工程师';
+CREATE INDEX idx_wo_assigned_user ON repair_workorder(assigned_user_id);
+COMMENT ON INDEX idx_wo_assigned_user IS '索引：维修工单.指派负责人';
 
 CREATE INDEX idx_maint_plan_device ON maintenance_plan(device_id);
 COMMENT ON INDEX idx_maint_plan_device IS '索引：保养计划.关联设备';
@@ -131,6 +131,9 @@ COMMENT ON INDEX idx_device_service_expiry IS '索引：医疗设备台账.使�
 
 CREATE INDEX IF NOT EXISTS idx_wo_event_wo ON repair_workorder_event(workorder_id, created_at);
 COMMENT ON INDEX idx_wo_event_wo IS '索引：维修工单事件.工单+时间';
+
+CREATE INDEX IF NOT EXISTS idx_wo_process_wo ON repair_workorder_process(workorder_id, created_at);
+COMMENT ON INDEX idx_wo_process_wo IS '索引：维修工单流程记录.工单+时间';
 
 CREATE INDEX IF NOT EXISTS idx_power_reading_tag_read_at ON power_current_reading(tag_id, read_at DESC);
 COMMENT ON INDEX idx_power_reading_tag_read_at IS '索引：电流读数.标签+读取时间';

@@ -1,4 +1,4 @@
-# MEIS local dev control panel - http://localhost:5099
+﻿# MEIS local dev control panel - http://localhost:5099
 param(
     [int]$Port = 5099,
     [switch]$NoBrowser,
@@ -33,7 +33,87 @@ if (-not (Test-Path $htmlPath)) { throw "Missing panel UI: $htmlPath" }
 $script:PanelBuildPending = @{}
 $script:PanelHotReloadResults = @{}
 $script:PanelLibraryReloadResults = @{}
-$script:PanelBackgroundJobs = [ordered]@{}
+$script:PanelBackgroundJobs = @{}
+$script:PanelAutoHotReloadEnabled = $true
+$script:PanelAutoReloadCooldown = @{}
+$Global:MeisPanelSourceDirty = @{}
+$script:PanelSourceWatcherRegistrations = @()
+
+function Initialize-PanelSourceWatchers {
+    $Global:MeisPanelSourceDirty = @{}
+    $script:PanelSourceWatcherRegistrations = @()
+    foreach ($s in $script:MeisServices) {
+        $src = Join-Path $script:MeisRoot "$($s.name)\src"
+        if (-not (Test-Path $src)) { continue }
+        $svcName = [string]$s.name
+        $watcher = New-Object System.IO.FileSystemWatcher
+        $watcher.Path = $src
+        $watcher.Filter = '*'
+        $watcher.IncludeSubdirectories = $true
+        $watcher.NotifyFilter = [IO.NotifyFilters]'FileName, LastWrite, CreationTime, Size'
+        $watcher.EnableRaisingEvents = $true
+        # Changed / Created / Renamed：覆盖本机保存与 git pull 新增/覆盖/改名；不依赖文件 mtime 早晚
+        foreach ($evtName in @('Changed', 'Created', 'Renamed')) {
+            $sid = "meis-src-$($evtName.ToLowerInvariant())-$svcName"
+            $reg = Register-ObjectEvent -InputObject $watcher -EventName $evtName -SourceIdentifier $sid -MessageData $svcName -Action {
+                $name = [string]$Event.MessageData
+                $rel = [string]$Event.SourceEventArgs.Name
+                if ([string]::IsNullOrWhiteSpace($rel) -and $Event.SourceEventArgs.ChangeType -eq [IO.WatcherChangeTypes]::Renamed) {
+                    $rel = [string]$Event.SourceEventArgs.FullPath
+                }
+                if ([string]::IsNullOrWhiteSpace($rel)) { return }
+                $ext = [IO.Path]::GetExtension($rel).ToLowerInvariant()
+                $allowed = @('.java', '.xml', '.yml', '.yaml', '.properties', '.sql', '.kt')
+                if ($ext -and $allowed -notcontains $ext) { return }
+                $Global:MeisPanelSourceDirty[$name] = Get-Date
+            }
+            $script:PanelSourceWatcherRegistrations += $reg
+        }
+    }
+}
+
+function Stop-PanelSourceWatchers {
+    foreach ($reg in @($script:PanelSourceWatcherRegistrations)) {
+        if ($null -eq $reg) { continue }
+        try { Unregister-Event -SubscriptionId $reg.SubscriptionId -ErrorAction SilentlyContinue } catch { }
+        try { Remove-Event -SubscriptionId $reg.SubscriptionId -ErrorAction SilentlyContinue } catch { }
+    }
+    $script:PanelSourceWatcherRegistrations = @()
+    $Global:MeisPanelSourceDirty = @{}
+}
+
+function Test-PanelServiceDebugRunning {
+    param([Parameter(Mandatory = $true)][string]$ServiceName)
+    $svc = $script:MeisServices | Where-Object { $_.name -eq $ServiceName } | Select-Object -First 1
+    if ($null -eq $svc) { return $false }
+    $httpUp = Test-MeisPortListening -Port $svc.port
+    $debugUp = $svc.debugPort -and (Test-MeisPortListening -Port $svc.debugPort)
+    return $httpUp -and $debugUp
+}
+
+function Invoke-PanelAutoHotReloadTick {
+    if (-not $script:PanelAutoHotReloadEnabled) { return }
+    if ($null -eq $Global:MeisPanelSourceDirty) { return }
+    $now = Get-Date
+    foreach ($name in @($Global:MeisPanelSourceDirty.Keys)) {
+        $dirtyAt = $Global:MeisPanelSourceDirty[$name]
+        if (($now - $dirtyAt).TotalSeconds -lt 2) { continue }
+        if ($script:PanelBuildPending.ContainsKey($name)) { continue }
+        if (-not (Test-PanelServiceDebugRunning -ServiceName $name)) { continue }
+        if ($script:PanelBackgroundJobs.ContainsKey("hotreload-$name")) {
+            $hrJob = $script:PanelBackgroundJobs["hotreload-$name"]
+            if ($null -ne $hrJob -and $hrJob.State -eq 'Running') { continue }
+        }
+        if ($script:PanelAutoReloadCooldown.ContainsKey($name)) {
+            $last = $script:PanelAutoReloadCooldown[$name]
+            if (($now - $last).TotalSeconds -lt 20) { continue }
+        }
+        $Global:MeisPanelSourceDirty.Remove($name) | Out-Null
+        $script:PanelAutoReloadCooldown[$name] = $now
+        Add-MeisPanelEvent ("AUTO HOT-RELOAD " + $name + " (source changed)")
+        Start-PanelServiceBackgroundJob -ServiceName $name -Action 'reload-classes'
+    }
+}
 
 function Set-PanelLibraryReloadResult {
     param(
@@ -54,15 +134,73 @@ function Set-PanelHotReloadResult {
         [Parameter(Mandatory = $true)][string]$ServiceName,
         [Parameter(Mandatory = $true)][hashtable]$Result
     )
+    $at = (Get-Date)
     $script:PanelHotReloadResults[$ServiceName] = [ordered]@{
-        at        = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
-        ok        = [bool]$Result.ok
-        message   = [string]$Result.message
-        steps     = @($Result.steps)
-        httpUp    = [bool]$Result.httpUp
-        debugUp   = [bool]$Result.debugUp
-        fileCount = if ($null -ne $Result.fileCount) { [int]$Result.fileCount } else { 0 }
+        at            = $at.ToString('yyyy-MM-dd HH:mm:ss')
+        atSort        = [DateTimeOffset]::new($at).ToUnixTimeMilliseconds()
+        ok            = [bool]$Result.ok
+        message       = [string]$Result.message
+        steps         = @($Result.steps)
+        httpUp        = [bool]$Result.httpUp
+        debugUp       = [bool]$Result.debugUp
+        fileCount     = if ($null -ne $Result.fileCount) { [int]$Result.fileCount } else { 0 }
     }
+    if ([bool]$Result.ok) {
+        Clear-MeisModuleMtimeCache -ModuleName $ServiceName
+    }
+}
+
+function Convert-PanelDateTime {
+    param([string]$Text)
+    if ([string]::IsNullOrWhiteSpace($Text)) { return $null }
+    try {
+        return [DateTime]::ParseExact($Text.Trim(), 'yyyy-MM-dd HH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture)
+    } catch {
+        try { return [datetime]$Text } catch { return $null }
+    }
+}
+
+function Resolve-PanelHotReloadDisplay {
+    param(
+        [Parameter(Mandatory = $true)][string]$ServiceName,
+        [Parameter(Mandatory = $true)]$ServiceItem
+    )
+    if (-not $script:PanelHotReloadResults.ContainsKey($ServiceName)) { return $null }
+    $hr = $script:PanelHotReloadResults[$ServiceName]
+    if ($hr.ok) { return $hr }
+
+    $httpUp = $false
+    $jarHealthy = $false
+    $jarMtime = ''
+    if ($ServiceItem -is [System.Collections.IDictionary]) {
+        $httpUp = [bool]$ServiceItem['httpUp']
+        $jarHealthy = [bool]$ServiceItem['jarHealthy']
+        $jarMtime = [string]$ServiceItem['jarMtime']
+    } else {
+        $httpUp = [bool]$ServiceItem.httpUp
+        $jarHealthy = [bool]$ServiceItem.jarHealthy
+        $jarMtime = [string]$ServiceItem.jarMtime
+    }
+
+    if ($httpUp -and $jarHealthy) {
+        $hrAt = Convert-PanelDateTime ([string]$hr.at)
+        $jarAt = Convert-PanelDateTime $jarMtime
+        if ($jarAt -and $hrAt -and $jarAt -gt $hrAt) {
+            $script:PanelHotReloadResults.Remove($ServiceName) | Out-Null
+            return $null
+        }
+        return [ordered]@{
+            at        = $hr.at
+            ok        = $false
+            recovered = $true
+            message   = '上次热加载失败，当前服务与 JAR 已恢复'
+            steps     = @($hr.steps)
+            httpUp    = $httpUp
+            debugUp   = [bool]$hr.debugUp
+            fileCount = if ($null -ne $hr.fileCount) { [int]$hr.fileCount } else { 0 }
+        }
+    }
+    return $hr
 }
 
 function Test-PanelClientDisconnectError {
@@ -139,7 +277,9 @@ function ConvertTo-PanelJsonData {
         return [PSCustomObject]$obj
     }
     if ($Value -is [System.Collections.IEnumerable] -and $Value -isnot [string]) {
-        return @($Value | ForEach-Object { ConvertTo-PanelJsonData $_ })
+        $items = @($Value | ForEach-Object { ConvertTo-PanelJsonData $_ })
+        # 单元素数组在赋给 PSCustomObject 属性时会被 PowerShell 展平为标量，导致 JSON 不是数组
+        return ,$items
     }
     return $Value
 }
@@ -168,19 +308,61 @@ function Sync-PanelBackgroundJobs {
             continue
         }
         try {
-            $null = Receive-Job $job -ErrorAction SilentlyContinue
-            if ($state -eq 'Failed') {
+            $output = Receive-Job $job -ErrorAction SilentlyContinue
+            if ($label -like 'hotreload-*') {
+                $svcName = $label.Substring(10)
+                if ($state -eq 'Failed') {
+                    Add-MeisPanelEvent ($label + ' FAILED (background job)')
+                    Set-PanelHotReloadResult -ServiceName $svcName -Result @{
+                        ok = $false; message = 'hot-reload failed'; steps = @()
+                    }
+                } else {
+                    Add-MeisPanelEvent ($label + ' -> done')
+                    if ($output) {
+                        Set-PanelHotReloadResult -ServiceName $svcName -Result $output
+                    }
+                }
+            } elseif ($state -eq 'Failed') {
                 Add-MeisPanelEvent ($label + ' FAILED (background job)')
             } else {
                 Add-MeisPanelEvent ($label + ' -> done')
+                if ($label -match '^(.+)\s+restarting$') {
+                    $svcName = $Matches[1]
+                    if ($script:PanelHotReloadResults.ContainsKey($svcName)) {
+                        $prev = $script:PanelHotReloadResults[$svcName]
+                        if (-not $prev.ok) {
+                            $script:PanelHotReloadResults.Remove($svcName) | Out-Null
+                        }
+                    }
+                }
             }
         } catch {
             Add-MeisPanelEvent ($label + ' FAILED: ' + $_.Exception.Message)
+            if ($label -like 'hotreload-*') {
+                $svcName = $label.Substring(10)
+                Set-PanelHotReloadResult -ServiceName $svcName -Result @{
+                    ok = $false; message = $_.Exception.Message; steps = @()
+                }
+            }
         }
         Remove-Job $job -Force -ErrorAction SilentlyContinue
         $script:PanelBackgroundJobs.Remove($label) | Out-Null
+        if ($label -like 'frontend-build-*') {
+            $script:PanelBuildPending.Remove('meis-web') | Out-Null
+        }
     }
     return @($running)
+}
+
+function Test-PanelFrontendBuildRunning {
+    foreach ($label in @($script:PanelBackgroundJobs.Keys)) {
+        if ($label -notlike 'frontend-build-*') { continue }
+        $job = $script:PanelBackgroundJobs[$label]
+        if ($null -ne $job -and $job.State -eq 'Running') {
+            return $true
+        }
+    }
+    return $false
 }
 
 function Start-PanelBackgroundJob {
@@ -237,7 +419,7 @@ function Start-PanelServiceBackgroundJob {
     if ($Action -eq 'build') {
         $script:PanelBuildPending[$ServiceName] = (Get-Date)
     }
-    $null = Start-Job -ScriptBlock {
+    $job = Start-Job -ScriptBlock {
         param($ActionName, $Name, $ScriptsDir, $Root, $BuildMode, $DoEnableJdwp)
         Set-Location $Root
         . (Join-Path $ScriptsDir 'meis-services.ps1')
@@ -263,9 +445,9 @@ function Start-PanelServiceBackgroundJob {
                             Invoke-MeisMavenModule -Module $Name -Package -AlsoMake | Out-Null
                         }
                         'quick' {
-                            $health = Test-MeisServiceJarHealthy $Name
-                            if (-not $health.ok) {
-                                Invoke-MeisMavenModule -Module $Name -Package -AlsoMake | Out-Null
+                            $repair = Repair-MeisServiceJarIfNeeded -ServiceName $Name -StopIfRunning
+                            if ($repair.stopped) {
+                                Add-MeisPanelEvent ('BUILD ' + $Name + ': stopped for JAR repack')
                             }
                             Invoke-MeisMavenModule -Module $Name -Compile -AlsoMake | Out-Null
                             Sync-MeisServiceClassesToJar -ServiceName $Name | Out-Null
@@ -276,7 +458,7 @@ function Start-PanelServiceBackgroundJob {
                     }
                 }
                 'reload-classes' {
-                    Invoke-MeisServiceHotReload -ServiceName $Name | Out-Null
+                    return Invoke-MeisServiceHotReload -ServiceName $Name
                 }
             }
         } catch {
@@ -284,6 +466,9 @@ function Start-PanelServiceBackgroundJob {
             throw
         }
     } -ArgumentList $Action, $ServiceName, $scriptsDir, $root, $BuildMode, [bool]$DoEnableJdwp
+    if ($Action -eq 'reload-classes') {
+        $script:PanelBackgroundJobs["hotreload-$ServiceName"] = $job
+    }
     $verb = switch ($Action) {
         'start' { 'starting' }
         'start-debug' { 'starting (debug)' }
@@ -305,7 +490,12 @@ function Start-PanelFrontendBackgroundJob {
     if ($Action -eq 'build') {
         $script:PanelBuildPending['meis-web'] = Get-Date
     }
-    $null = Start-Job -ScriptBlock {
+    $jobLabel = switch ($Action) {
+        'build' { 'frontend-build-' + $(if ([string]::IsNullOrWhiteSpace($BuildMode)) { 'typecheck' } else { $BuildMode }) }
+        'start' { 'frontend-start' }
+        'restart' { 'frontend-restart' }
+    }
+    $job = Start-Job -ScriptBlock {
         param($ActionName, $Mode, $ScriptsDir, $Root)
         Set-Location $Root
         . (Join-Path $ScriptsDir 'meis-services.ps1')
@@ -341,6 +531,9 @@ function Start-PanelFrontendBackgroundJob {
             throw
         }
     } -ArgumentList $Action, $BuildMode, $scriptsDir, $root
+    if ($Action -eq 'build') {
+        $script:PanelBackgroundJobs[$jobLabel] = $job
+    }
     $verb = switch ($Action) {
         'start' { 'starting dev server' }
         'restart' { 'restarting dev server' }
@@ -371,14 +564,9 @@ function Invoke-PanelAction {
 
 function Get-PanelFrontendStatus {
     $fe = Get-MeisFrontendStatus
-    $building = $false
-    if ($script:PanelBuildPending.ContainsKey('meis-web')) {
-        $started = $script:PanelBuildPending['meis-web']
-        if (((Get-Date) - $started).TotalSeconds -lt 600) {
-            $building = $true
-        } else {
-            $script:PanelBuildPending.Remove('meis-web') | Out-Null
-        }
+    $building = Test-PanelFrontendBuildRunning
+    if (-not $building -and $script:PanelBuildPending.ContainsKey('meis-web')) {
+        $script:PanelBuildPending.Remove('meis-web') | Out-Null
     }
     $fe.buildInProgress = $building
     return $fe
@@ -403,6 +591,19 @@ function Clear-PanelBuildPending {
     }
 }
 
+function Get-PanelServiceSourceSortKey {
+    param($Item)
+    if ($null -eq $Item) { return [long]0 }
+    $v = $null
+    if ($Item -is [System.Collections.IDictionary]) {
+        $v = $Item['sourceMtimeSort']
+    } else {
+        $v = $Item.sourceMtimeSort
+    }
+    if ($null -eq $v -or [string]::IsNullOrWhiteSpace([string]$v)) { return [long]0 }
+    return [long]$v
+}
+
 function Get-PanelServiceStatusList {
     $list = @(Get-MeisServiceStatusList)
     $now = Get-Date
@@ -421,11 +622,21 @@ function Get-PanelServiceStatusList {
             }
         }
         $item.buildInProgress = $building
-        if ($script:PanelHotReloadResults.ContainsKey($name)) {
-            $item.hotReload = $script:PanelHotReloadResults[$name]
+        $item.hotReloadInProgress = $false
+        $hrLabel = "hotreload-$name"
+        if ($script:PanelBackgroundJobs.ContainsKey($hrLabel)) {
+            $hrJob = $script:PanelBackgroundJobs[$hrLabel]
+            if ($null -ne $hrJob -and $hrJob.State -eq 'Running') {
+                $item.hotReloadInProgress = $true
+            }
         }
+        if ($script:PanelHotReloadResults.ContainsKey($name)) {
+            $item.hotReload = Resolve-PanelHotReloadDisplay -ServiceName $name -ServiceItem $item
+        }
+        $item.sourceDirtyPending = $Global:MeisPanelSourceDirty.ContainsKey($name)
+        $item.autoReloadEligible = Test-PanelServiceDebugRunning -ServiceName $name
     }
-    return $list
+    return @($list | Sort-Object { Get-PanelServiceSourceSortKey $_ } -Descending)
 }
 
 function Get-PanelLibraryStatusList {
@@ -473,12 +684,14 @@ function Handle-PanelRequest {
 
     if ($method -eq 'GET' -and $path -eq '/api/status') {
         $backgroundJobs = Sync-PanelBackgroundJobs
+        Invoke-PanelAutoHotReloadTick
         $payload = [ordered]@{
             timestamp = (Get-Date).ToString('o')
             gatewayUrl = 'http://localhost:8080'
             panelPort = $Port
             redisUp = Test-MeisRedisAvailable
             backgroundJobs = $backgroundJobs
+            autoHotReload = [bool]$script:PanelAutoHotReloadEnabled
             frontend = Get-PanelFrontendStatus
             coreServices = @($script:MeisCoreServiceNames)
             libraries = @(Get-PanelLibraryStatusList)
@@ -611,6 +824,27 @@ function Handle-PanelRequest {
             $r = Start-PanelBackgroundJob -Label 'maven-install' -Action 'build-install'
             Write-JsonResponse -Response $res -Data $r
             return
+        }
+        if ($path -eq '/api/panel/auto-hot-reload') {
+            if ($method -eq 'GET') {
+                Write-JsonResponse -Response $res -Data @{ enabled = [bool]$script:PanelAutoHotReloadEnabled }
+                return
+            }
+            if ($method -eq 'POST') {
+                $enabled = [string]$req.QueryString.Get('enabled')
+                $script:PanelAutoHotReloadEnabled = ($enabled -eq '1' -or $enabled -eq 'true' -or $enabled -eq 'on')
+                Add-MeisPanelEvent ('AUTO HOT-RELOAD ' + $(if ($script:PanelAutoHotReloadEnabled) { 'ON' } else { 'OFF' }))
+                Write-JsonResponse -Response $res -Data @{
+                    ok = $true
+                    enabled = [bool]$script:PanelAutoHotReloadEnabled
+                    message = if ($script:PanelAutoHotReloadEnabled) {
+                        '已开启：保存源码后自动热加载（仅调试中服务）'
+                    } else {
+                        '已关闭自动热加载'
+                    }
+                }
+                return
+            }
         }
         if ($path -eq '/api/panel/shutdown') {
             Add-MeisPanelEvent 'SHUTDOWN panel'
@@ -769,6 +1003,7 @@ try {
 }
 
 $script:DevPanelListener = $listener
+Initialize-PanelSourceWatchers
 
 Write-Host "MEIS Dev Panel: $prefix" -ForegroundColor Cyan
 Write-Host 'Press Ctrl+C to stop the panel server.' -ForegroundColor DarkGray
@@ -788,6 +1023,7 @@ try {
         Invoke-PanelRequestSafe -Context $ctx
     }
 } finally {
+    Stop-PanelSourceWatchers
     try { if ($listener.IsListening) { $listener.Stop() } } catch { }
     try { $listener.Close() } catch { }
     $script:DevPanelListener = $null

@@ -23,7 +23,7 @@ public class TenantAwareDataSource extends DelegatingDataSource {
 
     private Connection prepare(Connection conn) throws SQLException {
         String schema = TenantContext.getSchemaName();
-        if (schema == null || schema.isBlank()) {
+        if (schema == null || schema.trim().isEmpty()) {
             schema = "public";
         }
         try (Statement st = conn.createStatement()) {

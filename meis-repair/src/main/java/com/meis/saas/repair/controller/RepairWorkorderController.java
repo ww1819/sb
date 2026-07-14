@@ -8,6 +8,9 @@ import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
+import com.meis.saas.repair.service.RepairWorkorderProcessService;
+import com.meis.saas.repair.service.RepairWorkorderProcessService.ProcessRecord;
+import com.meis.saas.repair.service.RepairWorkorderSegmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +30,7 @@ public class RepairWorkorderController {
     /** 占用设备、不可再报修的工单状态（不含草稿） */
     private static final Set<String> ACTIVE_STATUSES = Set.of(
             "reported", "dispatching", "pending_accept", "accepted",
-            "repairing", "pending_verify", "suspended"
+            "repairing", "pending_verify", "suspended", "verify_rejected"
     );
 
     private static final Set<String> DRAFT_EDITABLE_FIELDS = Set.of(
@@ -36,8 +39,19 @@ public class RepairWorkorderController {
             "fault_type_id", "remark"
     );
 
+    private static final Set<String> HANDLE_LIST_STATUSES = Set.of(
+            "reported", "dispatching", "pending_accept", "accepted",
+            "repairing", "suspended", "verify_rejected", "pending_verify", "verified"
+    );
+
+    private static final Set<String> VERIFY_LIST_STATUSES = Set.of(
+            "pending_verify", "verified", "closed"
+    );
+
     private final JdbcTemplate jdbc;
     private final EntityChangeLogService changeLog;
+    private final RepairWorkorderProcessService processService;
+    private final RepairWorkorderSegmentService segmentService;
 
     @GetMapping("/devices/candidates")
     public Result<List<Map<String, Object>>> deviceCandidates(
@@ -57,7 +71,7 @@ public class RepairWorkorderController {
                   AND d.id NOT IN (
                       SELECT device_id FROM repair_workorder
                       WHERE device_id IS NOT NULL
-                        AND status IN ('reported','dispatching','pending_accept','accepted','repairing','pending_verify','suspended')
+                        AND status IN ('reported','dispatching','pending_accept','accepted','repairing','pending_verify','suspended','verify_rejected')
                   )
                 """);
         List<Object> args = new ArrayList<>();
@@ -75,7 +89,14 @@ public class RepairWorkorderController {
     public Result<PageResult<Map<String, Object>>> page(
             PageQuery query,
             @RequestParam(required = false) String mode,
-            @RequestParam(required = false) String status) {
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String statuses,
+            @RequestParam(required = false) String urgencyLevel,
+            @RequestParam(required = false) String reportDeptId,
+            @RequestParam(required = false) String assignedUserId,
+            @RequestParam(required = false) String assignment,
+            @RequestParam(required = false) String reportTimeFrom,
+            @RequestParam(required = false) String reportTimeTo) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null));
         List<Object> args = new ArrayList<>();
@@ -90,16 +111,30 @@ public class RepairWorkorderController {
             args.add(kw);
             args.add(kw);
         }
-        if (status != null && !status.isBlank()) {
-            where.append(" AND status = ? ");
-            args.add(status);
-        } else if (mode != null && !mode.isBlank()) {
-            switch (mode) {
-                case "apply" -> where.append(" AND status IN ('draft','reported','dispatching') ");
-                case "handle" -> where.append(" AND status IN ('dispatching','pending_accept','accepted','repairing','suspended') ");
-                case "verify" -> where.append(" AND status = 'pending_verify' ");
-                default -> { }
-            }
+        appendStatusFilter(where, args, mode, status, statuses);
+        if (urgencyLevel != null && !urgencyLevel.isBlank()) {
+            where.append(" AND urgency_level = ? ");
+            args.add(urgencyLevel);
+        }
+        if (reportDeptId != null && !reportDeptId.isBlank()) {
+            where.append(" AND report_dept_id = ?::uuid ");
+            args.add(reportDeptId);
+        }
+        if (assignedUserId != null && !assignedUserId.isBlank()) {
+            where.append(" AND assigned_user_id = ?::uuid ");
+            args.add(assignedUserId);
+        } else if ("unassigned".equalsIgnoreCase(assignment)) {
+            where.append(" AND assigned_user_id IS NULL ");
+        } else if ("assigned".equalsIgnoreCase(assignment)) {
+            where.append(" AND assigned_user_id IS NOT NULL ");
+        }
+        if (reportTimeFrom != null && !reportTimeFrom.isBlank()) {
+            where.append(" AND report_time >= ?::date ");
+            args.add(reportTimeFrom);
+        }
+        if (reportTimeTo != null && !reportTimeTo.isBlank()) {
+            where.append(" AND report_time < (?::date + INTERVAL '1 day') ");
+            args.add(reportTimeTo);
         }
 
         Long total = jdbc.queryForObject("SELECT COUNT(*) FROM repair_workorder" + where, Long.class, args.toArray());
@@ -109,17 +144,65 @@ public class RepairWorkorderController {
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT * FROM repair_workorder" + where + " ORDER BY report_time DESC NULLS LAST, created_at DESC LIMIT ? OFFSET ?",
                 pageArgs.toArray());
+        processService.enrichWorkorders(rows);
         return Result.ok(PageResult.of(rows, total != null ? total : 0, query.getPage(), query.getSize()));
     }
 
     @GetMapping("/{id:" + UUID_PATH + "}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
-        return Result.ok(requireWo(id));
+        return Result.ok(loadWorkorder(id));
+    }
+
+    @GetMapping("/{id:" + UUID_PATH + "}/process")
+    public Result<List<Map<String, Object>>> listProcess(@PathVariable UUID id) {
+        requireWo(id);
+        return Result.ok(processService.listByWorkorder(id));
+    }
+
+    @GetMapping("/{id:" + UUID_PATH + "}/segments")
+    public Result<List<Map<String, Object>>> listSegments(@PathVariable UUID id) {
+        requireWo(id);
+        return Result.ok(segmentService.listSegments(id));
+    }
+
+    @PostMapping("/{id:" + UUID_PATH + "}/segments")
+    @Transactional
+    @OperationLog(module = "repair", description = "添加维修进程段")
+    public Result<Map<String, Object>> addSegment(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
+        Map<String, Object> wo = requireWo(id);
+        assertRepairEngineer();
+        if (!isUnassigned(wo)) {
+            assertAssignedOwner(wo);
+        }
+        Object rawTypeId = body.get("processTypeId") != null ? body.get("processTypeId") : body.get("process_type_id");
+        if (rawTypeId == null || String.valueOf(rawTypeId).isBlank()) {
+            throw new BizException(400, "请选择进程类型");
+        }
+        UUID typeId = UUID.fromString(String.valueOf(rawTypeId));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> parts = (List<Map<String, Object>>) body.getOrDefault("parts", List.of());
+        Map<String, Object> seg = segmentService.addEngineerSegment(id, wo, typeId, str(body.get("remark")), parts);
+        addEvent(id, "add_segment", str(wo.get("status")), str(loadWorkorder(id).get("status")),
+                null, null, wo.get("assigned_user_id"), null, null,
+                "添加进程段: " + seg.get("type_name"), null);
+        return Result.ok(seg);
+    }
+
+    @PostMapping("/{id:" + UUID_PATH + "}/segments/{segmentId:" + UUID_PATH + "}/parts")
+    @Transactional
+    @OperationLog(module = "repair", description = "进程段添加配件")
+    public Result<Map<String, Object>> addSegmentPart(@PathVariable UUID id,
+                                                       @PathVariable UUID segmentId,
+                                                       @RequestBody Map<String, Object> body) {
+        requireWo(id);
+        assertRepairEngineer();
+        assertAssignedOwner(requireWo(id));
+        return Result.ok(segmentService.addPart(segmentId, body));
     }
 
     @GetMapping("/{id:" + UUID_PATH + "}/timeline")
     public Result<Map<String, Object>> timeline(@PathVariable UUID id) {
-        Map<String, Object> wo = requireWo(id);
+        Map<String, Object> wo = loadWorkorder(id);
         List<Map<String, Object>> events = jdbc.queryForList(
                 "SELECT * FROM repair_workorder_event WHERE workorder_id = ?::uuid ORDER BY created_at ASC, id ASC", id);
 
@@ -270,43 +353,52 @@ public class RepairWorkorderController {
         if (!Set.of("reported", "dispatching", "pending_accept", "accepted", "repairing").contains(current)) {
             throw new BizException(400, "当前状态不可派工: " + current);
         }
-        Object engineerId = body.get("engineerId") != null ? body.get("engineerId") : body.get("engineer_id");
-        if (engineerId == null || String.valueOf(engineerId).isBlank()) {
+        if (Set.of("reported", "dispatching").contains(current) && !isUnassigned(wo)) {
+            throw new BizException(400, "工单已指派负责人，请使用转派或由负责人接单");
+        }
+        Object userId = resolveUserId(body);
+        if (userId == null || String.valueOf(userId).isBlank()) {
             throw new BizException(400, "请选择工程师");
         }
         boolean startNow = Boolean.TRUE.equals(body.get("startRepair")) || Boolean.TRUE.equals(body.get("start_repair"));
         String target = startNow ? "repairing" : "pending_accept";
-        String fromEngineer = str(wo.get("assigned_engineer_id"));
+        String fromUser = str(wo.get("assigned_user_id"));
+        String fromSub = str(wo.get("repair_sub_status"));
+        String remark = str(body.get("remark"));
 
         if ("reported".equals(current)) {
-            jdbc.update("""
-                UPDATE repair_workorder SET dispatch_started_at = COALESCE(dispatch_started_at, NOW()),
-                assigned_engineer_id = ?::uuid, assigned_at = NOW(), assigner_id = ?::uuid,
-                status = ?, repair_sub_status = CASE WHEN ? = 'repairing' THEN COALESCE(repair_sub_status, 'internal') ELSE repair_sub_status END,
-                repair_start_time = CASE WHEN ? = 'repairing' THEN COALESCE(repair_start_time, NOW()) ELSE repair_start_time END,
-                response_time = CASE WHEN ? = 'repairing' THEN COALESCE(response_time, NOW()) ELSE response_time END,
-                updated_at = NOW() WHERE id = ?::uuid
-                """, engineerId, operatorId(), target, target, target, target, id);
+            processService.insertProcess(id, ProcessRecord.builder("dispatch")
+                    .fromStatus(current).toStatus(target)
+                    .toSubStatus(startNow ? "internal" : null)
+                    .userId(userId).toUserId(userId).operatorId(operatorId())
+                    .remark(remark).build());
+            if (startNow) {
+                processService.insertProcess(id, ProcessRecord.builder("start_repair")
+                        .fromStatus(current).toStatus("repairing").toSubStatus("internal")
+                        .userId(userId).operatorId(operatorId()).remark("派工并开始维修").build());
+            }
             addEvent(id, "dispatch", current, target, null, startNow ? "internal" : null,
-                    engineerId, null, engineerId, str(body.get("remark")), null);
+                    userId, null, userId, remark, null);
             if (startNow) {
                 addEvent(id, "start_repair", current, "repairing", null, "internal",
-                        engineerId, null, null, "派工并开始维修", null);
+                        userId, null, null, "派工并开始维修", null);
             }
         } else {
-            jdbc.update("""
-                UPDATE repair_workorder SET assigned_engineer_id = ?::uuid, assigned_at = NOW(), assigner_id = ?::uuid,
-                status = ?,
-                repair_sub_status = CASE WHEN ? = 'repairing' THEN COALESCE(repair_sub_status, 'internal') ELSE NULL END,
-                repair_start_time = CASE WHEN ? = 'repairing' THEN COALESCE(repair_start_time, NOW()) ELSE repair_start_time END,
-                accepted_at = CASE WHEN ? = 'repairing' THEN COALESCE(accepted_at, NOW()) ELSE accepted_at END,
-                updated_at = NOW() WHERE id = ?::uuid
-                """, engineerId, operatorId(), target, target, target, target, id);
-            String eventType = Objects.equals(fromEngineer, String.valueOf(engineerId)) ? "dispatch" : "transfer";
-            addEvent(id, eventType, current, target, str(wo.get("repair_sub_status")),
-                    startNow ? "internal" : null, engineerId, fromEngineer, engineerId, str(body.get("remark")), null);
+            String eventType = Objects.equals(fromUser, String.valueOf(userId)) ? "dispatch" : "transfer";
+            processService.insertProcess(id, ProcessRecord.builder(eventType)
+                    .fromStatus(current).toStatus(target)
+                    .fromSubStatus(fromSub).toSubStatus(startNow ? "internal" : null)
+                    .userId(userId).fromUserId(fromUser).toUserId(userId).operatorId(operatorId())
+                    .remark(remark).build());
+            addEvent(id, eventType, current, target, fromSub,
+                    startNow ? "internal" : null, userId, fromUser, userId, remark, null);
         }
-        return Result.ok(requireWo(id));
+        processService.syncWorkorderState(id, target, startNow ? "internal" : null, userId);
+        if (startNow) {
+            syncDeviceStatus(wo.get("device_id"), "maintenance");
+            segmentService.openSegmentByCode(id, "internal", userId, remark.isBlank() ? "派工并开始维修" : remark);
+        }
+        return Result.ok(loadWorkorder(id));
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/start-repair")
@@ -318,22 +410,25 @@ public class RepairWorkorderController {
         if (!Set.of("reported", "dispatching", "pending_accept", "accepted").contains(current)) {
             throw new BizException(400, "当前状态不可开始维修: " + current);
         }
-        Object engineerId = body != null && body.get("engineerId") != null ? body.get("engineerId")
-                : (body != null && body.get("engineer_id") != null ? body.get("engineer_id") : wo.get("assigned_engineer_id"));
+        assertRepairEngineer();
+        assertAssignedOwner(wo);
+        Object userId = body != null ? resolveUserId(body) : null;
+        if (userId == null || String.valueOf(userId).isBlank()) {
+            userId = wo.get("assigned_user_id");
+        }
         String sub = body != null && body.get("repair_sub_status") != null
                 ? String.valueOf(body.get("repair_sub_status")) : "internal";
-        jdbc.update("""
-            UPDATE repair_workorder SET status = 'repairing', repair_sub_status = ?,
-            assigned_engineer_id = COALESCE(?::uuid, assigned_engineer_id),
-            repair_start_time = COALESCE(repair_start_time, NOW()),
-            response_time = COALESCE(response_time, NOW()),
-            accepted_at = COALESCE(accepted_at, NOW()),
-            updated_at = NOW() WHERE id = ?::uuid
-            """, sub, blankToNull(engineerId), id);
+        String remark = body != null ? str(body.get("remark")) : "开始维修";
+        processService.insertProcess(id, ProcessRecord.builder("start_repair")
+                .fromStatus(current).toStatus("repairing")
+                .fromSubStatus(str(wo.get("repair_sub_status"))).toSubStatus(sub)
+                .userId(userId).operatorId(operatorId()).remark(remark).build());
+        processService.syncWorkorderState(id, "repairing", sub, userId);
         addEvent(id, "start_repair", current, "repairing", str(wo.get("repair_sub_status")), sub,
-                engineerId, null, null, body != null ? str(body.get("remark")) : "开始维修", null);
+                userId, null, null, remark, null);
         syncDeviceStatus(wo.get("device_id"), "maintenance");
-        return Result.ok(requireWo(id));
+        segmentService.openSegmentByCode(id, "internal", userId, remark);
+        return Result.ok(loadWorkorder(id));
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/accept")
@@ -345,26 +440,70 @@ public class RepairWorkorderController {
         if (!Set.of("pending_accept", "dispatching").contains(current)) {
             throw new BizException(400, "当前状态不可接单: " + current);
         }
+        assertRepairEngineer();
+        assertAssignedOwner(wo);
         boolean startNow = body == null || !Boolean.FALSE.equals(body.get("startRepair"));
+        Object userId = wo.get("assigned_user_id");
         if (startNow) {
-            jdbc.update("""
-                UPDATE repair_workorder SET status = 'repairing', accepted_at = NOW(),
-                repair_start_time = COALESCE(repair_start_time, NOW()),
-                response_time = COALESCE(response_time, NOW()),
-                repair_sub_status = COALESCE(repair_sub_status, 'internal'),
-                updated_at = NOW() WHERE id = ?::uuid
-                """, id);
-            addEvent(id, "accept", current, "accepted", null, null, wo.get("assigned_engineer_id"), null, null, "接单", null);
+            processService.insertProcess(id, ProcessRecord.builder("accept")
+                    .fromStatus(current).toStatus("accepted")
+                    .userId(userId).operatorId(operatorId()).remark("接单").build());
+            processService.insertProcess(id, ProcessRecord.builder("start_repair")
+                    .fromStatus("accepted").toStatus("repairing").toSubStatus("internal")
+                    .userId(userId).operatorId(operatorId()).remark("接单并开始维修").build());
+            processService.syncWorkorderState(id, "repairing", "internal", null);
+            addEvent(id, "accept", current, "accepted", null, null, userId, null, null, "接单", null);
             addEvent(id, "start_repair", "accepted", "repairing", null, "internal",
-                    wo.get("assigned_engineer_id"), null, null, "接单并开始维修", null);
+                    userId, null, null, "接单并开始维修", null);
+            syncDeviceStatus(wo.get("device_id"), "maintenance");
+            segmentService.openSegmentByCode(id, "internal", userId, "接单并开始维修");
         } else {
-            jdbc.update("""
-                UPDATE repair_workorder SET status = 'accepted', accepted_at = NOW(),
-                response_time = COALESCE(response_time, NOW()), updated_at = NOW() WHERE id = ?::uuid
-                """, id);
-            addEvent(id, "accept", current, "accepted", null, null, wo.get("assigned_engineer_id"), null, null, "接单", null);
+            processService.insertProcess(id, ProcessRecord.builder("accept")
+                    .fromStatus(current).toStatus("accepted")
+                    .userId(userId).operatorId(operatorId()).remark("接单").build());
+            processService.syncWorkorderState(id, "accepted", null, null);
+            addEvent(id, "accept", current, "accepted", null, null, userId, null, null, "接单", null);
         }
-        return Result.ok(requireWo(id));
+        return Result.ok(loadWorkorder(id));
+    }
+
+    @PostMapping("/{id:" + UUID_PATH + "}/grab")
+    @Transactional
+    @OperationLog(module = "repair", description = "工程师抢单")
+    public Result<Map<String, Object>> grab(@PathVariable UUID id, @RequestBody(required = false) Map<String, Object> body) {
+        assertRepairEngineer();
+        Map<String, Object> wo = requireWo(id);
+        String current = str(wo.get("status"));
+        if (!Set.of("reported", "dispatching").contains(current)) {
+            throw new BizException(400, "仅待派单工单可抢单: " + current);
+        }
+        if (!isUnassigned(wo)) {
+            throw new BizException(400, "工单已指派负责人，不可抢单");
+        }
+        Object userId = operatorId();
+        String remark = body != null ? str(body.get("remark")) : "工程师抢单";
+        if (remark.isBlank()) remark = "工程师抢单";
+
+        int updated = jdbc.update("""
+                UPDATE repair_workorder
+                SET status = 'repairing', assigned_user_id = ?::uuid, repair_sub_status = 'internal', updated_at = NOW()
+                WHERE id = ?::uuid AND status IN ('reported','dispatching') AND assigned_user_id IS NULL
+                """, userId, id);
+        if (updated == 0) {
+            throw new BizException(409, "工单已被他人抢单或已派单，请刷新后重试");
+        }
+
+        processService.insertProcess(id, ProcessRecord.builder("grab")
+                .fromStatus(current).toStatus("repairing").toSubStatus("internal")
+                .userId(userId).toUserId(userId).operatorId(userId).remark(remark).build());
+        processService.insertProcess(id, ProcessRecord.builder("start_repair")
+                .fromStatus(current).toStatus("repairing").toSubStatus("internal")
+                .userId(userId).operatorId(userId).remark("抢单并开始维修").build());
+        addEvent(id, "grab", current, "repairing", null, "internal", userId, null, userId, remark, null);
+        addEvent(id, "start_repair", current, "repairing", null, "internal", userId, null, null, "抢单并开始维修", null);
+        syncDeviceStatus(wo.get("device_id"), "maintenance");
+        segmentService.openSegmentByCode(id, "internal", userId, remark);
+        return Result.ok(loadWorkorder(id));
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/transfer")
@@ -373,25 +512,29 @@ public class RepairWorkorderController {
     public Result<Map<String, Object>> transfer(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
         Map<String, Object> wo = requireWo(id);
         String current = str(wo.get("status"));
-        if (!Set.of("dispatching", "pending_accept", "accepted", "repairing").contains(current)) {
+        if (!Set.of("dispatching", "pending_accept", "accepted", "repairing", "verify_rejected").contains(current)) {
             throw new BizException(400, "当前状态不可转派: " + current);
         }
-        Object toEngineer = body.get("engineerId") != null ? body.get("engineerId") : body.get("engineer_id");
-        if (toEngineer == null || String.valueOf(toEngineer).isBlank()) {
+        assertRepairEngineer();
+        assertAssignedOwner(wo);
+        Object toUser = resolveUserId(body);
+        if (toUser == null || String.valueOf(toUser).isBlank()) {
             throw new BizException(400, "请选择转派目标工程师");
         }
         boolean keepRepairing = Boolean.TRUE.equals(body.get("keepRepairing")) || Boolean.TRUE.equals(body.get("keep_repairing"));
-        String target = keepRepairing && "repairing".equals(current) ? "repairing" : "pending_accept";
-        Object fromEngineer = wo.get("assigned_engineer_id");
-        jdbc.update("""
-            UPDATE repair_workorder SET assigned_engineer_id = ?::uuid, assigned_at = NOW(), assigner_id = ?::uuid,
-            status = ?, accepted_at = CASE WHEN ? = 'pending_accept' THEN NULL ELSE accepted_at END,
-            updated_at = NOW() WHERE id = ?::uuid
-            """, toEngineer, operatorId(), target, target, id);
-        addEvent(id, "transfer", current, target, str(wo.get("repair_sub_status")),
-                str(wo.get("repair_sub_status")), toEngineer, fromEngineer, toEngineer,
-                str(body.get("remark")), null);
-        return Result.ok(requireWo(id));
+        String target = keepRepairing && Set.of("repairing", "verify_rejected").contains(current) ? current : "pending_accept";
+        Object fromUser = wo.get("assigned_user_id");
+        String fromSub = str(wo.get("repair_sub_status"));
+        String remark = str(body.get("remark"));
+        processService.insertProcess(id, ProcessRecord.builder("transfer")
+                .fromStatus(current).toStatus(target)
+                .fromSubStatus(fromSub).toSubStatus(keepRepairing ? fromSub : null)
+                .userId(toUser).fromUserId(fromUser).toUserId(toUser).operatorId(operatorId())
+                .remark(remark).build());
+        processService.syncWorkorderState(id, target, keepRepairing ? fromSub : null, toUser);
+        addEvent(id, "transfer", current, target, fromSub,
+                keepRepairing ? fromSub : null, toUser, fromUser, toUser, remark, null);
+        return Result.ok(loadWorkorder(id));
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/sub-status")
@@ -399,20 +542,27 @@ public class RepairWorkorderController {
     @OperationLog(module = "repair", description = "更新维修子状态")
     public Result<Map<String, Object>> updateSubStatus(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
         Map<String, Object> wo = requireWo(id);
-        if (!"repairing".equals(str(wo.get("status")))) {
-            throw new BizException(400, "仅维修中可更新子状态");
+        String current = str(wo.get("status"));
+        if (!Set.of("repairing", "verify_rejected").contains(current)) {
+            throw new BizException(400, "仅维修中或拒绝验收后可更新子状态");
         }
+        assertRepairEngineer();
+        assertAssignedOwner(wo);
         String sub = str(body.get("repair_sub_status"));
         if (sub.isBlank()) throw new BizException(400, "请指定子状态");
         String fromSub = str(wo.get("repair_sub_status"));
-        jdbc.update("UPDATE repair_workorder SET repair_sub_status = ?, repair_type = COALESCE(?, repair_type), updated_at = NOW() WHERE id = ?::uuid",
-                sub, mapRepairType(sub), id);
-        if ("on_site".equals(sub) && wo.get("arrival_time") == null) {
-            jdbc.update("UPDATE repair_workorder SET arrival_time = NOW() WHERE id = ?::uuid", id);
-        }
-        addEvent(id, "sub_status_change", "repairing", "repairing", fromSub, sub,
-                wo.get("assigned_engineer_id"), null, null, str(body.get("remark")), null);
-        return Result.ok(requireWo(id));
+        String repairType = mapRepairType(sub);
+        String extraJson = "on_site".equals(sub)
+                ? "{\"repair_type\":\"" + repairType + "\",\"arrival_recorded\":true}" : null;
+        processService.insertProcess(id, ProcessRecord.builder("sub_status")
+                .fromStatus(current).toStatus(current)
+                .fromSubStatus(fromSub).toSubStatus(sub)
+                .userId(wo.get("assigned_user_id")).operatorId(operatorId())
+                .remark(str(body.get("remark"))).extraJson(extraJson).build());
+        processService.syncWorkorderState(id, current, sub, null);
+        addEvent(id, "sub_status_change", current, current, fromSub, sub,
+                wo.get("assigned_user_id"), null, null, str(body.get("remark")), null);
+        return Result.ok(loadWorkorder(id));
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/complete")
@@ -421,20 +571,26 @@ public class RepairWorkorderController {
     public Result<Map<String, Object>> complete(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
         Map<String, Object> wo = requireWo(id);
         String current = str(wo.get("status"));
-        if (!"repairing".equals(current)) {
-            throw new BizException(400, "仅维修中可完工: " + current);
+        if (!Set.of("repairing", "verify_rejected").contains(current)) {
+            throw new BizException(400, "仅维修中或拒绝验收后可完工: " + current);
         }
+        assertRepairEngineer();
+        assertAssignedOwner(wo);
         boolean skipVerify = Boolean.TRUE.equals(body.get("skipVerify")) || Boolean.TRUE.equals(body.get("skip_verify"));
+        if (skipVerify && "verify_rejected".equals(current)) {
+            throw new BizException(400, "拒绝验收返修后不可跳过验收直接结案");
+        }
         String target = skipVerify ? "closed" : "pending_verify";
-        jdbc.update("""
-            UPDATE repair_workorder SET solution_description=?, parts_cost=?, labor_cost=?, total_cost=?,
-            repair_end_time=NOW(), status=?, repair_sub_status=NULL,
-            closed_at = CASE WHEN ? = 'closed' THEN NOW() ELSE closed_at END,
-            updated_at=NOW() WHERE id=?::uuid
-            """,
-                body.get("solution_description"), body.getOrDefault("parts_cost", 0),
-                body.getOrDefault("labor_cost", 0), body.getOrDefault("total_cost", 0),
-                target, target, id);
+        processService.insertProcess(id, ProcessRecord.builder("complete")
+                .fromStatus(current).toStatus(target)
+                .fromSubStatus(str(wo.get("repair_sub_status")))
+                .userId(wo.get("assigned_user_id")).operatorId(operatorId())
+                .solutionDescription(str(body.get("solution_description")))
+                .laborCost(body.getOrDefault("labor_cost", 0))
+                .partsCost(body.getOrDefault("parts_cost", 0))
+                .totalCost(body.getOrDefault("total_cost", 0))
+                .skipVerify(skipVerify)
+                .remark(skipVerify ? "完工直接结案" : "完工提交验收").build());
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> parts = (List<Map<String, Object>>) body.getOrDefault("spareParts", List.of());
         for (Map<String, Object> p : parts) {
@@ -443,17 +599,21 @@ public class RepairWorkorderController {
             jdbc.update("INSERT INTO spare_part_transaction (spare_part_id, txn_type, quantity, workorder_id) VALUES (?::uuid,'out',?,?::uuid)",
                     p.get("spare_part_id") != null ? p.get("spare_part_id") : p.get("part_id"), p.get("quantity"), id);
         }
+        processService.syncWorkorderState(id, target, null, null);
         addEvent(id, "complete", current, target, str(wo.get("repair_sub_status")), null,
-                wo.get("assigned_engineer_id"), null, null,
+                wo.get("assigned_user_id"), null, null,
                 skipVerify ? "完工直接结案" : "完工提交验收", null);
         if (skipVerify) {
+            processService.insertProcess(id, ProcessRecord.builder("close")
+                    .fromStatus(target).toStatus("closed").operatorId(operatorId()).remark("跳过验收结案").build());
             addEvent(id, "close", target, "closed", null, null, null, null, null, "跳过验收结案", null);
             syncDeviceStatus(wo.get("device_id"), "normal");
         } else {
             addEvent(id, "submit_verify", current, "pending_verify", null, null, null, null, null, "提交验收", null);
             syncDeviceStatus(wo.get("device_id"), "pending_verify");
+            segmentService.openSystemSegment(id, "pending_verify", wo.get("assigned_user_id"), "完工提交验收", null);
         }
-        return Result.ok(requireWo(id));
+        return Result.ok(loadWorkorder(id));
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/verify")
@@ -466,28 +626,40 @@ public class RepairWorkorderController {
         }
         String result = str(body.getOrDefault("verify_result", "pass"));
         boolean pass = !"fail".equalsIgnoreCase(result);
+        Object verifierId = blankToNull(body.get("verifier_id"));
         if (pass) {
-            jdbc.update("""
-                UPDATE repair_workorder SET verifier_id=?::uuid, verify_time=NOW(), verify_result=?, verify_comment=?,
-                satisfaction_rating=?, satisfaction_comment=?, status='verified', updated_at=NOW() WHERE id=?::uuid
-                """,
-                    blankToNull(body.get("verifier_id")), result, body.get("verify_comment"),
-                    body.get("satisfaction_rating"), body.get("satisfaction_comment"), id);
-            jdbc.update("UPDATE repair_workorder SET status='closed', closed_at=NOW(), updated_at=NOW() WHERE id=?::uuid", id);
+            processService.insertProcess(id, ProcessRecord.builder("verify_pass")
+                    .fromStatus("pending_verify").toStatus("verified")
+                    .operatorId(verifierId != null ? verifierId : operatorId())
+                    .verifyResult(result).verifyComment(str(body.get("verify_comment")))
+                    .satisfactionRating(body.get("satisfaction_rating"))
+                    .satisfactionComment(str(body.get("satisfaction_comment")))
+                    .remark(str(body.get("verify_comment"))).build());
+            processService.insertProcess(id, ProcessRecord.builder("close")
+                    .fromStatus("verified").toStatus("closed").operatorId(operatorId()).remark("验收后关闭").build());
+            processService.syncWorkorderState(id, "closed", null, null);
             addEvent(id, "verify_pass", "pending_verify", "verified", null, null, null, null, null, str(body.get("verify_comment")), null);
             addEvent(id, "close", "verified", "closed", null, null, null, null, null, "验收后关闭", null);
             syncDeviceStatus(wo.get("device_id"), "normal");
+            segmentService.openSystemSegment(id, "verified", verifierId, "验收通过", null);
         } else {
-            jdbc.update("""
-                UPDATE repair_workorder SET verifier_id=?::uuid, verify_time=NOW(), verify_result=?, verify_comment=?,
-                status='repairing', repair_sub_status=COALESCE(repair_sub_status,'internal'), updated_at=NOW() WHERE id=?::uuid
-                """,
-                    blankToNull(body.get("verifier_id")), result, body.get("verify_comment"), id);
-            addEvent(id, "verify_fail", "pending_verify", "repairing", null, "internal",
-                    wo.get("assigned_engineer_id"), null, null, str(body.get("verify_comment")), null);
+            String comment = str(body.get("verify_comment"));
+            if (comment.isBlank()) {
+                throw new BizException(400, "请填写拒绝验收原因");
+            }
+            processService.insertProcess(id, ProcessRecord.builder("verify_fail")
+                    .fromStatus("pending_verify").toStatus("verify_rejected")
+                    .userId(wo.get("assigned_user_id"))
+                    .operatorId(verifierId != null ? verifierId : operatorId())
+                    .verifyResult(result).verifyComment(comment)
+                    .remark(comment).build());
+            processService.syncWorkorderState(id, "verify_rejected", null, null);
+            addEvent(id, "verify_fail", "pending_verify", "verify_rejected", null, null,
+                    wo.get("assigned_user_id"), null, null, comment, null);
             syncDeviceStatus(wo.get("device_id"), "maintenance");
+            segmentService.openSystemSegment(id, "verify_rejected", wo.get("assigned_user_id"), comment, comment);
         }
-        return Result.ok(requireWo(id));
+        return Result.ok(loadWorkorder(id));
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/suspend")
@@ -498,10 +670,18 @@ public class RepairWorkorderController {
         if (!"repairing".equals(str(wo.get("status")))) {
             throw new BizException(400, "仅维修中可挂起");
         }
-        jdbc.update("UPDATE repair_workorder SET status='suspended', updated_at=NOW() WHERE id=?::uuid", id);
+        assertRepairEngineer();
+        assertAssignedOwner(wo);
+        String remark = body != null ? str(body.get("remark")) : null;
+        processService.insertProcess(id, ProcessRecord.builder("suspend")
+                .fromStatus("repairing").toStatus("suspended")
+                .fromSubStatus(str(wo.get("repair_sub_status")))
+                .userId(wo.get("assigned_user_id")).operatorId(operatorId())
+                .remark(remark).build());
+        processService.syncWorkorderState(id, "suspended", str(wo.get("repair_sub_status")), null);
         addEvent(id, "suspend", "repairing", "suspended", str(wo.get("repair_sub_status")), null,
-                wo.get("assigned_engineer_id"), null, null, body != null ? str(body.get("remark")) : null, null);
-        return Result.ok(requireWo(id));
+                wo.get("assigned_user_id"), null, null, remark, null);
+        return Result.ok(loadWorkorder(id));
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/resume")
@@ -512,12 +692,19 @@ public class RepairWorkorderController {
         if (!"suspended".equals(str(wo.get("status")))) {
             throw new BizException(400, "仅挂起工单可恢复");
         }
+        assertRepairEngineer();
+        assertAssignedOwner(wo);
         String sub = body != null && body.get("repair_sub_status") != null
                 ? str(body.get("repair_sub_status")) : "internal";
-        jdbc.update("UPDATE repair_workorder SET status='repairing', repair_sub_status=?, updated_at=NOW() WHERE id=?::uuid", sub, id);
+        String remark = body != null ? str(body.get("remark")) : null;
+        processService.insertProcess(id, ProcessRecord.builder("resume")
+                .fromStatus("suspended").toStatus("repairing").toSubStatus(sub)
+                .userId(wo.get("assigned_user_id")).operatorId(operatorId())
+                .remark(remark).build());
+        processService.syncWorkorderState(id, "repairing", sub, null);
         addEvent(id, "resume", "suspended", "repairing", null, sub,
-                wo.get("assigned_engineer_id"), null, null, body != null ? str(body.get("remark")) : null, null);
-        return Result.ok(requireWo(id));
+                wo.get("assigned_user_id"), null, null, remark, null);
+        return Result.ok(loadWorkorder(id));
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/cancel")
@@ -532,13 +719,17 @@ public class RepairWorkorderController {
         if (Set.of("closed", "cancelled", "verified").contains(current)) {
             throw new BizException(400, "当前状态不可取消");
         }
-        jdbc.update("UPDATE repair_workorder SET status='cancelled', closed_at=NOW(), repair_sub_status=NULL, updated_at=NOW() WHERE id=?::uuid", id);
+        String remark = body != null ? str(body.get("remark")) : "取消工单";
+        processService.insertProcess(id, ProcessRecord.builder("cancel")
+                .fromStatus(current).toStatus("cancelled")
+                .fromSubStatus(str(wo.get("repair_sub_status")))
+                .operatorId(operatorId()).remark(remark).build());
+        processService.syncWorkorderState(id, "cancelled", null, null);
         addEvent(id, "cancel", current, "cancelled", str(wo.get("repair_sub_status")), null,
-                null, null, null, body != null ? str(body.get("remark")) : "取消工单", null);
+                null, null, null, remark, null);
         syncDeviceStatus(wo.get("device_id"), "normal");
-        changeLog.recordAction("repair_workorder", id, "cancel", wo, requireWo(id),
-                body != null ? str(body.get("remark")) : "取消工单");
-        return Result.ok(requireWo(id));
+        changeLog.recordAction("repair_workorder", id, "cancel", wo, requireWo(id), remark);
+        return Result.ok(loadWorkorder(id));
     }
 
     // ---------- helpers ----------
@@ -551,16 +742,18 @@ public class RepairWorkorderController {
         return rows.get(0);
     }
 
+    private Map<String, Object> loadWorkorder(UUID id) {
+        Map<String, Object> wo = requireWo(id);
+        processService.enrichWorkorder(wo);
+        return wo;
+    }
+
     private void assertWithdrawable(Map<String, Object> wo) {
         if (!"reported".equals(str(wo.get("status")))) {
             throw new BizException(400, "仅已提交且尚未派单/响应的报修可撤回");
         }
-        if (!isBlankObj(wo.get("assigned_engineer_id"))
-                || !isBlankObj(wo.get("dispatch_started_at"))
-                || !isBlankObj(wo.get("assigned_at"))
-                || !isBlankObj(wo.get("accepted_at"))
-                || !isBlankObj(wo.get("repair_start_time"))
-                || !isBlankObj(wo.get("response_time"))) {
+        UUID id = UUID.fromString(String.valueOf(wo.get("id")));
+        if (processService.hasWorkflowStarted(id)) {
             throw new BizException(400, "已进入派单或维修流程，不可撤回，如需作废请使用取消");
         }
     }
@@ -576,7 +769,7 @@ public class RepairWorkorderController {
         }
         String sql = """
                 SELECT id FROM repair_workorder
-                WHERE device_id = ?::uuid AND status IN ('reported','dispatching','pending_accept','accepted','repairing','pending_verify','suspended')
+                WHERE device_id = ?::uuid AND status IN ('reported','dispatching','pending_accept','accepted','repairing','pending_verify','suspended','verify_rejected')
                 """ + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null);
         List<Object> args = new ArrayList<>();
         args.add(deviceId);
@@ -600,19 +793,57 @@ public class RepairWorkorderController {
     }
 
     private void addEvent(UUID woId, String type, String fromStatus, String toStatus,
-                          String fromSub, String toSub, Object engineerId,
-                          Object fromEngineer, Object toEngineer, String remark, String extraJson) {
+                          String fromSub, String toSub, Object userId,
+                          Object fromUser, Object toUser, String remark, String extraJson) {
         jdbc.update("""
             INSERT INTO repair_workorder_event
             (id, workorder_id, event_type, from_status, to_status, from_sub_status, to_sub_status,
-             operator_id, engineer_id, from_engineer_id, to_engineer_id, remark, extra_json)
+             operator_id, user_id, from_user_id, to_user_id, remark, extra_json)
             VALUES (?::uuid,?::uuid,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?::uuid,?,CAST(? AS jsonb))
             """,
                 UUID.randomUUID(), woId, type, blankToNull(fromStatus), blankToNull(toStatus),
                 blankToNull(fromSub), blankToNull(toSub),
-                blankToNull(operatorId()), blankToNull(engineerId),
-                blankToNull(fromEngineer), blankToNull(toEngineer),
+                blankToNull(operatorId()), blankToNull(userId),
+                blankToNull(fromUser), blankToNull(toUser),
                 blankToNull(remark), extraJson);
+    }
+
+    private static Object resolveUserId(Map<String, Object> body) {
+        if (body == null) return null;
+        for (String key : List.of("userId", "user_id", "engineerId", "engineer_id")) {
+            Object v = body.get(key);
+            if (v != null && !String.valueOf(v).isBlank()) return v;
+        }
+        return null;
+    }
+
+    private static boolean isUnassigned(Map<String, Object> wo) {
+        Object v = wo.get("assigned_user_id");
+        return v == null || String.valueOf(v).isBlank() || "null".equalsIgnoreCase(String.valueOf(v));
+    }
+
+    private void assertRepairEngineer() {
+        String uid = operatorId();
+        if (uid == null || uid.isBlank()) {
+            throw new BizException(401, "未登录");
+        }
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT COALESCE(is_repair_engineer, false) AS is_repair_engineer FROM sys_user WHERE id = ?::uuid AND is_active = true",
+                uid);
+        if (rows.isEmpty() || !Boolean.TRUE.equals(rows.get(0).get("is_repair_engineer"))) {
+            throw new BizException(403, "仅维修工程师可执行此操作");
+        }
+    }
+
+    private void assertAssignedOwner(Map<String, Object> wo) {
+        String assigned = str(wo.get("assigned_user_id"));
+        String op = str(operatorId());
+        if (assigned.isBlank()) {
+            throw new BizException(400, "工单尚未指派负责人");
+        }
+        if (op.isBlank() || !assigned.equals(op)) {
+            throw new BizException(403, "仅当前负责人可操作此工单");
+        }
     }
 
     private String operatorId() {
@@ -660,6 +891,8 @@ public class RepairWorkorderController {
             case "withdraw" -> "撤回报修";
             case "delete" -> "删除草稿";
             case "dispatch" -> "派工";
+            case "grab" -> "抢单";
+            case "add_segment" -> "添加进程段";
             case "transfer" -> "转派";
             case "accept" -> "接单";
             case "reject" -> "退单";
@@ -670,7 +903,7 @@ public class RepairWorkorderController {
             case "complete" -> "维修完工";
             case "submit_verify" -> "提交验收";
             case "verify_pass" -> "验收通过";
-            case "verify_fail" -> "验收不通过";
+            case "verify_fail" -> "拒绝验收";
             case "close" -> "工单关闭";
             case "cancel" -> "取消";
             default -> type;
@@ -811,5 +1044,50 @@ public class RepairWorkorderController {
     private static Object firstNonNull(Object... vals) {
         for (Object v : vals) if (v != null) return v;
         return null;
+    }
+
+    private static Set<String> modeStatusScope(String mode) {
+        if (mode == null || mode.isBlank()) return Set.of();
+        return switch (mode) {
+            case "handle" -> HANDLE_LIST_STATUSES;
+            case "verify" -> VERIFY_LIST_STATUSES;
+            default -> Set.of();
+        };
+    }
+
+    private static List<String> parseCsv(String csv) {
+        if (csv == null || csv.isBlank()) return List.of();
+        return Arrays.stream(csv.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+    }
+
+    private static void appendStatusFilter(StringBuilder where, List<Object> args,
+                                           String mode, String status, String statuses) {
+        List<String> selected = !parseCsv(statuses).isEmpty()
+                ? parseCsv(statuses)
+                : (status != null && !status.isBlank() ? List.of(status.trim()) : List.of());
+        Set<String> scope = modeStatusScope(mode);
+        List<String> effective;
+        if (!selected.isEmpty()) {
+            if (scope.isEmpty()) {
+                effective = selected;
+            } else {
+                effective = selected.stream().filter(scope::contains).distinct().toList();
+            }
+        } else if (!scope.isEmpty()) {
+            effective = new ArrayList<>(scope);
+        } else {
+            return;
+        }
+        if (effective.isEmpty()) {
+            where.append(" AND 1=0 ");
+            return;
+        }
+        where.append(" AND status IN (");
+        where.append(String.join(",", Collections.nCopies(effective.size(), "?")));
+        where.append(") ");
+        args.addAll(effective);
     }
 }

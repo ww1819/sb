@@ -122,6 +122,7 @@ CREATE TABLE sys_user (
     last_login_ip VARCHAR(45),
     is_locked BOOLEAN DEFAULT FALSE,
     is_active BOOLEAN DEFAULT TRUE,
+    is_repair_engineer BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     permissions JSONB,
@@ -1127,7 +1128,7 @@ CREATE TABLE repair_workorder (
     urgency_level VARCHAR(20) DEFAULT 'normal',
     fault_type_id UUID REFERENCES fault_type_dict(id),
     fault_category VARCHAR(50),
-    assigned_engineer_id UUID REFERENCES engineer(id),
+    assigned_user_id UUID REFERENCES sys_user(id),
     assigned_at TIMESTAMP WITH TIME ZONE,
     assigner_id UUID REFERENCES sys_user(id),
     response_time TIMESTAMP WITH TIME ZONE,
@@ -1174,7 +1175,7 @@ COMMENT ON COLUMN repair_workorder.fault_photos IS 'fault photos';
 COMMENT ON COLUMN repair_workorder.urgency_level IS 'urgency level';
 COMMENT ON COLUMN repair_workorder.fault_type_id IS '关联faulttype';
 COMMENT ON COLUMN repair_workorder.fault_category IS 'fault category';
-COMMENT ON COLUMN repair_workorder.assigned_engineer_id IS '指派工程师';
+COMMENT ON COLUMN repair_workorder.assigned_user_id IS '指派维修负责人';
 COMMENT ON COLUMN repair_workorder.assigned_at IS 'assigned时间';
 COMMENT ON COLUMN repair_workorder.assigner_id IS '关联assigner';
 COMMENT ON COLUMN repair_workorder.response_time IS 'response time';
@@ -1216,9 +1217,9 @@ CREATE TABLE repair_workorder_event (
     from_sub_status VARCHAR(30),
     to_sub_status VARCHAR(30),
     operator_id UUID,
-    engineer_id UUID,
-    from_engineer_id UUID,
-    to_engineer_id UUID,
+    user_id UUID,
+    from_user_id UUID,
+    to_user_id UUID,
     remark TEXT,
     extra_json JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -1232,12 +1233,126 @@ COMMENT ON COLUMN repair_workorder_event.to_status IS '变更后主状态';
 COMMENT ON COLUMN repair_workorder_event.from_sub_status IS '变更前子状态';
 COMMENT ON COLUMN repair_workorder_event.to_sub_status IS '变更后子状态';
 COMMENT ON COLUMN repair_workorder_event.operator_id IS '操作人';
-COMMENT ON COLUMN repair_workorder_event.engineer_id IS '相关工程师';
-COMMENT ON COLUMN repair_workorder_event.from_engineer_id IS '转派前工程师';
-COMMENT ON COLUMN repair_workorder_event.to_engineer_id IS '转派后工程师';
+COMMENT ON COLUMN repair_workorder_event.user_id IS '相关维修负责人';
+COMMENT ON COLUMN repair_workorder_event.from_user_id IS '转派前负责人';
+COMMENT ON COLUMN repair_workorder_event.to_user_id IS '转派后负责人';
 COMMENT ON COLUMN repair_workorder_event.remark IS '备注';
 COMMENT ON COLUMN repair_workorder_event.extra_json IS '扩展JSON';
 COMMENT ON COLUMN repair_workorder_event.created_at IS '事件时间';
+
+-- 5.3.2 维修工单流程业务记录（派工/接单/转派/维修/验收等操作明细，主单仅维护状态）
+CREATE TABLE repair_workorder_process (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workorder_id UUID NOT NULL REFERENCES repair_workorder(id) ON DELETE CASCADE,
+    action_type VARCHAR(40) NOT NULL,
+    from_status VARCHAR(30),
+    to_status VARCHAR(30),
+    from_sub_status VARCHAR(30),
+    to_sub_status VARCHAR(30),
+    user_id UUID,
+    from_user_id UUID,
+    to_user_id UUID,
+    operator_id UUID,
+    solution_description TEXT,
+    labor_cost DECIMAL(10,2),
+    parts_cost DECIMAL(10,2),
+    total_cost DECIMAL(10,2),
+    verify_result VARCHAR(20),
+    verify_comment TEXT,
+    satisfaction_rating INTEGER,
+    satisfaction_comment TEXT,
+    skip_verify BOOLEAN,
+    remark TEXT,
+    extra_json JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID
+);
+COMMENT ON TABLE repair_workorder_process IS '维修工单流程业务记录（派工/维修/验收等操作明细）';
+COMMENT ON COLUMN repair_workorder_process.id IS '主键';
+COMMENT ON COLUMN repair_workorder_process.workorder_id IS '关联维修工单';
+COMMENT ON COLUMN repair_workorder_process.action_type IS '操作类型：dispatch/accept/transfer/start_repair/sub_status/complete/verify_pass/verify_fail/suspend/resume/cancel';
+COMMENT ON COLUMN repair_workorder_process.from_status IS '操作前主状态';
+COMMENT ON COLUMN repair_workorder_process.to_status IS '操作后主状态';
+COMMENT ON COLUMN repair_workorder_process.from_sub_status IS '操作前子状态';
+COMMENT ON COLUMN repair_workorder_process.to_sub_status IS '操作后子状态';
+COMMENT ON COLUMN repair_workorder_process.user_id IS '相关维修负责人';
+COMMENT ON COLUMN repair_workorder_process.from_user_id IS '转派前负责人';
+COMMENT ON COLUMN repair_workorder_process.to_user_id IS '转派后负责人';
+COMMENT ON COLUMN repair_workorder_process.operator_id IS '操作人';
+COMMENT ON COLUMN repair_workorder_process.solution_description IS '处理方案（完工）';
+COMMENT ON COLUMN repair_workorder_process.labor_cost IS '人工费';
+COMMENT ON COLUMN repair_workorder_process.parts_cost IS '配件费';
+COMMENT ON COLUMN repair_workorder_process.total_cost IS '总费用';
+COMMENT ON COLUMN repair_workorder_process.verify_result IS '验收结果';
+COMMENT ON COLUMN repair_workorder_process.verify_comment IS '验收意见';
+COMMENT ON COLUMN repair_workorder_process.satisfaction_rating IS '满意度';
+COMMENT ON COLUMN repair_workorder_process.satisfaction_comment IS '满意度备注';
+COMMENT ON COLUMN repair_workorder_process.skip_verify IS '是否跳过验收直接结案';
+COMMENT ON COLUMN repair_workorder_process.remark IS '备注';
+COMMENT ON COLUMN repair_workorder_process.extra_json IS '扩展JSON';
+COMMENT ON COLUMN repair_workorder_process.created_at IS '操作时间';
+COMMENT ON COLUMN repair_workorder_process.updated_at IS '更新时间';
+COMMENT ON COLUMN repair_workorder_process.created_by IS '创建者';
+COMMENT ON COLUMN repair_workorder_process.updated_by IS '更新者';
+COMMENT ON COLUMN repair_workorder_process.is_deleted IS '删除标志';
+COMMENT ON COLUMN repair_workorder_process.deleted_at IS '删除时间';
+COMMENT ON COLUMN repair_workorder_process.deleted_by IS '删除者';
+
+-- 5.3.3 维修进程类型（主数据）
+CREATE TABLE repair_process_type (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    type_code VARCHAR(40) NOT NULL UNIQUE,
+    type_name VARCHAR(100) NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    can_add_parts BOOLEAN NOT NULL DEFAULT FALSE,
+    can_engineer_add BOOLEAN NOT NULL DEFAULT FALSE,
+    engineer_add_rule VARCHAR(40),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID
+);
+COMMENT ON TABLE repair_process_type IS '维修进程类型主数据';
+COMMENT ON COLUMN repair_process_type.type_code IS '类型编码';
+COMMENT ON COLUMN repair_process_type.type_name IS '类型名称';
+COMMENT ON COLUMN repair_process_type.can_add_parts IS '是否允许添加配件';
+COMMENT ON COLUMN repair_process_type.can_engineer_add IS '工程师是否可主动新增';
+COMMENT ON COLUMN repair_process_type.engineer_add_rule IS '工程师新增规则扩展';
+
+-- 5.3.4 维修工单进程段
+CREATE TABLE repair_workorder_segment (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workorder_id UUID NOT NULL REFERENCES repair_workorder(id) ON DELETE CASCADE,
+    process_type_id UUID NOT NULL REFERENCES repair_process_type(id),
+    user_id UUID REFERENCES sys_user(id),
+    started_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ended_at TIMESTAMP WITH TIME ZONE,
+    remark TEXT,
+    verify_comment TEXT,
+    auto_created BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID
+);
+COMMENT ON TABLE repair_workorder_segment IS '维修工单进程段';
+COMMENT ON COLUMN repair_workorder_segment.workorder_id IS '关联维修工单';
+COMMENT ON COLUMN repair_workorder_segment.process_type_id IS '进程类型';
+COMMENT ON COLUMN repair_workorder_segment.user_id IS '负责人';
+COMMENT ON COLUMN repair_workorder_segment.started_at IS '开始时间';
+COMMENT ON COLUMN repair_workorder_segment.ended_at IS '结束时间';
 
 -- 5.4 备件库表
 CREATE TABLE spare_part (
@@ -1300,6 +1415,25 @@ COMMENT ON COLUMN spare_part_usage.unit_price IS 'unit price';
 COMMENT ON COLUMN spare_part_usage.total_price IS '合计金额';
 COMMENT ON COLUMN spare_part_usage.used_at IS 'used时间';
 COMMENT ON COLUMN spare_part_usage.operator_id IS '关联操作人';
+
+-- 5.5.1 进程段配件明细
+CREATE TABLE repair_workorder_segment_part (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    segment_id UUID NOT NULL REFERENCES repair_workorder_segment(id) ON DELETE CASCADE,
+    spare_part_id UUID REFERENCES spare_part(id),
+    quantity INTEGER NOT NULL DEFAULT 1,
+    unit_price DECIMAL(10,2),
+    total_price DECIMAL(10,2),
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID
+);
+COMMENT ON TABLE repair_workorder_segment_part IS '维修进程段配件明细';
 
 -- ================================================================================
 -- 6. 保养管理模块
@@ -2578,6 +2712,17 @@ CREATE TABLE sys_config (
     config_type VARCHAR(20),
     description TEXT,
     is_system BOOLEAN DEFAULT FALSE,
+    category_code VARCHAR(20),
+    category_name VARCHAR(100),
+    item_code VARCHAR(20),
+    item_name VARCHAR(200),
+    value1 TEXT,
+    value2 TEXT,
+    value3 TEXT,
+    value4 TEXT,
+    value5 TEXT,
+    value6 TEXT,
+    sort_order INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

@@ -6,7 +6,7 @@ spring:
   flyway:
     enabled: false
   datasource:
-    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:meis}
+    url: jdbc:postgresql://${POSTGRES_HOST:43.138.177.53}:${POSTGRES_PORT:5432}/${POSTGRES_DB:meis}
     username: ${POSTGRES_USER:med}
     password: ${POSTGRES_PASSWORD:med123456}
   data:

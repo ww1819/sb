@@ -1,5 +1,5 @@
 <template>
-  <el-form label-width="96px" class="device-ledger-form" :disabled="isView">
+  <el-form label-width="96px" class="device-ledger-form" :class="{ 'device-ledger-form--view': isView }">
     <FormTabNav v-model="activeTab" :tabs="visibleTabs" />
 
     <div class="device-ledger-form__panel">
@@ -8,7 +8,11 @@
         table="medical_device"
         :model="model"
         :fields="basicFields"
-        :group-span="{ basic: 6, finance: 6 }"
+        :group-columns="{ basic: 5, finance: 5, location: 5, vendor: 5, time: 5, accounting: 5, status: 5, compliance: 5, other: 5 }"
+        :group-rows="{ basic: basicFormRows, vendor: vendorFormRows, accounting: accountingFormRows, location: locationFormRows }"
+        :group-panels="{ basic: basicFormPanel, status: statusFormPanel }"
+        :highlight-labels="highlightLabels"
+        :group-titles="{ finance: '折旧信息', time: '合同信息', accounting: '财务信息', status: '设备属性', compliance: '动态监测' }"
       />
 
       <div v-show="activeTab === 'card'" class="device-ledger-form__card-pane">
@@ -72,6 +76,10 @@
         load-url="/qc/adverse/page"
         :device-id="String(model.id ?? '')"
       />
+      <DeviceCurrentReadingPanel
+        v-show="activeTab === 'current'"
+        :device-id="String(model.id ?? '')"
+      />
       <DeviceLabelPanel
         v-show="activeTab === 'label'"
         :device-id="String(model.id ?? '')"
@@ -90,9 +98,11 @@ import DeviceAssetCard from '@/components/asset/DeviceAssetCard.vue'
 import DeviceArchivePanel from '@/components/asset/tabs/DeviceArchivePanel.vue'
 import DeviceImagePanel from '@/components/asset/tabs/DeviceImagePanel.vue'
 import DeviceRecordTablePanel from '@/components/asset/tabs/DeviceRecordTablePanel.vue'
+import DeviceCurrentReadingPanel from '@/components/asset/tabs/DeviceCurrentReadingPanel.vue'
 import DeviceLabelPanel from '@/components/asset/tabs/DeviceLabelPanel.vue'
 import type { RecordColumn } from '@/components/asset/tabs/DeviceRecordTablePanel.vue'
 import { getSchema, type FieldSchema } from '@/config/pageSchemas'
+import { toPinyinShortCode } from '@/utils/pinyinCode'
 
 const props = withDefaults(
   defineProps<{
@@ -121,14 +131,17 @@ const allTabs = [
   { key: 'shared_loan', label: '借调记录' },
   { key: 'shared_fee', label: '借调费用' },
   { key: 'inventory', label: '盘点记录' },
-  { key: 'adverse', label: '不良事件' }
+  { key: 'adverse', label: '不良事件' },
+  { key: 'current', label: '电流度数' }
 ]
 
-/** 编辑：基本信息+图片+档案；查看：全部（含标签与业务 Sheet） */
+/** 新增：仅基本信息/档案/图片；编辑与查看：全部 Tab */
 const visibleTabs = computed(() => {
-  if (isView.value) return allTabs
-  const editKeys = new Set(['basic', 'archive', 'images'])
-  return allTabs.filter((t) => editKeys.has(t.key))
+  if (isCreate.value) {
+    const createKeys = new Set(['basic', 'archive', 'images'])
+    return allTabs.filter((t) => createKeys.has(t.key))
+  }
+  return allTabs
 })
 
 watch(
@@ -138,7 +151,69 @@ watch(
   }
 )
 
-const basicGroupKeys = new Set(['basic', 'finance', 'location', 'time', 'status', 'compliance', 'attachment', 'remark', 'other'])
+const basicGroupKeys = new Set(['basic', 'finance', 'location', 'vendor', 'time', 'accounting', 'status', 'compliance', 'other', 'attachment'])
+
+const basicFormRows = [
+  ['device_code', 'card_code', 'device_name', 'pinyin_code', 'brand'],
+  ['specification', 'model', 'serial_number', 'device_unit'],
+  ['asset_category_id', 'finance_category_id', 'standby_current_max_ma', 'standby_current_min_ma'],
+  ['country_of_origin', 'use_dept_head', 'dept_id', 'manage_dept_head', 'manage_dept_id'],
+  ['registration_no', 'category_id']
+]
+
+const basicFormPanel = {
+  inner: ['is_imported']
+}
+
+const highlightLabels = ['device_code', 'device_name', 'device_unit', 'dept_id']
+
+const vendorFormRows = [
+  ['supplier_uscc', 'supplier_id', 'supplier_contact', 'supplier_phone'],
+  ['maintenance_uscc', 'maintenance_company', 'maintenance_engineer', 'maintenance_phone'],
+  ['manufacturer_uscc', 'manufacturer_id']
+]
+
+const accountingFormRows = [
+  ['material_category_code', 'material_group', 'asset_class_code', 'asset_class_name', 'acceptance_date'],
+  ['kingdee_asset_code', 'invoice_no', 'invoice_date', 'expense_item_code', 'expense_item_name'],
+  ['fund_source', 'lease_fee_per_use', 'lease_fee_per_day']
+]
+
+const locationFormRows = [
+  ['campus_id', 'building_id', 'warehouse_id', 'location_floor', 'room_number'],
+  ['location_detail']
+]
+
+const statusFormPanel = {
+  outer: ['device_status', 'risk_level'],
+  inner: [
+    'is_life_support',
+    'is_emergency',
+    'is_metrology',
+    'is_shared_device',
+    'is_maintain_device',
+    'is_inspection_device',
+    'is_pm_device'
+  ]
+}
+
+watch(
+  () => props.model.device_name,
+  (name, oldName) => {
+    if (isView.value) return
+    const next = toPinyinShortCode(String(name ?? ''))
+    if (!next) return
+    const current = String(props.model.pinyin_code ?? '').trim()
+    // 初次加载或名称未变：仅当简码为空时按设备名称回填
+    if (oldName === undefined || oldName === name) {
+      if (!current) props.model.pinyin_code = next
+      return
+    }
+    // 用户修改设备名称时同步更新简码
+    props.model.pinyin_code = next
+  },
+  { immediate: true }
+)
 
 const basicFields = computed(() => {
   const source = props.fields?.length ? props.fields : getSchema('medical_device')
@@ -244,5 +319,27 @@ const adverseColumns: RecordColumn[] = [
 
 .device-ledger-form__card-pane {
   padding-top: 4px;
+}
+
+.device-ledger-form--view :deep(.el-input__wrapper),
+.device-ledger-form--view :deep(.el-select__wrapper),
+.device-ledger-form--view :deep(.el-input-number .el-input__wrapper),
+.device-ledger-form--view :deep(.el-date-editor .el-input__wrapper),
+.device-ledger-form :deep(.el-input.is-disabled .el-input__wrapper),
+.device-ledger-form :deep(.el-select__wrapper.is-disabled),
+.device-ledger-form :deep(.el-input-number.is-disabled .el-input__wrapper),
+.device-ledger-form :deep(.el-date-editor.is-disabled .el-input__wrapper) {
+  background-color: #fff !important;
+  cursor: default;
+}
+
+.device-ledger-form--view :deep(.el-input__inner),
+.device-ledger-form--view :deep(.el-select__selected-item),
+.device-ledger-form--view :deep(.el-input-number .el-input__inner),
+.device-ledger-form :deep(.el-input.is-disabled .el-input__inner),
+.device-ledger-form :deep(.el-select__wrapper.is-disabled .el-select__selected-item),
+.device-ledger-form :deep(.el-input-number.is-disabled .el-input__inner) {
+  color: var(--el-text-color-regular) !important;
+  -webkit-text-fill-color: var(--el-text-color-regular);
 }
 </style>

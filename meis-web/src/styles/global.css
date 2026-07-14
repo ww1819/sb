@@ -48,7 +48,7 @@ body {
   bottom: 0;
   left: -16px;
   height: auto !important;
-  z-index: 100;
+  z-index: 100 !important;
 }
 
 .layout--top #layout-content-root .layout-content-modal {
@@ -228,6 +228,10 @@ body {
   font-weight: 600;
 }
 
+.system-table .el-table__header th .cell {
+  white-space: nowrap;
+}
+
 .system-table .el-table__row {
   height: var(--meis-table-row-height);
   transition: background 0.15s ease, box-shadow 0.15s ease;
@@ -243,10 +247,20 @@ body {
 
 .system-table-wrap .system-table {
   border-radius: var(--meis-card-radius);
+  width: 100%;
 }
 
 .system-table-wrap .el-table {
   --el-table-border-color: var(--meis-border-light);
+}
+
+.system-table-wrap .el-table__inner-wrapper {
+  height: 100% !important;
+}
+
+.system-table-wrap .el-table__body-wrapper {
+  flex: 1;
+  min-height: 0;
 }
 
 .system-empty {
@@ -397,14 +411,72 @@ body {
 }
 
 .table-actions {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
+  justify-content: center;
+  flex-wrap: nowrap;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.system-table :deep(.col-operations .cell) {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.system-table :deep(.col-operations .table-actions .el-button) {
+  padding-left: 4px;
+  padding-right: 4px;
 }
 
 .table-actions :deep(.el-button + .el-button) {
   margin-left: 0;
+}
+
+.table-sort-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.table-sort-header__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table-sort-header__btns {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.table-sort-header__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 12px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--el-text-color-placeholder);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.table-sort-header__btn:hover {
+  color: var(--el-color-primary);
+}
+
+.table-sort-header__btn.active {
+  color: var(--el-color-primary);
+}
+
+.table-sort-header__btn .el-icon {
+  font-size: 12px;
 }
 
 .cell-number {

@@ -8,6 +8,7 @@
     :show-close="false"
     :close-on-click-modal="closeOnClickModal"
     :append-to="appendTarget"
+    :z-index="layoutModalZIndex"
     modal-class="layout-content-modal"
     class="app-modal"
     :class="`app-modal--${size}`"
@@ -33,6 +34,8 @@ import { computed, onMounted, shallowRef } from 'vue'
 import { LAYOUT_CONTENT_ROOT_ID } from '@/config/app'
 
 const appendTarget = shallowRef<string | HTMLElement>(`#${LAYOUT_CONTENT_ROOT_ID}`)
+/** 低于顶栏下拉（z-index 5000），避免遮挡系统菜单 */
+const layoutModalZIndex = 100
 
 onMounted(() => {
   const root = document.getElementById(LAYOUT_CONTENT_ROOT_ID)

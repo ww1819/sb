@@ -17,11 +17,6 @@
     :disabled="field.readonly"
     @update:model-value="onPickerModel"
   />
-  <RefDisplay
-    v-else-if="field.linkTable && field.readonly"
-    :link-table="field.linkTable"
-    :value="model"
-  />
   <RefSelect
     v-else-if="field.linkTable"
     v-model="model"
@@ -40,7 +35,14 @@
     :placeholder="field.label"
     :disabled="field.readonly"
   />
-  <component v-else :is="inputComponent" v-model="model" v-bind="attrs" :disabled="field.readonly">
+  <component
+    v-else
+    :is="inputComponent"
+    v-model="model"
+    v-bind="attrs"
+    :disabled="field.readonly && !useNativeReadonly"
+    :readonly="field.readonly && useNativeReadonly"
+  >
     <template v-if="useDictSelect && options.length">
       <el-option v-for="o in options" :key="o.value" :label="o.label" :value="o.value" />
     </template>
@@ -52,7 +54,6 @@ import { computed, onMounted, ref } from 'vue'
 import type { FieldSchema } from '@/config/pageSchemas'
 import { useDict } from '@/composables/useDict'
 import RefSelect from '@/components/form/RefSelect.vue'
-import RefDisplay from '@/components/form/RefDisplay.vue'
 import FileUploadField from '@/components/form/FileUploadField.vue'
 import RepairDevicePickerField from '@/components/repair/RepairDevicePickerField.vue'
 import AssetDevicePickerField from '@/components/form/AssetDevicePickerField.vue'
@@ -80,6 +81,12 @@ const fileModel = computed({
 
 const useDictSelect = computed(() => !!props.field.dictType)
 
+const useNativeReadonly = computed(() => {
+  if (props.field.dictType || props.field.type === 'select') return false
+  if (props.field.type === 'number' || props.field.type === 'date' || props.field.type === 'datetime') return false
+  return true
+})
+
 const inputComponent = computed(() => {
   if (props.field.dictType) return 'el-select'
   if (props.field.type === 'textarea') return 'el-input'
@@ -91,12 +98,14 @@ const inputComponent = computed(() => {
 })
 
 const attrs = computed(() => {
-  if (props.field.type === 'textarea') return { type: 'textarea', rows: 3, style: 'width:100%' }
-  if (props.field.type === 'date') return { type: 'date', valueFormat: 'YYYY-MM-DD', style: 'width:100%' }
-  if (props.field.type === 'datetime') return { type: 'datetime', valueFormat: 'YYYY-MM-DD HH:mm:ss', style: 'width:100%' }
-  if (props.field.type === 'number') return { style: 'width:100%' }
-  if (props.field.dictType) return { clearable: true, style: 'width:100%' }
-  return { style: 'width:100%' }
+  const base: Record<string, unknown> = {}
+  if (props.field.placeholder) base.placeholder = props.field.placeholder
+  if (props.field.type === 'textarea') return { ...base, type: 'textarea', rows: 3, style: 'width:100%' }
+  if (props.field.type === 'date') return { ...base, type: 'date', valueFormat: 'YYYY-MM-DD', style: 'width:100%' }
+  if (props.field.type === 'datetime') return { ...base, type: 'datetime', valueFormat: 'YYYY-MM-DD HH:mm:ss', style: 'width:100%' }
+  if (props.field.type === 'number') return { ...base, style: 'width:100%' }
+  if (props.field.dictType) return { ...base, clearable: true, style: 'width:100%' }
+  return { ...base, style: 'width:100%' }
 })
 
 onMounted(async () => {

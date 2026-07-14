@@ -4,6 +4,9 @@
       <el-button type="primary" @click="openForm()">新增院区</el-button>
     </template>
     <el-table :data="filteredList" border stripe class="system-table" :height="tableHeight">
+      <el-table-column label="序号" width="64" align="center">
+        <template #default="{ $index }">{{ $index + 1 }}</template>
+      </el-table-column>
       <el-table-column prop="campus_code" label="院区编码" width="100" />
       <el-table-column prop="campus_name" label="院区名称" />
       <el-table-column prop="address" label="地址" show-overflow-tooltip />
@@ -91,12 +94,36 @@ function openForm(row?: any) {
   visible.value = true
 }
 
+function upsertCampus(row: any) {
+  const idx = list.value.findIndex((r) => r.id === row.id)
+  if (idx >= 0) list.value[idx] = row
+  else list.value = [...list.value, row]
+  list.value.sort((a, b) => String(a.campus_code).localeCompare(String(b.campus_code)))
+}
+
 async function save() {
-  if (form.value.id) await http.put(`/system/campuses/${form.value.id}`, form.value)
-  else await http.post('/system/campuses', form.value)
-  ElMessage.success('保存成功')
-  visible.value = false
-  load()
+  const code = String(form.value.campus_code ?? '').trim()
+  const name = String(form.value.campus_name ?? '').trim()
+  if (!code || !name) {
+    ElMessage.warning('请填写院区编码和院区名称')
+    return
+  }
+  const payload = { ...form.value, campus_code: code, campus_name: name }
+  try {
+    const { data } = form.value.id
+      ? await http.put(`/system/campuses/${form.value.id}`, payload)
+      : await http.post('/system/campuses', payload)
+    if (data.code !== 0) {
+      ElMessage.error(data.message || '保存失败')
+      return
+    }
+    if (data.data) upsertCampus(data.data)
+    ElMessage.success('保存成功')
+    visible.value = false
+    await load()
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.message || '保存失败')
+  }
 }
 
 async function remove(row: any) {

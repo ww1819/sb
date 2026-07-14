@@ -24,7 +24,22 @@ public class AssetDeviceController {
     private final DeviceCodeGenerator codeGenerator;
 
     @GetMapping("/page")
-    public Result<PageResult<Map<String, Object>>> page(PageQuery query) {
+    public Result<PageResult<Map<String, Object>>> page(
+            PageQuery query,
+            @RequestParam(value = "enable_dateFrom", required = false) String enable_dateFrom,
+            @RequestParam(value = "enable_dateTo", required = false) String enable_dateTo,
+            @RequestParam(value = "supplier_id", required = false) String supplier_id,
+            @RequestParam(value = "manufacturer_id", required = false) String manufacturer_id,
+            @RequestParam(value = "supplier_name", required = false) String supplier_name,
+            @RequestParam(value = "manufacturer_name", required = false) String manufacturer_name,
+            @RequestParam(value = "device_name", required = false) String device_name,
+            @RequestParam(value = "specification", required = false) String specification,
+            @RequestParam(value = "model", required = false) String model,
+            @RequestParam(value = "dept_id", required = false) String dept_id,
+            @RequestParam(value = "manage_dept_id", required = false) String manage_dept_id,
+            @RequestParam(value = "dept_name", required = false) String dept_name,
+            @RequestParam(value = "manage_dept_name", required = false) String manage_dept_name,
+            @RequestParam(value = "serial_number", required = false) String serial_number) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d"));
         List<Object> args = new ArrayList<>();
@@ -40,17 +55,123 @@ public class AssetDeviceController {
             args.add(kw);
             args.add(kw);
         }
+        appendUuidEq(where, args, "d.supplier_id", supplier_id);
+        appendUuidEq(where, args, "d.manufacturer_id", manufacturer_id);
+        appendUuidEq(where, args, "d.dept_id", dept_id);
+        appendUuidEq(where, args, "d.manage_dept_id", manage_dept_id);
+        boolean needSupplier = hasText(supplier_name);
+        boolean needManufacturer = hasText(manufacturer_name) && !hasText(manufacturer_id);
+        boolean needUseDept = hasText(dept_name) || "dept_id".equals(query.getSortBy());
+        boolean needManageDept = hasText(manage_dept_name) && !hasText(manage_dept_id);
+        if (hasText(supplier_name)) {
+            appendSupplierSearch(where, args, supplier_name);
+        }
+        if (!hasText(manufacturer_id)) {
+            appendNameOrPinyin(where, args, "mfr.manufacturer_name", "mfr.pinyin_code", manufacturer_name);
+        }
+        appendNameOrPinyin(where, args, "d.device_name", "d.pinyin_code", device_name);
+        appendLike(where, args, "d.specification", specification);
+        appendLike(where, args, "d.model", model);
+        if (!hasText(dept_id)) {
+            appendNameOrPinyin(where, args, "use_dept.dept_name", "use_dept.pinyin_code", dept_name);
+        }
+        if (!hasText(manage_dept_id)) {
+            appendNameOrPinyin(where, args, "mgr_dept.dept_name", "mgr_dept.pinyin_code", manage_dept_name);
+        }
+        appendLike(where, args, "d.serial_number", serial_number);
+        if (enable_dateFrom != null && !enable_dateFrom.isBlank()) {
+            where.append(" AND d.enable_date >= ?::date ");
+            args.add(enable_dateFrom.trim());
+        }
+        if (enable_dateTo != null && !enable_dateTo.isBlank()) {
+            where.append(" AND d.enable_date <= ?::date ");
+            args.add(enable_dateTo.trim());
+        }
+        String from = buildFrom(needSupplier, needManufacturer, needUseDept, needManageDept);
         long total = Optional.ofNullable(jdbc.queryForObject(
-                "SELECT COUNT(*) FROM medical_device d" + where, Long.class, args.toArray())).orElse(0L);
+                "SELECT COUNT(*) " + from + where, Long.class, args.toArray())).orElse(0L);
         int offset = (query.getPage() - 1) * query.getSize();
         args.add(query.getSize());
         args.add(offset);
         var rows = jdbc.queryForList("""
                 SELECT d.*
-                FROM medical_device d
-                """ + where + " ORDER BY d.created_at DESC NULLS LAST, d.device_code LIMIT ? OFFSET ?", args.toArray());
+                """ + from + where + buildOrderBy(query) + " LIMIT ? OFFSET ?", args.toArray());
         MedicalDeviceDeleteGuard.enrichCanDelete(jdbc, rows);
         return Result.ok(new PageResult<>(rows, total, query.getPage(), query.getSize()));
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private static void appendLike(StringBuilder where, List<Object> args, String column, String value) {
+        if (!hasText(value)) return;
+        where.append(" AND ").append(column).append(" ILIKE ? ");
+        args.add("%" + value.trim() + "%");
+    }
+
+    private static void appendUuidEq(StringBuilder where, List<Object> args, String column, String value) {
+        if (!hasText(value)) return;
+        where.append(" AND ").append(column).append(" = ?::uuid ");
+        args.add(value.trim());
+    }
+
+    private static void appendSupplierSearch(StringBuilder where, List<Object> args, String value) {
+        if (!hasText(value)) return;
+        String kw = "%" + value.trim() + "%";
+        where.append("""
+                 AND (sup.supplier_name ILIKE ? OR sup.pinyin_code ILIKE ? OR sup.supplier_code ILIKE ?)
+                """);
+        args.add(kw);
+        args.add(kw);
+        args.add(kw);
+    }
+
+    private static void appendNameOrPinyin(StringBuilder where, List<Object> args,
+                                           String nameColumn, String pinyinColumn, String value) {
+        if (!hasText(value)) return;
+        String kw = "%" + value.trim() + "%";
+        where.append(" AND (").append(nameColumn).append(" ILIKE ? OR ").append(pinyinColumn).append(" ILIKE ?) ");
+        args.add(kw);
+        args.add(kw);
+    }
+
+    private static String buildFrom(boolean needSupplier, boolean needManufacturer,
+                                    boolean needUseDept, boolean needManageDept) {
+        StringBuilder from = new StringBuilder(" FROM medical_device d ");
+        if (needSupplier) {
+            from.append(" LEFT JOIN supplier sup ON d.supplier_id = sup.id ");
+        }
+        if (needManufacturer) {
+            from.append(" LEFT JOIN manufacturer mfr ON d.manufacturer_id = mfr.id ");
+        }
+        if (needUseDept) {
+            from.append(" LEFT JOIN department use_dept ON d.dept_id = use_dept.id ");
+        }
+        if (needManageDept) {
+            from.append(" LEFT JOIN department mgr_dept ON d.manage_dept_id = mgr_dept.id ");
+        }
+        return from.toString();
+    }
+
+    private static String buildOrderBy(PageQuery query) {
+        String sortBy = query.getSortBy();
+        String sortOrder = query.getSortOrder();
+        if (sortBy == null || sortBy.isBlank() || sortOrder == null || sortOrder.isBlank()) {
+            return " ORDER BY d.created_at DESC NULLS LAST, d.device_code ASC";
+        }
+        String dir = "desc".equalsIgnoreCase(sortOrder) ? "DESC" : "ASC";
+        String column = switch (sortBy) {
+            case "device_code" -> "d.device_code";
+            case "device_name" -> "d.device_name";
+            case "specification" -> "d.specification";
+            case "dept_id" -> "use_dept.dept_name";
+            default -> null;
+        };
+        if (column == null) {
+            return " ORDER BY d.created_at DESC NULLS LAST, d.device_code ASC";
+        }
+        return " ORDER BY " + column + " " + dir + " NULLS LAST, d.device_code ASC";
     }
 
     @GetMapping("/{id}/detail")

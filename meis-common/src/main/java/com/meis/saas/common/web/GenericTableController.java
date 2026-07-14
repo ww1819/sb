@@ -61,8 +61,50 @@ public abstract class GenericTableController {
         return Result.ok(jdbc().queryForList("SELECT * FROM " + table + where + " LIMIT " + Math.min(limit, 500)));
     }
 
-    @GetMapping("/{table}/{id}")
-    public Result<Map<String, Object>> get(@PathVariable String table, @PathVariable String id) {
+    @GetMapping("/{table}/lookup")
+    public Result<List<Map<String, Object>>> lookup(@PathVariable String table,
+                                                    @RequestParam(required = false) String keyword,
+                                                    @RequestParam(defaultValue = "20") int limit) {
+        check(table);
+        String[] columns = lookupColumns(table);
+        if (columns == null) throw new BizException(400, "lookup not supported: " + table);
+        StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc(), table, null));
+        List<Object> args = new ArrayList<>();
+        if (keyword != null && !keyword.isBlank()) {
+            String kw = "%" + keyword.trim() + "%";
+            where.append(" AND (");
+            for (int i = 0; i < columns.length; i++) {
+                if (i > 0) where.append(" OR ");
+                if ("pinyin_code".equals(columns[i])) {
+                    where.append("COALESCE(").append(columns[i]).append(", '') ILIKE ?");
+                } else {
+                    where.append(columns[i]).append(" ILIKE ?");
+                }
+                args.add(kw);
+            }
+            where.append(") ");
+        }
+        int lim = Math.min(Math.max(limit, 1), 50);
+        args.add(lim);
+        List<Map<String, Object>> rows = jdbc().queryForList(
+                "SELECT * FROM " + table + where + " ORDER BY " + columns[0] + " ASC LIMIT ?",
+                args.toArray());
+        return Result.ok(rows);
+    }
+
+    private static String[] lookupColumns(String table) {
+        return switch (table) {
+            case "supplier" -> new String[]{"supplier_name", "supplier_code", "pinyin_code"};
+            case "manufacturer" -> new String[]{"manufacturer_name", "manufacturer_code", "pinyin_code"};
+            default -> null;
+        };
+    }
+
+    @GetMapping("/{table}/{id:[0-9a-fA-F\\-]{36}}")
+    public Result<Map<String, Object>> get(
+            @PathVariable String table,
+            @PathVariable String id) {
         check(table);
         String where = " WHERE id = ?::uuid " + SoftDeleteSupport.notDeletedClause(jdbc(), table, null);
         List<Map<String, Object>> rows = jdbc().queryForList("SELECT * FROM " + table + where, id);
@@ -105,7 +147,7 @@ public abstract class GenericTableController {
         return Result.ok(body);
     }
 
-    @PutMapping("/{table}/{id}")
+    @PutMapping("/{table}/{id:[0-9a-fA-F\\-]{36}}")
     public Result<Void> update(@PathVariable String table, @PathVariable String id, @RequestBody Map<String, Object> body) {
         check(table);
         denyRepairWorkorderBypass(table);
@@ -184,7 +226,7 @@ public abstract class GenericTableController {
         return Result.ok(Map.of("updated", count));
     }
 
-    @DeleteMapping("/{table}/{id}")
+    @DeleteMapping("/{table}/{id:[0-9a-fA-F\\-]{36}}")
     public Result<Void> delete(@PathVariable String table, @PathVariable String id) {
         check(table);
         denyRepairWorkorderBypass(table);

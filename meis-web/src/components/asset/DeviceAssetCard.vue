@@ -87,7 +87,7 @@ const leftItems = computed(() => [
 const rightItems = computed(() => [
   { label: '设备编码', value: display(props.model.device_code), mono: true },
   { label: '领用科室', value: deptLabel.value },
-  { label: '原值 / 净值', value: financeText.value }
+  { label: '折旧起点 / 当前净值', value: financeText.value }
 ])
 
 function display(val: unknown) {

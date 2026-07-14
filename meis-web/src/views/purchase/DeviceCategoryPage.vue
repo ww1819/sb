@@ -3,8 +3,12 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import CrudPage from '@/components/CrudPage.vue'
-import type { PageConfig } from '@/config/pageRegistry'
+import { getPageConfig } from '@/config/pageRegistry'
 
-const config: PageConfig = { title: '设备分类', apiBase: '/system', table: 'medical_device_category' }
+const route = useRoute()
+const path = computed(() => '/' + (route.params.module as string) + '/' + (route.params.page as string))
+const config = computed(() => getPageConfig(path.value)!)
 </script>

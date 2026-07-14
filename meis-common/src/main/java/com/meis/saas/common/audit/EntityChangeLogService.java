@@ -18,7 +18,7 @@ public class EntityChangeLogService {
     public static final Set<String> TRACKED_TABLES = Set.of(
             "medical_device", "manufacturer", "supplier", "department", "sys_user", "repair_workorder",
             "campus", "building", "warehouse", "asset_category", "medical_device_category",
-            "engineer", "fault_type_dict", "finance_category", "unit_dict", "sys_role"
+            "engineer", "fault_type_dict", "repair_process_type", "finance_category", "unit_dict", "sys_role"
     );
 
     /** 附录 T.5：delete/submit/withdraw 精简快照字段（按实体） */
@@ -38,11 +38,11 @@ public class EntityChangeLogService {
                     "is_clinical", "sort_order", "is_active")),
             Map.entry("sys_user", List.of(
                     "username", "real_name", "employee_no", "phone", "email",
-                    "dept_id", "is_active", "permission_mode")),
+                    "dept_id", "is_active", "is_repair_engineer", "permission_mode")),
             Map.entry("repair_workorder", List.of(
                     "wo_no", "device_id", "device_code", "device_name", "status", "urgency_level",
                     "fault_description", "reporter_id", "report_dept_id", "report_time",
-                    "assigned_engineer_id", "repair_sub_status")),
+                    "assigned_user_id", "repair_sub_status")),
             Map.entry("campus", List.of(
                     "campus_code", "campus_name", "address", "contact_phone", "is_active")),
             Map.entry("building", List.of(
@@ -59,6 +59,9 @@ public class EntityChangeLogService {
                     "engineer_no", "real_name", "user_id", "specialty", "phone", "is_on_duty")),
             Map.entry("fault_type_dict", List.of(
                     "fault_code", "fault_name", "level", "is_active")),
+            Map.entry("repair_process_type", List.of(
+                    "type_code", "type_name", "sort_order", "is_active",
+                    "can_add_parts", "can_engineer_add", "engineer_add_rule")),
             Map.entry("finance_category", List.of(
                     "finance_code", "finance_name", "parent_id", "account_subject",
                     "fund_source", "sort_order", "is_active")),
