@@ -16,7 +16,7 @@
 --   is_deleted  SMALLINT NOT NULL DEFAULT 0            -- 删除标志：0未删除 / 1已删除
 --   deleted_at  TIMESTAMPTZ                            -- 删除时间
 --   deleted_by  UUID                                   -- 删除者
--- 老租户缺列由 R__audit_columns.sql / R__is_deleted_columns.sql 幂等补全。
+-- 老租户缺列由 R__columns_audit.sql 幂等补全。
 -- 详见 docs/meis-requirements.md 附录 G.0。
 -- ================================================================================
 -- 启用扩展
@@ -205,6 +205,35 @@ COMMENT ON COLUMN sys_operation_log.execution_time IS '执行耗时(ms)';
 COMMENT ON COLUMN sys_operation_log.status IS '状态';
 COMMENT ON COLUMN sys_operation_log.error_msg IS '错误信息';
 COMMENT ON COLUMN sys_operation_log.created_at IS '创建时间';
+
+-- 1.7 实体变更记录（附录 T）
+CREATE TABLE sys_entity_change_log (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    entity_type VARCHAR(64) NOT NULL,
+    entity_id UUID NOT NULL,
+    action VARCHAR(32) NOT NULL,
+    changed_fields JSONB,
+    snapshot_json JSONB,
+    operator_id UUID,
+    operator_name VARCHAR(100),
+    remark TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMPTZ,
+    deleted_by UUID
+);
+COMMENT ON TABLE sys_entity_change_log IS '主数据实体变更记录';
+COMMENT ON COLUMN sys_entity_change_log.entity_type IS '实体类型';
+COMMENT ON COLUMN sys_entity_change_log.entity_id IS '实体主键';
+COMMENT ON COLUMN sys_entity_change_log.action IS '动作（CREATE/UPDATE/DELETE 等）';
+COMMENT ON COLUMN sys_entity_change_log.changed_fields IS '变更字段 JSON';
+COMMENT ON COLUMN sys_entity_change_log.snapshot_json IS '精简快照 JSON';
+COMMENT ON COLUMN sys_entity_change_log.operator_id IS '操作人ID';
+COMMENT ON COLUMN sys_entity_change_log.operator_name IS '操作人姓名';
+COMMENT ON COLUMN sys_entity_change_log.remark IS '备注';
 
 -- ================================================================================
 -- 2. 医疗器械分类与供应商
@@ -1056,7 +1085,14 @@ CREATE TABLE device_label_print_log (
     printed_by UUID REFERENCES sys_user(id),
     printed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     template_code VARCHAR(50) DEFAULT 'default',
-    remark TEXT
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID
 );
 COMMENT ON TABLE device_label_print_log IS '资产标签打印记录';
 COMMENT ON COLUMN device_label_print_log.device_code IS '打印时设备编码快照（二维码载荷）';

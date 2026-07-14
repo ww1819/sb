@@ -1,57 +1,37 @@
 -- =============================================================================
--- 租户 schema 补列（可重复迁移 R__）—— 老租户缺列兜底
+-- 租户 schema 数据更正 / 字典与种子（可重复迁移 R__）
 -- =============================================================================
--- 约定（务必遵守）：
---   1. 新建表 / 完整字段定义 → 只改 V1__tables.sql
---      （老租户更新时由 SchemaTableEnsuring 幂等执行 V1：没有的表会创建）
---   2. 本文件只做「已有表补列」：每条语句只 ADD 一个字段（ADD COLUMN IF NOT EXISTS）
---      禁止一条 ALTER 写多个列，避免老库漏列
---   3. 不要在本文件 CREATE TABLE（建表归 V1）
---   4. 不要在本文件 COMMENT ON（空注释由 SchemaCommentFiller 补，避免覆盖租户自定义）
---   5. 手工镜像：db/source/patches/tenant_column_patches.sql（与本文件保持同步）
---   6. 【标准七列】created_at/updated_at/created_by/updated_by/is_deleted/deleted_at/deleted_by
---      由 R__audit_columns.sql（含 is_deleted）与 R__is_deleted_columns.sql 幂等保证；
---      业务补列写本文件，勿把标准七列散落在本文件各处。
+-- 槽位：R__data_fix.sql（按字母序：columns_audit → columns_biz → data_fix）
+-- 约定：
+--   1. 本文件仅 INSERT / UPDATE / DELETE / 以数据为主的 DO 块
+--   2. 结构性 ALTER 归 R__columns_biz.sql；审计七列归 R__columns_audit.sql
+--   3. 不要 CREATE TABLE / CREATE INDEX；不要 COMMENT ON
 -- =============================================================================
-
--- ---------- inventory_check ----------
-ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS audit_status VARCHAR(20) DEFAULT 'pending';
-
--- ---------- repair_workorder（每列一条） ----------
-ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS repair_sub_status VARCHAR(30);
-ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS dispatch_started_at TIMESTAMP WITH TIME ZONE;
-ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMP WITH TIME ZONE;
-ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS closed_at TIMESTAMP WITH TIME ZONE;
 
 -- ---------- 数据修正与字典（非 DDL，可重复） ----------
 UPDATE inventory_check
 SET audit_status = 'approved'
 WHERE approved_by IS NOT NULL AND COALESCE(audit_status, 'pending') = 'pending';
-
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('audit_status', 'pending', '待审核', 'pending', 1),
 ('audit_status', 'approved', '已审核', 'approved', 2)
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
-
 UPDATE repair_workorder SET status = 'pending_accept' WHERE status = 'dispatched';
 UPDATE repair_workorder SET status = 'repairing' WHERE status = 'in_progress';
 UPDATE repair_workorder SET status = 'pending_verify' WHERE status = 'completed';
 UPDATE repair_workorder SET status = 'verified'
 WHERE status = 'accepted' AND verify_time IS NOT NULL;
-
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order)
 SELECT 'device_status', 'pending_verify', '已维修待验收', 'pending_verify', 5
 WHERE NOT EXISTS (
     SELECT 1 FROM sys_dict WHERE dict_type = 'device_status' AND dict_code = 'pending_verify'
 );
-
 UPDATE medical_device d
 SET device_status = 'pending_verify', updated_at = NOW()
 FROM repair_workorder w
 WHERE w.device_id = d.id
   AND w.status = 'pending_verify'
   AND COALESCE(d.device_status, '') = 'maintenance';
-
 DELETE FROM sys_dict WHERE dict_type = 'wo_status';
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('wo_status', 'draft', '未提交', 'draft', 0),
@@ -66,7 +46,6 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('wo_status', 'closed', '已关闭', 'closed', 9),
 ('wo_status', 'cancelled', '已取消', 'cancelled', 10),
 ('wo_status', 'suspended', '已挂起', 'suspended', 11);
-
 DELETE FROM sys_dict WHERE dict_type = 'repair_sub_status';
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('repair_sub_status', 'internal', '院内维修', 'internal', 1),
@@ -76,94 +55,6 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('repair_sub_status', 'on_site', '已到场', 'on_site', 5),
 ('repair_sub_status', 'diagnosing', '诊断中', 'diagnosing', 6),
 ('repair_sub_status', 'testing', '调试中', 'testing', 7);
-
--- ---------- 基础字典模块：补列 ----------
-ALTER TABLE supplier ADD COLUMN IF NOT EXISTS pinyin_code VARCHAR(50);
-ALTER TABLE manufacturer ADD COLUMN IF NOT EXISTS pinyin_code VARCHAR(50);
-ALTER TABLE department ADD COLUMN IF NOT EXISTS pinyin_code VARCHAR(50);
-ALTER TABLE warehouse ADD COLUMN IF NOT EXISTS warehouse_type VARCHAR(30) DEFAULT 'device';
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS asset_category_id UUID;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS finance_category_id UUID;
-ALTER TABLE asset_category ADD COLUMN IF NOT EXISTS depreciation_years INTEGER;
-ALTER TABLE asset_category ADD COLUMN IF NOT EXISTS residual_rate DECIMAL(5,2);
-ALTER TABLE finance_category ADD COLUMN IF NOT EXISTS account_subject VARCHAR(50);
-ALTER TABLE finance_category ADD COLUMN IF NOT EXISTS fund_source VARCHAR(50);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS residual_rate DECIMAL(5,2);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS accrued_disposal_cost DECIMAL(15,2);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS depreciation_start_date DATE;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS depreciated_months INTEGER;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS estimated_useful_life_months INTEGER;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS monthly_depreciation_rate DECIMAL(8,4);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS depreciation_status VARCHAR(20);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS contract_name VARCHAR(200);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS contract_sign_date DATE;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS contract_price DECIMAL(15,2);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS contract_submit_time TIMESTAMPTZ;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS bid_win_date DATE;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS supply_notice_date DATE;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS delivery_deadline DATE;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS first_acceptance_date DATE;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS second_acceptance_date DATE;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS warranty_expiry_date DATE;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS maintenance_company VARCHAR(200);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS maintenance_phone VARCHAR(50);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS supplier_phone VARCHAR(50);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS supplier_contact VARCHAR(100);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS maintenance_engineer VARCHAR(100);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS material_category_code VARCHAR(50);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS material_group VARCHAR(100);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS asset_class_code VARCHAR(50);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS asset_class_name VARCHAR(100);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS kingdee_asset_code VARCHAR(50);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS invoice_no VARCHAR(50);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS invoice_date DATE;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS expense_item_code VARCHAR(50);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS expense_item_name VARCHAR(200);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS fund_source VARCHAR(100);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS lease_fee_per_use DECIMAL(12,2);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS lease_fee_per_day DECIMAL(12,2);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS supplier_uscc VARCHAR(30);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS maintenance_uscc VARCHAR(30);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS manufacturer_uscc VARCHAR(30);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS electronic_tag_barcode VARCHAR(100);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS boot_current_min_ma DECIMAL(10,2);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS boot_current_max_ma DECIMAL(10,2);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS risk_assessment VARCHAR(100);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS inventory_category VARCHAR(100);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS after_sales_engineer VARCHAR(100);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS after_sales_engineer_phone VARCHAR(50);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS warranty_start_date DATE;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS warranty_service_end_date DATE;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS warranty_period_years INTEGER;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS warranty_type VARCHAR(50);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS has_network_function BOOLEAN;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS same_batch_purchase_count INTEGER;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS standard_function_count INTEGER;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS purchase_expected_benefit VARCHAR(200);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS rated_workload VARCHAR(100);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS device_unit VARCHAR(30);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS manage_dept_id UUID;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS location_floor VARCHAR(50);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS room_number VARCHAR(50);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS card_code VARCHAR(50);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS use_dept_head VARCHAR(100);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS manage_dept_head VARCHAR(100);
-
--- 历史库 finance_category 误用 asset 列名 category_code/category_name，纠正为 finance_code/finance_name
-DO $finance_cat_fix$
-BEGIN
-    IF EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema = current_schema() AND table_name = 'finance_category' AND column_name = 'category_code'
-    ) AND NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema = current_schema() AND table_name = 'finance_category' AND column_name = 'finance_code'
-    ) THEN
-        ALTER TABLE finance_category RENAME COLUMN category_code TO finance_code;
-        ALTER TABLE finance_category RENAME COLUMN category_name TO finance_name;
-    END IF;
-END $finance_cat_fix$;
-
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('warehouse_type', 'device', '设备库', 'device', 1),
 ('warehouse_type', 'spare', '备件库', 'spare', 2),
@@ -172,14 +63,12 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('unit_type', 'weight', '重量', 'weight', 2),
 ('unit_type', 'volume', '体积', 'volume', 3)
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
-
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('depreciation_status', 'not_started', '未开始', 'not_started', 1),
 ('depreciation_status', 'depreciating', '折旧中', 'depreciating', 2),
 ('depreciation_status', 'completed', '已提足', 'completed', 3),
 ('depreciation_status', 'suspended', '暂停折旧', 'suspended', 4)
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
-
 INSERT INTO unit_dict (unit_code, unit_name, unit_type, sort_order) VALUES
 ('pcs', '个', 'quantity', 1),
 ('set', '套', 'quantity', 2),
@@ -191,71 +80,19 @@ INSERT INTO unit_dict (unit_code, unit_name, unit_type, sort_order) VALUES
 ('l', '升', 'volume', 20),
 ('ml', '毫升', 'volume', 21)
 ON CONFLICT (unit_code) DO NOTHING;
-
--- ---------- 资产台账模块：设备档案补列 ----------
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS specification VARCHAR(200);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS registration_no VARCHAR(100);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS production_date DATE;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS service_life_years INTEGER;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS calibration_period_days INTEGER;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS last_calibration_date DATE;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS next_calibration_date DATE;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS service_expiry_date DATE;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS extension_data JSONB DEFAULT '{}'::jsonb;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS warehouse_id UUID;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_metrology BOOLEAN DEFAULT FALSE;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_maintain_device BOOLEAN DEFAULT FALSE;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_inspection_device BOOLEAN DEFAULT FALSE;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS pinyin_code VARCHAR(50);
-
 UPDATE medical_device SET extension_data = '{}'::jsonb WHERE extension_data IS NULL;
-
--- ---------- 维修管理模块：配件档案补列 ----------
-ALTER TABLE spare_part ADD COLUMN IF NOT EXISTS model VARCHAR(100);
-ALTER TABLE spare_part ADD COLUMN IF NOT EXISTS unit_id UUID;
-ALTER TABLE spare_part ADD COLUMN IF NOT EXISTS manufacturer_id UUID;
-ALTER TABLE spare_part ADD COLUMN IF NOT EXISTS warehouse_id UUID;
-ALTER TABLE spare_part_transaction ADD COLUMN IF NOT EXISTS ref_no VARCHAR(50);
-ALTER TABLE spare_part_transaction ADD COLUMN IF NOT EXISTS remark TEXT;
-
--- ---------- 保养管理模块：参数/计划/执行补列 ----------
-ALTER TABLE maintenance_template ADD COLUMN IF NOT EXISTS template_code VARCHAR(30);
-ALTER TABLE maintenance_template ADD COLUMN IF NOT EXISTS maintenance_level_id UUID;
-ALTER TABLE maintenance_template ADD COLUMN IF NOT EXISTS description TEXT;
-ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS cycle_days INTEGER;
-ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20) DEFAULT 'draft';
-ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS created_by UUID;
-ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS approved_by UUID;
-ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP WITH TIME ZONE;
-
 INSERT INTO maintenance_level (level_code, level_name, sort_order, description) VALUES
 ('L1', '日常保养', 1, '每日或每周例行保养'),
 ('L2', '一级保养', 2, '月度基础保养'),
 ('L3', '二级保养', 3, '季度深度保养'),
 ('L4', '三级保养', 4, '年度全面保养')
 ON CONFLICT (level_code) DO NOTHING;
-
--- ---------- 巡检管理模块：参数/计划/执行补列 ----------
-ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS template_id UUID;
-ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS inspection_type_id UUID;
-ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS cycle_days INTEGER;
-ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS next_due_date DATE;
-ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS last_inspected_at DATE;
-ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS assigned_inspector_id UUID;
-ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20) DEFAULT 'draft';
-ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS created_by UUID;
-ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS approved_by UUID;
-ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP WITH TIME ZONE;
-ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS remark TEXT;
-ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
-
 INSERT INTO inspection_type (type_code, type_name, sort_order, description) VALUES
 ('ROUTINE', '日常巡检', 1, '每日或每周例行巡检'),
 ('SAFETY', '安全巡检', 2, '安全隐患排查'),
 ('DEPT', '科室巡检', 3, '科室责任区巡检'),
 ('SPECIAL', '专项巡检', 4, '专项检查巡检')
 ON CONFLICT (type_code) DO NOTHING;
-
 -- ---------- 计量管理模块：参数/计划/执行（新表由补丁创建，此处仅种子） ----------
 INSERT INTO metrology_category (category_code, category_name, sort_order, description) VALUES
 ('FORCE', '力学计量', 1, '压力、力值等'),
@@ -263,7 +100,6 @@ INSERT INTO metrology_category (category_code, category_name, sort_order, descri
 ('TEMP', '热学计量', 3, '温度、湿度等'),
 ('LENGTH', '长度计量', 4, '尺寸、量具等')
 ON CONFLICT (category_code) DO NOTHING;
-
 -- 计量检定类型（法规属性 / 实施时机 / 执行地点 / 分级管理）
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('metrology_classification_group', 'regulatory', '法规监管属性', 'regulatory', 1),
@@ -290,13 +126,6 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('metrology_certificate_kind', 'calibration_cert', '校准证书', 'calibration_cert', 2),
 ('metrology_certificate_kind', 'none', '无法定证书', 'none', 3)
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
-
--- 计量检定类型：纠正错误绑定到 public.metrology_type 的自引用外键（历史 search_path 串写）
-ALTER TABLE "${flyway:defaultSchema}".metrology_type DROP CONSTRAINT IF EXISTS metrology_type_parent_id_fkey;
-ALTER TABLE "${flyway:defaultSchema}".metrology_type
-  ADD CONSTRAINT metrology_type_parent_id_fkey
-  FOREIGN KEY (parent_id) REFERENCES "${flyway:defaultSchema}".metrology_type(id);
-
 -- 计量检定类型种子：显式限定当前迁移 schema，避免 public.metrology_type 影子表导致 parent_id 外键失败
 INSERT INTO "${flyway:defaultSchema}".metrology_type (type_code, type_name, classification_group, regulatory_attr, traceability_mode, certificate_kind, sort_order, legal_basis, executor_scope, cycle_rule, description) VALUES
 ('MANDATORY', '强制检定（法定强制管理）', 'regulatory', 'mandatory', 'verification', 'verification_cert', 1,
@@ -306,21 +135,18 @@ INSERT INTO "${flyway:defaultSchema}".metrology_type (type_code, type_name, clas
  '医院自主管理', '法定机构或具备资质第三方校准实验室', '医院结合风险与使用频次自行制定',
  '未列入强检目录但诊疗质控需保证量值准确的设备，可检定或校准，医院自行判定是否可用。')
 ON CONFLICT (type_code) DO NOTHING;
-
 INSERT INTO "${flyway:defaultSchema}".metrology_type (type_code, type_name, parent_id, classification_group, regulatory_attr, traceability_mode, timing_kind, certificate_kind, sort_order, cycle_rule, description)
 SELECT 'MAND_FIRST_ONCE', '首次检定（失准报废/到期轮换）', id, 'regulatory', 'mandatory', 'verification', 'first_only', 'verification_cert', 1,
  '仅出厂/入库做一次检定，使用中不周期复检，失准直接报废',
  '典型：玻璃水银体温计。'
 FROM "${flyway:defaultSchema}".metrology_type WHERE type_code = 'MANDATORY'
 ON CONFLICT (type_code) DO NOTHING;
-
 INSERT INTO "${flyway:defaultSchema}".metrology_type (type_code, type_name, parent_id, classification_group, regulatory_attr, traceability_mode, timing_kind, certificate_kind, sort_order, cycle_rule, description)
 SELECT 'MAND_PERIODIC', '周期强制检定', id, 'regulatory', 'mandatory', 'verification', 'periodic', 'verification_cert', 2,
  '按检定规程每年/每半年送检，周期不可更改',
  '绝大多数医用强检设备。出具检定证书（合格/不合格结论），带法定计量印记。'
 FROM "${flyway:defaultSchema}".metrology_type WHERE type_code = 'MANDATORY'
 ON CONFLICT (type_code) DO NOTHING;
-
 INSERT INTO "${flyway:defaultSchema}".metrology_type (type_code, type_name, parent_id, classification_group, regulatory_attr, traceability_mode, timing_kind, sort_order, description)
 SELECT v.code, v.name, p.id, 'device_scope', 'mandatory', 'verification', 'periodic', v.ord, v.descr
 FROM "${flyway:defaultSchema}".metrology_type p
@@ -331,13 +157,11 @@ CROSS JOIN (VALUES
 ) AS v(code, name, ord, descr)
 WHERE p.type_code = 'MAND_PERIODIC'
 ON CONFLICT (type_code) DO NOTHING;
-
 INSERT INTO "${flyway:defaultSchema}".metrology_type (type_code, type_name, parent_id, classification_group, regulatory_attr, traceability_mode, sort_order, description)
 SELECT 'VOL_SCOPE_COMMON', '常见非强检设备', id, 'device_scope', 'voluntary', 'calibration', 1,
  '呼吸机、麻醉机、注射泵/输液泵、除颤仪、高频电刀、B超/MRI、骨密度仪、肺功能仪、医用激光源、负压压力表、生化分析仪、理疗设备等。'
 FROM "${flyway:defaultSchema}".metrology_type WHERE type_code = 'VOLUNTARY'
 ON CONFLICT (type_code) DO NOTHING;
-
 INSERT INTO "${flyway:defaultSchema}".metrology_type (type_code, type_name, classification_group, timing_kind, traceability_mode, sort_order, description) VALUES
 ('TIME_FIRST', '首次检定', 'timing', 'first_only', 'verification', 1, '新设备入库、维修后、更换核心传感器后首次计量，合格后方可投入临床。'),
 ('TIME_PERIODIC', '周期检定（定期检定）', 'timing', 'periodic', 'verification', 2, '强检设备法定周期、非强检设备医院规定周期，到期统一送检/上门检。'),
@@ -345,12 +169,10 @@ INSERT INTO "${flyway:defaultSchema}".metrology_type (type_code, type_name, clas
 ('TIME_ARBITRATION', '临时检定（仲裁检定）', 'timing', 'arbitration', 'verification', 4, '医疗纠纷、数据争议、监管抽查异议时申请法定机构仲裁计量，具备法律效力。'),
 ('TIME_INTERIM', '期间核查', 'timing', 'interim', 'calibration', 5, '两次周期检定之间医院内部简易比对与稳定性核查，仅内部质控，无法定证书。')
 ON CONFLICT (type_code) DO NOTHING;
-
 INSERT INTO "${flyway:defaultSchema}".metrology_type (type_code, type_name, classification_group, location_kind, sort_order, description) VALUES
 ('LOC_LAB', '送检检定', 'location', 'lab', 1, '小型设备（血压计、体温计、验光镜片等）送至计量实验室检测。'),
 ('LOC_ONSITE', '现场上门检定', 'location', 'onsite', 2, '大型固定设备（CT、DR、监护仪、直线加速器等）计量人员到院内现场检测。')
 ON CONFLICT (type_code) DO NOTHING;
-
 INSERT INTO "${flyway:defaultSchema}".metrology_type (type_code, type_name, classification_group, management_grade, regulatory_attr, traceability_mode, sort_order, cycle_rule, description) VALUES
 ('GRADE_A', 'A级（强检类）', 'grade', 'A', 'mandatory', 'verification', 1, '法定周期，专人台账、证书存档',
  '全部强制检定设备，专人台账、法定周期、证书存档。'),
@@ -359,7 +181,6 @@ INSERT INTO "${flyway:defaultSchema}".metrology_type (type_code, type_name, clas
 ('GRADE_C', 'C级（一般辅助设备）', 'grade', 'C', 'voluntary', 'calibration', 3, '2~3年校准 + 内部期间核查',
  '理疗、常规压力表、小型治疗设备等。')
 ON CONFLICT (type_code) DO NOTHING;
-
 -- ---------- 不良事件模块：字典种子 ----------
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('adverse_event_type', 'malfunction', '设备故障', 'malfunction', 1),
@@ -376,16 +197,6 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('adverse_status', 'reviewed', '已审核', 'reviewed', 3),
 ('adverse_status', 'closed', '已结案', 'closed', 4)
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
-
--- ---------- 库房管理模块：补列 ----------
-ALTER TABLE device_entry ADD COLUMN IF NOT EXISTS warehouse_id UUID;
-ALTER TABLE device_outbound ADD COLUMN IF NOT EXISTS warehouse_id UUID;
-ALTER TABLE device_outbound ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'draft';
-ALTER TABLE device_outbound ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20) DEFAULT 'draft';
-ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS from_warehouse_id UUID;
-ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS to_warehouse_id UUID;
-ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS warehouse_id UUID;
-
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('return_type', 'unused', '未使用退回', 'unused', 1),
 ('return_type', 'quality', '质量问题', 'quality', 2),
@@ -395,15 +206,12 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('return_status', 'returned', '已退库', 'returned', 2),
 ('transfer_type', 'warehouse', '库房间调拨', 'warehouse', 4)
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
-
 INSERT INTO sys_approval_flow (flow_code, flow_name, business_type) VALUES
 ('device_return_default', '设备退货审批', 'device_return')
 ON CONFLICT (flow_code) DO NOTHING;
-
 INSERT INTO sys_approval_node (flow_id, node_order, node_name, approver_role, amount_threshold)
 SELECT f.id, 1, '装备部审核', 'equipment_head', 0 FROM sys_approval_flow f WHERE f.flow_code = 'device_return_default'
 AND NOT EXISTS (SELECT 1 FROM sys_approval_node n WHERE n.flow_id = f.id AND n.node_order = 1);
-
 -- ---------- 特种设备模块：字典种子 ----------
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('special_type', 'radiation', '放射辐射类', 'radiation', 1),
@@ -426,26 +234,11 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('urgency_level', 'urgent', '紧急', 'urgent', 2),
 ('urgency_level', 'critical', '特急', 'critical', 3)
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
-
--- ---------- 公用设备借调模块（附录 N） ----------
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_shared_device BOOLEAN DEFAULT FALSE;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS metrology_type_code VARCHAR(50);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS shared_fee_mode VARCHAR(20);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS shared_fee_time_unit VARCHAR(10);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS shared_fee_unit_price DECIMAL(12,2);
-
-ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS fee_mode VARCHAR(20);
-ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS fee_time_unit VARCHAR(10);
-ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS fee_unit_price DECIMAL(12,2);
-ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS billing_start_at TIMESTAMPTZ;
-ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS billing_end_at TIMESTAMPTZ;
-
 UPDATE shared_device_loan SET
   fee_mode = COALESCE(fee_mode, 'time'),
   fee_time_unit = COALESCE(fee_time_unit, 'day'),
   fee_unit_price = COALESCE(fee_unit_price, fee_standard, 0)
 WHERE fee_unit_price IS NULL OR fee_mode IS NULL;
-
 -- 存量 shared_device 计费合并至台账后删表（附录 N/O）
 DO $$
 BEGIN
@@ -460,7 +253,6 @@ BEGIN
   END IF;
 END $$;
 DROP TABLE IF EXISTS shared_device CASCADE;
-
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('shared_availability', 'available', '可借', 'available', 1),
 ('shared_availability', 'on_loan', '借出中', 'on_loan', 2),
@@ -487,26 +279,16 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('shared_loan_display_status', 'on_loan', '已借用', 'on_loan', 3),
 ('shared_loan_display_status', 'return_pending', '归还申请中', 'return_pending', 4)
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
-
 INSERT INTO sys_approval_flow (flow_code, flow_name, business_type) VALUES
 ('shared_loan_default', '公用设备借调审批', 'shared_device_loan'),
 ('shared_return_default', '公用设备归还审批', 'shared_device_return')
 ON CONFLICT (flow_code) DO NOTHING;
-
--- ---------- 预防性维护模块 ----------
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_pm_device BOOLEAN DEFAULT FALSE;
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS standby_current_max_ma DECIMAL(10,2);
-ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS standby_current_min_ma DECIMAL(10,2);
-ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS device_code VARCHAR(20);
-ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
-
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('pm_risk_level', 'low', '低', 'low', 1),
 ('pm_risk_level', 'medium', '中', 'medium', 2),
 ('pm_risk_level', 'high', '高', 'high', 3),
 ('pm_risk_level', 'critical', '极高', 'critical', 4)
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
-
 -- ---------- 效益分析模块（字典种子） ----------
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('benefit_level', 'excellent', '优秀', 'excellent', 1),
@@ -525,7 +307,6 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('benefit_data_source', 'LIS', 'LIS', 'LIS', 4),
 ('benefit_data_source', 'HRP', 'HRP', 'HRP', 5)
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
-
 -- ---------- 电流监测模块 ----------
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('power_protocol_type', 'mqtt', 'MQTT', 'mqtt', 1),
@@ -539,50 +320,15 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('power_work_state', 'offline', '离线', 'offline', 3),
 ('power_work_state', 'alarm', '告警', 'alarm', 4)
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
-
--- ---------- 附录 P：资产标签打印记录 ----------
-CREATE TABLE IF NOT EXISTS device_label_print_log (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    device_id UUID NOT NULL REFERENCES medical_device(id),
-    device_code VARCHAR(20) NOT NULL,
-    device_name VARCHAR(200),
-    printed_by UUID,
-    printed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    template_code VARCHAR(50) DEFAULT 'default',
-    remark TEXT
-);
-
 -- ---------- 附录 S/T：报修草稿状态 + 实体变更记录 ----------
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('wo_status', 'draft', '未提交', 'draft', 0)
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
-
-CREATE TABLE IF NOT EXISTS sys_entity_change_log (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    entity_type VARCHAR(64) NOT NULL,
-    entity_id UUID NOT NULL,
-    action VARCHAR(32) NOT NULL,
-    changed_fields JSONB,
-    snapshot_json JSONB,
-    operator_id UUID,
-    operator_name VARCHAR(100),
-    remark TEXT,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX IF NOT EXISTS idx_sys_entity_change_log_entity
-    ON sys_entity_change_log (entity_type, entity_id, created_at DESC);
-
--- ---------- REP-03：维修工程师 sys_user + assigned_user_id ----------
-ALTER TABLE sys_user ADD COLUMN IF NOT EXISTS is_repair_engineer BOOLEAN NOT NULL DEFAULT FALSE;
-
 UPDATE sys_user u
 SET is_repair_engineer = TRUE
 FROM engineer e
 WHERE e.user_id = u.id
   AND COALESCE(u.is_repair_engineer, FALSE) = FALSE;
-
-ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS assigned_user_id UUID;
-
 DO $rep03_backfill_assigned_user$
 BEGIN
     IF EXISTS (
@@ -604,169 +350,36 @@ BEGIN
           AND EXISTS (SELECT 1 FROM sys_user u WHERE u.id = w.assigned_engineer_id);
     END IF;
 END $rep03_backfill_assigned_user$;
-
--- ---------- 系统配置：分类 + 编号/名称 + 值1~值6 ----------
-ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS category_code VARCHAR(20);
-ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS category_name VARCHAR(100);
-ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS item_code VARCHAR(20);
-ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS item_name VARCHAR(200);
-ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS value1 TEXT;
-ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS value2 TEXT;
-ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS value3 TEXT;
-ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS value4 TEXT;
-ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS value5 TEXT;
-ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS value6 TEXT;
-ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
-
-DO $rep03_drop_wo_eng$
-BEGIN
-    IF EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema = current_schema() AND table_name = 'repair_workorder' AND column_name = 'assigned_engineer_id'
-    ) AND EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema = current_schema() AND table_name = 'repair_workorder' AND column_name = 'assigned_user_id'
-    ) THEN
-        ALTER TABLE repair_workorder DROP CONSTRAINT IF EXISTS repair_workorder_assigned_engineer_id_fkey;
-        ALTER TABLE repair_workorder DROP COLUMN assigned_engineer_id;
-    END IF;
-END $rep03_drop_wo_eng$;
-
-DO $rep03_rename_process$
-BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_process' AND column_name = 'engineer_id')
-       AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_process' AND column_name = 'user_id')
-    THEN
-        ALTER TABLE repair_workorder_process RENAME COLUMN engineer_id TO user_id;
-    END IF;
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_process' AND column_name = 'from_engineer_id')
-       AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_process' AND column_name = 'from_user_id')
-    THEN
-        ALTER TABLE repair_workorder_process RENAME COLUMN from_engineer_id TO from_user_id;
-    END IF;
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_process' AND column_name = 'to_engineer_id')
-       AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_process' AND column_name = 'to_user_id')
-    THEN
-        ALTER TABLE repair_workorder_process RENAME COLUMN to_engineer_id TO to_user_id;
-    END IF;
-END $rep03_rename_process$;
-
 UPDATE repair_workorder_process p
 SET user_id = e.user_id
 FROM engineer e
 WHERE p.user_id = e.id
   AND NOT EXISTS (SELECT 1 FROM sys_user u WHERE u.id = p.user_id);
-
 UPDATE repair_workorder_process p
 SET from_user_id = e.user_id
 FROM engineer e
 WHERE p.from_user_id = e.id
   AND NOT EXISTS (SELECT 1 FROM sys_user u WHERE u.id = p.from_user_id);
-
 UPDATE repair_workorder_process p
 SET to_user_id = e.user_id
 FROM engineer e
 WHERE p.to_user_id = e.id
   AND NOT EXISTS (SELECT 1 FROM sys_user u WHERE u.id = p.to_user_id);
-
-DO $rep03_rename_event$
-BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_event' AND column_name = 'engineer_id')
-       AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_event' AND column_name = 'user_id')
-    THEN
-        ALTER TABLE repair_workorder_event RENAME COLUMN engineer_id TO user_id;
-    END IF;
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_event' AND column_name = 'from_engineer_id')
-       AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_event' AND column_name = 'from_user_id')
-    THEN
-        ALTER TABLE repair_workorder_event RENAME COLUMN from_engineer_id TO from_user_id;
-    END IF;
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_event' AND column_name = 'to_engineer_id')
-       AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'repair_workorder_event' AND column_name = 'to_user_id')
-    THEN
-        ALTER TABLE repair_workorder_event RENAME COLUMN to_engineer_id TO to_user_id;
-    END IF;
-END $rep03_rename_event$;
-
 UPDATE repair_workorder_event ev
 SET user_id = e.user_id
 FROM engineer e
 WHERE ev.user_id = e.id
   AND NOT EXISTS (SELECT 1 FROM sys_user u WHERE u.id = ev.user_id);
-
 UPDATE repair_workorder_event ev
 SET from_user_id = e.user_id
 FROM engineer e
 WHERE ev.from_user_id = e.id
   AND NOT EXISTS (SELECT 1 FROM sys_user u WHERE u.id = ev.from_user_id);
-
 UPDATE repair_workorder_event ev
 SET to_user_id = e.user_id
 FROM engineer e
 WHERE ev.to_user_id = e.id
   AND NOT EXISTS (SELECT 1 FROM sys_user u WHERE u.id = ev.to_user_id);
-
-CREATE INDEX IF NOT EXISTS idx_wo_assigned_user ON repair_workorder(assigned_user_id);
-
--- ---------- REP-05：维修进程类型 + 工单进程段 ----------
-CREATE TABLE IF NOT EXISTS repair_process_type (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    type_code VARCHAR(40) NOT NULL UNIQUE,
-    type_name VARCHAR(100) NOT NULL,
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    can_add_parts BOOLEAN NOT NULL DEFAULT FALSE,
-    can_engineer_add BOOLEAN NOT NULL DEFAULT FALSE,
-    engineer_add_rule VARCHAR(40),
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID,
-    updated_by UUID,
-    is_deleted SMALLINT NOT NULL DEFAULT 0,
-    deleted_at TIMESTAMPTZ,
-    deleted_by UUID
-);
-
-CREATE TABLE IF NOT EXISTS repair_workorder_segment (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    workorder_id UUID NOT NULL REFERENCES repair_workorder(id) ON DELETE CASCADE,
-    process_type_id UUID NOT NULL REFERENCES repair_process_type(id),
-    user_id UUID REFERENCES sys_user(id),
-    started_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    ended_at TIMESTAMPTZ,
-    remark TEXT,
-    verify_comment TEXT,
-    auto_created BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID,
-    updated_by UUID,
-    is_deleted SMALLINT NOT NULL DEFAULT 0,
-    deleted_at TIMESTAMPTZ,
-    deleted_by UUID
-);
-
-CREATE INDEX IF NOT EXISTS idx_wo_segment_wo ON repair_workorder_segment(workorder_id, started_at);
-
-CREATE TABLE IF NOT EXISTS repair_workorder_segment_part (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    segment_id UUID NOT NULL REFERENCES repair_workorder_segment(id) ON DELETE CASCADE,
-    spare_part_id UUID REFERENCES spare_part(id),
-    quantity INTEGER NOT NULL DEFAULT 1,
-    unit_price DECIMAL(10,2),
-    total_price DECIMAL(10,2),
-    remark TEXT,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID,
-    updated_by UUID,
-    is_deleted SMALLINT NOT NULL DEFAULT 0,
-    deleted_at TIMESTAMPTZ,
-    deleted_by UUID
-);
-
-CREATE INDEX IF NOT EXISTS idx_wo_segment_part_seg ON repair_workorder_segment_part(segment_id);
-
 INSERT INTO repair_process_type (type_code, type_name, sort_order, can_add_parts, can_engineer_add, engineer_add_rule)
 SELECT v.type_code, v.type_name, v.sort_order, v.can_add_parts, v.can_engineer_add, v.engineer_add_rule
 FROM (VALUES

@@ -2,6 +2,7 @@ package com.meis.saas.maintain.controller;
 
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -21,6 +22,8 @@ public class MaintenanceQueryController {
             @RequestParam(required = false) String deviceCode,
             @RequestParam(required = false) String resultStatus) {
         StringBuilder where = new StringBuilder(" WHERE ei.status = 'completed' ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "maintenance_execution_item", "ei"));
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "maintenance_execution", "e"));
         List<Object> args = new ArrayList<>();
         if (deviceCode != null && !deviceCode.isBlank()) {
             where.append(" AND ei.device_code ILIKE ? ");
@@ -65,11 +68,14 @@ public class MaintenanceQueryController {
                 LEFT JOIN maintenance_template t ON t.id = e.template_id
                 LEFT JOIN maintenance_level l ON l.id = e.maintenance_level_id
                 WHERE ei.id = ?::uuid
-                """, itemId);
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "maintenance_execution_item", "ei")
+                + SoftDeleteSupport.notDeletedClause(jdbc, "maintenance_execution", "e"), itemId);
         if (rows.isEmpty()) return Result.ok(Map.of());
         Map<String, Object> result = new LinkedHashMap<>(rows.get(0));
         result.put("results", jdbc.queryForList(
-                "SELECT * FROM maintenance_execution_result WHERE execution_item_id = ?::uuid ORDER BY created_at", itemId));
+                "SELECT * FROM maintenance_execution_result WHERE execution_item_id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "maintenance_execution_result", null)
+                        + " ORDER BY created_at", itemId));
         return Result.ok(result);
     }
 }

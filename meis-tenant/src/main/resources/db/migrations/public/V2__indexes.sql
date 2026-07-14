@@ -1,4 +1,4 @@
-﻿-- MEIS extensions: CREATE INDEX + COMMENT ON INDEX (visible in database catalog)
+﻿-- MEIS indexes: CREATE INDEX + COMMENT ON INDEX（槽位 V2__indexes.sql）
 
 CREATE INDEX IF NOT EXISTS idx_tenant_code ON sys_tenant(tenant_code);
 COMMENT ON INDEX idx_tenant_code IS '索引：租户.租户编码';

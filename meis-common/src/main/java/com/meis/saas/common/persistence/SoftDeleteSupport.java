@@ -1,5 +1,6 @@
 package com.meis.saas.common.persistence;
 
+import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.tenant.TenantContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -63,7 +64,8 @@ public final class SoftDeleteSupport {
     public static int softDelete(JdbcTemplate jdbc, String table, String id) {
         Set<String> cols = TableColumnCache.columns(jdbc, table);
         if (!cols.contains("deleted_at") && !cols.contains("is_deleted")) {
-            return jdbc.update("DELETE FROM " + table + " WHERE id = ?::uuid", id);
+            throw new BizException(500,
+                    "表 " + table + " 缺少软删列，拒绝物理删除；请按附录 G.0 在 V1/R__ 补齐 is_deleted");
         }
         String userId = TenantContext.getUserId();
         List<String> sets = new ArrayList<>();

@@ -1,13 +1,17 @@
-# 补列脚本（老租户兜底）
+# patches（已废弃 / DEPRECATED）
 
-| 文件 | 说明 |
-|------|------|
-| `tenant_column_patches.sql` | 与 `R__tenant_schema_sync.sql` 同步：**每条语句只 ADD 一个字段** |
+本目录为**历史手工补丁**留存，**不再作为新变更入口**。
 
-**建表**：不在本文件。老租户缺表由运行时 `SchemaTableEnsuring` 幂等执行 V1（`CREATE TABLE IF NOT EXISTS`）。
+- 权威脚本：`meis-tenant/src/main/resources/db/migrations/{public,tenant}/` 固定槽位
+- **禁止**再新增按功能的 patch SQL（如 `*_module_patches.sql`）
+- 现有 `.sql` 暂不批量删除（未与 DB 同步时风险高）；内容仅供对照/应急
 
-**注释**：不在本文件。由 `SchemaCommentFiller` 仅补空注释。
+新工作请写入对应 Flyway 槽位：
 
-```powershell
-powershell -File scripts/apply-tenant-patches.ps1 -Schema tenant_demo
-```
+| 变更类型 | 写入 |
+|----------|------|
+| 新表 / 全量字段 | `tenant/V1__tables.sql` 或 `public/V1__tables.sql` |
+| 索引 | `V2__indexes.sql` |
+| 审计七列 / `is_deleted` | `tenant/R__columns_audit.sql` |
+| 业务补列 / FK | `tenant/R__columns_biz.sql` |
+| 字典 / 数据更正 / 菜单 | `R__data_fix.sql`（public 或 tenant） |

@@ -2,6 +2,7 @@ package com.meis.saas.purchase.controller;
 
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -32,6 +33,7 @@ public class PurchaseApprovalController {
             args.add(PURCHASE_TYPES.get(i));
         }
         where.append(") ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "sys_approval_instance", "i"));
         if (status != null && !status.isBlank()) {
             where.append(" AND i.status = ? ");
             args.add(status);
@@ -57,8 +59,10 @@ public class PurchaseApprovalController {
                 SELECT i.*, u.real_name AS applicant_name, n.node_name AS current_node_name, n.approver_role
                 FROM sys_approval_instance i
                 LEFT JOIN sys_user u ON u.id = i.applicant_id
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "u") + """
                 LEFT JOIN sys_approval_node n ON n.flow_id = i.flow_id AND n.node_order = i.current_node_order
-                """ + where + " ORDER BY i.created_at DESC LIMIT ? OFFSET ?", pageArgs.toArray());
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "sys_approval_node", "n")
+                + where + " ORDER BY i.created_at DESC LIMIT ? OFFSET ?", pageArgs.toArray());
         return Result.ok(PageResult.of(rows, total, query.getPage(), query.getSize()));
     }
 
@@ -67,7 +71,8 @@ public class PurchaseApprovalController {
         Map<String, Object> result = new LinkedHashMap<>();
         for (String type : PURCHASE_TYPES) {
             long pending = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM sys_approval_instance WHERE business_type=? AND status='pending'",
+                    "SELECT COUNT(*) FROM sys_approval_instance WHERE business_type=? AND status='pending'"
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "sys_approval_instance", null),
                     Long.class, type);
             result.put(type, pending);
         }
@@ -75,7 +80,7 @@ public class PurchaseApprovalController {
                 SELECT COUNT(*) FROM sys_approval_instance
                 WHERE business_type IN ('purchase_plan','purchase_project','purchase_contract','purchase_acceptance','contract_payment')
                   AND status='pending'
-                """, Long.class);
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "sys_approval_instance", null), Long.class);
         result.put("totalPending", totalPending);
         return Result.ok(result);
     }

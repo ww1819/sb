@@ -147,7 +147,7 @@ public class SchemaCommentFiller {
             PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
             for (String path : List.of(
                     "classpath:db/migrations/tenant/V1__tables.sql",
-                    "classpath:db/migrations/tenant/V2__extensions.sql")) {
+                    "classpath:db/migrations/tenant/V2__indexes.sql")) {
                 try {
                     Resource res = resolver.getResource(path);
                     if (!res.exists()) continue;

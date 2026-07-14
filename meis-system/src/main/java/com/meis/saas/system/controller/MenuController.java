@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.meis.saas.common.cache.CacheKeys;
 import com.meis.saas.common.cache.MeisCacheProperties;
 import com.meis.saas.common.cache.RedisJsonCache;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.rbac.PermissionService;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
@@ -53,7 +54,9 @@ public class MenuController {
         UUID[] roleIds = new UUID[0];
         if (userId != null) {
             List<Map<String, Object>> users = jdbc.queryForList(
-                    "SELECT role_ids FROM " + schema + ".sys_user WHERE id = ?::uuid", userId);
+                    "SELECT role_ids FROM " + schema + ".sys_user WHERE id = ?::uuid "
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", null),
+                    userId);
             if (!users.isEmpty()) roleIds = parseRoleIds(users.get(0).get("role_ids"));
         }
         Map<String, Object> rolePerms = permissionService.loadRolePermissions(schema, roleIds);
@@ -80,7 +83,9 @@ public class MenuController {
                 cacheProps.getDictTtl(),
                 new TypeReference<List<Map<String, Object>>>() {},
                 () -> jdbc.queryForList(
-                        "SELECT dict_code as code, dict_label as label FROM sys_dict WHERE dict_type = 'button_perm' AND is_active = true ORDER BY sort_order")));
+                        "SELECT dict_code as code, dict_label as label FROM sys_dict WHERE dict_type = 'button_perm' AND is_active = true "
+                                + SoftDeleteSupport.notDeletedClause(jdbc, "sys_dict", null)
+                                + " ORDER BY sort_order")));
     }
 
     @GetMapping("/menus/platform-nav")

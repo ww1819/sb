@@ -1,6 +1,7 @@
 package com.meis.saas.qc.controller;
 
 import com.meis.saas.common.result.Result;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
@@ -19,7 +20,10 @@ public class MetrologyController {
         return Result.ok(jdbc.queryForList("""
             SELECT r.*, m.device_code, m.device_name FROM metrology_record r
             JOIN medical_device m ON m.id = r.device_id
-            WHERE r.next_due_date <= CURRENT_DATE + 30 ORDER BY r.next_due_date
+            WHERE r.next_due_date <= CURRENT_DATE + 30
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_record", "r")
+            + SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "m") + """
+            ORDER BY r.next_due_date
             """));
     }
 }

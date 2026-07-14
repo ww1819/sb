@@ -106,7 +106,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
 import AppModal from '@/components/AppModal.vue'
-import TableCellValue from '@/components/TableCellValue.vue'
+import TableCellValue from '@/components/table/TableCellValue.vue'
 import RefSelect from '@/components/form/RefSelect.vue'
 import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
 

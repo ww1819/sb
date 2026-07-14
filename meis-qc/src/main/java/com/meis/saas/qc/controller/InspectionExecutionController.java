@@ -4,6 +4,7 @@ import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -22,6 +23,7 @@ public class InspectionExecutionController {
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(PageQuery query, @RequestParam(required = false) String status) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "inspection_execution", "e"));
         List<Object> args = new ArrayList<>();
         if (status != null && !status.isBlank()) {
             where.append(" AND e.status = ? ");
@@ -56,19 +58,22 @@ public class InspectionExecutionController {
                 LEFT JOIN inspection_template t ON t.id = e.template_id
                 LEFT JOIN inspection_type it ON it.id = e.inspection_type_id
                 WHERE e.id = ?::uuid
-                """, id);
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "inspection_execution", "e"), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> result = new LinkedHashMap<>(rows.get(0));
         var items = jdbc.queryForList("""
                 SELECT ei.*, d.dept_name
                 FROM inspection_execution_item ei
                 LEFT JOIN department d ON d.id = ei.dept_id
-                WHERE ei.execution_id = ?::uuid ORDER BY ei.created_at
-                """, id);
+                WHERE ei.execution_id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "inspection_execution_item", "ei")
+                + " ORDER BY ei.created_at", id);
         for (Map<String, Object> item : items) {
             UUID itemId = (UUID) item.get("id");
             item.put("results", jdbc.queryForList(
-                    "SELECT * FROM inspection_execution_result WHERE execution_item_id = ?::uuid ORDER BY created_at",
+                    "SELECT * FROM inspection_execution_result WHERE execution_item_id = ?::uuid "
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "inspection_execution_result", null)
+                            + " ORDER BY created_at",
                     itemId));
         }
         result.put("items", items);
@@ -107,11 +112,14 @@ public class InspectionExecutionController {
                 UPDATE inspection_execution_item SET status='completed', overall_result=?, remark=?, updated_at=NOW()
                 WHERE id=?::uuid
                 """, body.getOrDefault("overall_result", "pass"), body.get("remark"), itemId);
-        var execRows = jdbc.queryForList("SELECT execution_id FROM inspection_execution_item WHERE id = ?::uuid", itemId);
+        var execRows = jdbc.queryForList(
+                "SELECT execution_id FROM inspection_execution_item WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "inspection_execution_item", null), itemId);
         if (!execRows.isEmpty()) {
             UUID execId = (UUID) execRows.get(0).get("execution_id");
             long pending = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM inspection_execution_item WHERE execution_id=?::uuid AND status <> 'completed'",
+                    "SELECT COUNT(*) FROM inspection_execution_item WHERE execution_id=?::uuid AND status <> 'completed'"
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "inspection_execution_item", null),
                     Long.class, execId);
             if (pending == 0) {
                 jdbc.update("UPDATE inspection_execution SET status='completed', execute_end_time=NOW(), updated_at=NOW() WHERE id=?::uuid", execId);
@@ -126,10 +134,12 @@ public class InspectionExecutionController {
         var planIds = jdbc.queryForList("""
                 SELECT DISTINCT plan_id FROM inspection_execution_item
                 WHERE execution_id=?::uuid AND plan_id IS NOT NULL
-                """, execId);
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "inspection_execution_item", null), execId);
         for (Map<String, Object> row : planIds) {
             UUID planId = (UUID) row.get("plan_id");
-            var plan = jdbc.queryForList("SELECT cycle_days, next_due_date FROM inspection_plan WHERE id=?::uuid", planId);
+            var plan = jdbc.queryForList(
+                    "SELECT cycle_days, next_due_date FROM inspection_plan WHERE id=?::uuid "
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "inspection_plan", null), planId);
             if (plan.isEmpty()) continue;
             Integer cycleDays = (Integer) plan.get(0).get("cycle_days");
             LocalDate next = cycleDays != null && cycleDays > 0

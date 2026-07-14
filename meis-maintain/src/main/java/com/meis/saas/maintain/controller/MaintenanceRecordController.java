@@ -2,6 +2,7 @@ package com.meis.saas.maintain.controller;
 
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +21,9 @@ public class MaintenanceRecordController {
 
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
-        var rows = jdbc.queryForList("SELECT * FROM maintenance_record WHERE id = ?::uuid", id);
+        var rows = jdbc.queryForList(
+                "SELECT * FROM maintenance_record WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "maintenance_record", null), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         return Result.ok(rows.get(0));
     }
@@ -30,7 +33,9 @@ public class MaintenanceRecordController {
     public Result<Map<String, Object>> save(@RequestBody Map<String, Object> body) throws Exception {
         UUID id = body.containsKey("id") ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
         String itemsJson = mapper.writeValueAsString(body.getOrDefault("items_result", List.of()));
-        boolean exists = !jdbc.queryForList("SELECT 1 FROM maintenance_record WHERE id = ?::uuid", id).isEmpty();
+        boolean exists = !jdbc.queryForList(
+                "SELECT 1 FROM maintenance_record WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "maintenance_record", null), id).isEmpty();
         if (!exists) {
             jdbc.update("""
                 INSERT INTO maintenance_record (id, record_no, plan_id, device_id, maintenance_level, template_id,
@@ -48,6 +53,8 @@ public class MaintenanceRecordController {
             jdbc.update("UPDATE maintenance_plan SET last_maintained_at = CURRENT_DATE, status = 'active', updated_at = NOW() WHERE id = ?::uuid",
                     body.get("plan_id"));
         }
-        return Result.ok(jdbc.queryForList("SELECT * FROM maintenance_record WHERE id = ?::uuid", id).get(0));
+        return Result.ok(jdbc.queryForList(
+                "SELECT * FROM maintenance_record WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "maintenance_record", null), id).get(0));
     }
 }

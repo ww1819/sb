@@ -65,15 +65,19 @@ public class RepairWorkorderController {
                 SELECT d.id, d.device_code, d.device_name, d.specification, d.serial_number,
                        d.financial_code, d.dept_id, d.device_status, dept.dept_name
                 FROM medical_device d
-                LEFT JOIN department dept ON dept.id = d.dept_id
+                LEFT JOIN department dept ON dept.id = d.dept_id""");
+        sql.append(SoftDeleteSupport.notDeletedClause(jdbc, "department", "dept"));
+        sql.append("""
                 WHERE d.is_active = true
                   AND COALESCE(d.device_status, '') NOT IN ('maintenance', 'pending_verify', 'scrap')
                   AND d.id NOT IN (
                       SELECT device_id FROM repair_workorder
                       WHERE device_id IS NOT NULL
                         AND status IN ('reported','dispatching','pending_accept','accepted','repairing','pending_verify','suspended','verify_rejected')
-                  )
                 """);
+        sql.append(SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null));
+        sql.append(")");
+        sql.append(SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d"));
         List<Object> args = new ArrayList<>();
         appendIlike(sql, args, "dept.dept_name", deptName);
         appendIlike(sql, args, "d.device_name", deviceName);
@@ -204,7 +208,9 @@ public class RepairWorkorderController {
     public Result<Map<String, Object>> timeline(@PathVariable UUID id) {
         Map<String, Object> wo = loadWorkorder(id);
         List<Map<String, Object>> events = jdbc.queryForList(
-                "SELECT * FROM repair_workorder_event WHERE workorder_id = ?::uuid ORDER BY created_at ASC, id ASC", id);
+                "SELECT * FROM repair_workorder_event WHERE workorder_id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_event", null)
+                        + " ORDER BY created_at ASC, id ASC", id);
 
         List<Map<String, Object>> milestones = buildMilestones(wo, events);
         List<Map<String, Object>> segments = buildSubStatusSegments(events);
@@ -761,7 +767,8 @@ public class RepairWorkorderController {
     private void assertDeviceAvailable(Object deviceId, UUID excludeWoId) {
         if (deviceId == null || String.valueOf(deviceId).isBlank()) return;
         List<Map<String, Object>> device = jdbc.queryForList(
-                "SELECT device_status FROM medical_device WHERE id = ?::uuid", deviceId);
+                "SELECT device_status FROM medical_device WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", null), deviceId);
         if (device.isEmpty()) throw new BizException(400, "设备不存在");
         String ds = str(device.get(0).get("device_status"));
         if (Set.of("maintenance", "pending_verify", "scrap").contains(ds)) {
@@ -828,7 +835,8 @@ public class RepairWorkorderController {
             throw new BizException(401, "未登录");
         }
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT COALESCE(is_repair_engineer, false) AS is_repair_engineer FROM sys_user WHERE id = ?::uuid AND is_active = true",
+                "SELECT COALESCE(is_repair_engineer, false) AS is_repair_engineer FROM sys_user WHERE id = ?::uuid AND is_active = true"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", null),
                 uid);
         if (rows.isEmpty() || !Boolean.TRUE.equals(rows.get(0).get("is_repair_engineer"))) {
             throw new BizException(403, "仅维修工程师可执行此操作");

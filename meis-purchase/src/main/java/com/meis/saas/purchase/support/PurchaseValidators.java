@@ -1,6 +1,7 @@
 package com.meis.saas.purchase.support;
 
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
@@ -13,7 +14,8 @@ public final class PurchaseValidators {
     public static void validateProjectAmount(JdbcTemplate jdbc, Object planId, Object totalAmount) {
         if (planId == null || totalAmount == null) return;
         var plan = jdbc.queryForList(
-                "SELECT total_budget FROM purchase_plan WHERE id = ?::uuid", planId);
+                "SELECT total_budget FROM purchase_plan WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", null), planId);
         if (plan.isEmpty()) return;
         double budget = toDouble(plan.get(0).get("total_budget"));
         double amount = toDouble(totalAmount);
@@ -25,7 +27,8 @@ public final class PurchaseValidators {
     public static void validateContractAmount(JdbcTemplate jdbc, Object projectId, Object contractAmount, UUID contractId) {
         if (projectId == null || contractAmount == null) return;
         var project = jdbc.queryForList(
-                "SELECT total_amount FROM purchase_project WHERE id = ?::uuid", projectId);
+                "SELECT total_amount FROM purchase_project WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_project", null), projectId);
         if (project.isEmpty()) return;
         double projectAmount = toDouble(project.get(0).get("total_amount"));
         double amount = toDouble(contractAmount);
@@ -34,7 +37,8 @@ public final class PurchaseValidators {
         }
         if (contractId != null) {
             var dup = jdbc.queryForList(
-                    "SELECT id FROM purchase_contract WHERE project_id = ?::uuid AND id != ?::uuid LIMIT 1",
+                    "SELECT id FROM purchase_contract WHERE project_id = ?::uuid AND id != ?::uuid"
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_contract", null) + " LIMIT 1",
                     projectId, contractId);
             if (!dup.isEmpty()) throw new BizException(400, "该项目已存在其他合同");
         }
@@ -42,7 +46,8 @@ public final class PurchaseValidators {
 
     public static void validatePaymentTotal(JdbcTemplate jdbc, UUID contractId, List<Map<String, Object>> payments) {
         var contract = jdbc.queryForList(
-                "SELECT contract_amount FROM purchase_contract WHERE id = ?::uuid", contractId);
+                "SELECT contract_amount FROM purchase_contract WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_contract", null), contractId);
         if (contract.isEmpty()) return;
         double contractAmount = toDouble(contract.get(0).get("contract_amount"));
         double sum = payments.stream().mapToDouble(p -> toDouble(p.get("payment_amount"))).sum();
@@ -53,13 +58,14 @@ public final class PurchaseValidators {
 
     public static void recalcContractPaymentProgress(JdbcTemplate jdbc, UUID contractId) {
         var contract = jdbc.queryForList(
-                "SELECT contract_amount FROM purchase_contract WHERE id = ?::uuid", contractId);
+                "SELECT contract_amount FROM purchase_contract WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_contract", null), contractId);
         if (contract.isEmpty()) return;
         double contractAmount = toDouble(contract.get(0).get("contract_amount"));
         var paid = jdbc.queryForList("""
             SELECT COALESCE(SUM(payment_amount), 0) AS paid
             FROM contract_payment WHERE contract_id = ?::uuid AND status = 'paid'
-            """, contractId);
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "contract_payment", null), contractId);
         double paidAmount = toDouble(paid.get(0).get("paid"));
         double progress = contractAmount > 0 ? Math.min(100, paidAmount / contractAmount * 100) : 0;
         jdbc.update("""
@@ -67,7 +73,8 @@ public final class PurchaseValidators {
             WHERE id = ?::uuid
             """, paidAmount, progress, contractId);
         var project = jdbc.queryForList(
-                "SELECT project_id FROM purchase_contract WHERE id = ?::uuid", contractId);
+                "SELECT project_id FROM purchase_contract WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_contract", null), contractId);
         if (!project.isEmpty() && project.get(0).get("project_id") != null) {
             jdbc.update("""
                 UPDATE purchase_project SET updated_at = NOW() WHERE id = ?::uuid
@@ -80,9 +87,11 @@ public final class PurchaseValidators {
             SELECT pc.business_chain_no, pl.plan_code, pj.project_code, pc.contract_code
             FROM purchase_contract pc
             LEFT JOIN purchase_project pj ON pj.id = pc.project_id
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_project", "pj") + """
             LEFT JOIN purchase_plan pl ON pl.id = pj.plan_id
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", "pl") + """
             WHERE pc.id = ?::uuid
-            """, contractId);
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_contract", "pc"), contractId);
         if (chain.isEmpty()) return null;
         Map<String, Object> row = chain.get(0);
         Object bc = row.get("business_chain_no");
@@ -95,7 +104,8 @@ public final class PurchaseValidators {
 
     public static void checkVersion(JdbcTemplate jdbc, String table, UUID id, Object clientVersion) {
         if (clientVersion == null) return;
-        var rows = jdbc.queryForList("SELECT version FROM " + table + " WHERE id = ?::uuid", id);
+        var rows = jdbc.queryForList("SELECT version FROM " + table + " WHERE id = ?::uuid"
+                + SoftDeleteSupport.notDeletedClause(jdbc, table, null), id);
         if (rows.isEmpty()) return;
         int dbVer = rows.get(0).get("version") instanceof Number n ? n.intValue() : 1;
         int reqVer = clientVersion instanceof Number n ? n.intValue() : Integer.parseInt(clientVersion.toString());

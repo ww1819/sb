@@ -1,5 +1,6 @@
 package com.meis.saas.purchase.controller;
 
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -26,9 +27,13 @@ public class PurchaseReportController {
                         ELSE 0 END AS execution_rate
             FROM purchase_plan p
             LEFT JOIN department d ON d.id = p.dept_id
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "department", "d") + """
             LEFT JOIN purchase_project pj ON pj.plan_id = p.id
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_project", "pj") + """
             LEFT JOIN purchase_contract pc ON pc.project_id = pj.id
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_contract", "pc") + """
             WHERE p.plan_year = ? AND p.is_active IS NOT FALSE
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", "p") + """
             GROUP BY p.id, p.plan_code, p.plan_year, d.dept_name, p.total_budget, p.approval_status
             ORDER BY p.plan_code
             """, year);
@@ -52,7 +57,9 @@ public class PurchaseReportController {
             SELECT l.*, u.real_name AS operator_name
             FROM sys_operation_log l
             LEFT JOIN sys_user u ON u.id = l.user_id
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "u") + """
             WHERE l.module_name = ?
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "sys_operation_log", "l") + """
             ORDER BY l.created_at DESC LIMIT ?
             """, module, Math.min(limit, 200)));
     }

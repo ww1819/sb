@@ -67,8 +67,10 @@ public class RepairWorkorderSegmentService {
                 SELECT s.*, t.type_code, t.type_name, t.can_add_parts,
                        u.real_name AS user_name
                 FROM repair_workorder_segment s
-                JOIN repair_process_type t ON t.id = s.process_type_id
-                LEFT JOIN sys_user u ON u.id = s.user_id
+                JOIN repair_process_type t ON t.id = s.process_type_id"""
+                + SoftDeleteSupport.notDeletedClause(jdbc, "repair_process_type", "t") + """
+                LEFT JOIN sys_user u ON u.id = s.user_id"""
+                + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "u") + """
                 WHERE s.workorder_id = ?::uuid""" + segClause + """
                 ORDER BY s.started_at ASC, s.id ASC
                 """, workorderId);
@@ -77,8 +79,9 @@ public class RepairWorkorderSegmentService {
             List<Map<String, Object>> parts = jdbc.queryForList("""
                     SELECT p.*, sp.part_code, sp.part_name
                     FROM repair_workorder_segment_part p
-                    LEFT JOIN spare_part sp ON sp.id = p.spare_part_id
-                    WHERE p.segment_id = ?::uuid""" + partClause + " ORDER BY p.created_at ASC", segId);
+                    LEFT JOIN spare_part sp ON sp.id = p.spare_part_id"""
+                    + SoftDeleteSupport.notDeletedClause(jdbc, "spare_part", "sp")
+                    + " WHERE p.segment_id = ?::uuid" + partClause + " ORDER BY p.created_at ASC", segId);
             seg.put("parts", parts);
             seg.put("open", seg.get("ended_at") == null);
         }
@@ -121,7 +124,9 @@ public class RepairWorkorderSegmentService {
         UUID segmentId = insertSegment(workorderId, UUID.fromString(String.valueOf(type.get("id"))),
                 userId, remark, verifyComment, true);
         Map<String, Object> wo = jdbc.queryForList(
-                "SELECT * FROM repair_workorder WHERE id = ?::uuid", workorderId).stream().findFirst().orElse(Map.of());
+                "SELECT * FROM repair_workorder WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null), workorderId)
+                .stream().findFirst().orElse(Map.of());
         applyTypeEffect(workorderId, wo, type, userId);
         return loadSegment(segmentId);
     }
@@ -134,7 +139,9 @@ public class RepairWorkorderSegmentService {
         UUID segmentId = insertSegment(workorderId, UUID.fromString(String.valueOf(type.get("id"))),
                 userId, remark, null, false);
         Map<String, Object> wo = jdbc.queryForList(
-                "SELECT * FROM repair_workorder WHERE id = ?::uuid", workorderId).stream().findFirst().orElse(Map.of());
+                "SELECT * FROM repair_workorder WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null), workorderId)
+                .stream().findFirst().orElse(Map.of());
         applyTypeEffect(workorderId, wo, type, userId);
         return loadSegment(segmentId);
     }
@@ -228,7 +235,8 @@ public class RepairWorkorderSegmentService {
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 SELECT s.*, t.type_code, t.type_name, t.can_add_parts
                 FROM repair_workorder_segment s
-                JOIN repair_process_type t ON t.id = s.process_type_id
+                JOIN repair_process_type t ON t.id = s.process_type_id"""
+                + SoftDeleteSupport.notDeletedClause(jdbc, "repair_process_type", "t") + """
                 WHERE s.id = ?::uuid""" + clause, segmentId);
         if (rows.isEmpty()) throw new BizException(404, "进程段不存在");
         return rows.get(0);
@@ -236,7 +244,8 @@ public class RepairWorkorderSegmentService {
 
     private Map<String, Object> loadPart(UUID partId) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT * FROM repair_workorder_segment_part WHERE id = ?::uuid", partId);
+                "SELECT * FROM repair_workorder_segment_part WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment_part", null), partId);
         if (rows.isEmpty()) throw new BizException(404, "配件明细不存在");
         return rows.get(0);
     }

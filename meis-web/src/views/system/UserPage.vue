@@ -10,6 +10,7 @@
     @page-change="onPageChange"
   >
     <template #actions>
+      <el-button :disabled="selectedCount === 0" @click="openBatch">批量修改（{{ selectedCount }}）</el-button>
       <el-button type="primary" :icon="Plus" @click="openCreate">新建用户</el-button>
     </template>
 
@@ -26,18 +27,60 @@
             <el-option label="启用" :value="true" />
             <el-option label="停用" :value="false" />
           </el-select>
+          <el-select
+            v-model="filterDeptId"
+            clearable
+            filterable
+            placeholder="科室"
+            style="width: 160px"
+            @change="search"
+          >
+            <el-option v-for="d in flatDepts" :key="d.id" :label="d.dept_name" :value="d.id" />
+          </el-select>
+          <el-select
+            v-model="filterRepairEngineer"
+            clearable
+            placeholder="维修工程师"
+            style="width: 140px"
+            @change="search"
+          >
+            <el-option label="是" :value="true" />
+            <el-option label="否" :value="false" />
+          </el-select>
+          <el-select
+            v-model="filterRoleId"
+            clearable
+            filterable
+            placeholder="角色"
+            style="width: 150px"
+            @change="search"
+          >
+            <el-option v-for="r in roleOptions" :key="r.id" :label="r.role_name" :value="r.id" />
+          </el-select>
+          <el-select
+            v-model="filterPermissionMode"
+            clearable
+            placeholder="权限模式"
+            style="width: 130px"
+            @change="search"
+          >
+            <el-option label="跟随角色" value="synced" />
+            <el-option label="自定义" value="custom" />
+          </el-select>
         </template>
       </PageFilterBar>
     </template>
 
     <el-table
       v-if="rows.length || loading"
+      ref="tableRef"
       :data="rows"
       row-key="id"
       stripe
       class="system-table user-table"
       style="width: 100%"
       :height="tableHeight"
+      @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" fixed="left" reserve-selection />
       <el-table-column label="序号" width="64" fixed="left" align="center">
@@ -74,6 +117,13 @@
       <el-table-column prop="role_name" label="角色" min-width="120" show-overflow-tooltip>
         <template #default="{ row }">
           <span class="text-muted">{{ row.role_name || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="维修工程师" width="110" align="center">
+        <template #default="{ row }">
+          <el-tag :type="row.is_repair_engineer ? 'success' : 'info'" effect="light" size="small">
+            {{ row.is_repair_engineer ? '是' : '否' }}
+          </el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="permission_mode" label="权限模式" width="110">
@@ -161,6 +211,11 @@
               <el-switch v-model="form.is_active" active-text="启用" inactive-text="停用" />
             </el-form-item>
           </el-col>
+          <el-col :span="12">
+            <el-form-item label="是否维修工程师">
+              <el-switch v-model="form.is_repair_engineer" active-text="是" inactive-text="否" />
+            </el-form-item>
+          </el-col>
         </el-row>
 
         <div class="form-section-title">基本信息</div>
@@ -211,6 +266,51 @@
       <template #footer>
         <el-button @click="formVisible = false">取消</el-button>
         <el-button type="primary" :loading="savingForm" @click="saveForm">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="batchVisible" title="批量修改用户" width="520px" destroy-on-close>
+      <p class="permission-hint" style="margin-bottom: 12px">
+        已选 {{ selectedCount }} 人。仅更新下方<strong>勾选</strong>的字段，未勾选的保持不变。
+      </p>
+      <div class="batch-fields">
+        <div class="batch-field">
+          <el-checkbox v-model="batchForm.setDept">修改科室</el-checkbox>
+          <el-select
+            v-model="batchForm.dept_id"
+            :disabled="!batchForm.setDept"
+            filterable
+            clearable
+            placeholder="选择科室（可清空表示无科室）"
+            class="batch-field-control"
+          >
+            <el-option v-for="d in flatDepts" :key="d.id" :label="d.dept_name" :value="d.id" />
+          </el-select>
+        </div>
+        <div class="batch-field">
+          <el-checkbox v-model="batchForm.setActive">修改启用状态</el-checkbox>
+          <el-switch
+            v-model="batchForm.is_active"
+            :disabled="!batchForm.setActive"
+            active-text="启用"
+            inactive-text="停用"
+            class="batch-field-control"
+          />
+        </div>
+        <div class="batch-field">
+          <el-checkbox v-model="batchForm.setRepairEngineer">修改是否维修工程师</el-checkbox>
+          <el-switch
+            v-model="batchForm.is_repair_engineer"
+            :disabled="!batchForm.setRepairEngineer"
+            active-text="是"
+            inactive-text="否"
+            class="batch-field-control"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="batchVisible = false">取消</el-button>
+        <el-button type="primary" :loading="savingBatch" @click="saveBatch">确认修改</el-button>
       </template>
     </el-dialog>
 
@@ -278,7 +378,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { ArrowDown, Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
@@ -289,20 +389,36 @@ import PermissionEditor, { type PermissionModel } from '@/components/PermissionE
 import AppModal from '@/components/AppModal.vue'
 import EntityChangeHistoryDrawer from '@/components/EntityChangeHistoryDrawer.vue'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
+import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
 
 const tableHeight = useSystemTableHeight()
+const tableRef = ref()
+const { selectedCount, syncFromTable, selectedIds, clear: clearSelection } = useCrossPageSelection()
 
 const filterActive = ref<boolean | ''>('')
+const filterDeptId = ref('')
+const filterRepairEngineer = ref<boolean | ''>('')
+const filterRoleId = ref('')
+const filterPermissionMode = ref('')
 const roleOptions = ref<any[]>([])
 const flatDepts = ref<any[]>([])
 const formVisible = ref(false)
+const batchVisible = ref(false)
 const roleVisible = ref(false)
 const permVisible = ref(false)
 const changeLogVisible = ref(false)
 const changeLogId = ref('')
 const formTitle = ref('新建用户')
-const form = ref<any>({ is_active: true })
+const form = ref<any>({ is_active: true, is_repair_engineer: false })
 const currentUser = ref<any>(null)
+const batchForm = reactive({
+  setDept: false,
+  dept_id: '' as string,
+  setActive: false,
+  is_active: true,
+  setRepairEngineer: false,
+  is_repair_engineer: false
+})
 
 function openChangeLog(row: any) {
   changeLogId.value = String(row.id)
@@ -313,18 +429,31 @@ const syncOnAssign = ref(true)
 const permValue = ref<PermissionModel>()
 const permEditorRef = ref<InstanceType<typeof PermissionEditor>>()
 const savingForm = ref(false)
+const savingBatch = ref(false)
 const savingRole = ref(false)
 const savingPerm = ref(false)
 
 const { rows, total, page, size, keyword, loading, load, search, onPageChange } = usePagedList((params) => {
   if (filterActive.value !== '') params.set('isActive', String(filterActive.value))
+  if (filterDeptId.value) params.set('deptId', filterDeptId.value)
+  if (filterRepairEngineer.value !== '') params.set('isRepairEngineer', String(filterRepairEngineer.value))
+  if (filterRoleId.value) params.set('roleId', filterRoleId.value)
+  if (filterPermissionMode.value) params.set('permissionMode', filterPermissionMode.value)
   return fetchPage('/system/users/page', params)
 })
 
 function resetSearch() {
   keyword.value = ''
   filterActive.value = ''
+  filterDeptId.value = ''
+  filterRepairEngineer.value = ''
+  filterRoleId.value = ''
+  filterPermissionMode.value = ''
   search()
+}
+
+function onSelectionChange(selection: Record<string, unknown>[]) {
+  syncFromTable(selection)
 }
 
 function avatarText(name?: string) {
@@ -363,14 +492,68 @@ onMounted(async () => {
 
 function openCreate() {
   formTitle.value = '新建用户'
-  form.value = { username: '', password: '123456', real_name: '', is_active: true }
+  form.value = { username: '', password: '123456', real_name: '', is_active: true, is_repair_engineer: false }
   formVisible.value = true
 }
 
 function openEdit(row: any) {
   formTitle.value = '编辑用户'
-  form.value = { ...row, is_active: row.is_active ?? true }
+  form.value = {
+    ...row,
+    is_active: row.is_active ?? true,
+    is_repair_engineer: !!row.is_repair_engineer
+  }
   formVisible.value = true
+}
+
+function openBatch() {
+  if (selectedCount.value === 0) {
+    ElMessage.warning('请先勾选用户')
+    return
+  }
+  batchForm.setDept = false
+  batchForm.dept_id = ''
+  batchForm.setActive = false
+  batchForm.is_active = true
+  batchForm.setRepairEngineer = false
+  batchForm.is_repair_engineer = false
+  batchVisible.value = true
+}
+
+async function saveBatch() {
+  if (!batchForm.setDept && !batchForm.setActive && !batchForm.setRepairEngineer) {
+    ElMessage.warning('请至少勾选一项要修改的字段')
+    return
+  }
+  const ids = selectedIds()
+  await ElMessageBox.confirm(`将对 ${ids.length} 名用户批量修改已勾选字段，是否继续？`, '批量修改', {
+    type: 'warning'
+  })
+  savingBatch.value = true
+  try {
+    const { data } = await http.post('/system/users/batch-update', {
+      userIds: ids,
+      setDept: batchForm.setDept,
+      dept_id: batchForm.setDept ? (batchForm.dept_id || null) : undefined,
+      setActive: batchForm.setActive,
+      is_active: batchForm.setActive ? batchForm.is_active : undefined,
+      setRepairEngineer: batchForm.setRepairEngineer,
+      is_repair_engineer: batchForm.setRepairEngineer ? batchForm.is_repair_engineer : undefined
+    })
+    if (data.code !== 0 && data.code !== 200) {
+      ElMessage.error(data.message || '批量修改失败')
+      return
+    }
+    ElMessage.success(`已更新 ${data.data?.updated ?? ids.length} 名用户`)
+    batchVisible.value = false
+    clearSelection()
+    tableRef.value?.clearSelection()
+    await load()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.message || '批量修改失败')
+  } finally {
+    savingBatch.value = false
+  }
 }
 
 async function saveForm() {
@@ -505,4 +688,26 @@ function onUserAction(cmd: string, row: any) {
   padding-right: 4px;
   margin-left: 0;
 }
+
+.batch-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.batch-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+}
+
+.batch-field-control {
+  width: 100%;
+  max-width: 100%;
+}
+
 </style>

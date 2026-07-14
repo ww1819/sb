@@ -286,7 +286,7 @@ stateDiagram-v2
 
 详情/列表 API 通过 `RepairWorkorderProcessService.enrichWorkorder` 将最新完工、验收、派工/接单时间等 **展示字段** 回填到主单 Map，前端无需改契约。`repair_workorder_event` 继续双写，供时间轴审计。
 
-建表：`V1__tables.sql`；索引：`V2__extensions.sql` → `idx_wo_process_wo`。
+建表：`V1__tables.sql`；索引：`V2__indexes.sql` → `idx_wo_process_wo`。
 
 ---
 
@@ -320,9 +320,20 @@ stateDiagram-v2
 
 ## 7. 前端操作按钮（按状态）
 
+**入口约定（2026-07-14）**：
+
+| 操作 | 列表操作列（维修处理） | 详情底栏 |
+|------|------------------------|----------|
+| **派工** | ✓ | ✗（已移出） |
+| **取消** | ✓ | ✗（已移出） |
+| **添加进程** | ✓（当前账号为维修工程师且可编） | ✓ |
+| 抢单 / 接单 / 转派 / 子状态 / 完工 / 挂起 / 恢复 | — | ✓ |
+
+工程师下拉接口：`GET /api/repair/engineer/options`（`is_repair_engineer=true` 的启用用户）。
+
 | 当前状态 | 可用操作 |
 |----------|----------|
-| 报修中 | 派工、开始维修（直修）、取消 |
+| 报修中 | 派工、开始维修（直修）、取消；工程师可抢单/添加首段进程 |
 | 派单中 / 待接单 | 改派、接单、开始维修、取消 |
 | 已接单 | 开始维修、转派 |
 | 维修中 | 更新子状态、**添加进程**、转派、完工、挂起 |
@@ -331,6 +342,8 @@ stateDiagram-v2
 | 已维修待验收 | 验收通过、验收不通过 |
 | 已验收 | 关闭（若未自动关闭） |
 | 已关闭 / 已取消 | 仅查看 |
+
+> **添加进程** 仅对 **当前登录用户** 满足：① `is_repair_engineer=true`；② 未派单时可加首段，或已是工单负责人。仅在他人用户上勾选「维修工程师」不够，调度账号自己也要开启该开关。
 
 完工时可选：
 
@@ -347,8 +360,8 @@ stateDiagram-v2
 |------|------|
 | `repair_workorder` 新字段、`repair_workorder_event` 建表 | `V1__tables.sql` |
 | `repair_workorder_process` 流程业务表 | `V1__tables.sql` |
-| 流程表索引 `idx_wo_process_wo` | `V2__extensions.sql` |
-| 老租户 `ADD COLUMN` / `CREATE TABLE IF NOT EXISTS`、状态与字典同步 | `R__tenant_schema_sync.sql` |
+| 流程表索引 `idx_wo_process_wo` | `V2__indexes.sql` |
+| 老租户业务补列 / 状态与字典同步 | `R__columns_biz.sql` / `R__data_fix.sql` |
 | 新租户字典种子 | `V3__seed_data.sql` |
 
 存量状态映射（由 R__ 幂等执行）：

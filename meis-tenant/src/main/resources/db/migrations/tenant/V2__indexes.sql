@@ -1,4 +1,4 @@
-﻿-- MEIS extensions: CREATE INDEX + COMMENT ON INDEX (visible in database catalog)
+﻿-- MEIS indexes: CREATE INDEX + COMMENT ON INDEX（槽位 V2__indexes.sql）
 
 CREATE INDEX idx_op_log_user ON sys_operation_log(user_id);
 COMMENT ON INDEX idx_op_log_user IS '索引：操作日志.关联用户';
@@ -143,3 +143,13 @@ COMMENT ON INDEX idx_power_reading_station_read_at IS '索引：电流读数.基
 
 CREATE INDEX IF NOT EXISTS idx_power_tag_bind_log_tag ON power_tag_bind_log(tag_id, bound_at DESC);
 COMMENT ON INDEX idx_power_tag_bind_log_tag IS '索引：标签绑定历史.标签+绑定时间';
+
+CREATE INDEX IF NOT EXISTS idx_sys_entity_change_log_entity
+    ON sys_entity_change_log (entity_type, entity_id, created_at DESC);
+COMMENT ON INDEX idx_sys_entity_change_log_entity IS '索引：实体变更记录.类型+实体+时间';
+
+CREATE INDEX IF NOT EXISTS idx_wo_segment_wo ON repair_workorder_segment(workorder_id, started_at);
+COMMENT ON INDEX idx_wo_segment_wo IS '索引：维修进程段.工单+开始时间';
+
+CREATE INDEX IF NOT EXISTS idx_wo_segment_part_seg ON repair_workorder_segment_part(segment_id);
+COMMENT ON INDEX idx_wo_segment_part_seg IS '索引：维修进程段配件.关联进程段';

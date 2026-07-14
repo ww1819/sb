@@ -32,7 +32,9 @@ public class DictController {
                 cacheProps.getDictTtl(),
                 new TypeReference<List<Map<String, Object>>>() {},
                 () -> jdbc.queryForList(
-                        "SELECT dict_type, COUNT(*) as item_count FROM sys_dict GROUP BY dict_type ORDER BY dict_type")));
+                        "SELECT dict_type, COUNT(*) as item_count FROM sys_dict WHERE 1=1 "
+                                + SoftDeleteSupport.notDeletedClause(jdbc, "sys_dict", null)
+                                + " GROUP BY dict_type ORDER BY dict_type")));
     }
 
     @GetMapping("/type/{dictType}")

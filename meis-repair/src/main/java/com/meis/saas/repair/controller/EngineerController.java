@@ -32,9 +32,10 @@ public class EngineerController {
             return Result.ok(Map.of("isRepairEngineer", false));
         }
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT COALESCE(is_repair_engineer, false) AS is_repair_engineer FROM sys_user WHERE id = ?::uuid AND is_active = true",
+                "SELECT COALESCE(is_repair_engineer, false) AS is_repair_engineer FROM sys_user WHERE id = ?::uuid AND is_active = true"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", null),
                 userId);
-        boolean flag = !rows.isEmpty() && Boolean.TRUE.equals(rows.get(0).get("is_repair_engineer"));
+        boolean flag = !rows.isEmpty() && toBool(rows.get(0).get("is_repair_engineer"));
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("isRepairEngineer", flag);
         data.put("userId", userId);
@@ -71,18 +72,26 @@ public class EngineerController {
         return Result.ok(pageUsers(where, args, query));
     }
 
-    /** 外键选择器：在职维修工程师 */
-    @GetMapping("/list")
+    /** 外键选择器：在职维修工程师（/options 避免与通用 /{table}/list 冲突） */
+    @GetMapping({"/list", "/options"})
     public Result<List<Map<String, Object>>> list(@RequestParam(required = false) String keyword) {
         StringBuilder where = new StringBuilder(" WHERE u.is_active = true AND COALESCE(u.is_repair_engineer, false) = true ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "u"));
         List<Object> args = new ArrayList<>();
         appendKeyword(where, args, keyword);
-        return Result.ok(jdbc.queryForList(
+        List<Map<String, Object>> rows = jdbc.queryForList(
                 """
                 SELECT u.id, u.real_name, u.employee_no, u.phone, d.dept_name
                 FROM sys_user u
-                LEFT JOIN department d ON d.id = u.dept_id
-                """ + where + " ORDER BY u.real_name LIMIT 500", args.toArray()));
+                LEFT JOIN department d ON d.id = u.dept_id"""
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "department", "d")
+                        + where + " ORDER BY u.real_name LIMIT 500", args.toArray());
+        for (Map<String, Object> row : rows) {
+            if (row.get("id") instanceof UUID id) {
+                row.put("id", id.toString());
+            }
+        }
+        return Result.ok(rows);
     }
 
     @PostMapping("/batch-add")
@@ -128,15 +137,18 @@ public class EngineerController {
                 FROM sys_user u
                 LEFT JOIN repair_workorder w ON w.assigned_user_id = u.id""" + woClause + """
                 WHERE COALESCE(u.is_repair_engineer, false) = true
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "u") + """
                 GROUP BY u.id, u.real_name, u.employee_no
                 ORDER BY workorder_count DESC
                 """));
     }
 
     private PageResult<Map<String, Object>> pageUsers(StringBuilder where, List<Object> args, PageQuery query) {
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "u"));
         String from = """
                 FROM sys_user u
-                LEFT JOIN department d ON d.id = u.dept_id
+                LEFT JOIN department d ON d.id = u.dept_id"""
+                + SoftDeleteSupport.notDeletedClause(jdbc, "department", "d") + """
                 LEFT JOIN (
                     SELECT assigned_user_id, COUNT(*) AS workorder_count
                     FROM repair_workorder
@@ -169,6 +181,14 @@ public class EngineerController {
         args.add(kw);
         args.add(kw);
         args.add(kw);
+    }
+
+    private static boolean toBool(Object v) {
+        if (v == null) return false;
+        if (v instanceof Boolean b) return b;
+        if (v instanceof Number n) return n.intValue() != 0;
+        String s = String.valueOf(v).trim();
+        return "true".equalsIgnoreCase(s) || "t".equalsIgnoreCase(s) || "1".equals(s) || "yes".equalsIgnoreCase(s);
     }
 
     @SuppressWarnings("unchecked")

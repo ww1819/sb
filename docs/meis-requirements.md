@@ -72,7 +72,7 @@
 | 租户模型 | `public` 存租户元数据；`tenant_{code}` 存业务表 |
 | 前端 | `meis-web`（Vue3 + Element Plus） |
 | 后端 | 微服务（网关 8080，各业务服务 8081–8094） |
-| 数据库迁移 | `meis-tenant` Flyway + `R__tenant_schema_sync.sql` 租户补表 |
+| 数据库迁移 | `meis-tenant` Flyway + `R__columns_biz.sql / R__data_fix.sql` 租户补表 |
 | 移动端 | `meis-mobile`（Flutter 骨架） |
 
 ### 1.4 模块地图
@@ -159,7 +159,7 @@
 |--------|------|-------------|------|
 | 院区管理 | `/system/campus` | `campus` | 待编写 |
 | 科室管理 | `/system/dept` | `department` | 待编写 |
-| 用户管理 | `/system/user` | `sys_user` | 待编写 |
+| 用户管理 | `/system/user` | `sys_user` | 已增强（见 SYS-F-04） |
 | 角色管理 | `/system/role` | `sys_role` | 待编写 |
 | 数据字典 | `/system/dict` | `sys_dict` | 待编写 |
 | 操作日志 | `/system/log` | `sys_operation_log` | 待编写 |
@@ -171,6 +171,11 @@
 - [ ] SYS-F-01 登录：医院编码 + 账号 + 密码，JWT 含 schemaName
 - [ ] SYS-F-02 角色权限控制菜单与按钮（`v-permission`）
 - [ ] SYS-F-03 租户开户自动执行 Schema 迁移
+- [x] **SYS-F-04 用户管理增强（2026-07-14）**
+  - 编辑/新建表单增加 **是否维修工程师**（`is_repair_engineer`），与维修工程师管理页同源字段
+  - 列表筛选：关键词 + 启用状态 + **科室** + **是否维修工程师** + **角色** + **权限模式**
+  - **批量修改**：勾选用户后可批量设置科室 / 启用状态 / 是否维修工程师（只更新勾选的字段；不含密码与权限）
+  - 列表展示「维修工程师」列
 - [ ] SYS-B-01 科室与院区层级关系规则
 - [ ] SYS-B-02 用户与科室归属、数据权限范围
 
@@ -908,7 +913,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | 1.3 | 2026-07-11 | — | 明确仅下限时读数等于下限归入待机 |
 | 1.4 | 2026-07-11 | — | 附录 D：数据库迁移双轨规范；V1 补全电流监测相关字段与表 |
 | 1.5 | 2026-07-11 | — | 附录 D.4：明确老租户启动先建表后补列；`SchemaTableEnsuring` 执行 V1/V2 |
-| 1.6 | 2026-07-11 | — | 清理 `R__tenant_schema_sync.sql` 建表语句；R__ 仅保留补列与种子数据 |
+| 1.6 | 2026-07-11 | — | 清理 `R__columns_biz.sql / R__data_fix.sql` 建表语句；R__ 仅保留补列与种子数据 |
 | 1.7 | 2026-07-11 | — | 附录 E：开发完成验收清单；开发面板热加载改为同步执行并分步反馈 |
 | 1.8 | 2026-07-11 | — | 标签：修复换绑设备；待机电流独立行操作；列表展示上下限 |
 | 1.9 | 2026-07-11 | — | 标签：修复换绑与绑定记录；标签名称不得与编码相同 |
@@ -928,6 +933,14 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | 1.23 | 2026-07-13 | — | 后端列表：双横向滚动条、筛选/表头浮动、列显示开关 |
 | 1.24 | 2026-07-13 | — | 附录 U：维修调度/工程师/进程/验收定稿（含拒绝验收状态） |
 | 1.25 | 2026-07-13 | — | 附录 U 补充：废弃 engineer 表、`verify_rejected`、列表范围与完整性评估 |
+| 1.39 | 2026-07-14 | — | Q.7：从文档沉淀约定增量双写约定包 v1.2（槽位/串库/软删读过滤/主从保存/新表通检等） |
+| 1.38 | 2026-07-14 | — | 附录 D.6：public/tenant 固定脚本槽位整合（建表/索引/补列/数据）；废止零散 V20+/patch |
+| 1.37 | 2026-07-14 | — | 附录 G.10：物理删除盘点；库结构 SQL 为主+代码扫描为辅；SoftDelete 无列时禁止静默物理删 |
+| 1.36 | 2026-07-14 | — | 附录 I.5：动态补齐缺 `is_deleted` 的租户表（标签打印日志/实体变更记录等） |
+| 1.35 | 2026-07-14 | — | 附录 I.4：自定义读 SQL 统一补 SoftDelete 过滤（system/auth/repair/asset/purchase/maintain/qc） |
+| 1.34 | 2026-07-14 | — | 租户库补齐 `sys_user.is_repair_engineer`；全表未删行 `is_deleted=0` + DEFAULT 0（见附录 I.3） |
+| 1.33 | 2026-07-14 | — | 维修处理：派工/取消进操作列；工程师下拉 `/engineer/options`；添加进程可见性说明 |
+| 1.32 | 2026-07-14 | — | 用户管理：维修工程师开关、列表筛选、批量改科室/启用/工程师 |
 | 1.31 | 2026-07-13 | — | 附录 U.11：四列表查询/状态多选；REP-F-02/03 长期搁置 |
 | 1.30 | 2026-07-13 | — | 落地 REP-05：维修进程类型、工单进程段、段上配件明细 |
 | 1.29 | 2026-07-13 | — | 落地 REP-04：抢单 API、负责人互斥、抢单并发锁 |
@@ -1009,7 +1022,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | 设备弹窗（报修） | `meis-web/src/components/repair/RepairDevicePicker.vue` |
 | 基站弹窗 | `meis-web/src/components/form/PowerStationPicker.vue` |
 | 租户迁库 | `meis-tenant/src/main/resources/db/migrations/` |
-| 租户补表脚本 | `meis-tenant/.../R__tenant_schema_sync.sql` |
+| 租户补表脚本 | `meis-tenant/.../R__columns_biz.sql / R__data_fix.sql` |
 | 数据库备份还原 | `scripts/backup-db.ps1`、`scripts/restore-db.ps1` |
 
 ---
@@ -1036,21 +1049,21 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 新增或修改租户表字段时，**必须同时维护两处**，保证新开户与老租户升级结果一致：
 
-| 场景 | `V1__tables.sql`（全量建表） | `R__tenant_schema_sync.sql`（老租户补列） |
-|------|------------------------------|------------------------------------------|
+| 场景 | `V1__tables.sql`（全量建表） | `R__columns_biz.sql`（老租户业务补列） / `R__data_fix.sql`（数据） |
+|------|------------------------------|------------------------------------------------------|
 | **新建表** | 写入完整 `CREATE TABLE` + 字段 + 默认 `COMMENT` | **不写**（建表由 `SchemaTableEnsuring` 执行 V1） |
-| **已有表加列** | 在对应 `CREATE TABLE` 中补上该列 | **单独一行** `ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...`（禁止一条 ALTER 多列） |
-| **索引** | `V2__extensions.sql` | **不写**（索引由 `SchemaTableEnsuring` 执行 V2） |
-| **手工镜像** | `db/source/create/tenant_tables.sql` | `db/source/patches/tenant_column_patches.sql`（与 R__ 补列段同步） |
+| **已有表加列** | 在对应 `CREATE TABLE` 中补上该列 | **单独一行** `ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...`（禁止一条 ALTER 多列；标准七列走 `R__columns_audit.sql`） |
+| **索引** | `V2__indexes.sql` | **不写**（索引由 `SchemaTableEnsuring` 执行 V2） |
+| **手工镜像** | `db/source/create/tenant_tables.sql` | `db/source/patches/` 已废弃新补丁；只改 Flyway 槽位 |
 
 ### D.2 开发检查清单（提交前）
 
 - [ ] `V1__tables.sql` 中 `CREATE TABLE` 已包含全部字段（新租户开箱即用）
 - [ ] **标准七列**已写入新建表：`created_at` / `updated_at` / `created_by` / `updated_by` / `is_deleted` / `deleted_at` / `deleted_by`（见附录 G.0）
-- [ ] `R__tenant_schema_sync.sql` 中每条**业务**新增列有对应 `ADD COLUMN IF NOT EXISTS`（标准七列走 `R__audit_columns.sql`）
+- [ ] `R__columns_biz.sql` 中每条**业务**新增列有对应 `ADD COLUMN IF NOT EXISTS`（标准七列走 `R__columns_audit.sql`；字典/回填写 `R__data_fix.sql`）
 - [ ] R__ 中**无** `CREATE TABLE` / `CREATE INDEX`（建表与索引仅维护 V1/V2）
-- [ ] `V2__extensions.sql` 已补充必要索引
-- [ ] `tenant_column_patches.sql` 已镜像 R__ 业务补列语句
+- [ ] `V2__indexes.sql` 已补充必要索引
+- [ ] 未在 `db/source/patches` 新增功能补丁（该目录已废弃）
 - [ ] 未在 R__ 中写 `COMMENT ON`（空注释由 `SchemaCommentFiller` 补全）
 - [ ] 前后端 CRUD 与交互走通（清单见附录 M.7）
 
@@ -1078,8 +1091,8 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 步骤 | 组件 | 作用 |
 |------|------|------|
-| 1 | `SchemaTableEnsuring` | 幂等建表与索引：`V1__tables.sql` + `V2__extensions.sql`（**先** `CREATE EXTENSION`，再 `SET search_path TO tenant, public`） |
-| 2 | Flyway `migrate` | 补列与修正：`R__tenant_schema_sync.sql` 中的 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` 及字典/数据 UPDATE |
+| 1 | `SchemaTableEnsuring` | 幂等建表与索引：`V1__tables.sql` + `V2__indexes.sql`（**先** `CREATE EXTENSION`，再 `SET search_path TO tenant, public`） |
+| 2 | Flyway `migrate` | 补列与修正：`R__columns_audit.sql` → `R__columns_biz.sql` → `R__data_fix.sql` |
 | 3 | `SchemaCommentFiller` | 仅对空注释列/表补 `COMMENT ON` |
 | 4 | `TenantSchemaShadowGuard` | 校验 V1 表是否齐全；缺表则重跑建表；仍缺则**启动失败**（避免串写 public） |
 
@@ -1118,6 +1131,21 @@ powershell -File scripts/ensure-tenant-tables.ps1
 ```
 
 **注意**：`public` 中误建的租户业务表（如 `power_tag_bind_log`）不会自动删除；修复后以租户 schema 内表为准。新环境勿向 public 写入租户业务 DDL。
+
+### D.6 固定脚本槽位（2026-07-14 整合）
+
+**目标**：public / 租户各一套固定文件；**禁止**「每加一张表/一个字段就新建一个迁移文件」。
+
+| 职责 | public | tenant |
+|------|--------|--------|
+| **建表** | `V1__tables.sql` | `V1__tables.sql` |
+| **索引** | `V2__indexes.sql` | `V2__indexes.sql` |
+| **一次性种子** | `V3__seed_data.sql`（冻结） | `V3__seed_data.sql` |
+| **历史注释** | `V4__comments.sql`（冻结） | `V4__comments.sql` |
+| **补全字段** | 平台列：写入 `R__data_fix.sql` 的 ALTER 段 | `R__columns_audit.sql`（七列）+ `R__columns_biz.sql`（业务列） |
+| **更正数据** | `R__data_fix.sql`（菜单等） | `R__data_fix.sql`（字典/回填） |
+
+本次整合：合并 `R__audit`+`R__is_deleted` → `R__columns_audit`；拆分原 `R__tenant_schema_sync` → `R__columns_biz` + `R__data_fix`；`V2__extensions` 更名为 `V2__indexes`；删除 `V20`/`V21`；`db/source/patches` 标记废弃。
 
 ---
 
@@ -1182,17 +1210,17 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 文件 | 职责 |
 |------|------|
 | `public/V1__tables.sql` | 平台表全量 `CREATE TABLE` + `COMMENT ON`（含全部字段） |
-| `public/V2__extensions.sql` | 索引 |
+| `public/V2__indexes.sql` | 索引 |
 | `public/V3__seed_data.sql` | 一次性：演示租户、套餐、平台管理员 |
 | `public/V4__comments.sql` | 历史注释回填 |
-| `public/R__public_schema_sync.sql` | **菜单目录**幂等同步；**已有表**逐列 `ADD COLUMN` |
+| `public/R__data_fix.sql` | **菜单目录**幂等同步；**已有表**逐列 `ADD COLUMN` |
 
 ### F.2 操作规则
 
 1. **新平台表** → 写入 `V1__tables.sql`
 2. **平台表加列** → V1 补 `CREATE TABLE` 字段 + R__ 补一行 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
-3. **新菜单 / 改菜单** → 只改 `R__public_schema_sync.sql`（`ON CONFLICT DO UPDATE`）
-4. **禁止**新建 `V5__xxx.sql` 等版本化菜单脚本（原 V5–V19 已删除并并入 R__）
+3. **新菜单 / 改菜单** → 只改 `R__data_fix.sql`（`ON CONFLICT DO UPDATE`）
+4. **禁止**新建 `V5__xxx.sql` / `V20+` 等版本化脚本（原 V5–V21 已删除并并入 R__）
 5. `spring.flyway.ignore-migration-patterns: "*:missing"` + dev 环境 `repair`，兼容已执行过旧版本的库
 
 ### F.3 本次整合记录
@@ -1200,7 +1228,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 变更 | 说明 |
 |------|------|
 | 删除 | `V5`–`V19`（15 个模块菜单脚本） |
-| 新增 | `R__public_schema_sync.sql`（基础菜单 + 各模块调整 + 套餐/租户授权） |
+| 新增 | `R__data_fix.sql`（基础菜单 + 各模块调整 + 套餐/租户授权） |
 | 精简 | `V3__seed_data.sql` 仅保留平台级一次性种子 |
 | 配置 | `application.yml` 增加 `ignore-migration-patterns` |
 
@@ -1231,8 +1259,8 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 场景 | 做法 |
 |------|------|
 | **以后新建表** | 在 `tenant/V1__tables.sql` 的 `CREATE TABLE` 中**直接写出上述七列**（文件头已有模板注释） |
-| **以前已有表** | 由 `R__audit_columns.sql`（含七列）+ `R__is_deleted_columns.sql` 幂等 `ADD COLUMN IF NOT EXISTS` 补全；重启 **meis-tenant** 生效 |
-| **禁止** | 在 `R__tenant_schema_sync.sql` 业务补列段零散追加标准七列；勿再拆 `V5+` 脚本 |
+| **以前已有表** | 由 `R__columns_audit.sql` 幂等 `ADD COLUMN IF NOT EXISTS` 补全（含标准七列与动态 `is_deleted`）；重启 **meis-tenant** 生效 |
+| **禁止** | 在 `R__columns_biz.sql` 业务补列段零散追加标准七列；勿再拆 `V5+` 脚本 |
 
 应用层读写约定见 G.1；工具类为 `SoftDeleteSupport`。
 
@@ -1254,7 +1282,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 通用 CRUD | `GenericTableController`（删/建/改/查） |
 | 分页 | `PageableJdbc`、`ExcelExportHelper` |
 | 导入 | `SimpleTableImporter` |
-| 库表补列 | `tenant/R__audit_columns.sql`（标准七列）、`tenant/R__is_deleted_columns.sql`（`is_deleted` 兼容补全） |
+| 库表补列 | `tenant/R__columns_audit.sql`（标准七列 + `is_deleted` 兼容补全） |
 
 ### G.3 明细表例外
 
@@ -1333,9 +1361,9 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 ### G.7 迁库锁表（2026-07-12 修复）
 
-`R__tenant_schema_sync.sql` 中 **DO 块批量 ALTER 114 表**会在单事务内长时间持锁，导致所有业务查询（含资产管理列表）超时失败。
+`R__columns_biz.sql / R__data_fix.sql` 中 **DO 块批量 ALTER 114 表**会在单事务内长时间持锁，导致所有业务查询（含资产管理列表）超时失败。
 
-已拆分为独立脚本 `tenant/R__audit_columns.sql`，并设置 `flyway:executeInTransaction=false`，逐条 `ALTER` 提交释放锁。若再次遇到全站查询挂起，检查 `pg_stat_activity` 是否有未结束的迁库会话。
+已拆分为独立脚本 `tenant/R__columns_audit.sql`，并设置 `flyway:executeInTransaction=false`，逐条 `ALTER` 提交释放锁。若再次遇到全站查询挂起，检查 `pg_stat_activity` 是否有未结束的迁库会话。
 
 修改 `meis-common`（如软删除工具类）后，在面板对 `meis-common` 点 **热加载依赖**，或手动对具体微服务点「热加载」。
 
@@ -1385,14 +1413,17 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 ### I.3 迁库
 
-脚本 `tenant/R__audit_columns.sql` / `R__is_deleted_columns.sql`（`flyway:executeInTransaction=false`）：
+脚本 `tenant/R__columns_audit.sql`（`flyway:executeInTransaction=false`）：
 
 1. 全租户业务表补齐标准七列（含 `is_deleted`）
 2. 将已有 `deleted_at IS NOT NULL` 的行回填为 `is_deleted=1`
+3. **存量修补（2026-07-14）**：凡含 `is_deleted` 的基表，对未删除行统一 `is_deleted=0`（含原 `NULL`），并 `ALTER … SET DEFAULT 0` / 尽量 `NOT NULL`（`R__columns_audit.sql` 末尾 DO 块；手工补丁见 `db/source/patches/sys_user_repair_engineer_and_is_deleted_defaults.sql`）
 
 部署后重启 **meis-tenant**，并对业务服务热加载 **meis-common**。
 
 新建表请直接在 `V1__tables.sql` 写入七列，见 **附录 G.0**。
+
+> **运维提示**：若租户库长期未跑 R__，`sys_user.is_repair_engineer` 缺失会导致派工工程师下拉无数据、`/repair/engineer/me` 失败、「添加进程」不显示。缺列时用户管理中开关可能看似已保存但无法落库；补列后需在用户管理 / 维修工程师管理中 **重新勾选**。
 
 ## 附录 J：开发面板整体 Clean 与打包（2026-07-12）
 
@@ -1565,7 +1596,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 ### M.3 种子数据
 
-`R__tenant_schema_sync.sql` 预置：法规（`MANDATORY`、`MANDATORY_ONCE`、`MANDATORY_PERIODIC`、`VOLUNTARY` 及设备范围）、时机、地点、A/B/C 分级等条目。
+`R__columns_biz.sql / R__data_fix.sql` 预置：法规（`MANDATORY`、`MANDATORY_ONCE`、`MANDATORY_PERIODIC`、`VOLUNTARY` 及设备范围）、时机、地点、A/B/C 分级等条目。
 
 ### M.4 接口与前端
 
@@ -1598,8 +1629,8 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 **数据库**
 
-- [ ] `V1__tables.sql` 全量建表（含标准七列）；索引写 `V2__extensions.sql`
-- [ ] 业务补列写 `R__tenant_schema_sync.sql`；种子数据（字典/主数据）同步
+- [ ] `V1__tables.sql` 全量建表（含标准七列）；索引写 `V2__indexes.sql`
+- [ ] 业务补列写 `R__columns_biz.sql / R__data_fix.sql`；种子数据（字典/主数据）同步
 - [ ] `MetrologyDomainController`（或对应域 `TABLES`）注册表名
 
 **后端**
@@ -1784,7 +1815,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 | 类别 | 处理 |
 |------|------|
-| `shared_device` 表 | **删除**（V1 去除建表；`R__tenant_schema_sync` 迁移后 `DROP`） |
+| `shared_device` 表 | **删除**（V1 去除建表；`R__columns_biz / R__data_fix` 迁移后 `DROP`） |
 | `*DeviceController`（保养/巡检/计量/PM） | **删除**；执行单生成迁入 `*ExecutionGenerator` + `*PlanController` |
 | 前端 `*DevicePage.vue` 及菜单 `*_device` | **停用并移除**；设备标记与属性在台账表单维护 |
 | 独立设备表（保养/巡检/计量/PM） | **不存在**；无需删表 |
@@ -1798,7 +1829,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 ### O.4 实施清单
 
 - [x] 删除 `shared_device` 建表及审计脚本引用
-- [x] `R__tenant_schema_sync`：存量迁移 + `DROP TABLE shared_device`
+- [x] `R__columns_biz / R__data_fix`：存量迁移 + `DROP TABLE shared_device`
 - [x] 删除 4 个 `*DeviceController`，执行生成逻辑迁入 Generator
 - [x] 删除 4 个 `*DevicePage.vue`，移除 `ModulePage` / `pageRegistry` 路由
 - [x] 停用菜单：`maintain_device`、`inspect_device`、`metrology_device`、`pm_device`
@@ -1902,17 +1933,32 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 | 主题 | 位置 |
 |------|------|
-| **跨项目可复用约定全集** | [reusable-engineering-conventions.md](reusable-engineering-conventions.md) |
-| 数据库迁移双轨（V1/V2 建表，R__ 补列） | [附录 D](#附录-d数据库迁移规范必读) |
+| **跨项目可复用约定全集** | [reusable-engineering-conventions.md](reusable-engineering-conventions.md)（**v1.2**） |
+| 数据库迁移双轨 / **固定槽位** / 串库防护 | [附录 D](#附录-d数据库迁移规范必读)（含 D.5 / D.6） |
 | 开发完成验收清单 | [附录 E](#附录-e开发完成验收清单必读) |
 | public schema 迁移 | [附录 F](#附录-fpublic-schema-迁移规范2026-07-11) |
-| 标准七列 / 软删与审计 | [附录 G](#附录-g软删除与审计字段规范2026-07-12)、[附录 I](#附录-i删除状态字段-is_deleted2026-07-12)、[附录 K](#附录-k审计字段与软删唯一键修补2026-07-12) |
+| 标准七列 / 软删与审计 / 读过滤 / 物理删盘点 | [附录 G](#附录-g软删除与审计字段规范2026-07-12)、[附录 I](#附录-i删除状态字段-is_deleted2026-07-12)、[附录 K](#附录-k审计字段与软删唯一键修补2026-07-12)、G.10、I.4–I.5 |
 | 外键显示名称 | [附录 H](#附录-h外键字段显示名称2026-07-12) |
+| 新增表/字段 CRUD 通检 | [附录 M.7](#m7-新增表字段通用检查清单每次必做) |
 | 开发面板 Clean/打包与状态 | [附录 J](#附录-j开发面板整体-clean-与打包2026-07-12)、[附录 L](#附录-l开发面板状态显示滞后2026-07-12) |
 | 主数据变更记录与精简快照 | [附录 T](#附录-t主数据查看与变更记录)（含 T.5 / T.6） |
 | 列表字典中文 | [附录 R](#附录-r列表状态与字典值中文显示) |
 | 报修草稿/提交/撤回 | [附录 S](#附录-s设备报修草稿--提交--撤回) |
 | 维修调度/进程/工程师/验收 | [附录 U](#附录-u维修调度工程师进程与验收2026-07-13) |
+
+### Q.7 2026-07-14 从需求文档沉淀的约定增量
+
+已写入 [约定包 v1.2](reusable-engineering-conventions.md)，摘要：
+
+| 增量 | 来源附录 | 约定包章节 |
+|------|----------|------------|
+| 迁库固定槽位、禁止碎片脚本 | D.6 / F | §2.1 |
+| search_path 缺表串库防护 | D.5 | §2.2 |
+| 读接口全覆盖软删过滤；softDelete 禁静默物理删 | I.4 / G.10 | §3.1 / §3.4 |
+| 主从单据禁止只存主表 | PLT-X-05 | §6.1 |
+| UUID 字符串化、options 路径勿与 `/{id}` 冲突 | 工程实践 / H | §5.3 |
+| 新表 CRUD + 变更记录通检 | M.7 / T | §7.4 |
+| 业务编码创建后只读；有关联禁止删主数据 | O / 资产标签等 | §8 NF-06/07 |
 
 ---
 
@@ -2461,4 +2507,61 @@ API：`GET /repair/workorder/page` 增加 `statuses`（逗号分隔）、`urgenc
 
 **建议**：`git pull` 后若涉及 Java，对改过的服务点一次「热加载」最稳妥；依赖 `meis-common` 时用「热加载依赖」。
 
----
+### I.4 查询默认排除已软删（2026-07-14）
+
+| 项 | 约定 |
+|----|------|
+| 适用范围 | 所有读接口：列表、详情、下拉/options、统计 COUNT/SUM、登录与权限解析、业务校验用的存在性查询 |
+| 实现 | 拼接 `SoftDeleteSupport.notDeletedClause(jdbc, table, alias)`（无 `is_deleted`/`deleted_at` 列时返回空串，安全兼容） |
+| 例外 | 变更记录快照加载、按唯一键**查找已软删行以便恢复**、明确「含已删」的管理排查接口（须标注） |
+| 联表 | **每张有软删列的业务表别名**各自加过滤；勿只滤主表而忽略子表/候选设备等 |
+
+> 手工 SQL / 业务重写的 page/get（尤其 `meis-purchase`、`meis-maintain`、`meis-qc`、`meis-asset` 出入库类）历史上易漏；`GenericTableController` 路径已默认过滤。
+
+### I.5 缺 `is_deleted` 表的动态补齐（2026-07-14）
+
+| 项 | 约定 |
+|----|------|
+| 范围 | 各租户 schema 内全部 `BASE TABLE`（排除 `flyway_%`） |
+| 动作 | 缺列则 `ADD is_deleted SMALLINT NOT NULL DEFAULT 0`；同步补 `deleted_at`/`deleted_by`；存量因 DEFAULT 为 `0`；有 `deleted_at` 时已删行回填 `is_deleted=1` |
+| 脚本 | `R__columns_audit.sql` 动态 DO（权威）；勿再新增零散 patch |
+| 扫描结果 | `tenant_*` 仅缺：`device_label_print_log`、`sys_entity_change_log`（日志类亦补标志；读过滤仍按 I.4 例外） |
+| public | 平台/遗留副本不在本轮租户补齐范围 |
+
+
+### G.10 物理删除盘点与结构补齐策略（2026-07-14）
+
+#### G.10.1 代码中 `DELETE FROM` 盘点
+
+| 类别 | 表 / 位置 | 结论 |
+|------|-----------|------|
+| **明细先清空再写入（保留物理删）** | `*_item` / `*_member` / `contract_payment`（随主单保存重写）：采购计划/合同付款/验收、出入库退货盘点明细、保养/巡检/计量/PM 模板项 | **符合 G.3**，不改为软删（否则每次保存堆积软删行） |
+| **主表删除 API** | 走 `SoftDeleteSupport.softDelete` / `GenericTableController` | **已是软删** |
+| **工具兜底** | `SoftDeleteSupport`：表无软删列时曾物理 `DELETE` | **改为报错**，禁止静默物理删主数据 |
+| **平台租户注销** | `TenantService`：`sys_tenant` + `sys_tenant_menu` | **例外**：平台配置/关联重绑；租户行现状物理删 |
+| **租户菜单重绑** | `TenantMenuService`：先删后插绑定 | **等同明细例外**，保留物理删 |
+
+> 结论：租户**业务主表**侧未发现「删除接口仍物理删」的缺口；现存物理删几乎全是 G.3 明细重写或平台绑定。
+
+#### G.10.2 新增表必须含标准七列（重申并加强）
+
+| 要求 | 说明 |
+|------|------|
+| **强制** | 新建租户业务表 `CREATE TABLE` **必须**含附录 G.0 七列 |
+| `is_deleted` | `SMALLINT NOT NULL DEFAULT 0`（未删默认 0） |
+| **禁止** | 建表后再靠业务代码「碰巧」补列；禁止无七列的新表进入 `V1__tables.sql` |
+| **存量** | 继续靠 `R__columns_audit.sql`（含动态补 `is_deleted`） |
+
+#### G.10.3 库结构补齐：SQL 脚本为主，代码扫描为辅（定稿）
+
+| 方式 | 擅长 | 不擅长 |
+|------|------|--------|
+| **SQL / Flyway R__（结构真理来源）** | 幂等加列、默认值、存量回填、多租户一致、可审计 | 发现代码误写物理 `DELETE` |
+| **代码扫描（行为门禁）** | 找 `DELETE FROM`、漏 `notDeletedClause`、主表未走 `softDelete` | 不能代替迁库给各租户加列 |
+
+**定稿组合**：
+
+1. **库结构** → **只认 SQL**：`V1`（新表）+ `R__`（老表幂等）；必要时手工 patch；启动 `meis-tenant` 落到各租户。
+2. **运行行为** → **代码约定 + 扫描**：主表禁止裸 `DELETE`；明细 G.3 例外须可识别；可用巡检扫 `DELETE FROM`。
+3. **不要**用应用启动时 Java 扫库再 `ALTER` 作主方案；动态 DO 放在 **R__ SQL** 内（已采用）。
+

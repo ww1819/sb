@@ -5,6 +5,7 @@ import com.meis.saas.common.code.DeviceCodeGenerator;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -24,6 +25,7 @@ public class DeviceEntryController {
     public Result<PageResult<Map<String, Object>>> page(PageQuery query,
             @RequestParam(required = false) String status) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "device_entry", "e"));
         List<Object> args = new ArrayList<>();
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
             where.append(" AND (e.entry_no ILIKE ? OR e.trace_no ILIKE ? OR pc.contract_code ILIKE ?) ");
@@ -36,11 +38,11 @@ public class DeviceEntryController {
             where.append(" AND e.status = ? ");
             args.add(status);
         }
-        String from = """
-            FROM device_entry e
-            LEFT JOIN purchase_contract pc ON pc.id = e.contract_id
-            LEFT JOIN supplier s ON s.id = e.supplier_id
-            """;
+        String from = " FROM device_entry e "
+                + " LEFT JOIN purchase_contract pc ON pc.id = e.contract_id"
+                + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_contract", "pc")
+                + " LEFT JOIN supplier s ON s.id = e.supplier_id"
+                + SoftDeleteSupport.notDeletedClause(jdbc, "supplier", "s");
         Long total = jdbc.queryForObject("SELECT COUNT(*) " + from + where, Long.class, args.toArray());
         List<Object> pageArgs = new ArrayList<>(args);
         pageArgs.add(query.limit());
@@ -53,10 +55,14 @@ public class DeviceEntryController {
 
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
-        var rows = jdbc.queryForList("SELECT * FROM device_entry WHERE id = ?::uuid", id);
+        var rows = jdbc.queryForList(
+                "SELECT * FROM device_entry WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "device_entry", null), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> e = rows.get(0);
-        e.put("items", jdbc.queryForList("SELECT * FROM device_entry_item WHERE entry_id = ?::uuid", id));
+        e.put("items", jdbc.queryForList(
+                "SELECT * FROM device_entry_item WHERE entry_id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "device_entry_item", null), id));
         return Result.ok(e);
     }
 
@@ -95,25 +101,33 @@ public class DeviceEntryController {
     @OperationLog(module = "asset", description = "完成入库生成台账")
     public Result<Map<String, Object>> complete(@PathVariable UUID id, @RequestBody(required = false) Map<String, Object> body) {
         body = body != null ? body : Map.of();
-        var entryRows = jdbc.queryForList("SELECT * FROM device_entry WHERE id = ?::uuid", id);
+        var entryRows = jdbc.queryForList(
+                "SELECT * FROM device_entry WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "device_entry", null), id);
         if (entryRows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> entry = entryRows.get(0);
         if ("completed".equals(entry.get("status"))) throw new BizException(400, "入库单已完成");
 
         Object deptId = body.get("dept_id");
         if (deptId == null && entry.get("plan_id") != null) {
-            var plan = jdbc.queryForList("SELECT dept_id FROM purchase_plan WHERE id = ?::uuid", entry.get("plan_id"));
+            var plan = jdbc.queryForList(
+                    "SELECT dept_id FROM purchase_plan WHERE id = ?::uuid"
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", null), entry.get("plan_id"));
             if (!plan.isEmpty()) deptId = plan.get(0).get("dept_id");
         }
         Object supplierId = entry.get("supplier_id");
         if (supplierId == null && entry.get("contract_id") != null) {
-            var c = jdbc.queryForList("SELECT supplier_id FROM purchase_contract WHERE id = ?::uuid", entry.get("contract_id"));
+            var c = jdbc.queryForList(
+                    "SELECT supplier_id FROM purchase_contract WHERE id = ?::uuid"
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_contract", null), entry.get("contract_id"));
             if (!c.isEmpty()) supplierId = c.get(0).get("supplier_id");
         }
 
         Object warehouseId = body.get("warehouse_id") != null ? body.get("warehouse_id") : entry.get("warehouse_id");
 
-        var items = jdbc.queryForList("SELECT * FROM device_entry_item WHERE entry_id = ?::uuid", id);
+        var items = jdbc.queryForList(
+                "SELECT * FROM device_entry_item WHERE entry_id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "device_entry_item", null), id);
         List<UUID> deviceIds = new ArrayList<>();
         for (Map<String, Object> item : items) {
             int qty = item.get("quantity") instanceof Number n ? Math.max(1, n.intValue()) : 1;

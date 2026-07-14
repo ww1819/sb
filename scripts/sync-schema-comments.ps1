@@ -274,7 +274,7 @@ function Strip-V2([string]$v2) {
 function Process-Schema([string]$RelDir, [string]$SchemaLabel, [switch]$CommentsOnly) {
     $base = Join-Path $Root "meis-tenant\src\main\resources\db\migrations\$RelDir"
     $v1Path = Join-Path $base 'V1__tables.sql'
-    $v2Path = Join-Path $base 'V2__extensions.sql'
+    $v2Path = Join-Path $base 'V2__indexes.sql'
     $v4Path = Join-Path $base 'V4__comments.sql'
 
     $v1 = [IO.File]::ReadAllText($v1Path)

@@ -2,6 +2,7 @@ package com.meis.saas.system.controller;
 
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -25,6 +26,7 @@ public class OperationLogController {
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "sys_operation_log", null));
         List<Object> args = new ArrayList<>();
         if (module != null && !module.isBlank()) {
             where.append(" AND module_name = ? ");
@@ -54,7 +56,10 @@ public class OperationLogController {
 
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable long id) {
-        List<Map<String, Object>> rows = jdbc.queryForList("SELECT * FROM sys_operation_log WHERE id = ?", id);
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT * FROM sys_operation_log WHERE id = ? "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "sys_operation_log", null),
+                id);
         if (rows.isEmpty()) return Result.fail("not found");
         return Result.ok(rows.get(0));
     }

@@ -1,5 +1,6 @@
 package com.meis.saas.purchase.support;
 
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
@@ -20,7 +21,9 @@ public final class AcceptanceChecklistService {
 
     public static void seedDefaultItems(JdbcTemplate jdbc, UUID acceptanceId) {
         var existing = jdbc.queryForList(
-                "SELECT 1 FROM purchase_acceptance_item WHERE acceptance_id = ?::uuid LIMIT 1", acceptanceId);
+                "SELECT 1 FROM purchase_acceptance_item WHERE acceptance_id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_acceptance_item", null) + " LIMIT 1",
+                acceptanceId);
         if (!existing.isEmpty()) return;
         int order = 1;
         for (String[] item : DEFAULT_ITEMS) {
@@ -34,7 +37,9 @@ public final class AcceptanceChecklistService {
 
     private static void seedDefaultMembers(JdbcTemplate jdbc, UUID acceptanceId) {
         var existing = jdbc.queryForList(
-                "SELECT 1 FROM purchase_acceptance_member WHERE acceptance_id = ?::uuid LIMIT 1", acceptanceId);
+                "SELECT 1 FROM purchase_acceptance_member WHERE acceptance_id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_acceptance_member", null) + " LIMIT 1",
+                acceptanceId);
         if (!existing.isEmpty()) return;
         String[][] roles = {
                 {"quality", "质控人员"}, {"engineering", "工程人员"},
@@ -81,7 +86,7 @@ public final class AcceptanceChecklistService {
         var failed = jdbc.queryForList("""
             SELECT id FROM purchase_acceptance_item
             WHERE acceptance_id = ?::uuid AND (is_passed IS NOT TRUE OR check_result = 'failed')
-            """, acceptanceId);
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_acceptance_item", null), acceptanceId);
         return failed.isEmpty();
     }
 }

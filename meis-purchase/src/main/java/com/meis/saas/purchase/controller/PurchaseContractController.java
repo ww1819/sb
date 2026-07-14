@@ -4,6 +4,7 @@ import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.workflow.ApprovalInstanceService;
 import com.meis.saas.purchase.support.PurchasePageQueries;
@@ -31,10 +32,14 @@ public class PurchaseContractController {
 
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
-        var rows = jdbc.queryForList("SELECT * FROM purchase_contract WHERE id = ?::uuid", id);
+        var rows = jdbc.queryForList(
+                "SELECT * FROM purchase_contract WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_contract", null), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> c = rows.get(0);
-        c.put("payments", jdbc.queryForList("SELECT * FROM contract_payment WHERE contract_id = ?::uuid", id));
+        c.put("payments", jdbc.queryForList(
+                "SELECT * FROM contract_payment WHERE contract_id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "contract_payment", null), id));
         return Result.ok(c);
     }
 
@@ -44,10 +49,14 @@ public class PurchaseContractController {
     public Result<Map<String, Object>> save(@RequestBody Map<String, Object> body) {
         UUID id = body.containsKey("id") ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
         PurchaseValidators.validateContractAmount(jdbc, body.get("project_id"), body.get("contract_amount"), id);
-        boolean exists = !jdbc.queryForList("SELECT 1 FROM purchase_contract WHERE id = ?::uuid", id).isEmpty();
+        boolean exists = !jdbc.queryForList(
+                "SELECT 1 FROM purchase_contract WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_contract", null), id).isEmpty();
         Object chainNo = null;
         if (body.get("project_id") != null) {
-            var pj = jdbc.queryForList("SELECT business_chain_no FROM purchase_project WHERE id = ?::uuid", body.get("project_id"));
+            var pj = jdbc.queryForList(
+                    "SELECT business_chain_no FROM purchase_project WHERE id = ?::uuid"
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_project", null), body.get("project_id"));
             if (!pj.isEmpty()) chainNo = pj.get(0).get("business_chain_no");
         }
         if (exists) {
@@ -119,7 +128,8 @@ public class PurchaseContractController {
     public Result<Map<String, Object>> submitPayment(@PathVariable UUID contractId, @PathVariable UUID paymentId,
             @RequestBody Map<String, Object> body) {
         var rows = jdbc.queryForList(
-                "SELECT * FROM contract_payment WHERE id = ?::uuid AND contract_id = ?::uuid", paymentId, contractId);
+                "SELECT * FROM contract_payment WHERE id = ?::uuid AND contract_id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "contract_payment", null), paymentId, contractId);
         if (rows.isEmpty()) throw new BizException(404, "payment not found");
         Map<String, Object> payment = rows.get(0);
         approvalService.submit("contract_payment", paymentId,

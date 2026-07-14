@@ -2,6 +2,7 @@ package com.meis.saas.maintain.controller;
 
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -25,11 +26,13 @@ public class PmTemplateController {
                 FROM pm_template t
                 LEFT JOIN pm_type l ON l.id = t.pm_type_id
                 WHERE t.id = ?::uuid
-                """, id);
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "pm_template", "t"), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> result = new LinkedHashMap<>(rows.get(0));
         result.put("items", jdbc.queryForList(
-                "SELECT * FROM pm_template_item WHERE template_id = ?::uuid ORDER BY sort_order, created_at", id));
+                "SELECT * FROM pm_template_item WHERE template_id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "pm_template_item", null)
+                        + " ORDER BY sort_order, created_at", id));
         return Result.ok(result);
     }
 
@@ -38,7 +41,9 @@ public class PmTemplateController {
     @OperationLog(module = "pm", description = "保存预防性维护模板")
     public Result<Map<String, Object>> save(@RequestBody Map<String, Object> body) throws Exception {
         UUID id = body.containsKey("id") ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
-        boolean exists = !jdbc.queryForList("SELECT 1 FROM pm_template WHERE id = ?::uuid", id).isEmpty();
+        boolean exists = !jdbc.queryForList(
+                "SELECT 1 FROM pm_template WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "pm_template", null), id).isEmpty();
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> items = (List<Map<String, Object>>) body.getOrDefault("items", List.of());
         String itemsJson = mapper.writeValueAsString(items);

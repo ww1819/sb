@@ -4,6 +4,7 @@ import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.workflow.ApprovalInstanceService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ public class DeviceOutboundController {
     public Result<PageResult<Map<String, Object>>> page(PageQuery query,
             @RequestParam(required = false) String doc_status) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "device_outbound", "o"));
         List<Object> args = new ArrayList<>();
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
             where.append(" AND (o.outbound_no ILIKE ? OR d.dept_name ILIKE ?) ");
@@ -35,11 +37,11 @@ public class DeviceOutboundController {
             where.append(" AND o.doc_status = ? ");
             args.add(doc_status);
         }
-        String from = """
-            FROM device_outbound o
-            LEFT JOIN department d ON d.id = o.dept_id
-            LEFT JOIN warehouse w ON w.id = o.warehouse_id
-            """;
+        String from = " FROM device_outbound o "
+                + " LEFT JOIN department d ON d.id = o.dept_id"
+                + SoftDeleteSupport.notDeletedClause(jdbc, "department", "d")
+                + " LEFT JOIN warehouse w ON w.id = o.warehouse_id"
+                + SoftDeleteSupport.notDeletedClause(jdbc, "warehouse", "w");
         Long total = jdbc.queryForObject("SELECT COUNT(*) " + from + where, Long.class, args.toArray());
         List<Object> pageArgs = new ArrayList<>(args);
         pageArgs.add(query.limit());
@@ -52,10 +54,14 @@ public class DeviceOutboundController {
 
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
-        var rows = jdbc.queryForList("SELECT * FROM device_outbound WHERE id = ?::uuid", id);
+        var rows = jdbc.queryForList(
+                "SELECT * FROM device_outbound WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "device_outbound", null), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> o = rows.get(0);
-        o.put("items", jdbc.queryForList("SELECT * FROM device_outbound_item WHERE outbound_id = ?::uuid", id));
+        o.put("items", jdbc.queryForList(
+                "SELECT * FROM device_outbound_item WHERE outbound_id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "device_outbound_item", null), id));
         return Result.ok(o);
     }
 
@@ -106,7 +112,9 @@ public class DeviceOutboundController {
     @Transactional
     @OperationLog(module = "asset", description = "出库发放")
     public Result<Map<String, Object>> issue(@PathVariable UUID id) {
-        var items = jdbc.queryForList("SELECT device_id FROM device_outbound_item WHERE outbound_id = ?::uuid", id);
+        var items = jdbc.queryForList(
+                "SELECT device_id FROM device_outbound_item WHERE outbound_id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "device_outbound_item", null), id);
         for (Map<String, Object> item : items) {
             if (item.get("device_id") != null) {
                 jdbc.update("""

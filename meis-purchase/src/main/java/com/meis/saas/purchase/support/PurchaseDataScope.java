@@ -1,7 +1,9 @@
 package com.meis.saas.purchase.support;
 
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.rbac.PermissionContext;
 import com.meis.saas.common.rbac.PermissionInterceptor;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -10,7 +12,7 @@ import java.util.UUID;
 public final class PurchaseDataScope {
     private PurchaseDataScope() {}
 
-    public static void applyPlanFilter(StringBuilder where, List<Object> args) {
+    public static void applyPlanFilter(StringBuilder where, List<Object> args, JdbcTemplate jdbc) {
         PermissionContext ctx = PermissionInterceptor.CTX.get();
         if (ctx == null) return;
         String scope = ctx.getDataScope();
@@ -21,7 +23,8 @@ public final class PurchaseDataScope {
             return;
         }
         if ("dept".equals(scope) && ctx.getUserId() != null) {
-            where.append(" AND p.dept_id = (SELECT dept_id FROM sys_user WHERE id = ?::uuid) ");
+            where.append(" AND p.dept_id = (SELECT dept_id FROM sys_user WHERE id = ?::uuid"
+                    + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", null) + ") ");
             args.add(UUID.fromString(ctx.getUserId()));
             return;
         }
@@ -30,7 +33,7 @@ public final class PurchaseDataScope {
         }
     }
 
-    public static void applyProjectFilter(StringBuilder where, List<Object> args) {
+    public static void applyProjectFilter(StringBuilder where, List<Object> args, JdbcTemplate jdbc) {
         PermissionContext ctx = PermissionInterceptor.CTX.get();
         if (ctx == null) return;
         String scope = ctx.getDataScope();
@@ -39,13 +42,16 @@ public final class PurchaseDataScope {
             where.append("""
                  AND pj.plan_id IN (
                    SELECT pl.id FROM purchase_plan pl
-                   WHERE pl.dept_id = (SELECT dept_id FROM sys_user WHERE id = ?::uuid)
+                   WHERE pl.dept_id = (SELECT dept_id FROM sys_user WHERE id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", null) + ")"
+                    + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", "pl") + """
                  ) """);
             args.add(UUID.fromString(ctx.getUserId()));
             return;
         }
         if ("custom".equals(scope) && ctx.getDeptIds() != null && !ctx.getDeptIds().isEmpty()) {
-            where.append(" AND pj.plan_id IN (SELECT pl.id FROM purchase_plan pl WHERE ");
+            where.append(" AND pj.plan_id IN (SELECT pl.id FROM purchase_plan pl WHERE 1=1 "
+                    + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", "pl") + " AND ");
             appendDeptIn(where, args, "pl.dept_id", ctx.getDeptIds());
             where.append(") ");
         }

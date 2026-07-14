@@ -1,5 +1,6 @@
 package com.meis.saas.qc.metrology;
 
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -26,8 +27,9 @@ public class MetrologyExecutionGenerator {
                 SELECT p.*, t.template_name
                 FROM metrology_plan p
                 LEFT JOIN metrology_template t ON t.id = p.template_id
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_template", "t") + """
                 WHERE p.id = ?::uuid
-                """, planId);
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_plan", "p"), planId);
         if (plan.isEmpty()) return Map.of("planId", planId, "error", "plan not found");
         Map<String, Object> p = plan.get(0);
         if (!"approved".equals(p.get("approval_status"))) {
@@ -44,7 +46,10 @@ public class MetrologyExecutionGenerator {
                 p.get("assigned_inspector_id"), "pending", body.get("created_by"));
 
         UUID itemId = UUID.randomUUID();
-        var device = jdbc.queryForList("SELECT device_code, device_name, dept_id FROM medical_device WHERE id=?::uuid", p.get("device_id"));
+        var device = jdbc.queryForList(
+                "SELECT device_code, device_name, dept_id FROM medical_device WHERE id=?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", null),
+                p.get("device_id"));
         String deviceCode = device.isEmpty() ? null : (String) device.get(0).get("device_code");
         String deviceName = device.isEmpty() ? null : (String) device.get(0).get("device_name");
         Object deptId = device.isEmpty() ? null : device.get(0).get("dept_id");
@@ -54,7 +59,9 @@ public class MetrologyExecutionGenerator {
                 """, itemId, execId, p.get("device_id"), deviceCode, deviceName, deptId, planId);
 
         var templateItems = jdbc.queryForList("""
-                SELECT * FROM metrology_template_item WHERE template_id = ?::uuid ORDER BY sort_order, created_at
+                SELECT * FROM metrology_template_item WHERE template_id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_template_item", null) + """
+                 ORDER BY sort_order, created_at
                 """, p.get("template_id"));
         for (Map<String, Object> ti : templateItems) {
             jdbc.update("""
@@ -62,6 +69,9 @@ public class MetrologyExecutionGenerator {
                     VALUES (?::uuid,?::uuid,?::uuid,?,?,?)
                     """, UUID.randomUUID(), itemId, ti.get("id"), ti.get("item_name"), ti.get("item_content"), "pending");
         }
-        return jdbc.queryForList("SELECT * FROM metrology_execution WHERE id=?::uuid", execId).get(0);
+        return jdbc.queryForList(
+                "SELECT * FROM metrology_execution WHERE id=?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_execution", null),
+                execId).get(0);
     }
 }

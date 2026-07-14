@@ -138,20 +138,24 @@ public class AssetDeviceController {
         args.add(kw);
     }
 
-    private static String buildFrom(boolean needSupplier, boolean needManufacturer,
-                                    boolean needUseDept, boolean needManageDept) {
+    private String buildFrom(boolean needSupplier, boolean needManufacturer,
+                             boolean needUseDept, boolean needManageDept) {
         StringBuilder from = new StringBuilder(" FROM medical_device d ");
         if (needSupplier) {
-            from.append(" LEFT JOIN supplier sup ON d.supplier_id = sup.id ");
+            from.append(" LEFT JOIN supplier sup ON d.supplier_id = sup.id ")
+                    .append(SoftDeleteSupport.notDeletedClause(jdbc, "supplier", "sup"));
         }
         if (needManufacturer) {
-            from.append(" LEFT JOIN manufacturer mfr ON d.manufacturer_id = mfr.id ");
+            from.append(" LEFT JOIN manufacturer mfr ON d.manufacturer_id = mfr.id ")
+                    .append(SoftDeleteSupport.notDeletedClause(jdbc, "manufacturer", "mfr"));
         }
         if (needUseDept) {
-            from.append(" LEFT JOIN department use_dept ON d.dept_id = use_dept.id ");
+            from.append(" LEFT JOIN department use_dept ON d.dept_id = use_dept.id ")
+                    .append(SoftDeleteSupport.notDeletedClause(jdbc, "department", "use_dept"));
         }
         if (needManageDept) {
-            from.append(" LEFT JOIN department mgr_dept ON d.manage_dept_id = mgr_dept.id ");
+            from.append(" LEFT JOIN department mgr_dept ON d.manage_dept_id = mgr_dept.id ")
+                    .append(SoftDeleteSupport.notDeletedClause(jdbc, "department", "mgr_dept"));
         }
         return from.toString();
     }
@@ -178,23 +182,45 @@ public class AssetDeviceController {
 
     @GetMapping("/{id}/detail")
     public Result<Map<String, Object>> detail(@PathVariable UUID id) {
-        var device = jdbc.queryForList("SELECT * FROM medical_device WHERE id = ?::uuid", id);
+        var device = jdbc.queryForList(
+                "SELECT * FROM medical_device WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", null), id);
         if (device.isEmpty()) return Result.ok(null);
         Map<String, Object> d = device.get(0);
         d.put("can_delete", !MedicalDeviceDeleteGuard.hasBusinessData(jdbc, id.toString()));
-        d.put("repairs", jdbc.queryForList("SELECT * FROM repair_workorder WHERE device_id = ?::uuid ORDER BY created_at DESC LIMIT 20", id));
-        d.put("maintenance", jdbc.queryForList("SELECT * FROM maintenance_record WHERE device_id = ?::uuid ORDER BY created_at DESC LIMIT 20", id));
-        d.put("transfers", jdbc.queryForList("SELECT * FROM asset_transfer WHERE device_id = ?::uuid ORDER BY created_at DESC LIMIT 10", id));
+        d.put("repairs", jdbc.queryForList(
+                "SELECT * FROM repair_workorder WHERE device_id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null)
+                        + " ORDER BY created_at DESC LIMIT 20", id));
+        d.put("maintenance", jdbc.queryForList(
+                "SELECT * FROM maintenance_record WHERE device_id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "maintenance_record", null)
+                        + " ORDER BY created_at DESC LIMIT 20", id));
+        d.put("transfers", jdbc.queryForList(
+                "SELECT * FROM asset_transfer WHERE device_id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "asset_transfer", null)
+                        + " ORDER BY created_at DESC LIMIT 10", id));
         d.put("qc", jdbc.queryForList("""
             SELECT 'risk' AS type, id, created_at FROM risk_assessment WHERE device_id = ?::uuid
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "risk_assessment", null) + """
             UNION ALL SELECT 'metrology', id, created_at FROM metrology_record WHERE device_id = ?::uuid
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_record", null) + """
             UNION ALL SELECT 'performance', id, created_at FROM performance_test WHERE device_id = ?::uuid
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "performance_test", null) + """
             ORDER BY created_at DESC LIMIT 20
             """, id, id, id));
-        d.put("benefit", jdbc.queryForList("SELECT * FROM device_benefit_summary WHERE device_id = ?::uuid ORDER BY summary_year DESC LIMIT 12", id));
-        d.put("logs", jdbc.queryForList("SELECT * FROM sys_operation_log WHERE request_params::text LIKE ? ORDER BY created_at DESC LIMIT 20", "%" + id + "%"));
+        d.put("benefit", jdbc.queryForList(
+                "SELECT * FROM device_benefit_summary WHERE device_id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "device_benefit_summary", null)
+                        + " ORDER BY summary_year DESC LIMIT 12", id));
+        d.put("logs", jdbc.queryForList(
+                "SELECT * FROM sys_operation_log WHERE request_params::text LIKE ?"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "sys_operation_log", null)
+                        + " ORDER BY created_at DESC LIMIT 20", "%" + id + "%"));
         d.put("label_prints", jdbc.queryForList("""
-                SELECT * FROM device_label_print_log WHERE device_id = ?::uuid ORDER BY printed_at DESC LIMIT 50
+                SELECT * FROM device_label_print_log WHERE device_id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "device_label_print_log", null) + """
+                 ORDER BY printed_at DESC LIMIT 50
                 """, id));
         return Result.ok(d);
     }
@@ -220,7 +246,8 @@ public class AssetDeviceController {
     @GetMapping("/{id}/label")
     public Result<Map<String, Object>> labelInfo(@PathVariable UUID id) {
         var rows = jdbc.queryForList(
-                "SELECT id, device_code, device_name, brand, model, specification, dept_id, label_printed, qr_code_url FROM medical_device WHERE id = ?::uuid",
+                "SELECT id, device_code, device_name, brand, model, specification, dept_id, label_printed, qr_code_url FROM medical_device WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", null),
                 id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> d = new LinkedHashMap<>(rows.get(0));
@@ -228,7 +255,9 @@ public class AssetDeviceController {
         d.put("qr_payload", code);
         d.put("prints", jdbc.queryForList("""
                 SELECT id, device_code, device_name, printed_by, printed_at, template_code, remark
-                FROM device_label_print_log WHERE device_id = ?::uuid ORDER BY printed_at DESC LIMIT 50
+                FROM device_label_print_log WHERE device_id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "device_label_print_log", null) + """
+                 ORDER BY printed_at DESC LIMIT 50
                 """, id));
         return Result.ok(d);
     }
@@ -237,7 +266,9 @@ public class AssetDeviceController {
     @Transactional
     @OperationLog(module = "asset", description = "打印资产标签")
     public Result<Map<String, Object>> printLabel(@PathVariable UUID id, @RequestBody(required = false) Map<String, Object> body) {
-        var rows = jdbc.queryForList("SELECT id, device_code, device_name FROM medical_device WHERE id = ?::uuid", id);
+        var rows = jdbc.queryForList(
+                "SELECT id, device_code, device_name FROM medical_device WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", null), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> device = rows.get(0);
         String code = Objects.toString(device.get("device_code"), "");
@@ -255,6 +286,8 @@ public class AssetDeviceController {
         jdbc.update("""
                 UPDATE medical_device SET label_printed = TRUE, qr_code_url = ?, updated_at = NOW() WHERE id = ?::uuid
                 """, code, id);
-        return Result.ok(jdbc.queryForList("SELECT * FROM device_label_print_log WHERE id = ?::uuid", logId).get(0));
+        return Result.ok(jdbc.queryForList(
+                "SELECT * FROM device_label_print_log WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "device_label_print_log", null), logId).get(0));
     }
 }

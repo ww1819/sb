@@ -4,6 +4,7 @@ import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.workflow.ApprovalInstanceService;
 import com.meis.saas.purchase.support.PurchaseChainService;
@@ -32,10 +33,14 @@ public class PurchasePlanController {
 
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
-        List<Map<String, Object>> plans = jdbc.queryForList("SELECT * FROM purchase_plan WHERE id = ?::uuid", id);
+        List<Map<String, Object>> plans = jdbc.queryForList(
+                "SELECT * FROM purchase_plan WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", null), id);
         if (plans.isEmpty()) throw new BizException(404, "plan not found");
         Map<String, Object> plan = plans.get(0);
-        plan.put("items", jdbc.queryForList("SELECT * FROM purchase_plan_item WHERE plan_id = ?::uuid", id));
+        plan.put("items", jdbc.queryForList(
+                "SELECT * FROM purchase_plan_item WHERE plan_id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan_item", null), id));
         return Result.ok(plan);
     }
 
@@ -44,7 +49,9 @@ public class PurchasePlanController {
     @OperationLog(module = "purchase", description = "保存采购计划")
     public Result<Map<String, Object>> save(@RequestBody Map<String, Object> body) {
         UUID id = body.containsKey("id") ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
-        boolean exists = !jdbc.queryForList("SELECT 1 FROM purchase_plan WHERE id = ?::uuid", id).isEmpty();
+        boolean exists = !jdbc.queryForList(
+                "SELECT 1 FROM purchase_plan WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", null), id).isEmpty();
         String planCode = body.getOrDefault("plan_code", "PP" + System.currentTimeMillis()).toString();
         if (exists) {
             PurchaseValidators.checkVersion(jdbc, "purchase_plan", id, body.get("version"));
@@ -87,7 +94,8 @@ public class PurchasePlanController {
         if (body.get("plan_year") != null) {
             int year = ((Number) body.get("plan_year")).intValue();
             var dup = jdbc.queryForList(
-                    "SELECT id FROM purchase_plan WHERE plan_year = ? AND id != ?::uuid AND is_active = true LIMIT 1",
+                    "SELECT id FROM purchase_plan WHERE plan_year = ? AND id != ?::uuid AND is_active = true"
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", null) + " LIMIT 1",
                     year, id);
             if (!dup.isEmpty() && !exists) {
                 throw new BizException(400, "该年度已有采购计划");

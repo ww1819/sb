@@ -6,7 +6,7 @@
       detail-mode
       hide-add
       delete-url="/repair/workorder"
-      :operation-column-width="320"
+      :operation-column-width="400"
       :can-edit="canEditRow"
       :can-delete="canDeleteRow"
       @detail="openDetail"
@@ -20,6 +20,11 @@
           <el-button v-if="canRowSubmit(row)" link type="primary" @click.stop="doSubmit(row)">提交</el-button>
           <el-button v-if="canRowWithdraw(row)" link type="warning" @click.stop="doWithdraw(row)">撤回</el-button>
         </template>
+        <template v-if="pageMode === 'handle' || pageMode === 'all'">
+          <el-button v-if="canOnRow('dispatch', row)" link type="primary" @click.stop="openDispatch(row)">派工</el-button>
+          <el-button v-if="canOnRow('segment', row)" link type="primary" @click.stop="openAddSegment(row)">添加进程</el-button>
+          <el-button v-if="canOnRow('cancel', row)" link type="danger" @click.stop="doCancel(row)">取消</el-button>
+        </template>
         <el-button v-if="canRowChangeLog(row)" link @click.stop="openChangeLog(row)">变更记录</el-button>
       </template>
     </CrudPage>
@@ -28,7 +33,11 @@
       <template v-if="wo">
         <GroupedFormFields :table="config.table" :model="wo" :fields="formFields" />
 
-        <FormSection v-if="wo.id && processSegments.length && pageMode !== 'apply'" title="维修进程段" class="timeline-section">
+        <FormSection v-if="wo.id && pageMode !== 'apply'" title="维修进程段" class="timeline-section">
+          <div v-if="!processSegments.length" class="muted">
+            暂无进程段。
+            <span v-if="!isRepairEngineer">添加进程需当前登录账号为维修工程师（用户管理开启「是否维修工程师」），且为工单负责人或待派单可首段。</span>
+          </div>
           <div v-for="seg in processSegments" :key="String(seg.id)" class="seg-row">
             <div>
               <strong>{{ seg.type_name }}</strong>
@@ -97,16 +106,14 @@
         <el-button @click="visible = false">关闭</el-button>
         <template v-if="wo?.id && (pageMode === 'handle' || pageMode === 'all')">
           <el-button v-if="can('grab')" type="primary" @click="doGrab">抢单</el-button>
-          <el-button v-if="can('dispatch')" @click="openDispatch">派工</el-button>
           <el-button v-if="can('start')" type="success" plain @click="doStartRepair">开始维修</el-button>
           <el-button v-if="can('accept')" @click="doAccept">接单</el-button>
-          <el-button v-if="can('segment')" type="primary" plain @click="openAddSegment">添加进程</el-button>
+          <el-button v-if="can('segment')" type="primary" plain @click="openAddSegment()">添加进程</el-button>
           <el-button v-if="can('transfer')" @click="openTransfer">转派</el-button>
           <el-button v-if="can('sub')" @click="openSubStatus">子状态</el-button>
           <el-button v-if="can('complete')" type="warning" @click="openComplete">完工</el-button>
           <el-button v-if="can('suspend')" @click="doSuspend">挂起</el-button>
           <el-button v-if="can('resume')" @click="doResume">恢复</el-button>
-          <el-button v-if="pageMode === 'handle' && can('cancel')" type="danger" plain @click="doCancel">取消</el-button>
         </template>
         <template v-if="pageMode === 'verify' && wo?.id">
           <el-button v-if="can('verify')" type="success" @click="openVerify">验收</el-button>
@@ -259,7 +266,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onActivated, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
@@ -447,12 +454,15 @@ function isOwnerWo(row?: Record<string, unknown> | null) {
   return String(target.assigned_user_id ?? '') === String(uid)
 }
 
-function can(action: string) {
-  const s = status.value
+function can(action: string, row?: Record<string, unknown> | null) {
+  const target = row ?? wo.value
+  const s = String(target?.status ?? status.value)
   const mode = pageMode.value
   if (isCancelledStatus(s)) return false
   if (action === 'submit') return s === 'draft' && (mode === 'apply' || mode === 'all')
-  if (action === 'withdraw') return canWithdraw.value && (mode === 'apply' || mode === 'all')
+  if (action === 'withdraw') {
+    return canWithdrawRow(target ?? {}) && (mode === 'apply' || mode === 'all')
+  }
   if (action === 'delete') return s === 'draft' && (mode === 'apply' || mode === 'all')
   if (mode === 'apply') return false
   if (mode === 'verify') {
@@ -461,8 +471,8 @@ function can(action: string) {
   if (mode === 'handle' && isHandleReadOnlyStatus(s)) return false
   if (mode === 'handle' && action === 'verify') return false
 
-  const unassigned = isUnassignedWo()
-  const owner = isOwnerWo()
+  const unassigned = isUnassignedWo(target)
+  const owner = isOwnerWo(target)
 
   switch (action) {
     case 'grab':
@@ -494,10 +504,16 @@ function can(action: string) {
     case 'resume':
       return s === 'suspended' && owner
     case 'cancel':
-      return !['draft', 'closed', 'cancelled', 'verified'].includes(s)
+      return mode === 'handle' || mode === 'all'
+        ? !['draft', 'closed', 'cancelled', 'verified', 'pending_verify'].includes(s)
+        : !['draft', 'closed', 'cancelled', 'verified'].includes(s)
     default:
       return false
   }
+}
+
+function canOnRow(action: string, row: Record<string, unknown>) {
+  return can(action, row)
 }
 
 function fmt(v: unknown) {
@@ -548,7 +564,19 @@ async function loadAddableTypes() {
   addableTypes.value = data.data ?? []
 }
 
-async function openAddSegment() {
+async function openAddSegment(row?: Record<string, unknown>) {
+  if (row?.id) {
+    await openDetail(row)
+  }
+  if (!wo.value?.id) return
+  if (!can('segment')) {
+    ElMessage.warning(
+      isRepairEngineer.value
+        ? '当前账号不是该工单负责人，无法添加进程'
+        : '添加维修进程需当前登录账号为「维修工程师」（请在用户管理开启）'
+    )
+    return
+  }
   actionForm.processTypeId = ''
   actionForm.segmentRemark = ''
   segmentPartRows.value = []
@@ -716,7 +744,10 @@ function resetActionForm() {
   actionForm.subStatus = String(wo.value?.repair_sub_status ?? 'internal')
 }
 
-function openDispatch() {
+function openDispatch(row?: Record<string, unknown>) {
+  if (row) {
+    wo.value = { ...row }
+  }
   resetActionForm()
   dispatchVisible.value = true
 }
@@ -924,14 +955,24 @@ async function doCancel(row?: Record<string, unknown>) {
   await refresh()
 }
 
-onMounted(async () => {
-  if (pageMode.value !== 'handle' && pageMode.value !== 'all') return
+async function loadMyEngineerFlag() {
+  if (pageMode.value !== 'handle' && pageMode.value !== 'all') {
+    isRepairEngineer.value = false
+    return
+  }
   try {
     const { data } = await http.get('/repair/engineer/me')
     isRepairEngineer.value = Boolean(data.data?.isRepairEngineer)
   } catch {
     isRepairEngineer.value = false
   }
+}
+
+onMounted(() => {
+  void loadMyEngineerFlag()
+})
+onActivated(() => {
+  void loadMyEngineerFlag()
 })
 </script>
 

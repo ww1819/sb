@@ -1,5 +1,6 @@
 package com.meis.saas.asset.controller;
 
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -16,7 +17,9 @@ public class InspectionController {
     @GetMapping("/plans")
     public Result<List<Map<String, Object>>> plans(@RequestParam(defaultValue = "pending") String status) {
         return Result.ok(jdbc.queryForList(
-                "SELECT * FROM inspection_plan WHERE status = ? ORDER BY plan_date LIMIT 100", status));
+                "SELECT * FROM inspection_plan WHERE status = ?"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "inspection_plan", null)
+                        + " ORDER BY plan_date LIMIT 100", status));
     }
 
     @PostMapping("/records")

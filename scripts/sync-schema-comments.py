@@ -337,7 +337,7 @@ def build_comments(sql: str, schema_label: str) -> str:
 def process_schema(rel_dir: str, schema_label: str) -> None:
     base = ROOT / "meis-tenant" / "src" / "main" / "resources" / "db" / "migrations" / rel_dir
     v1_path = base / "V1__tables.sql"
-    v2_path = base / "V2__extensions.sql"
+    v2_path = base / "V2__indexes.sql"
     v4_path = base / "V4__comments.sql"
 
     v1 = v1_path.read_text(encoding="utf-8")

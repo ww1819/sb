@@ -1,7 +1,6 @@
 import java.nio.file.*;
 import java.sql.*;
 import java.util.*;
-import java.util.regex.*;
 
 public class ApplySql {
     public static void main(String[] args) throws Exception {
@@ -27,13 +26,41 @@ public class ApplySql {
         return sql.replaceAll("(?m)^\\s*--.*$", "").trim();
     }
 
+    /** Split on ';' outside single quotes and dollar-quoted bodies ($tag$...$tag$). */
     static List<String> splitStatements(String sql) {
         List<String> out = new ArrayList<>();
         StringBuilder cur = new StringBuilder();
         boolean inSingle = false;
+        String dollarTag = null;
         for (int i = 0; i < sql.length(); i++) {
             char ch = sql.charAt(i);
-            if (ch == '\'' && (i == 0 || sql.charAt(i - 1) != '\\')) inSingle = !inSingle;
+            if (dollarTag != null) {
+                if (sql.startsWith(dollarTag, i)) {
+                    cur.append(dollarTag);
+                    i += dollarTag.length() - 1;
+                    dollarTag = null;
+                } else {
+                    cur.append(ch);
+                }
+                continue;
+            }
+            if (!inSingle && ch == '$') {
+                int end = findDollarTagEnd(sql, i);
+                if (end > i) {
+                    dollarTag = sql.substring(i, end + 1);
+                    cur.append(dollarTag);
+                    i = end;
+                    continue;
+                }
+            }
+            if (ch == '\'') {
+                if (inSingle && i + 1 < sql.length() && sql.charAt(i + 1) == '\'') {
+                    cur.append("''");
+                    i++;
+                    continue;
+                }
+                inSingle = !inSingle;
+            }
             if (ch == ';' && !inSingle) {
                 String s = cur.toString().trim();
                 if (!s.isEmpty()) out.add(s);
@@ -45,5 +72,16 @@ public class ApplySql {
         String tail = cur.toString().trim();
         if (!tail.isEmpty()) out.add(tail);
         return out;
+    }
+
+    static int findDollarTagEnd(String sql, int i) {
+        int j = i + 1;
+        while (j < sql.length()) {
+            char c = sql.charAt(j);
+            if (c == '$') return j;
+            if (!(Character.isLetterOrDigit(c) || c == '_')) return -1;
+            j++;
+        }
+        return -1;
     }
 }

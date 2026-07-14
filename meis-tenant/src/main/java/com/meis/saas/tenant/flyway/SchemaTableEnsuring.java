@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
  * 老租户更新时幂等执行 V1/V2 结构脚本：
  * <ul>
  *   <li>没有的表 → {@code CREATE TABLE IF NOT EXISTS} 创建（含完整字段）</li>
- *   <li>已有的表 → 不改表结构（缺列由 {@code R__tenant_schema_sync.sql} 逐列补）</li>
+ *   <li>已有的表 → 不改表结构（缺列由 {@code R__columns_audit.sql} / {@code R__columns_biz.sql} 逐列补）</li>
  *   <li>不执行 COMMENT ON（空注释由 {@link SchemaCommentFiller} 补全，避免覆盖租户自定义）</li>
  * </ul>
  */
@@ -54,7 +54,7 @@ public class SchemaTableEnsuring {
         // 1) V1 全量建表（CREATE TABLE → IF NOT EXISTS，并 schema 限定）
         statements.addAll(loadIdempotentStatements("classpath:db/migrations/tenant/V1__tables.sql", schemaName));
         // 2) V2 索引
-        statements.addAll(loadIdempotentStatements("classpath:db/migrations/tenant/V2__extensions.sql", schemaName));
+        statements.addAll(loadIdempotentStatements("classpath:db/migrations/tenant/V2__indexes.sql", schemaName));
         if (statements.isEmpty()) {
             log.warn("Schema {}: no structure statements loaded from V1/V2", schemaName);
             return;

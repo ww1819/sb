@@ -162,7 +162,15 @@ public class DepartmentController {
     @GetMapping("/export")
     public void export(HttpServletResponse resp) throws IOException {
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT d.dept_code, d.dept_name, d.pinyin_code, pd.dept_code AS parent_dept_code, c.campus_name, d.is_clinical, d.sort_order, d.is_active FROM department d LEFT JOIN department pd ON d.parent_id = pd.id LEFT JOIN campus c ON d.campus_id = c.id ORDER BY d.sort_order, d.dept_code");
+                "SELECT d.dept_code, d.dept_name, d.pinyin_code, pd.dept_code AS parent_dept_code, c.campus_name, d.is_clinical, d.sort_order, d.is_active "
+                        + "FROM department d "
+                        + "LEFT JOIN department pd ON d.parent_id = pd.id"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "department", "pd")
+                        + " LEFT JOIN campus c ON d.campus_id = c.id"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "campus", "c")
+                        + " WHERE 1=1 "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "department", "d")
+                        + " ORDER BY d.sort_order, d.dept_code");
         CsvExportHelper.writeRows(resp, "department_export.csv",
                 new String[]{"dept_code", "dept_name", "pinyin_code", "parent_dept_code", "campus_name", "is_clinical", "sort_order", "is_active"}, rows);
     }
