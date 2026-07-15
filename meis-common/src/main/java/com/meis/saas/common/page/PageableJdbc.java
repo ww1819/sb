@@ -51,10 +51,21 @@ public final class PageableJdbc {
         pageArgs.add(q.limit());
         pageArgs.add(q.offset());
         String orderBy = resolveOrderBy(jdbc, table, q);
+        String selectList = selectColumns(table);
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT * FROM " + table + where + " ORDER BY " + orderBy + " LIMIT ? OFFSET ?",
+                "SELECT " + selectList + " FROM " + table + where + " ORDER BY " + orderBy + " LIMIT ? OFFSET ?",
                 pageArgs.toArray());
         return PageResult.of(rows, total != null ? total : 0, q.getPage(), q.getSize());
+    }
+
+    /** 设备分类列表附带上级名称（非表列，仅展示） */
+    private static String selectColumns(String table) {
+        if ("medical_device_category".equals(table)) {
+            return "*, (SELECT p.category_name FROM medical_device_category p"
+                    + " WHERE p.category_code = medical_device_category.parent_code"
+                    + " AND COALESCE(p.is_deleted, 0) = 0 LIMIT 1) AS parent_name";
+        }
+        return "*";
     }
 
     /** 仅允许表内已有列名，防止注入；默认 created_at DESC */

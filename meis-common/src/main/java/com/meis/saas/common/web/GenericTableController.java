@@ -13,6 +13,7 @@ import com.meis.saas.common.excel.ImportFieldRegistry;
 import com.meis.saas.common.excel.ImportProfileService;
 import com.meis.saas.common.excel.ImportResult;
 import com.meis.saas.common.excel.MedicalDeviceFieldHelper;
+import com.meis.saas.common.excel.MedicalDeviceCategoryImporter;
 import com.meis.saas.common.excel.SimpleTableImporter;
 import com.meis.saas.common.result.Result;
 import jakarta.servlet.http.HttpServletResponse;
@@ -75,7 +76,8 @@ public abstract class GenericTableController {
                                                    @RequestParam(defaultValue = "50") int limit) {
         check(table);
         String where = " WHERE 1=1 " + SoftDeleteSupport.notDeletedClause(jdbc(), table, null);
-        return Result.ok(jdbc().queryForList("SELECT * FROM " + table + where + " LIMIT " + Math.min(limit, 500)));
+        int lim = Math.min(Math.max(limit, 1), 5000);
+        return Result.ok(jdbc().queryForList("SELECT * FROM " + table + where + " LIMIT " + lim));
     }
 
     @GetMapping("/{table}/lookup")
@@ -216,10 +218,15 @@ public abstract class GenericTableController {
         String biz = importBusinessType(table);
         if (biz == null) throw new BizException(400, "table import not supported: " + table);
         var fields = resolveImportFields(biz, profile);
+        List<Map<String, String>> parsed = ExcelImportHelper.parseRows(file, fields);
+        if ("medical_device_category".equals(table)) {
+            parsed = ExcelImportHelper.ensureCategoryTwoColumnRows(parsed);
+            return Result.ok(MedicalDeviceCategoryImporter.importRows(jdbc(), parsed));
+        }
         var columns = importProfileService != null
                 ? importProfileService.standardColumns(biz, fields)
                 : new LinkedHashSet<>(fields.stream().map(ImportFieldDef::effectiveColumn).filter(Objects::nonNull).toList());
-        ImportResult result = SimpleTableImporter.importRows(jdbc(), table, ExcelImportHelper.parseRows(file, fields), columns);
+        ImportResult result = SimpleTableImporter.importRows(jdbc(), table, parsed, columns);
         return Result.ok(result);
     }
 
@@ -408,6 +415,7 @@ public abstract class GenericTableController {
         return switch (table) {
             case "supplier" -> ImportFieldRegistry.SUPPLIER;
             case "manufacturer" -> ImportFieldRegistry.MANUFACTURER;
+            case "medical_device_category" -> ImportFieldRegistry.DEVICE_CATEGORY;
             default -> null;
         };
     }

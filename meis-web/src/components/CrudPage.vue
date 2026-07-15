@@ -218,7 +218,7 @@
       :import-url="importUrl"
       :template-url="importTemplateUrl"
       :template-filename="`${config.table}_import_template.xlsx`"
-      @success="load"
+      @success="onImportSuccess"
     />
   </SystemPageCard>
 </template>
@@ -276,6 +276,7 @@ const emit = defineEmits<{
   add: []
   deleted: [row: Record<string, unknown>]
   saved: [payload: Record<string, unknown>]
+  imported: []
 }>()
 const slots = useSlots()
 const { loadDict, preloadDictTypes } = useDict()
@@ -553,6 +554,11 @@ async function save() {
     const err = e as { isBizError?: boolean; message?: string; response?: { data?: { message?: string } } }
     ElMessage.error(err?.response?.data?.message || err?.message || '保存失败')
   }
+}
+
+function onImportSuccess() {
+  emit('imported')
+  load()
 }
 
 function onAdd() {

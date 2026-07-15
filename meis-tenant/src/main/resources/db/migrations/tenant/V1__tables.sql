@@ -241,9 +241,9 @@ COMMENT ON COLUMN sys_entity_change_log.remark IS '备注';
 -- 2.1 医疗器械分类目录
 CREATE TABLE medical_device_category (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    category_code VARCHAR(6) UNIQUE NOT NULL,
+    category_code VARCHAR(16) UNIQUE NOT NULL,
     category_name VARCHAR(200) NOT NULL,
-    parent_code VARCHAR(6),
+    parent_code VARCHAR(16),
     level INTEGER NOT NULL,
     full_path VARCHAR(500),
     sort_order INTEGER DEFAULT 0,

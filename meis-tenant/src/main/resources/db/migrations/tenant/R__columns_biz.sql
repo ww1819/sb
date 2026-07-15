@@ -27,6 +27,9 @@ ALTER TABLE asset_category ADD COLUMN IF NOT EXISTS depreciation_years INTEGER;
 ALTER TABLE asset_category ADD COLUMN IF NOT EXISTS residual_rate DECIMAL(5,2);
 ALTER TABLE finance_category ADD COLUMN IF NOT EXISTS account_subject VARCHAR(50);
 ALTER TABLE finance_category ADD COLUMN IF NOT EXISTS fund_source VARCHAR(50);
+-- 设备 68 码三级编码为 8 位（如 68010101），历史 VARCHAR(6) 不够
+ALTER TABLE medical_device_category ALTER COLUMN category_code TYPE VARCHAR(16);
+ALTER TABLE medical_device_category ALTER COLUMN parent_code TYPE VARCHAR(16);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS residual_rate DECIMAL(5,2);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS accrued_disposal_cost DECIMAL(15,2);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS depreciation_start_date DATE;
