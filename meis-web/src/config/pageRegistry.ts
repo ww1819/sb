@@ -119,6 +119,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'purchase_contract',
     listPageUrl: '/purchase/contract/page',
     saveUrl: '/purchase/contract',
+    showRowSelection: true,
     listFilters: [
       { key: 'approval_status', label: '审批状态', dictType: 'approval_status' },
       { key: 'acceptance_status', label: '验收状态', dictType: 'acceptance_status' }

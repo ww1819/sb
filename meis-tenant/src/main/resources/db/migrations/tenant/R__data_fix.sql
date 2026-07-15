@@ -390,4 +390,6 @@ FROM (VALUES
     ('pending_verify', '已维修待验收', 5, false, true, 'verify_rejected_only'),
     ('verified', '已验收', 6, false, false, 'system_only')
 ) AS v(type_code, type_name, sort_order, can_add_parts, can_engineer_add, engineer_add_rule)
-WHERE NOT EXISTS (SELECT 1 FROM repair_process_type LIMIT 1);
+WHERE NOT EXISTS (
+    SELECT 1 FROM repair_process_type t WHERE t.type_code = v.type_code
+);

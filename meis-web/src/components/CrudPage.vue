@@ -72,6 +72,14 @@
       </PageFilterBar>
     </template>
 
+    <ListSelectionBar
+      v-if="hasSelectionColumn"
+      :count="selectedCount"
+      :has-current-page-rows="rows.length > 0"
+      @select-page="onSelectPage"
+      @clear="onClearSelection"
+    />
+
     <el-table
       ref="tableRef"
       v-loading="loading"
@@ -83,8 +91,7 @@
       @row-dblclick="onRowDblClick"
       @selection-change="onSelectionChange"
     >
-      <el-table-column v-if="showRowSelection" type="selection" width="48" fixed="left" reserve-selection />
-      <el-table-column v-else-if="showPinyinCode" type="selection" width="48" fixed="left" reserve-selection />
+      <el-table-column v-if="hasSelectionColumn" type="selection" width="48" fixed="left" reserve-selection />
       <el-table-column
         v-if="showRowIndex"
         label="序号"
@@ -213,7 +220,9 @@ import EntityChangeHistoryDrawer from './EntityChangeHistoryDrawer.vue'
 import { columnAlign } from '@/utils/tableCell'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
 import { useDict } from '@/composables/useDict'
+import ListSelectionBar from './ListSelectionBar.vue'
 import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
+import { promptListActionScope, assertScopeSelection } from '@/composables/useListActionScope'
 import { executePinyinGenerate, promptPinyinScope } from '@/composables/usePinyinGenerate'
 import { preloadRefLabelMaps } from '@/composables/useRefLabelMap'
 
@@ -256,7 +265,14 @@ const changeLogEntityId = ref<string>('')
 const sortField = ref<string | null>(null)
 const sortOrder = ref<'asc' | 'desc' | null>(null)
 const selectedRows = ref<Record<string, unknown>[]>([])
-const { selectedCount, syncFromTable, selectedIds, clear: clearSelection } = useCrossPageSelection()
+const {
+  selectedCount,
+  syncFromTable,
+  selectedIds,
+  clear: clearSelection,
+  selectCurrentPage,
+  clearAll
+} = useCrossPageSelection()
 
 const tableHeight = useSystemTableHeight()
 
@@ -274,6 +290,7 @@ const operationWidth = computed(() => {
 const changeLogEnabled = computed(() => props.config.enableChangeLog !== false && viewEnabled.value)
 const showRowIndex = computed(() => props.config.showRowIndex === true)
 const showRowSelection = computed(() => props.config.showRowSelection === true)
+const hasSelectionColumn = computed(() => showRowSelection.value || showPinyinCode.value)
 
 const prependFilters = computed(() => props.config.listFilters?.filter((f) => f.prepend) ?? [])
 const actionBarFilters = computed(() => props.config.listFilters?.filter((f) => f.actionBar) ?? [])
@@ -412,8 +429,7 @@ async function load() {
 function onSearch() {
   void nextTick().then(() => {
     page.value = 1
-    clearSelection()
-    tableRef.value?.clearSelection()
+    onClearSelection()
     load()
   })
 }
@@ -431,8 +447,7 @@ function onReset() {
   sortField.value = null
   sortOrder.value = null
   page.value = 1
-  clearSelection()
-  tableRef.value?.clearSelection()
+  onClearSelection()
   load()
 }
 
@@ -511,17 +526,53 @@ function onSelectionChange(selection: Record<string, unknown>[]) {
   syncFromTable(selection)
 }
 
+function onSelectPage() {
+  selectCurrentPage(tableRef.value, rows.value)
+}
+
+function onClearSelection() {
+  clearAll(tableRef.value)
+}
+
+function buildFilterQueryParams(): Record<string, string> {
+  const params: Record<string, string> = {}
+  if (!moreSearchFields.value.length && keyword.value) params.keyword = keyword.value
+  for (const f of moreSearchFields.value) {
+    const v = moreSearchValues.value[f.key]?.trim()
+    if (!v) continue
+    params[f.key] = v
+  }
+  if (props.config.listMode) params.mode = props.config.listMode
+  for (const f of props.config.listFilters ?? []) {
+    const v = filterValues[f.key]
+    if (f.type === 'daterange') {
+      const range = v as string[] | undefined
+      if (Array.isArray(range) && range[0]) params[`${f.key}From`] = range[0]
+      if (Array.isArray(range) && range[1]) params[`${f.key}To`] = range[1]
+      continue
+    }
+    if (f.multiple && Array.isArray(v) && v.length) {
+      params[f.key] = v.join(',')
+      continue
+    }
+    if (v !== undefined && v !== null && v !== '') params[f.key] = String(v)
+  }
+  for (const [k, v] of Object.entries(props.config.listParams ?? {})) {
+    if (v !== undefined && v !== null && v !== '') params[k] = String(v)
+  }
+  return params
+}
+
 async function openPinyinDialog() {
   const scope = await promptPinyinScope(selectedCount.value)
-  if (!scope) return
+  if (!scope || !assertScopeSelection(scope, selectedCount.value)) return
   try {
     const ok = await executePinyinGenerate(pinyinCodeUrl.value, scope, {
       selectedIds: selectedIds(),
       keyword: keyword.value || undefined
     })
     if (ok) {
-      clearSelection()
-      tableRef.value?.clearSelection()
+      onClearSelection()
       load()
     }
   } catch {
@@ -530,8 +581,20 @@ async function openPinyinDialog() {
 }
 
 async function exportCsv() {
+  const scope = await promptListActionScope(selectedCount.value, '导出')
+  if (!scope || !assertScopeSelection(scope, selectedCount.value)) return
   try {
-    await downloadApiFile(exportUrl.value, `${props.config.table}_export.csv`)
+    const params = new URLSearchParams()
+    if (scope === 'selected') {
+      params.set('ids', selectedIds().join(','))
+    } else {
+      for (const [k, v] of Object.entries(buildFilterQueryParams())) {
+        params.set(k, v)
+      }
+    }
+    const qs = params.toString()
+    const url = qs ? `${exportUrl.value}?${qs}` : exportUrl.value
+    await downloadApiFile(url, `${props.config.table}_export.csv`)
   } catch {
     ElMessage.error('导出失败')
   }

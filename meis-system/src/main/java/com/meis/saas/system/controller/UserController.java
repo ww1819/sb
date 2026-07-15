@@ -167,9 +167,14 @@ public class UserController {
     @PostMapping("/batch-update")
     @OperationLog(module = "system", description = "批量更新用户")
     public Result<Map<String, Object>> batchUpdate(@RequestBody Map<String, Object> body) {
-        List<String> ids = parseUserIds(body);
+        List<String> ids = Boolean.TRUE.equals(body.get("all"))
+                ? resolveUserIdsByFilter(body)
+                : parseUserIds(body);
         if (ids.isEmpty()) {
-            throw new BizException(400, "请选择用户");
+            throw new BizException(400, "请选择用户或确认当前查询条件下有结果");
+        }
+        if (ids.size() > 5000) {
+            throw new BizException(400, "单次批量修改不能超过 5000 人，请缩小查询条件");
         }
         boolean setDept = Boolean.TRUE.equals(body.get("setDept"));
         boolean setActive = Boolean.TRUE.equals(body.get("setActive"));
@@ -323,6 +328,56 @@ public class UserController {
     private UUID parseRoleId(Object roleId) {
         if (roleId == null || roleId.toString().isBlank()) return null;
         return UUID.fromString(roleId.toString());
+    }
+
+    /** 按与列表 page 相同的筛选条件解析用户 id（用于「全部查询结果」批量修改） */
+    private List<String> resolveUserIdsByFilter(Map<String, Object> body) {
+        StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "u"));
+        List<Object> args = new ArrayList<>();
+        Object keyword = body.get("keyword");
+        if (keyword != null && !String.valueOf(keyword).isBlank()) {
+            where.append(" AND (u.username ILIKE ? OR u.real_name ILIKE ? OR u.employee_no ILIKE ? OR u.phone ILIKE ?) ");
+            String kw = "%" + String.valueOf(keyword).trim() + "%";
+            args.add(kw);
+            args.add(kw);
+            args.add(kw);
+            args.add(kw);
+        }
+        Object isActive = body.get("isActive");
+        if (isActive instanceof Boolean b) {
+            where.append(" AND u.is_active = ? ");
+            args.add(b);
+        }
+        Object deptId = body.get("deptId");
+        if (deptId != null && !String.valueOf(deptId).isBlank()) {
+            where.append(" AND u.dept_id = ?::uuid ");
+            args.add(String.valueOf(deptId));
+        }
+        Object isRepairEngineer = body.get("isRepairEngineer");
+        if (isRepairEngineer instanceof Boolean b) {
+            where.append(" AND COALESCE(u.is_repair_engineer, false) = ? ");
+            args.add(b);
+        }
+        Object roleId = body.get("roleId");
+        if (roleId != null && !String.valueOf(roleId).isBlank()) {
+            where.append(" AND u.role_ids IS NOT NULL AND ?::uuid = ANY(u.role_ids) ");
+            args.add(String.valueOf(roleId));
+        }
+        Object permissionMode = body.get("permissionMode");
+        if (permissionMode != null && !String.valueOf(permissionMode).isBlank()) {
+            where.append(" AND COALESCE(u.permission_mode, 'synced') = ? ");
+            args.add(String.valueOf(permissionMode));
+        }
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT u.id FROM sys_user u " + where + " ORDER BY u.created_at DESC LIMIT 5000",
+                args.toArray());
+        List<String> ids = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            Object id = row.get("id");
+            if (id != null) ids.add(String.valueOf(id));
+        }
+        return ids;
     }
 
     @SuppressWarnings("unchecked")

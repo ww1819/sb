@@ -6,6 +6,12 @@
       <el-button @click="exportCsv">导出</el-button>
       <el-button @click="openPinyinDialog">生成简码</el-button>
     </template>
+    <ListSelectionBar
+      :count="selectedCount"
+      :has-current-page-rows="filteredList.length > 0"
+      @select-page="onSelectPage"
+      @clear="onClearSelection"
+    />
     <el-table
       ref="tableRef"
       :data="filteredList"
@@ -85,7 +91,9 @@ import ImportDialog from '@/components/ImportDialog.vue'
 import EntityChangeHistoryDrawer from '@/components/EntityChangeHistoryDrawer.vue'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
 import { downloadApiFile } from '@/utils/fileDownload'
+import ListSelectionBar from '@/components/ListSelectionBar.vue'
 import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
+import { promptListActionScope, assertScopeSelection } from '@/composables/useListActionScope'
 import { executePinyinGenerate, promptPinyinScope } from '@/composables/usePinyinGenerate'
 
 const tableHeight = useSystemTableHeight()
@@ -100,7 +108,13 @@ const changeLogVisible = ref(false)
 const changeLogId = ref('')
 const form = ref<any>({ is_active: true, is_clinical: false, sort_order: 0 })
 const tableRef = ref()
-const { selectedCount, syncFromTable, selectedIds, clear: clearSelection } = useCrossPageSelection()
+const {
+  selectedCount,
+  syncFromTable,
+  selectedIds,
+  selectCurrentPage,
+  clearAll
+} = useCrossPageSelection()
 
 function openChangeLog(row: any) {
   changeLogId.value = String(row.id)
@@ -135,14 +149,20 @@ function onSelectionChange(rows: any[]) {
   syncFromTable(rows)
 }
 
+function onSelectPage() {
+  selectCurrentPage(tableRef.value, filteredList.value as Record<string, unknown>[])
+}
+
+function onClearSelection() {
+  clearAll(tableRef.value)
+}
+
 function applyFilter() {
-  clearSelection()
-  tableRef.value?.clearSelection()
+  onClearSelection()
 }
 function resetFilter() {
   keyword.value = ''
-  clearSelection()
-  tableRef.value?.clearSelection()
+  onClearSelection()
 }
 
 function openForm(row?: any) {
@@ -165,8 +185,17 @@ async function remove(row: any) {
 }
 
 async function exportCsv() {
+  const scope = await promptListActionScope(selectedCount.value, '导出')
+  if (!scope || !assertScopeSelection(scope, selectedCount.value)) return
   try {
-    await downloadApiFile('/system/departments/export', 'department_export.csv')
+    const params = new URLSearchParams()
+    if (scope === 'selected') params.set('ids', selectedIds().join(','))
+    else if (keyword.value) params.set('keyword', keyword.value)
+    const qs = params.toString()
+    await downloadApiFile(
+      qs ? `/system/departments/export?${qs}` : '/system/departments/export',
+      'department_export.csv'
+    )
   } catch {
     ElMessage.error('导出失败')
   }
@@ -174,15 +203,14 @@ async function exportCsv() {
 
 async function openPinyinDialog() {
   const scope = await promptPinyinScope(selectedCount.value)
-  if (!scope) return
+  if (!scope || !assertScopeSelection(scope, selectedCount.value)) return
   try {
     const ok = await executePinyinGenerate('/system/departments/generate-pinyin', scope, {
       selectedIds: selectedIds(),
       keyword: keyword.value || undefined
     })
     if (ok) {
-      clearSelection()
-      tableRef.value?.clearSelection()
+      onClearSelection()
       load()
     }
   } catch {

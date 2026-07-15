@@ -19,7 +19,6 @@
     </div>
 
     <el-table v-loading="loading" :data="rows" border stripe class="system-table device-current-reading__table">
-      <el-table-column type="selection" width="48" />
       <el-table-column prop="tag_code" label="标签ID" min-width="120" show-overflow-tooltip />
       <el-table-column prop="station_code" label="基站ID" min-width="120" show-overflow-tooltip />
       <el-table-column prop="station_name" label="基站名称" min-width="140" show-overflow-tooltip />
