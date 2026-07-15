@@ -88,14 +88,6 @@
       </PageFilterBar>
     </template>
 
-    <ListSelectionBar
-      v-if="hasSelectionColumn && !hideSelectionBar"
-      :count="selectedCount"
-      :has-current-page-rows="rows.length > 0"
-      @select-page="onSelectPage"
-      @clear="onClearSelection"
-    />
-
     <el-table
       ref="tableRef"
       v-loading="loading"
@@ -246,7 +238,6 @@ import EntityChangeHistoryDrawer from './EntityChangeHistoryDrawer.vue'
 import { columnAlign } from '@/utils/tableCell'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
 import { useDict } from '@/composables/useDict'
-import ListSelectionBar from './ListSelectionBar.vue'
 import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
 import { promptListActionScope, assertScopeSelection } from '@/composables/useListActionScope'
 import { executePinyinGenerate, promptPinyinScope } from '@/composables/usePinyinGenerate'
@@ -308,7 +299,6 @@ const {
   syncFromTable,
   selectedIds,
   clear: clearSelection,
-  selectCurrentPage,
   clearAll
 } = useCrossPageSelection()
 
@@ -330,8 +320,6 @@ const changeLogEnabled = computed(() => props.config.enableChangeLog !== false &
 const showRowIndex = computed(() => props.config.showRowIndex === true)
 const showRowSelection = computed(() => props.config.showRowSelection === true)
 const hasSelectionColumn = computed(() => showRowSelection.value || showPinyinCode.value)
-/** 隐藏勾选提示条（仍可勾选列，供导出/生成简码作用域） */
-const hideSelectionBar = computed(() => props.config.hideSelectionBar === true)
 const useActionsRowToolbar = computed(() => props.config.toolbarLayout === 'actions-row')
 const formPlacement = computed(() => props.config.formPlacement === 'right' ? 'right' : 'center')
 
@@ -601,10 +589,6 @@ async function remove(row: Record<string, unknown>) {
 function onSelectionChange(selection: Record<string, unknown>[]) {
   selectedRows.value = selection
   syncFromTable(selection)
-}
-
-function onSelectPage() {
-  selectCurrentPage(tableRef.value, rows.value)
 }
 
 function onClearSelection() {

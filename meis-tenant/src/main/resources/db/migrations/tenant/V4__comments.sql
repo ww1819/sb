@@ -1,4 +1,4 @@
-﻿-- MEIS tenant: backfill COMMENT ON for objects created before V1 carried metadata comments
+-- MEIS tenant: backfill COMMENT ON for objects created before V1 carried metadata comments
 -- Safe to re-run: COMMENT ON overwrites existing descriptions
 
 COMMENT ON TABLE campus IS '院区表';

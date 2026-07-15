@@ -50,12 +50,6 @@
       <el-input v-model="candidateKeyword" placeholder="搜索姓名/工号/账号" clearable style="max-width: 280px" @keyup.enter="loadCandidates" />
       <el-button @click="loadCandidates">搜索</el-button>
     </div>
-    <ListSelectionBar
-      :count="selectedCount"
-      :has-current-page-rows="candidates.length > 0"
-      @select-page="onSelectCandidatePage"
-      @clear="onClearCandidateSelection"
-    />
     <el-table
       ref="candidateTableRef"
       :data="candidates"
@@ -113,7 +107,6 @@ import SystemPageCard from '@/components/system/SystemPageCard.vue'
 import AppModal from '@/components/AppModal.vue'
 import TableCellValue from '@/components/table/TableCellValue.vue'
 import RefSelect from '@/components/form/RefSelect.vue'
-import ListSelectionBar from '@/components/ListSelectionBar.vue'
 import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
 
 const loading = ref(false)
@@ -136,7 +129,6 @@ const {
   selectedCount,
   syncFromTable,
   selectedIds,
-  selectCurrentPage,
   clearAll
 } = useCrossPageSelection()
 
@@ -189,10 +181,6 @@ function openAdd() {
 
 function onCandidateSelect(selection: Record<string, unknown>[]) {
   syncFromTable(selection)
-}
-
-function onSelectCandidatePage() {
-  selectCurrentPage(candidateTableRef.value, candidates.value)
 }
 
 function onClearCandidateSelection() {

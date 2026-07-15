@@ -62,8 +62,6 @@ export interface PageConfig {
   showRowIndex?: boolean
   /** 序号列前显示多选框 */
   showRowSelection?: boolean
-  /** 隐藏「已选 N 条 / 全选当页 / 取消全选」条（勾选列可保留） */
-  hideSelectionBar?: boolean
   /**
    * 工具栏布局：
    * - standard（默认）：导入/生成简码在搜索行，查询/重置/新增/导出在第二行（原行为）
@@ -148,7 +146,6 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'supplier',
     importable: true,
     pinyinCode: true,
-    hideSelectionBar: true,
     toolbarLayout: 'actions-row',
     formPlacement: 'right',
     showRowIndex: true,
@@ -171,7 +168,6 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'manufacturer',
     importable: true,
     pinyinCode: true,
-    hideSelectionBar: true,
     toolbarLayout: 'actions-row',
     formPlacement: 'right',
     enableView: true
@@ -182,7 +178,6 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'supplier',
     importable: true,
     pinyinCode: true,
-    hideSelectionBar: true,
     toolbarLayout: 'actions-row',
     formPlacement: 'right',
     showRowIndex: true,
@@ -195,7 +190,6 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'manufacturer',
     importable: true,
     pinyinCode: true,
-    hideSelectionBar: true,
     toolbarLayout: 'actions-row',
     formPlacement: 'right',
     enableView: true
@@ -264,7 +258,6 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/asset/device/page',
     showRowIndex: true,
     showRowSelection: true,
-    hideSelectionBar: true,
     sortableColumns: ['device_code', 'device_name', 'specification', 'dept_name'],
     listFilters: [
       { key: 'enable_dateFrom', label: '起', type: 'date', actionBar: true },
@@ -682,7 +675,6 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'supplier',
     importable: true,
     pinyinCode: true,
-    hideSelectionBar: true,
     toolbarLayout: 'actions-row',
     formPlacement: 'right',
     showRowIndex: true,
@@ -705,7 +697,6 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'manufacturer',
     importable: true,
     pinyinCode: true,
-    hideSelectionBar: true,
     toolbarLayout: 'actions-row',
     formPlacement: 'right',
     enableView: true

@@ -71,13 +71,6 @@
       </PageFilterBar>
     </template>
 
-    <ListSelectionBar
-      :count="selectedCount"
-      :has-current-page-rows="rows.length > 0"
-      @select-page="onSelectPage"
-      @clear="onClearSelection"
-    />
-
     <el-table
       v-if="rows.length || loading"
       ref="tableRef"
@@ -395,7 +388,6 @@ import { fetchPage, usePagedList } from '@/composables/usePagedList'
 import PermissionEditor, { type PermissionModel } from '@/components/PermissionEditor.vue'
 import AppModal from '@/components/AppModal.vue'
 import EntityChangeHistoryDrawer from '@/components/EntityChangeHistoryDrawer.vue'
-import ListSelectionBar from '@/components/ListSelectionBar.vue'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
 import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
 import { promptListActionScope, assertScopeSelection, type ListActionScope } from '@/composables/useListActionScope'
@@ -406,7 +398,6 @@ const {
   selectedCount,
   syncFromTable,
   selectedIds,
-  selectCurrentPage,
   clearAll
 } = useCrossPageSelection()
 const batchScope = ref<ListActionScope>('selected')
@@ -471,10 +462,6 @@ function resetSearch() {
 
 function onSelectionChange(selection: Record<string, unknown>[]) {
   syncFromTable(selection)
-}
-
-function onSelectPage() {
-  selectCurrentPage(tableRef.value, rows.value as Record<string, unknown>[])
 }
 
 function onClearSelection() {

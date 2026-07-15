@@ -1,4 +1,4 @@
-﻿-- MEIS tenant: CREATE TABLE + COMMENT ON (visible in database catalog)
+-- MEIS tenant: CREATE TABLE + COMMENT ON (visible in database catalog)
 
 -- MEIS tenant business schema (per-tenant Flyway)
 -- ================================================================================

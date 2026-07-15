@@ -1,13 +1,6 @@
 <template>
   <AppModal v-model="visible" title="选择盘点设备" size="xl" @close="onClose">
     <PageFilterBar v-model:keyword="keyword" placeholder="资产编码/名称" @search="load" @reset="onReset" />
-    <ListSelectionBar
-      :count="selectedCount"
-      :has-current-page-rows="rows.length > 0"
-      :cross-page-hint="false"
-      @select-page="onSelectPage"
-      @clear="onClearSelection"
-    />
     <el-table
       ref="tableRef"
       v-loading="loading"
@@ -39,7 +32,6 @@ import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/api/http'
 import AppModal from '@/components/AppModal.vue'
-import ListSelectionBar from '@/components/ListSelectionBar.vue'
 import PageFilterBar from '@/components/system/PageFilterBar.vue'
 import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
 
@@ -66,7 +58,7 @@ const keyword = ref('')
 const rows = ref<Record<string, unknown>[]>([])
 const selected = ref<Record<string, unknown>[]>([])
 const tableRef = ref()
-const { selectedCount, syncFromTable, selectCurrentPage, clearAll } = useCrossPageSelection()
+const { syncFromTable, clearAll } = useCrossPageSelection()
 
 async function load() {
   if (!props.deptId) {
@@ -105,10 +97,6 @@ function onReset() {
 function onSelectionChange(selection: Record<string, unknown>[]) {
   selected.value = selection
   syncFromTable(selection)
-}
-
-function onSelectPage() {
-  selectCurrentPage(tableRef.value, rows.value)
 }
 
 function onClearSelection() {
