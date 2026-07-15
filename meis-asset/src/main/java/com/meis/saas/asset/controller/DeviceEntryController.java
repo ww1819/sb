@@ -139,7 +139,7 @@ public class DeviceEntryController {
                 jdbc.update("""
                     INSERT INTO medical_device (id, device_code, device_name, brand, model, dept_id, supplier_id,
                     device_status, purchase_price, contract_id, warehouse_id)
-                    VALUES (?::uuid,?,?,?,?::uuid,?::uuid,'normal',?,?::uuid,?::uuid)
+                    VALUES (?::uuid,?,?,?,?,?::uuid,?::uuid,'normal',?,?::uuid,?::uuid)
                     """,
                         deviceId, code, item.get("device_name"), item.get("brand"), item.get("model"),
                         deptId, supplierId, item.get("unit_price"), entry.get("contract_id"), warehouseId);

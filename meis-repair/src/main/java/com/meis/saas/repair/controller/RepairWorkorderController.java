@@ -186,6 +186,10 @@ public class RepairWorkorderController {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> parts = (List<Map<String, Object>>) body.getOrDefault("parts", List.of());
         Object userId = resolveUserId(body);
+        List<String> userIds = resolveUserIds(body);
+        if (userIds.isEmpty() && userId != null) {
+            userIds = List.of(String.valueOf(userId));
+        }
         OffsetDateTime startedAt = RepairWorkorderSegmentService.parseDateTime(
                 body.get("startedAt") != null ? body.get("startedAt") : body.get("started_at"));
         OffsetDateTime endedAt = null;
@@ -199,7 +203,7 @@ public class RepairWorkorderController {
             }
         }
         Map<String, Object> seg = segmentService.addEngineerSegment(
-                id, wo, typeId, str(body.get("remark")), parts, userId, startedAt, endedAt);
+                id, wo, typeId, str(body.get("remark")), parts, userIds, startedAt, endedAt);
         addEvent(id, "add_segment", str(wo.get("status")), str(loadWorkorder(id).get("status")),
                 null, null, seg.get("user_id"), null, null,
                 "添加进程段: " + seg.get("type_name"), null);
@@ -836,6 +840,23 @@ public class RepairWorkorderController {
             if (v != null && !String.valueOf(v).isBlank()) return v;
         }
         return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<String> resolveUserIds(Map<String, Object> body) {
+        if (body == null) return List.of();
+        Object raw = body.get("userIds") != null ? body.get("userIds") : body.get("user_ids");
+        if (raw instanceof List<?> list) {
+            List<String> out = new ArrayList<>();
+            for (Object o : list) {
+                if (o != null && !String.valueOf(o).isBlank()) out.add(String.valueOf(o));
+            }
+            return out;
+        }
+        if (raw instanceof String s && !s.isBlank()) {
+            return Arrays.stream(s.split(",")).map(String::trim).filter(x -> !x.isEmpty()).toList();
+        }
+        return List.of();
     }
 
     private static boolean isUnassigned(Map<String, Object> wo) {

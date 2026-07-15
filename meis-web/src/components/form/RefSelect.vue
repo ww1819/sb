@@ -3,6 +3,9 @@
     v-model="model"
     filterable
     clearable
+    :multiple="multiple"
+    :collapse-tags="multiple"
+    :collapse-tags-tooltip="multiple"
     :disabled="disabled"
     :placeholder="placeholder"
     :loading="loading"
@@ -29,12 +32,16 @@ function refRowLabel(row: Record<string, unknown>, meta: RefSelectMeta): string 
   return String(row[vk] ?? '')
 }
 
-const props = defineProps<{
-  modelValue: unknown
-  linkTable: string
-  placeholder?: string
-  disabled?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    modelValue: unknown
+    linkTable: string
+    placeholder?: string
+    disabled?: boolean
+    multiple?: boolean
+  }>(),
+  { multiple: false }
+)
 const emit = defineEmits<{ 'update:modelValue': [v: unknown] }>()
 
 const loading = ref(false)
@@ -75,7 +82,7 @@ onMounted(() => {
 watch(
   () => props.modelValue,
   (v) => {
-    if (v != null && v !== '' && !loaded.value) void load()
+    if (v != null && v !== '' && !(Array.isArray(v) && v.length === 0) && !loaded.value) void load()
   }
 )
 </script>

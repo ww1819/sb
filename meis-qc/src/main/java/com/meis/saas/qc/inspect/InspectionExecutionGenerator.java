@@ -40,7 +40,7 @@ public class InspectionExecutionGenerator {
         jdbc.update("""
                 INSERT INTO inspection_execution (id, execution_no, plan_id, template_id, inspection_type_id,
                     planned_date, assigned_inspector_id, status, created_by)
-                VALUES (?::uuid,?,?,?::uuid,?::uuid,?::uuid,?,?::uuid,?,?)
+                VALUES (?::uuid,?,?::uuid,?::uuid,?::uuid,?,?::uuid,?,?::uuid)
                 """, execId, execNo, planId, p.get("template_id"), p.get("inspection_type_id"),
                 body.getOrDefault("planned_date", p.getOrDefault("next_due_date", p.get("plan_date"))),
                 p.get("assigned_inspector_id"), "pending", body.get("created_by"));

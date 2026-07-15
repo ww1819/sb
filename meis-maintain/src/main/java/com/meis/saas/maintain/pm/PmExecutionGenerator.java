@@ -40,7 +40,7 @@ public class PmExecutionGenerator {
         jdbc.update("""
                 INSERT INTO pm_execution (id, execution_no, plan_id, template_id, pm_type_id,
                     planned_date, assigned_engineer_id, status, created_by)
-                VALUES (?::uuid,?,?,?::uuid,?::uuid,?::uuid,?,?::uuid,?,?)
+                VALUES (?::uuid,?,?::uuid,?::uuid,?::uuid,?,?::uuid,?,?::uuid)
                 """, execId, execNo, planId, p.get("template_id"), p.get("pm_type_id"),
                 body.getOrDefault("planned_date", p.get("next_due_date")),
                 p.get("assigned_engineer_id"), "pending", body.get("created_by"));
