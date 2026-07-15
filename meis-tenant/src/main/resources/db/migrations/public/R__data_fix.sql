@@ -353,6 +353,7 @@ ON CONFLICT (menu_code) DO UPDATE SET
     sort_order = EXCLUDED.sort_order,
     is_active = TRUE;
 
+-- 与库房管理重复的资产侧出入库/调拨/盘点/报废：停用菜单（入口保留在 mod_warehouse）
 UPDATE sys_menu SET is_active = FALSE WHERE menu_code IN (
     'asset_entry', 'asset_outbound', 'asset_transfer', 'asset_inventory', 'asset_scrap'
 );
@@ -738,11 +739,12 @@ ON CONFLICT (menu_code) DO UPDATE SET
     is_active = TRUE;
 
 UPDATE sys_menu SET sort_order = 1 WHERE menu_code = 'asset_device';
-UPDATE sys_menu SET sort_order = 2, is_active = TRUE WHERE menu_code = 'asset_entry';
-UPDATE sys_menu SET sort_order = 4 WHERE menu_code = 'asset_outbound';
-UPDATE sys_menu SET sort_order = 5 WHERE menu_code = 'asset_transfer';
-UPDATE sys_menu SET sort_order = 6 WHERE menu_code = 'asset_inventory';
-UPDATE sys_menu SET sort_order = 7 WHERE menu_code = 'asset_scrap';
+-- 设备入库/出库等与库房管理重复：保持停用，入口统一在 mod_warehouse
+UPDATE sys_menu SET sort_order = 2, is_active = FALSE WHERE menu_code = 'asset_entry';
+UPDATE sys_menu SET sort_order = 4, is_active = FALSE WHERE menu_code = 'asset_outbound';
+UPDATE sys_menu SET sort_order = 5, is_active = FALSE WHERE menu_code = 'asset_transfer';
+UPDATE sys_menu SET sort_order = 6, is_active = FALSE WHERE menu_code = 'asset_inventory';
+UPDATE sys_menu SET sort_order = 7, is_active = FALSE WHERE menu_code = 'asset_scrap';
 
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
 ('system_warehouse', 'mod_system', '仓库维护', 'menu', '/system/warehouse', 2)
