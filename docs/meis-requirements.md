@@ -157,13 +157,14 @@
 
 | 子模块 | 路径 | 核心表/实体 | 状态 |
 |--------|------|-------------|------|
-| 院区管理 | `/system/campus` | `campus` | 待编写 |
-| 科室管理 | `/system/dept` | `department` | 待编写 |
+| ~~院区管理~~ | `/system/campus` | `campus` | **菜单已迁至基础字典** `/dict/campus` |
+| ~~科室管理~~ | `/system/dept` | `department` | **菜单已停用**；入口在基础字典 `/dict/dept` |
 | 用户管理 | `/system/user` | `sys_user` | 已增强（见 SYS-F-04） |
 | 角色管理 | `/system/role` | `sys_role` | 待编写 |
 | 数据字典 | `/system/dict` | `sys_dict` | 待编写 |
 | 操作日志 | `/system/log` | `sys_operation_log` | 待编写 |
 | 审批配置 | `/system/approval` | `sys_approval_flow` | 待编写 |
+| 系统配置 | `/system/config` | `sys_config` | |
 | 租户管理 | 平台 | `sys_tenant` | 待编写 |
 
 **需求摘要（待补充）**：
@@ -188,9 +189,10 @@
 
 | 子模块 | 路径 | 说明 |
 |--------|------|------|
-| 供应商 | `/dict/supplier` | 支持导入、拼音简码 |
-| 生产厂家 | `/dict/manufacturer` | 支持导入、拼音简码 |
-| 设备 68 分类 | `/dict/category` | 医疗器械分类 |
+| 院区管理 | `/dict/campus` | 由系统管理迁入（`system_campus`） |
+| 供应商管理 | `/dict/supplier` | 支持导入、拼音简码 |
+| 生产厂商 | `/dict/manufacturer` | 支持导入、拼音简码 |
+| 设备分类 | `/dict/category` | 医疗器械 68 分类 |
 | 资产分类 | `/dict/asset-category` | |
 | 财务分类 | `/dict/finance-category` | |
 | 科室维护 | `/dict/dept` | |
@@ -199,6 +201,7 @@
 
 **需求摘要（待补充）**：
 
+- [x] DICT-M-01 院区/供应商/设备分类/生产厂商菜单归入基础字典（自系统管理迁出）
 - [ ] DICT-F-01 字典数据全院共享，变更需审计
 - [ ] DICT-F-02 拼音简码批量生成
 - [ ] DICT-B-01 已被业务引用的字典项不可物理删除
@@ -909,6 +912,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+| 1.44 | 2026-07-15 | — | 院区/供应商/设备分类/生产厂商菜单迁入基础字典；取消前端强制归并到系统管理 |
 | 1.43 | 2026-07-15 | — | Q-04 补充：停用库房管理「库房维护」、系统管理「仓库维护」；仓库入口统一基础字典 |
 | 1.42 | 2026-07-15 | — | Q-04：资产台账隐藏与库房重复的设备入库等菜单；修正 R__ 误把 `asset_entry` 重新启用 |
 | 0.1 | 2026-07-11 | — | 初稿：仅电流监测 |
