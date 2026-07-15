@@ -160,6 +160,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/system',
     table: 'medical_device_category',
     formPlacement: 'right',
+    showRowIndex: true,
     enableView: true
   },
   '/purchase/manufacturer': {
@@ -202,6 +203,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/system',
     table: 'medical_device_category',
     formPlacement: 'right',
+    showRowIndex: true,
     enableView: true
   },
   '/dict/campus': { title: '院区管理', apiBase: '/system', table: 'campus',
@@ -685,6 +687,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/system',
     table: 'medical_device_category',
     formPlacement: 'right',
+    showRowIndex: true,
     enableView: true
   },
   '/system/manufacturer': {

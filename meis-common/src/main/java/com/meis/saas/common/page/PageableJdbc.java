@@ -28,6 +28,14 @@ public final class PageableJdbc {
                     where.append(" AND (id = ?::uuid OR parent_id = ?::uuid) ");
                     args.add(v);
                     args.add(v);
+                } else if (TableColumnCache.hasColumn(jdbc, table, "parent_code")
+                        && TableColumnCache.hasColumn(jdbc, table, "category_code")) {
+                    // 设备分类等：按 parent_code 挂下级（节点传 id）
+                    where.append(" AND (id = ?::uuid OR parent_code = (");
+                    where.append("SELECT category_code FROM ").append(table);
+                    where.append(" WHERE id = ?::uuid)) ");
+                    args.add(v);
+                    args.add(v);
                 } else {
                     where.append(" AND id = ?::uuid ");
                     args.add(v);

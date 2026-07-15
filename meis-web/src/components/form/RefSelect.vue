@@ -38,6 +38,8 @@ const props = withDefaults(
     placeholder?: string
     disabled?: boolean
     multiple?: boolean
+    /** 覆盖 refSelectConfig.valueKey（如 parent_code 用 category_code） */
+    valueKey?: string
     /** 不出现在选项中的值（如编辑时排除自身及子孙，避免成环） */
     excludeValues?: string[]
   }>(),
@@ -68,7 +70,7 @@ async function load() {
   try {
     const { data } = await http.get(meta.url, { params: { limit: 500 } })
     const rows = data.data?.records ?? data.data ?? []
-    const vk = meta.valueKey ?? 'id'
+    const vk = props.valueKey || meta.valueKey || 'id'
     allOptions.value = rows.map((r: Record<string, unknown>) => ({
       label: refRowLabel(r, meta),
       value: String(r[vk] ?? '')

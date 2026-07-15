@@ -137,6 +137,7 @@ public abstract class GenericTableController {
         }
         prepareInsertDefaults(table, body);
         normalizeUuidFields(body);
+        applyCategoryHierarchyDefaults(table, body);
         SoftDeleteSupport.applyInsertAudit(jdbc(), table, body);
         var cols = TableColumnCache.columns(jdbc(), table);
         var softDeletedId = SoftDeleteSupport.findSoftDeletedId(jdbc(), table, body);
@@ -176,6 +177,7 @@ public abstract class GenericTableController {
             body.remove("device_code");
         }
         normalizeUuidFields(body);
+        applyCategoryHierarchyDefaults(table, body);
         if (body.isEmpty()) return Result.ok();
         Map<String, Object> before = loadTracked(table, id);
         executeUpdate(table, id, body);
@@ -328,6 +330,53 @@ public abstract class GenericTableController {
 
     private static boolean isBlank(Object v) {
         return v == null || (v instanceof String s && s.isBlank());
+    }
+
+    /**
+     * 设备分类（parent_code 树）：空上级=一级；补齐 level / full_path，避免 NOT NULL 失败。
+     */
+    private void applyCategoryHierarchyDefaults(String table, Map<String, Object> body) {
+        if (!"medical_device_category".equals(table)) return;
+        Object pc = body.get("parent_code");
+        if (pc instanceof String s && s.isBlank()) {
+            body.put("parent_code", null);
+            pc = null;
+        }
+        String parentCode = pc == null ? null : String.valueOf(pc).trim();
+        if (parentCode != null && parentCode.isEmpty()) {
+            body.put("parent_code", null);
+            parentCode = null;
+        }
+        String name = body.get("category_name") == null ? null : String.valueOf(body.get("category_name")).trim();
+
+        if (parentCode == null) {
+            if (isBlank(body.get("level"))) body.put("level", 1);
+            if (isBlank(body.get("full_path")) && name != null && !name.isEmpty()) {
+                body.put("full_path", name);
+            }
+            return;
+        }
+        List<Map<String, Object>> parents = jdbc().queryForList(
+                """
+                SELECT level, full_path, category_name FROM medical_device_category
+                WHERE category_code = ? AND COALESCE(is_deleted, 0) = 0 LIMIT 1
+                """,
+                parentCode);
+        if (parents.isEmpty()) {
+            throw new BizException(400, "上级分类不存在：" + parentCode);
+        }
+        Map<String, Object> parent = parents.get(0);
+        if (isBlank(body.get("level"))) {
+            int parentLevel = parent.get("level") instanceof Number n ? n.intValue() : 1;
+            body.put("level", parentLevel + 1);
+        }
+        if (isBlank(body.get("full_path")) && name != null && !name.isEmpty()) {
+            Object pfp = parent.get("full_path");
+            String prefix = pfp != null && !String.valueOf(pfp).isBlank()
+                    ? String.valueOf(pfp)
+                    : String.valueOf(parent.get("category_name"));
+            body.put("full_path", prefix + "/" + name);
+        }
     }
 
     /** 由 SoftDeleteSupport.appendUpdateAuditSets 统一写入，禁止进入 SET 以免列重复。 */

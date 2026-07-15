@@ -14,7 +14,11 @@ export const refSelectConfig: Record<string, RefSelectMeta> = {
   sys_user: { url: '/system/users', labelKey: 'real_name', codeKey: 'username' },
   supplier: { url: '/system/supplier/list', labelKey: 'supplier_name', codeKey: 'supplier_code', lookupUrl: '/system/supplier/lookup' },
   manufacturer: { url: '/system/manufacturer/list', labelKey: 'manufacturer_name', codeKey: 'manufacturer_code', lookupUrl: '/system/manufacturer/lookup' },
-  medical_device_category: { url: '/system/medical_device_category/list', labelKey: 'category_name' },
+  medical_device_category: {
+    url: '/system/medical_device_category/list',
+    labelKey: 'category_name',
+    codeKey: 'category_code'
+  },
   asset_category: { url: '/system/asset_category/list', labelKey: 'category_name' },
   finance_category: {
     url: '/system/finance_category/list',

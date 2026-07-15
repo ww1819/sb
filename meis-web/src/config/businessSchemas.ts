@@ -158,9 +158,14 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   medical_device_category: [
     { prop: 'category_code', label: '分类编码(68码)', list: true, required: true },
     { prop: 'category_name', label: '分类名称', list: true, required: true },
-    { prop: 'parent_code', label: '上级编码', list: true },
-    { prop: 'level', label: '层级', type: 'number', list: true },
-    { prop: 'full_path', label: '完整路径' },
+    {
+      prop: 'parent_code',
+      label: '上级编码',
+      list: true,
+      placeholder: '留空为一级分类'
+    },
+    { prop: 'level', label: '层级', type: 'number', list: true, readonly: true },
+    { prop: 'full_path', label: '完整路径', readonly: true },
     { prop: 'sort_order', label: '排序', type: 'number', list: true },
     { prop: 'is_active', label: '启用', type: 'boolean', list: true }
   ],
