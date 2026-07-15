@@ -1,9 +1,6 @@
 <template>
   <AppModal v-model="visible" title="选择盘点设备" size="xl" @close="onClose">
-<<<<<<< HEAD
     <PageFilterBar v-model:keyword="keyword" placeholder="资产编码/名称" @search="load" @reset="onReset" />
-=======
-    <PageFilterBar v-model:keyword="keyword" placeholder="设备编码/名称" @search="load" @reset="onReset" />
     <ListSelectionBar
       :count="selectedCount"
       :has-current-page-rows="rows.length > 0"
@@ -11,7 +8,6 @@
       @select-page="onSelectPage"
       @clear="onClearSelection"
     />
->>>>>>> 4e4c61a3afac5deb312f725ef1b31172115ce831
     <el-table
       ref="tableRef"
       v-loading="loading"
