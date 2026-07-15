@@ -205,6 +205,41 @@ body {
   border-radius: var(--el-dialog-border-radius, 8px);
 }
 
+/* 右侧贴边抽屉（仍挂在内容区，不遮挡顶栏/菜单状态栏） */
+#layout-content-root .layout-content-modal .app-modal--right.el-dialog {
+  height: 100% !important;
+  max-height: 100% !important;
+  align-self: stretch;
+  margin: 0 0 0 auto !important;
+  border-radius: var(--el-dialog-border-radius, 8px) 0 0 var(--el-dialog-border-radius, 8px);
+  box-shadow: -4px 0 16px rgba(0, 21, 41, 0.08);
+}
+
+#layout-content-root .layout-content-modal .app-modal--right.app-modal--sm.el-dialog {
+  width: 480px !important;
+}
+
+#layout-content-root .layout-content-modal .app-modal--right.app-modal--md.el-dialog {
+  width: 640px !important;
+}
+
+#layout-content-root .layout-content-modal .app-modal--right.app-modal--lg.el-dialog {
+  width: min(720px, 92vw) !important;
+}
+
+#layout-content-root .layout-content-modal .app-modal--right.app-modal--xl.el-dialog {
+  width: min(960px, 96vw) !important;
+}
+
+#layout-content-root .layout-content-modal .app-modal--right.el-dialog .el-dialog__header {
+  border-radius: var(--el-dialog-border-radius, 8px) 0 0 0;
+}
+
+#layout-content-root .layout-content-modal .el-overlay-dialog:has(.app-modal--right) {
+  padding: 6px 0 0 12px;
+  justify-content: flex-end;
+}
+
 .app-modal--xl .el-dialog__body,
 .app-modal--lg .el-dialog__body {
   max-height: calc(88vh - 112px);

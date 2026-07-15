@@ -62,6 +62,8 @@ export interface PageConfig {
   showRowIndex?: boolean
   /** 序号列前显示多选框 */
   showRowSelection?: boolean
+  /** 隐藏「已选 N 条 / 全选当页 / 取消全选」条（勾选列可保留） */
+  hideSelectionBar?: boolean
   /** 支持表头升序/降序的列 prop */
   sortableColumns?: string[]
 }
@@ -132,7 +134,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/purchase/acceptance/page',
     listFilters: [{ key: 'acceptance_status', label: '验收状态', dictType: 'acceptance_status' }]
   },
-  '/purchase/supplier': { title: '供应商管理', apiBase: '/system', table: 'supplier', importable: true, pinyinCode: true,
+  '/purchase/supplier': { title: '供应商管理', apiBase: '/system', table: 'supplier', importable: true, pinyinCode: true, hideSelectionBar: true,
   enableView: true
 },
   '/purchase/category': { title: '设备分类', apiBase: '/system', table: 'medical_device_category',
@@ -141,7 +143,7 @@ export const pageRegistry: Record<string, PageConfig> = {
   '/purchase/manufacturer': { title: '生产厂商', apiBase: '/system', table: 'manufacturer', importable: true, pinyinCode: true,
   enableView: true
 },
-  '/dict/supplier': { title: '供应商管理', apiBase: '/system', table: 'supplier', importable: true, pinyinCode: true,
+  '/dict/supplier': { title: '供应商管理', apiBase: '/system', table: 'supplier', importable: true, pinyinCode: true, hideSelectionBar: true,
   enableView: true
 },
   '/dict/manufacturer': { title: '生产厂商', apiBase: '/system', table: 'manufacturer', importable: true, pinyinCode: true,
@@ -597,7 +599,7 @@ export const pageRegistry: Record<string, PageConfig> = {
   '/system/dict': { title: '数据字典', apiBase: '/system', table: 'sys_dict' },
   '/system/log': { title: '操作日志', apiBase: '/system', table: 'sys_operation_log' },
   '/system/approval': { title: '审批配置', apiBase: '/system', table: 'sys_approval_flow' },
-  '/system/supplier': { title: '供应商管理', apiBase: '/system', table: 'supplier', importable: true, pinyinCode: true,
+  '/system/supplier': { title: '供应商管理', apiBase: '/system', table: 'supplier', importable: true, pinyinCode: true, hideSelectionBar: true,
   enableView: true
 },
   '/system/category': { title: '设备分类', apiBase: '/system', table: 'medical_device_category',

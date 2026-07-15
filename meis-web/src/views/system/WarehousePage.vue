@@ -1,6 +1,14 @@
 <template>
-  <SystemPageCard title="仓库维护" subtitle="维护仓库与院区、科室关联" :loading="loading" show-search @search="applyFilter" @reset="resetFilter" v-model:keyword="keyword">
-    <template #actions>
+  <SystemPageCard
+    title="仓库维护"
+    subtitle="维护仓库与院区、科室关联"
+    :loading="loading"
+    show-search
+    @search="applyFilter"
+    @reset="resetFilter"
+    v-model:keyword="keyword"
+  >
+    <template #filter>
       <el-button type="primary" @click="openForm()">新增仓库</el-button>
     </template>
     <el-table :data="filteredList" border stripe class="system-table" :height="tableHeight">
@@ -26,7 +34,12 @@
         </template>
       </el-table-column>
     </el-table>
-    <el-dialog v-model="visible" :title="form.id ? '编辑仓库' : '新增仓库'" width="520px" destroy-on-close>
+    <AppModal
+      v-model="visible"
+      :title="form.id ? '编辑仓库' : '新增仓库'"
+      size="sm"
+      placement="right"
+    >
       <el-form :model="form" label-width="90px">
         <el-form-item label="仓库编码" required><el-input v-model="form.warehouse_code" /></el-form-item>
         <el-form-item label="仓库名称" required><el-input v-model="form.warehouse_name" /></el-form-item>
@@ -48,7 +61,7 @@
         <el-button @click="visible = false">取消</el-button>
         <el-button type="primary" @click="save">保存</el-button>
       </template>
-    </el-dialog>
+    </AppModal>
   </SystemPageCard>
 </template>
 
@@ -57,6 +70,7 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
+import AppModal from '@/components/AppModal.vue'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
 
 const tableHeight = useSystemTableHeight()

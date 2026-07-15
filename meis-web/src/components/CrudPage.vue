@@ -12,7 +12,6 @@
       <PageFilterBar
         v-model:keyword="keyword"
         placeholder="关键词搜索"
-        :show-search-buttons="false"
         @search="onSearch"
         @reset="onReset"
       >
@@ -47,13 +46,6 @@
             @change="onSearch"
           />
         </template>
-        <template #trailing>
-          <el-button v-if="showImport" @click="importVisible = true">导入</el-button>
-          <template v-if="showPinyinCode">
-            <el-button @click="openPinyinDialog">生成简码</el-button>
-          </template>
-          <slot name="toolbar-extra" />
-        </template>
         <template #actions>
           <CrudListFilterField
             v-for="f in actionBarFilters"
@@ -63,17 +55,18 @@
             :options="filterOptions[f.key] ?? []"
             @change="onSearch"
           />
-          <el-button type="primary" :icon="Search" @click="onSearch">查询</el-button>
-          <el-button :icon="RefreshLeft" @click="onReset">重置</el-button>
           <el-button v-if="!hideAdd" v-permission="'add'" type="primary" @click="onAdd">新增</el-button>
           <el-button @click="exportCsv">导出</el-button>
+          <el-button v-if="showImport" @click="importVisible = true">导入</el-button>
+          <el-button v-if="showPinyinCode" @click="openPinyinDialog">生成简码</el-button>
+          <slot name="toolbar-extra" />
           <slot name="actions-after" />
         </template>
       </PageFilterBar>
     </template>
 
     <ListSelectionBar
-      v-if="hasSelectionColumn"
+      v-if="hasSelectionColumn && !hideSelectionBar"
       :count="selectedCount"
       :has-current-page-rows="rows.length > 0"
       @select-page="onSelectPage"
@@ -175,6 +168,7 @@
       v-model="formVisible"
       :title="formTitle"
       size="lg"
+      placement="right"
       :show-save="formMode !== 'view'"
       @save="save"
     >
@@ -209,7 +203,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onMounted, reactive, ref, useSlots, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { RefreshLeft, Search } from '@element-plus/icons-vue'
 import http from '@/api/http'
 import { downloadApiFile } from '@/utils/fileDownload'
 import CrudListFilterField from './CrudListFilterField.vue'
@@ -303,6 +296,8 @@ const changeLogEnabled = computed(() => props.config.enableChangeLog !== false &
 const showRowIndex = computed(() => props.config.showRowIndex === true)
 const showRowSelection = computed(() => props.config.showRowSelection === true)
 const hasSelectionColumn = computed(() => showRowSelection.value || showPinyinCode.value)
+/** 隐藏勾选提示条（仍可勾选列，供导出/生成简码作用域） */
+const hideSelectionBar = computed(() => props.config.hideSelectionBar === true)
 
 const prependFilters = computed(() => props.config.listFilters?.filter((f) => f.prepend) ?? [])
 const actionBarFilters = computed(() => props.config.listFilters?.filter((f) => f.actionBar) ?? [])

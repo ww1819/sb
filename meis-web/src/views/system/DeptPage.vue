@@ -1,24 +1,31 @@
 <template>
-  <SystemPageCard title="科室管理" subtitle="维护科室树与临床属性" :loading="loading" show-search @search="applyFilter" @reset="resetFilter" v-model:keyword="keyword">
-    <template #actions>
-      <el-button type="primary" @click="openForm()">新增科室</el-button>
-      <el-button @click="importVisible = true">导入</el-button>
-      <el-button @click="exportCsv">导出</el-button>
-      <el-button @click="openPinyinDialog">生成简码</el-button>
+  <SystemPageCard
+    title="科室维护"
+    subtitle="维护科室与临床属性"
+    :loading="loading"
+    show-pager
+    v-model:page="page"
+    v-model:size="size"
+    :total="filteredTotal"
+    @page-change="onPageChange"
+  >
+    <template #filterBar>
+      <PageFilterBar v-model:keyword="keyword" placeholder="关键词搜索" @search="applyFilter" @reset="resetFilter">
+        <template #actions>
+          <el-button type="primary" @click="openForm()">新增科室</el-button>
+          <el-button @click="importVisible = true">导入</el-button>
+          <el-button @click="exportCsv">导出</el-button>
+          <el-button @click="openPinyinDialog">生成简码</el-button>
+        </template>
+      </PageFilterBar>
     </template>
-    <ListSelectionBar
-      :count="selectedCount"
-      :has-current-page-rows="filteredList.length > 0"
-      @select-page="onSelectPage"
-      @clear="onClearSelection"
-    />
+
     <el-table
       ref="tableRef"
-      :data="filteredList"
+      :data="pagedList"
       border
       stripe
       row-key="id"
-      default-expand-all
       class="system-table dept-tree-table"
       :height="tableHeight"
       @selection-change="onSelectionChange"
@@ -46,7 +53,13 @@
         </template>
       </el-table-column>
     </el-table>
-    <el-dialog v-model="visible" :title="form.id ? '编辑科室' : '新增科室'" width="520px">
+
+    <AppModal
+      v-model="visible"
+      :title="form.id ? '编辑科室' : '新增科室'"
+      size="sm"
+      placement="right"
+    >
       <el-form :model="form" label-width="100px">
         <el-form-item label="科室编码" required><el-input v-model="form.dept_code" maxlength="3" /></el-form-item>
         <el-form-item label="科室名称" required><el-input v-model="form.dept_name" /></el-form-item>
@@ -69,7 +82,8 @@
         <el-button @click="visible = false">取消</el-button>
         <el-button type="primary" @click="save">保存</el-button>
       </template>
-    </el-dialog>
+    </AppModal>
+
     <EntityChangeHistoryDrawer v-model="changeLogVisible" entity-type="department" :entity-id="changeLogId" />
     <ImportDialog
       v-model="importVisible"
@@ -83,15 +97,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
+import PageFilterBar from '@/components/system/PageFilterBar.vue'
+import AppModal from '@/components/AppModal.vue'
 import ImportDialog from '@/components/ImportDialog.vue'
 import EntityChangeHistoryDrawer from '@/components/EntityChangeHistoryDrawer.vue'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
 import { downloadApiFile } from '@/utils/fileDownload'
-import ListSelectionBar from '@/components/ListSelectionBar.vue'
 import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
 import { promptListActionScope, assertScopeSelection } from '@/composables/useListActionScope'
 import { executePinyinGenerate, promptPinyinScope } from '@/composables/usePinyinGenerate'
@@ -108,11 +123,13 @@ const changeLogVisible = ref(false)
 const changeLogId = ref('')
 const form = ref<any>({ is_active: true, is_clinical: false, sort_order: 0 })
 const tableRef = ref()
+const page = ref(1)
+const size = ref(20)
+
 const {
   selectedCount,
   syncFromTable,
   selectedIds,
-  selectCurrentPage,
   clearAll
 } = useCrossPageSelection()
 
@@ -127,6 +144,18 @@ const filteredList = computed(() => {
   return list.value.filter((r) =>
     [r.dept_code, r.dept_name, r.pinyin_code, r.campus_name].some((v) => String(v || '').toLowerCase().includes(kw))
   )
+})
+
+const filteredTotal = computed(() => filteredList.value.length)
+
+const pagedList = computed(() => {
+  const start = (page.value - 1) * size.value
+  return filteredList.value.slice(start, start + size.value)
+})
+
+watch(filteredTotal, (total) => {
+  const maxPage = Math.max(1, Math.ceil(total / size.value) || 1)
+  if (page.value > maxPage) page.value = maxPage
 })
 
 onMounted(async () => {
@@ -149,20 +178,19 @@ function onSelectionChange(rows: any[]) {
   syncFromTable(rows)
 }
 
-function onSelectPage() {
-  selectCurrentPage(tableRef.value, filteredList.value as Record<string, unknown>[])
-}
-
-function onClearSelection() {
-  clearAll(tableRef.value)
+function onPageChange() {
+  // 分页切换后表格勾选由 reserve-selection 维持
 }
 
 function applyFilter() {
-  onClearSelection()
+  page.value = 1
+  clearAll(tableRef.value)
 }
+
 function resetFilter() {
   keyword.value = ''
-  onClearSelection()
+  page.value = 1
+  clearAll(tableRef.value)
 }
 
 function openForm(row?: any) {
@@ -210,7 +238,7 @@ async function openPinyinDialog() {
       keyword: keyword.value || undefined
     })
     if (ok) {
-      onClearSelection()
+      clearAll(tableRef.value)
       load()
     }
   } catch {
