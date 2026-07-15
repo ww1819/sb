@@ -48,8 +48,13 @@ public abstract class GenericTableController {
 
     @GetMapping("/{table}/page")
     public Result<com.meis.saas.common.page.PageResult<Map<String, Object>>> page(
-            @PathVariable String table, com.meis.saas.common.page.PageQuery query) {
+            @PathVariable String table,
+            com.meis.saas.common.page.PageQuery query,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false) String sortOrder) {
         check(table);
+        if (sortBy != null && !sortBy.isBlank()) query.setSortBy(sortBy.trim());
+        if (sortOrder != null && !sortOrder.isBlank()) query.setSortOrder(sortOrder.trim());
         return Result.ok(com.meis.saas.common.page.PageableJdbc.query(jdbc(), table, query));
     }
 

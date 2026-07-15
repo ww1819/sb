@@ -12,6 +12,7 @@
       <PageFilterBar
         v-model:keyword="keyword"
         placeholder="关键词搜索"
+        :show-search-buttons="useActionsRowToolbar"
         @search="onSearch"
         @reset="onReset"
       >
@@ -46,21 +47,43 @@
             @change="onSearch"
           />
         </template>
-        <template #actions>
-          <CrudListFilterField
-            v-for="f in actionBarFilters"
-            :key="f.key"
-            :filter="f"
-            v-model="filterValues[f.key]"
-            :options="filterOptions[f.key] ?? []"
-            @change="onSearch"
-          />
-          <el-button v-if="!hideAdd" v-permission="'add'" type="primary" @click="onAdd">新增</el-button>
-          <el-button @click="exportCsv">导出</el-button>
+        <template v-if="!useActionsRowToolbar" #trailing>
           <el-button v-if="showImport" @click="importVisible = true">导入</el-button>
           <el-button v-if="showPinyinCode" @click="openPinyinDialog">生成简码</el-button>
           <slot name="toolbar-extra" />
-          <slot name="actions-after" />
+        </template>
+        <template #actions>
+          <template v-if="useActionsRowToolbar">
+            <CrudListFilterField
+              v-for="f in actionBarFilters"
+              :key="f.key"
+              :filter="f"
+              v-model="filterValues[f.key]"
+              :options="filterOptions[f.key] ?? []"
+              @change="onSearch"
+            />
+            <el-button v-if="!hideAdd" v-permission="'add'" type="primary" @click="onAdd">新增</el-button>
+            <el-button @click="exportCsv">导出</el-button>
+            <el-button v-if="showImport" @click="importVisible = true">导入</el-button>
+            <el-button v-if="showPinyinCode" @click="openPinyinDialog">生成简码</el-button>
+            <slot name="toolbar-extra" />
+            <slot name="actions-after" />
+          </template>
+          <template v-else>
+            <CrudListFilterField
+              v-for="f in actionBarFilters"
+              :key="f.key"
+              :filter="f"
+              v-model="filterValues[f.key]"
+              :options="filterOptions[f.key] ?? []"
+              @change="onSearch"
+            />
+            <el-button type="primary" :icon="Search" @click="onSearch">查询</el-button>
+            <el-button :icon="RefreshLeft" @click="onReset">重置</el-button>
+            <el-button v-if="!hideAdd" v-permission="'add'" type="primary" @click="onAdd">新增</el-button>
+            <el-button @click="exportCsv">导出</el-button>
+            <slot name="actions-after" />
+          </template>
         </template>
       </PageFilterBar>
     </template>
@@ -110,7 +133,7 @@
             :field="f.prop"
             :sort-field="sortField"
             :sort-order="sortOrder"
-            @sort="setSort"
+            @sort="(field, order) => setSort(field, order)"
           />
         </template>
         <template #default="{ row }">
@@ -159,7 +182,7 @@
       v-model="formVisible"
       :title="formTitle"
       size="lg"
-      placement="right"
+      :placement="formPlacement"
       :show-save="formMode !== 'view'"
       @save="save"
     >
@@ -194,6 +217,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onMounted, reactive, ref, useSlots, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { RefreshLeft, Search } from '@element-plus/icons-vue'
 import http from '@/api/http'
 import { downloadApiFile } from '@/utils/fileDownload'
 import CrudListFilterField from './CrudListFilterField.vue'
@@ -286,6 +310,8 @@ const showRowSelection = computed(() => props.config.showRowSelection === true)
 const hasSelectionColumn = computed(() => showRowSelection.value || showPinyinCode.value)
 /** 隐藏勾选提示条（仍可勾选列，供导出/生成简码作用域） */
 const hideSelectionBar = computed(() => props.config.hideSelectionBar === true)
+const useActionsRowToolbar = computed(() => props.config.toolbarLayout === 'actions-row')
+const formPlacement = computed(() => props.config.formPlacement === 'right' ? 'right' : 'center')
 
 const prependFilters = computed(() => props.config.listFilters?.filter((f) => f.prepend) ?? [])
 const actionBarFilters = computed(() => props.config.listFilters?.filter((f) => f.actionBar) ?? [])
