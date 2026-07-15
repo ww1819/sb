@@ -19,7 +19,11 @@ export const refSelectConfig: Record<string, RefSelectMeta> = {
     labelKey: 'category_name',
     codeKey: 'category_code'
   },
-  asset_category: { url: '/system/asset_category/list', labelKey: 'category_name' },
+  asset_category: {
+    url: '/system/asset_category/list',
+    labelKey: 'category_name',
+    codeKey: 'category_code'
+  },
   finance_category: {
     url: '/system/finance_category/list',
     labelKey: 'finance_name',
