@@ -54,7 +54,8 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('repair_sub_status', 'waiting_approval', '待审批', 'waiting_approval', 4),
 ('repair_sub_status', 'on_site', '已到场', 'on_site', 5),
 ('repair_sub_status', 'diagnosing', '诊断中', 'diagnosing', 6),
-('repair_sub_status', 'testing', '调试中', 'testing', 7);
+('repair_sub_status', 'testing', '调试中', 'testing', 7),
+('repair_sub_status', 'verified', '已验收', 'verified', 8);
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('warehouse_type', 'device', '设备库', 'device', 1),
 ('warehouse_type', 'spare', '备件库', 'spare', 2),

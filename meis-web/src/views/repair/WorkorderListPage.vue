@@ -6,8 +6,8 @@
       detail-mode
       hide-add
       delete-url="/repair/workorder"
-      :operation-column-width="pageMode === 'handle' ? 100 : 400"
-      :hide-operation-column="pageMode === 'handle'"
+      :operation-column-width="pageMode === 'handle' || pageMode === 'verify' ? 100 : 400"
+      :hide-operation-column="pageMode === 'handle' || pageMode === 'verify'"
       :can-edit="canEditRow"
       :can-delete="canDeleteRow"
       @detail="openDetail"
@@ -16,7 +16,29 @@
       <template #toolbar-extra>
         <el-button v-if="showCreate" type="primary" @click="openCreate">新增报修</el-button>
       </template>
-      <template v-if="pageMode === 'handle'" #extra-columns>
+      <template v-if="pageMode === 'verify'" #extra-columns>
+        <el-table-column label="查看" width="72" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click.stop="openDetail(row)">查看</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="验收" width="72" align="center">
+          <template #default="{ row }">
+            <el-button v-if="canOnRow('verify', row)" link type="success" @click.stop="openVerify(row)">验收</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="拒绝验收" width="88" align="center">
+          <template #default="{ row }">
+            <el-button v-if="canOnRow('verify', row)" link type="danger" @click.stop="openRejectVerify(row)">拒绝</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="变更记录" width="88" align="center">
+          <template #default="{ row }">
+            <el-button v-if="canRowChangeLog(row)" link @click.stop="openChangeLog(row)">变更记录</el-button>
+          </template>
+        </el-table-column>
+      </template>
+      <template v-else-if="pageMode === 'handle'" #extra-columns>
         <el-table-column label="查看" width="72" align="center" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click.stop="openDetail(row)">查看</el-button>
@@ -123,6 +145,7 @@
               <div v-for="(u, ui) in seg.users" :key="String(u.user_id ?? ui)" class="muted">
                 工程师：{{ u.user_name || u.user_id }}{{ u.is_primary ? '（主责）' : '' }}
                 <span v-if="u.work_content"> · {{ u.work_content }}</span>
+                <span v-if="u.labor_cost != null && u.labor_cost !== ''"> · 人工费 {{ u.labor_cost }}</span>
               </div>
             </div>
             <div v-else-if="Array.isArray(seg.user_names) && seg.user_names.length" class="muted">
@@ -133,6 +156,7 @@
               <div v-for="p in seg.parts" :key="String(p.id)" class="muted seg-part-line">
                 配件：{{ p.part_name || p.spare_part_id }} × {{ p.quantity }}
                 <span v-if="p.unit_price != null && p.unit_price !== ''"> · 单价 {{ p.unit_price }}</span>
+                <span v-if="p.total_price != null && p.total_price !== ''"> · 金额 {{ p.total_price }}</span>
                 <span v-if="p.supplier_name"> · {{ p.supplier_name }}</span>
                 <template v-if="pageMode !== 'apply' && canEditSegment(seg)">
                   <el-button text type="primary" size="small" @click="openEditPart(seg, p)">改</el-button>
@@ -194,9 +218,9 @@
             </el-timeline-item>
           </el-timeline>
           <div v-if="timelineData.segments?.length" class="segments">
-            <div class="seg-title">维修中明细</div>
+            <div class="seg-title">进程时段明细</div>
             <div v-for="(s, i) in timelineData.segments" :key="i" class="seg-row">
-              {{ s.subStatusLabel }} · {{ fmt(s.start) }} ~ {{ fmt(s.end) }} · {{ fmtMin(s.minutes) }}
+              {{ s.subStatusLabel }} · {{ fmt(s.start) }} ~ {{ s.end ? fmt(s.end) : '至今' }} · {{ fmtMin(s.minutes) }}
               <span v-if="s.remark" class="muted">（{{ s.remark }}）</span>
             </div>
           </div>
@@ -225,7 +249,8 @@
           <el-button v-if="can('resume')" @click="doResume">恢复</el-button>
         </template>
         <template v-if="pageMode === 'verify' && wo?.id">
-          <el-button v-if="can('verify')" type="success" @click="openVerify">验收</el-button>
+          <el-button v-if="can('verify')" type="success" @click="openVerify()">验收</el-button>
+          <el-button v-if="can('verify')" type="danger" @click="openRejectVerify()">拒绝验收</el-button>
         </template>
         <el-button v-if="editable && !wo?.id" type="primary" @click="saveDraft">保存草稿</el-button>
         <el-button v-if="editable && wo?.id && status === 'draft'" type="primary" plain @click="saveDraft">保存</el-button>
@@ -238,7 +263,7 @@
       :entity-id="changeLogEntityId"
     />
 
-    <AppModal v-model="segmentVisible" title="添加维修进程" size="md">
+    <AppModal v-model="segmentVisible" title="添加维修进程" size="lg">
       <el-form label-width="120px">
         <el-form-item label="进程类型" required>
           <el-select v-model="actionForm.processTypeId" placeholder="请选择" style="width: 100%">
@@ -252,12 +277,20 @@
                 v-model="row.userId"
                 link-table="repair_engineer"
                 placeholder="选择工程师"
-                style="width: 180px"
+                style="width: 160px"
               />
               <el-input
                 v-model="row.workContent"
                 placeholder="工作内容（选填）"
-                style="flex: 1"
+                style="flex: 1; min-width: 120px"
+              />
+              <el-input-number
+                v-model="row.laborCost"
+                :min="0"
+                :precision="2"
+                :controls="false"
+                placeholder="人工费"
+                style="width: 110px"
               />
               <el-checkbox v-model="row.isPrimary" @change="onPrimaryChange(idx)">主责</el-checkbox>
               <el-button text type="danger" :disabled="engineerRows.length <= 1" @click="engineerRows.splice(idx, 1)">删</el-button>
@@ -291,11 +324,27 @@
         </el-form-item>
         <el-form-item v-if="selectedAddableType?.can_add_parts" label="配件">
           <div v-for="(row, idx) in segmentPartRows" :key="idx" class="seg-part-form-row">
-            <RefSelect v-model="row.sparePartId" link-table="spare_part" placeholder="配件" style="flex: 1" />
-            <el-input-number v-model="row.quantity" :min="1" :max="9999" style="width: 120px" />
+            <RefSelect
+              v-model="row.sparePartId"
+              link-table="spare_part"
+              placeholder="配件"
+              style="flex: 1; min-width: 160px"
+              @update:model-value="(v) => onSegmentPartSelected(row, v)"
+            />
+            <el-input-number v-model="row.quantity" :min="1" :max="9999" style="width: 110px" />
+            <el-input-number
+              v-model="row.unitPrice"
+              :min="0"
+              :precision="2"
+              :controls="false"
+              placeholder="单价"
+              style="width: 100px"
+            />
+            <el-input :model-value="formatPartAmount(row)" disabled placeholder="金额" style="width: 100px" />
+            <RefSelect v-model="row.supplierId" link-table="supplier" placeholder="供应商" style="width: 140px" />
             <el-button text type="danger" @click="segmentPartRows.splice(idx, 1)">删</el-button>
           </div>
-          <el-button text type="primary" @click="segmentPartRows.push({ sparePartId: '', quantity: 1 })">+ 添加配件</el-button>
+          <el-button text type="primary" @click="addEmptyPartRow(segmentPartRows)">+ 添加配件</el-button>
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="actionForm.segmentRemark" type="textarea" :rows="2" />
@@ -310,13 +359,21 @@
     <AppModal v-model="partVisible" title="进程段添加配件" size="md">
       <el-form label-width="80px">
         <el-form-item label="配件" required>
-          <RefSelect v-model="partForm.sparePartId" link-table="spare_part" placeholder="请选择配件" />
+          <RefSelect
+            v-model="partForm.sparePartId"
+            link-table="spare_part"
+            placeholder="请选择配件"
+            @update:model-value="(v) => onSegmentPartSelected(partForm as SegmentPartFormRow, v)"
+          />
         </el-form-item>
         <el-form-item label="数量" required>
           <el-input-number v-model="partForm.quantity" :min="1" :max="9999" />
         </el-form-item>
         <el-form-item label="单价">
           <el-input-number v-model="partForm.unitPrice" :min="0" :precision="2" :controls="false" />
+        </el-form-item>
+        <el-form-item label="金额">
+          <el-input :model-value="formatPartAmount(partForm)" disabled />
         </el-form-item>
         <el-form-item label="供应商">
           <RefSelect v-model="partForm.supplierId" link-table="supplier" placeholder="可选" />
@@ -328,7 +385,7 @@
       </template>
     </AppModal>
 
-    <AppModal v-model="editSegmentVisible" title="编辑维修进程" size="md">
+    <AppModal v-model="editSegmentVisible" title="编辑维修进程" size="lg">
       <el-form label-width="120px">
         <el-form-item label="进程类型">
           <el-input :model-value="String(editingSegment?.type_name ?? '')" disabled />
@@ -340,12 +397,20 @@
                 v-model="row.userId"
                 link-table="repair_engineer"
                 placeholder="选择工程师"
-                style="width: 180px"
+                style="width: 160px"
               />
               <el-input
                 v-model="row.workContent"
                 placeholder="工作内容（选填）"
-                style="flex: 1"
+                style="flex: 1; min-width: 120px"
+              />
+              <el-input-number
+                v-model="row.laborCost"
+                :min="0"
+                :precision="2"
+                :controls="false"
+                placeholder="人工费"
+                style="width: 110px"
               />
               <el-checkbox v-model="row.isPrimary" @change="onPrimaryChange(idx)">主责</el-checkbox>
               <el-button text type="danger" :disabled="engineerRows.length <= 1" @click="engineerRows.splice(idx, 1)">删</el-button>
@@ -383,18 +448,27 @@
               v-model="row.sparePartId"
               link-table="spare_part"
               placeholder="配件"
-              style="flex: 1"
+              style="flex: 1; min-width: 160px"
               :disabled="Boolean(row.id)"
+              @update:model-value="(v) => onSegmentPartSelected(row, v)"
             />
-            <el-input-number v-model="row.quantity" :min="1" :max="9999" style="width: 100px" />
-            <el-input-number v-model="row.unitPrice" :min="0" :precision="2" :controls="false" placeholder="单价" style="width: 100px" />
+            <el-input-number v-model="row.quantity" :min="1" :max="9999" style="width: 110px" />
+            <el-input-number
+              v-model="row.unitPrice"
+              :min="0"
+              :precision="2"
+              :controls="false"
+              placeholder="单价"
+              style="width: 100px"
+            />
+            <el-input :model-value="formatPartAmount(row)" disabled placeholder="金额" style="width: 100px" />
             <RefSelect v-model="row.supplierId" link-table="supplier" placeholder="供应商" style="width: 140px" />
             <el-button text type="danger" @click="editSegmentPartRows.splice(idx, 1)">删</el-button>
           </div>
           <el-button
             text
             type="primary"
-            @click="editSegmentPartRows.push({ sparePartId: '', quantity: 1, unitPrice: undefined, supplierId: '' })"
+            @click="addEmptyPartRow(editSegmentPartRows)"
           >+ 添加配件</el-button>
         </el-form-item>
         <el-form-item label="备注">
@@ -417,6 +491,9 @@
         </el-form-item>
         <el-form-item label="单价">
           <el-input-number v-model="partEditForm.unitPrice" :min="0" :precision="2" :controls="false" />
+        </el-form-item>
+        <el-form-item label="金额">
+          <el-input :model-value="formatPartAmount(partEditForm)" disabled />
         </el-form-item>
         <el-form-item label="供应商">
           <RefSelect v-model="partEditForm.supplierId" link-table="supplier" placeholder="可选" />
@@ -498,7 +575,11 @@
         <el-button type="primary" @click="doSubStatus">确认</el-button>
       </template>
     </AppModal>
-    <AppModal v-model="verifyVisible" title="维修验收" size="md">
+    <AppModal
+      v-model="verifyVisible"
+      :title="actionForm.verifyResult === 'fail' ? '拒绝验收' : '维修验收'"
+      size="md"
+    >
       <el-form label-width="100px">
         <el-form-item label="验收结果" required>
           <el-radio-group v-model="actionForm.verifyResult">
@@ -518,7 +599,10 @@
       </el-form>
       <template #footer>
         <el-button @click="verifyVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitVerify">确认验收</el-button>
+        <el-button
+          :type="actionForm.verifyResult === 'fail' ? 'danger' : 'primary'"
+          @click="submitVerify"
+        >{{ actionForm.verifyResult === 'fail' ? '确认拒绝' : '确认验收' }}</el-button>
       </template>
     </AppModal>
   </div>
@@ -604,13 +688,14 @@ const editSegmentVisible = ref(false)
 const editingSegment = ref<Record<string, unknown> | null>(null)
 const editingCanAddParts = ref(false)
 const originalEditPartIds = ref<string[]>([])
-const editSegmentPartRows = ref<Array<{
+type SegmentPartFormRow = {
   id?: string
   sparePartId: string
   quantity: number
   unitPrice?: number
   supplierId: string
-}>>([])
+}
+const editSegmentPartRows = ref<SegmentPartFormRow[]>([])
 const partVisible = ref(false)
 const partEditVisible = ref(false)
 const partForm = reactive({
@@ -628,8 +713,44 @@ const partEditForm = reactive({
   unitPrice: undefined as number | undefined,
   supplierId: ''
 })
-const segmentPartRows = ref<Array<{ sparePartId: string; quantity: number }>>([])
-const engineerRows = ref<Array<{ userId: string; workContent: string; isPrimary: boolean }>>([])
+const segmentPartRows = ref<SegmentPartFormRow[]>([])
+
+function formatPartAmount(row: { quantity?: number; unitPrice?: number }) {
+  const q = Number(row.quantity)
+  const p = row.unitPrice
+  if (p == null || Number.isNaN(Number(p)) || Number.isNaN(q)) return ''
+  return (q * Number(p)).toFixed(2)
+}
+
+function addEmptyPartRow(rows: SegmentPartFormRow[] | { value: SegmentPartFormRow[] }) {
+  const list = Array.isArray(rows) ? rows : rows.value
+  list.push({ sparePartId: '', quantity: 1, unitPrice: undefined, supplierId: '' })
+}
+
+async function onSegmentPartSelected(row: SegmentPartFormRow, partId: unknown) {
+  const id = partId != null && String(partId).trim() !== '' ? String(partId) : ''
+  row.sparePartId = id
+  if (!id) {
+    row.unitPrice = undefined
+    row.supplierId = ''
+    return
+  }
+  try {
+    const { data } = await http.get(`/repair/spare_part/${id}`)
+    const part = (data.data ?? data) as Record<string, unknown>
+    if (part && typeof part === 'object') {
+      if (part.unit_price != null && part.unit_price !== '') {
+        row.unitPrice = Number(part.unit_price)
+      }
+      if (part.supplier_id != null && String(part.supplier_id).trim() !== '') {
+        row.supplierId = String(part.supplier_id)
+      }
+    }
+  } catch {
+    /* 带出失败时仍可手工填单价/供应商 */
+  }
+}
+const engineerRows = ref<Array<{ userId: string; workContent: string; laborCost?: number; isPrimary: boolean }>>([])
 const dispatchVisible = ref(false)
 const transferVisible = ref(false)
 const completeVisible = ref(false)
@@ -657,7 +778,7 @@ const actionForm = reactive({
 })
 
 function addEngineerRow() {
-  engineerRows.value.push({ userId: '', workContent: '', isPrimary: false })
+  engineerRows.value.push({ userId: '', workContent: '', laborCost: undefined, isPrimary: false })
 }
 
 function onPrimaryChange(idx: number) {
@@ -671,6 +792,7 @@ function resetEngineerRows(defaultUserId = '') {
   engineerRows.value = [{
     userId: defaultUserId,
     workContent: '',
+    laborCost: undefined,
     isPrimary: true
   }]
 }
@@ -916,6 +1038,7 @@ async function doAddSegment() {
     .map((r, i, arr) => ({
       userId: r.userId,
       workContent: r.workContent || undefined,
+      laborCost: r.laborCost,
       isPrimary: r.isPrimary || (!arr.some((x) => x.isPrimary) && i === 0)
     }))
   if (!engineers.length) {
@@ -935,7 +1058,12 @@ async function doAddSegment() {
   }
   const parts = segmentPartRows.value
     .filter((r) => r.sparePartId)
-    .map((r) => ({ spare_part_id: r.sparePartId, quantity: r.quantity }))
+    .map((r) => ({
+      spare_part_id: r.sparePartId,
+      quantity: r.quantity,
+      unit_price: r.unitPrice,
+      supplier_id: r.supplierId || undefined
+    }))
   const primary = engineers.find((e) => e.isPrimary) ?? engineers[0]
   const { data } = await http.post(`/repair/workorder/${wo.value.id}/segments`, {
     processTypeId: actionForm.processTypeId,
@@ -1053,6 +1181,7 @@ function openEditSegment(seg: Record<string, unknown>) {
     engineerRows.value = users.map((u) => ({
       userId: String(u.user_id ?? ''),
       workContent: u.work_content != null ? String(u.work_content) : '',
+      laborCost: u.labor_cost != null && u.labor_cost !== '' ? Number(u.labor_cost) : undefined,
       isPrimary: Boolean(u.is_primary)
     }))
     if (!engineerRows.value.some((r) => r.isPrimary) && engineerRows.value.length) {
@@ -1080,6 +1209,7 @@ async function doSaveEditSegment() {
     .map((r, i, arr) => ({
       userId: r.userId,
       workContent: r.workContent || undefined,
+      laborCost: r.laborCost,
       isPrimary: r.isPrimary || (!arr.some((x) => x.isPrimary) && i === 0)
     }))
   if (!engineers.length) {
@@ -1476,66 +1606,88 @@ async function doSubStatus() {
 }
 
 async function doComplete() {
-  if (!wo.value?.id) return
-  const { data } = await http.post(`/repair/workorder/${wo.value.id}/complete`, {
-    solution_description: actionForm.solution || '维修完成',
-    parts_cost: wo.value.parts_cost ?? 0,
-    labor_cost: wo.value.labor_cost ?? 0,
-    total_cost: wo.value.total_cost ?? 0,
-    skipVerify: actionForm.skipVerify
-  })
-  if (data.code !== 0 && data.code !== 200) {
-    ElMessage.error(data.message || '完工失败')
+  if (!wo.value?.id) {
+    ElMessage.warning('工单未加载，请关闭后重试')
     return
   }
-  completeVisible.value = false
-  ElMessage.success(actionForm.skipVerify ? '已结案' : '已提交验收')
-  await refresh()
+  try {
+    await http.post(`/repair/workorder/${wo.value.id}/complete`, {
+      solution_description: actionForm.solution || '维修完成',
+      parts_cost: wo.value.parts_cost ?? 0,
+      labor_cost: wo.value.labor_cost ?? 0,
+      total_cost: wo.value.total_cost ?? 0,
+      skipVerify: actionForm.skipVerify
+    })
+    completeVisible.value = false
+    ElMessage.success(actionForm.skipVerify ? '已结案' : '已提交验收')
+    await refresh()
+  } catch (e: unknown) {
+    const err = e as { message?: string; response?: { data?: { message?: string } } }
+    ElMessage.error(err.message || err.response?.data?.message || '完工失败')
+  }
 }
 
-function openVerify() {
+function openVerify(row?: Record<string, unknown>) {
+  if (row) {
+    wo.value = { ...row }
+  }
   actionForm.verifyResult = 'pass'
   actionForm.verifyComment = '验收通过'
   actionForm.satisfactionRating = 5
   verifyVisible.value = true
 }
 
+function openRejectVerify(row?: Record<string, unknown>) {
+  if (row) {
+    wo.value = { ...row }
+  }
+  actionForm.verifyResult = 'fail'
+  actionForm.verifyComment = ''
+  actionForm.satisfactionRating = 5
+  verifyVisible.value = true
+}
+
 async function submitVerify() {
-  if (!wo.value?.id) return
+  if (!wo.value?.id) {
+    ElMessage.warning('工单未加载，请关闭后重试')
+    return
+  }
   const result = actionForm.verifyResult
   if (result === 'fail' && !actionForm.verifyComment.trim()) {
     ElMessage.warning('请填写拒绝验收原因')
     return
   }
-  const { data } = await http.post(`/repair/workorder/${wo.value.id}/verify`, {
-    verifier_id: auth.user?.userId ?? wo.value.reporter_id,
-    verify_result: result,
-    verify_comment: actionForm.verifyComment || (result === 'pass' ? '验收通过' : '验收不通过'),
-    satisfaction_rating: result === 'pass' ? actionForm.satisfactionRating : null
-  })
-  if (data.code !== 0 && data.code !== 200) {
-    ElMessage.error(data.message || '验收失败')
-    return
+  try {
+    await http.post(`/repair/workorder/${wo.value.id}/verify`, {
+      verifier_id: auth.user?.userId ?? wo.value.reporter_id,
+      verify_result: result,
+      verify_comment: actionForm.verifyComment || (result === 'pass' ? '验收通过' : '验收不通过'),
+      satisfaction_rating: result === 'pass' ? actionForm.satisfactionRating : null
+    })
+    verifyVisible.value = false
+    ElMessage.success(result === 'pass' ? '验收通过' : '已拒绝验收，工单退回返修')
+    await refresh()
+  } catch (e: unknown) {
+    const err = e as { message?: string; response?: { data?: { message?: string } } }
+    ElMessage.error(err.message || err.response?.data?.message || '验收失败')
   }
-  verifyVisible.value = false
-  ElMessage.success(result === 'pass' ? '验收通过' : '已拒绝验收，工单退回返修')
-  await refresh()
 }
 
 async function doVerify(result: 'pass' | 'fail') {
   if (!wo.value?.id) return
-  const { data } = await http.post(`/repair/workorder/${wo.value.id}/verify`, {
-    verifier_id: auth.user?.userId ?? wo.value.reporter_id,
-    verify_result: result,
-    verify_comment: result === 'pass' ? '验收通过' : '验收不通过，需返修',
-    satisfaction_rating: result === 'pass' ? 5 : null
-  })
-  if (data.code !== 0 && data.code !== 200) {
-    ElMessage.error(data.message || '验收失败')
-    return
+  try {
+    await http.post(`/repair/workorder/${wo.value.id}/verify`, {
+      verifier_id: auth.user?.userId ?? wo.value.reporter_id,
+      verify_result: result,
+      verify_comment: result === 'pass' ? '验收通过' : '验收不通过，需返修',
+      satisfaction_rating: result === 'pass' ? 5 : null
+    })
+    ElMessage.success(result === 'pass' ? '验收通过' : '已拒绝验收，工单退回返修')
+    await refresh()
+  } catch (e: unknown) {
+    const err = e as { message?: string; response?: { data?: { message?: string } } }
+    ElMessage.error(err.message || err.response?.data?.message || '验收失败')
   }
-  ElMessage.success(result === 'pass' ? '验收通过' : '已拒绝验收，工单退回返修')
-  await refresh()
 }
 
 async function doSuspend(row?: Record<string, unknown>) {

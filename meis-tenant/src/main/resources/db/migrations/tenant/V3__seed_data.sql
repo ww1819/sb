@@ -276,6 +276,7 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('repair_sub_status', 'on_site', '已到场', 'on_site', 5),
 ('repair_sub_status', 'diagnosing', '诊断中', 'diagnosing', 6),
 ('repair_sub_status', 'testing', '调试中', 'testing', 7),
+('repair_sub_status', 'verified', '已验收', 'verified', 8),
 ('verify_result', 'pass', '通过', 'pass', 1),
 ('verify_result', 'fail', '不通过', 'fail', 2),
 ('maintenance_level', 'daily', '日常保养', 'daily', 1),
