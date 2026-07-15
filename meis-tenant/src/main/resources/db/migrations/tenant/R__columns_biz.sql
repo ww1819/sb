@@ -178,6 +178,13 @@ ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
 -- ---------- REP-03：维修工程师 sys_user + assigned_user_id ----------
 ALTER TABLE sys_user ADD COLUMN IF NOT EXISTS is_repair_engineer BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS assigned_user_id UUID;
+-- ---------- U.14：进程段确认固化 + 工程师工作内容 ----------
+ALTER TABLE repair_workorder_segment ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE repair_workorder_segment ADD COLUMN IF NOT EXISTS confirmed_by UUID;
+ALTER TABLE repair_workorder_segment_user ADD COLUMN IF NOT EXISTS work_content TEXT;
+COMMENT ON COLUMN repair_workorder_segment.confirmed_at IS '段确认固化时间';
+COMMENT ON COLUMN repair_workorder_segment.confirmed_by IS '段确认人';
+COMMENT ON COLUMN repair_workorder_segment_user.work_content IS '工程师工作内容（选填）';
 -- ---------- 系统配置：分类 + 编号/名称 + 值1~值6 ----------
 ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS category_code VARCHAR(20);
 ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS category_name VARCHAR(100);
