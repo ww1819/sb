@@ -1,6 +1,7 @@
 package com.meis.saas.common.web;
 
 import com.meis.saas.common.asset.MedicalDeviceDeleteGuard;
+import com.meis.saas.common.asset.SparePartDeleteGuard;
 import com.meis.saas.common.audit.EntityChangeLogService;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
@@ -255,6 +256,9 @@ public abstract class GenericTableController {
         guardInventoryCheckMutable(table, id);
         if ("medical_device".equals(table)) {
             MedicalDeviceDeleteGuard.assertDeletable(jdbc(), id);
+        }
+        if ("spare_part".equals(table)) {
+            SparePartDeleteGuard.assertDeletable(jdbc(), id);
         }
         Map<String, Object> before = loadTracked(table, id);
         int n = SoftDeleteSupport.softDelete(jdbc(), table, id);

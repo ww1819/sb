@@ -660,17 +660,14 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   spare_part: [
     { prop: 'part_code', label: '配件编码', list: true, required: true },
     { prop: 'part_name', label: '配件名称', list: true, required: true },
+    { prop: 'pinyin_code', label: '拼音简码', list: true, readonly: true },
     { prop: 'specification', label: '规格', list: true },
     { prop: 'model', label: '型号', list: true },
     { prop: 'unit_id', label: '单位', linkTable: 'unit_dict', list: true },
     { prop: 'unit_price', label: '单价', type: 'number', list: true },
     { prop: 'manufacturer_id', label: '生产厂家', linkTable: 'manufacturer', list: true },
     { prop: 'supplier_id', label: '供应商', linkTable: 'supplier' },
-    { prop: 'warehouse_id', label: '库房', linkTable: 'warehouse', list: true },
     { prop: 'category', label: '分类', list: true },
-    { prop: 'stock_quantity', label: '库存', type: 'number', list: true },
-    { prop: 'min_stock', label: '最低库存', type: 'number', list: true },
-    { prop: 'storage_location', label: '库位' },
     { prop: 'is_active', label: '启用', type: 'boolean', list: true }
   ],
   fault_type_dict: [

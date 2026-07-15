@@ -158,3 +158,10 @@ COMMENT ON INDEX idx_wo_segment_user_uid IS '索引：进程段参与工程师.�
 
 CREATE INDEX IF NOT EXISTS idx_wo_segment_part_seg ON repair_workorder_segment_part(segment_id);
 COMMENT ON INDEX idx_wo_segment_part_seg IS '索引：维修进程段配件.关联进程段';
+
+CREATE INDEX IF NOT EXISTS idx_wo_event_device ON repair_workorder_event(device_id);
+CREATE INDEX IF NOT EXISTS idx_wo_process_device ON repair_workorder_process(device_id);
+CREATE INDEX IF NOT EXISTS idx_wo_segment_device ON repair_workorder_segment(device_id);
+CREATE INDEX IF NOT EXISTS idx_wo_segment_part_device ON repair_workorder_segment_part(device_id);
+CREATE INDEX IF NOT EXISTS idx_spare_part_pinyin_code ON spare_part(pinyin_code);
+COMMENT ON INDEX idx_spare_part_pinyin_code IS '索引：配件档案.拼音简码';

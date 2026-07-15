@@ -393,3 +393,35 @@ FROM (VALUES
 WHERE NOT EXISTS (
     SELECT 1 FROM repair_process_type t WHERE t.type_code = v.type_code
 );
+
+-- ---------- 附录 W：维修子表 device_* 历史回填（可重复） ----------
+UPDATE repair_workorder_event e
+SET device_id = w.device_id, device_code = w.device_code, device_name = w.device_name
+FROM repair_workorder w
+WHERE e.workorder_id = w.id AND e.device_id IS NULL AND w.device_id IS NOT NULL;
+
+UPDATE repair_workorder_process p
+SET device_id = w.device_id, device_code = w.device_code, device_name = w.device_name
+FROM repair_workorder w
+WHERE p.workorder_id = w.id AND p.device_id IS NULL AND w.device_id IS NOT NULL;
+
+UPDATE repair_workorder_segment s
+SET device_id = w.device_id, device_code = w.device_code, device_name = w.device_name
+FROM repair_workorder w
+WHERE s.workorder_id = w.id AND s.device_id IS NULL AND w.device_id IS NOT NULL;
+
+UPDATE repair_workorder_segment_part sp
+SET device_id = w.device_id, device_code = w.device_code, device_name = w.device_name
+FROM repair_workorder_segment s
+JOIN repair_workorder w ON w.id = s.workorder_id
+WHERE sp.segment_id = s.id AND sp.device_id IS NULL AND w.device_id IS NOT NULL;
+
+UPDATE spare_part_usage u
+SET device_id = w.device_id, device_code = w.device_code, device_name = w.device_name
+FROM repair_workorder w
+WHERE u.workorder_id = w.id AND u.device_id IS NULL AND w.device_id IS NOT NULL;
+
+UPDATE spare_part_transaction t
+SET device_id = w.device_id, device_code = w.device_code, device_name = w.device_name
+FROM repair_workorder w
+WHERE t.workorder_id = w.id AND t.device_id IS NULL AND w.device_id IS NOT NULL;

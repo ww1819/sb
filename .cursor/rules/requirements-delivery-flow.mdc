@@ -47,4 +47,4 @@ alwaysApply: true
 - 需求已足够明确且无风险时：可简要确认要点 → 写入文档 → 开发。
 - 有疑问仍须先对齐再动手。
 - 技术约定索引见附录 **Q.6**；约定沉淀增量见 **Q.7 / Q.8**。
-- 跨项目可复用约定全集见 `docs/reusable-engineering-conventions.md`（当前 v1.3）。
+- 跨项目可复用约定全集见 `docs/reusable-engineering-conventions.md`（当前 v1.4）。

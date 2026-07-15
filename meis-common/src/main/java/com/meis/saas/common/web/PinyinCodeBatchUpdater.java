@@ -50,6 +50,7 @@ public final class PinyinCodeBatchUpdater {
             case "department" -> Map.of("table", "department", "nameColumn", "dept_name", "codeColumn", "dept_code");
             case "supplier" -> Map.of("table", "supplier", "nameColumn", "supplier_name", "codeColumn", "supplier_code");
             case "manufacturer" -> Map.of("table", "manufacturer", "nameColumn", "manufacturer_name", "codeColumn", "manufacturer_code");
+            case "spare_part" -> Map.of("table", "spare_part", "nameColumn", "part_name", "codeColumn", "part_code");
             default -> null;
         };
     }

@@ -6,6 +6,7 @@ import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
+import com.meis.saas.common.persistence.TableColumnCache;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
 import com.meis.saas.repair.service.RepairWorkorderProcessService;
@@ -206,6 +207,44 @@ public class RepairWorkorderController {
         return Result.ok(seg);
     }
 
+    @PutMapping("/{id:" + UUID_PATH + "}/segments/{segmentId:" + UUID_PATH + "}")
+    @Transactional
+    @OperationLog(module = "repair", description = "编辑维修进程段")
+    public Result<Map<String, Object>> updateSegment(@PathVariable UUID id,
+                                                     @PathVariable UUID segmentId,
+                                                     @RequestBody Map<String, Object> body) {
+        Map<String, Object> wo = requireWo(id);
+        if ("draft".equals(str(wo.get("status")))) {
+            throw new BizException(400, "草稿工单不可编辑进程段");
+        }
+        assertRepairEngineer();
+        List<Map<String, Object>> engineers = resolveEngineers(body);
+        Map<String, Object> seg = segmentService.updateSegment(id, segmentId, body, engineers);
+        addEvent(id, "update_segment", str(wo.get("status")), str(wo.get("status")),
+                null, null, seg.get("user_id"), null, null,
+                "编辑进程段: " + seg.get("type_name"), null);
+        return Result.ok(seg);
+    }
+
+    @DeleteMapping("/{id:" + UUID_PATH + "}/segments/{segmentId:" + UUID_PATH + "}")
+    @Transactional
+    @OperationLog(module = "repair", description = "删除维修进程段")
+    public Result<Void> deleteSegment(@PathVariable UUID id, @PathVariable UUID segmentId) {
+        Map<String, Object> wo = requireWo(id);
+        if ("draft".equals(str(wo.get("status")))) {
+            throw new BizException(400, "草稿工单不可删除进程段");
+        }
+        assertRepairEngineer();
+        Map<String, Object> before = segmentService.listSegments(id).stream()
+                .filter(s -> segmentId.toString().equals(String.valueOf(s.get("id"))))
+                .findFirst().orElse(null);
+        segmentService.deleteSegment(id, segmentId);
+        addEvent(id, "delete_segment", str(wo.get("status")), str(wo.get("status")),
+                null, null, before != null ? before.get("user_id") : null, null, null,
+                "删除进程段" + (before != null && before.get("type_name") != null ? ": " + before.get("type_name") : ""), null);
+        return Result.ok();
+    }
+
     @PostMapping("/{id:" + UUID_PATH + "}/segments/{segmentId:" + UUID_PATH + "}/confirm")
     @Transactional
     @OperationLog(module = "repair", description = "确认维修进程段")
@@ -235,6 +274,32 @@ public class RepairWorkorderController {
         assertRepairEngineer();
         assertAssignedOwner(requireWo(id));
         return Result.ok(segmentService.addPart(segmentId, body));
+    }
+
+    @PutMapping("/{id:" + UUID_PATH + "}/segments/{segmentId:" + UUID_PATH + "}/parts/{partId:" + UUID_PATH + "}")
+    @Transactional
+    @OperationLog(module = "repair", description = "编辑进程段配件")
+    public Result<Map<String, Object>> updateSegmentPart(@PathVariable UUID id,
+                                                         @PathVariable UUID segmentId,
+                                                         @PathVariable UUID partId,
+                                                         @RequestBody Map<String, Object> body) {
+        requireWo(id);
+        assertRepairEngineer();
+        assertAssignedOwner(requireWo(id));
+        return Result.ok(segmentService.updatePart(segmentId, partId, body));
+    }
+
+    @DeleteMapping("/{id:" + UUID_PATH + "}/segments/{segmentId:" + UUID_PATH + "}/parts/{partId:" + UUID_PATH + "}")
+    @Transactional
+    @OperationLog(module = "repair", description = "删除进程段配件")
+    public Result<Void> deleteSegmentPart(@PathVariable UUID id,
+                                          @PathVariable UUID segmentId,
+                                          @PathVariable UUID partId) {
+        requireWo(id);
+        assertRepairEngineer();
+        assertAssignedOwner(requireWo(id));
+        segmentService.deletePart(segmentId, partId);
+        return Result.ok();
     }
 
     @GetMapping("/{id:" + UUID_PATH + "}/timeline")
@@ -838,17 +903,36 @@ public class RepairWorkorderController {
     private void addEvent(UUID woId, String type, String fromStatus, String toStatus,
                           String fromSub, String toSub, Object userId,
                           Object fromUser, Object toUser, String remark, String extraJson) {
-        jdbc.update("""
-            INSERT INTO repair_workorder_event
-            (id, workorder_id, event_type, from_status, to_status, from_sub_status, to_sub_status,
-             operator_id, user_id, from_user_id, to_user_id, remark, extra_json)
-            VALUES (?::uuid,?::uuid,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?::uuid,?,CAST(? AS jsonb))
-            """,
-                UUID.randomUUID(), woId, type, blankToNull(fromStatus), blankToNull(toStatus),
-                blankToNull(fromSub), blankToNull(toSub),
-                blankToNull(operatorId()), blankToNull(userId),
-                blankToNull(fromUser), blankToNull(toUser),
-                blankToNull(remark), extraJson);
+        Map<String, Object> wo = loadWorkorder(woId);
+        boolean hasDevice = TableColumnCache.hasColumn(jdbc, "repair_workorder_event", "device_id");
+        if (hasDevice) {
+            jdbc.update("""
+                INSERT INTO repair_workorder_event
+                (id, workorder_id, event_type, from_status, to_status, from_sub_status, to_sub_status,
+                 operator_id, user_id, from_user_id, to_user_id, remark, extra_json,
+                 device_id, device_code, device_name)
+                VALUES (?::uuid,?::uuid,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?::uuid,?,CAST(? AS jsonb),
+                        ?::uuid,?,?)
+                """,
+                    UUID.randomUUID(), woId, type, blankToNull(fromStatus), blankToNull(toStatus),
+                    blankToNull(fromSub), blankToNull(toSub),
+                    blankToNull(operatorId()), blankToNull(userId),
+                    blankToNull(fromUser), blankToNull(toUser),
+                    blankToNull(remark), extraJson,
+                    blankToNull(wo.get("device_id")), blankToNull(wo.get("device_code")), blankToNull(wo.get("device_name")));
+        } else {
+            jdbc.update("""
+                INSERT INTO repair_workorder_event
+                (id, workorder_id, event_type, from_status, to_status, from_sub_status, to_sub_status,
+                 operator_id, user_id, from_user_id, to_user_id, remark, extra_json)
+                VALUES (?::uuid,?::uuid,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?::uuid,?,CAST(? AS jsonb))
+                """,
+                    UUID.randomUUID(), woId, type, blankToNull(fromStatus), blankToNull(toStatus),
+                    blankToNull(fromSub), blankToNull(toSub),
+                    blankToNull(operatorId()), blankToNull(userId),
+                    blankToNull(fromUser), blankToNull(toUser),
+                    blankToNull(remark), extraJson);
+        }
     }
 
     private static Object resolveUserId(Map<String, Object> body) {
@@ -990,6 +1074,8 @@ public class RepairWorkorderController {
             case "dispatch" -> "派工";
             case "grab" -> "抢单";
             case "add_segment" -> "添加进程段";
+            case "update_segment" -> "编辑进程段";
+            case "delete_segment" -> "删除进程段";
             case "confirm_segment" -> "确认进程段";
             case "transfer" -> "转派";
             case "accept" -> "接单";

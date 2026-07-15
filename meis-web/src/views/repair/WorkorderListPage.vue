@@ -130,13 +130,32 @@
             </div>
             <div v-else-if="seg.user_name" class="muted">工程师：{{ seg.user_name }}</div>
             <div v-if="seg.parts?.length" class="seg-parts">
-              <div v-for="p in seg.parts" :key="String(p.id)" class="muted">
+              <div v-for="p in seg.parts" :key="String(p.id)" class="muted seg-part-line">
                 配件：{{ p.part_name || p.spare_part_id }} × {{ p.quantity }}
-                <span v-if="p.unit_price"> @ {{ p.unit_price }}</span>
+                <span v-if="p.unit_price != null && p.unit_price !== ''"> · 单价 {{ p.unit_price }}</span>
+                <span v-if="p.supplier_name"> · {{ p.supplier_name }}</span>
+                <template v-if="pageMode !== 'apply' && canEditSegment(seg)">
+                  <el-button text type="primary" size="small" @click="openEditPart(seg, p)">改</el-button>
+                  <el-button text type="danger" size="small" @click="doDeletePart(seg, p)">删</el-button>
+                </template>
               </div>
             </div>
             <div v-else class="muted">配件：无</div>
             <template v-if="pageMode !== 'apply'">
+              <el-button
+                v-if="canEditSegment(seg)"
+                text
+                type="primary"
+                size="small"
+                @click="openEditSegment(seg)"
+              >编辑</el-button>
+              <el-button
+                v-if="canEditSegment(seg)"
+                text
+                type="danger"
+                size="small"
+                @click="doDeleteSegment(seg)"
+              >删除</el-button>
               <el-button
                 v-if="segmentConfirmStatus(seg) === 'pending' && canConfirmSegment()"
                 text
@@ -296,10 +315,116 @@
         <el-form-item label="数量" required>
           <el-input-number v-model="partForm.quantity" :min="1" :max="9999" />
         </el-form-item>
+        <el-form-item label="单价">
+          <el-input-number v-model="partForm.unitPrice" :min="0" :precision="2" :controls="false" />
+        </el-form-item>
+        <el-form-item label="供应商">
+          <RefSelect v-model="partForm.supplierId" link-table="supplier" placeholder="可选" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="partVisible = false">取消</el-button>
         <el-button type="primary" @click="doAddPart">确认</el-button>
+      </template>
+    </AppModal>
+
+    <AppModal v-model="editSegmentVisible" title="编辑维修进程" size="md">
+      <el-form label-width="120px">
+        <el-form-item label="进程类型">
+          <el-input :model-value="String(editingSegment?.type_name ?? '')" disabled />
+        </el-form-item>
+        <el-form-item label="维修工程师" required>
+          <div class="seg-engineer-field">
+            <div v-for="(row, idx) in engineerRows" :key="idx" class="seg-engineer-row">
+              <RefSelect
+                v-model="row.userId"
+                link-table="repair_engineer"
+                placeholder="选择工程师"
+                style="width: 180px"
+              />
+              <el-input
+                v-model="row.workContent"
+                placeholder="工作内容（选填）"
+                style="flex: 1"
+              />
+              <el-checkbox v-model="row.isPrimary" @change="onPrimaryChange(idx)">主责</el-checkbox>
+              <el-button text type="danger" :disabled="engineerRows.length <= 1" @click="engineerRows.splice(idx, 1)">删</el-button>
+            </div>
+            <el-button text type="primary" @click="addEngineerRow">+ 添加工程师</el-button>
+          </div>
+        </el-form-item>
+        <el-form-item label="开始时间" required>
+          <el-date-picker
+            v-model="actionForm.startedAt"
+            type="datetime"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            format="YYYY-MM-DD HH:mm:ss"
+            placeholder="开始时间"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="结束时间">
+          <div class="seg-end-time">
+            <el-checkbox v-model="actionForm.enableEndedAt">填写结束时间</el-checkbox>
+            <el-date-picker
+              v-model="actionForm.endedAt"
+              type="datetime"
+              value-format="YYYY-MM-DD HH:mm:ss"
+              format="YYYY-MM-DD HH:mm:ss"
+              placeholder="结束时间"
+              style="width: 100%"
+              :disabled="!actionForm.enableEndedAt"
+            />
+          </div>
+        </el-form-item>
+        <el-form-item v-if="editingCanAddParts" label="配件">
+          <div v-for="(row, idx) in editSegmentPartRows" :key="idx" class="seg-part-form-row">
+            <RefSelect
+              v-model="row.sparePartId"
+              link-table="spare_part"
+              placeholder="配件"
+              style="flex: 1"
+              :disabled="Boolean(row.id)"
+            />
+            <el-input-number v-model="row.quantity" :min="1" :max="9999" style="width: 100px" />
+            <el-input-number v-model="row.unitPrice" :min="0" :precision="2" :controls="false" placeholder="单价" style="width: 100px" />
+            <RefSelect v-model="row.supplierId" link-table="supplier" placeholder="供应商" style="width: 140px" />
+            <el-button text type="danger" @click="editSegmentPartRows.splice(idx, 1)">删</el-button>
+          </div>
+          <el-button
+            text
+            type="primary"
+            @click="editSegmentPartRows.push({ sparePartId: '', quantity: 1, unitPrice: undefined, supplierId: '' })"
+          >+ 添加配件</el-button>
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="actionForm.segmentRemark" type="textarea" :rows="2" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editSegmentVisible = false">取消</el-button>
+        <el-button type="primary" @click="doSaveEditSegment">保存</el-button>
+      </template>
+    </AppModal>
+
+    <AppModal v-model="partEditVisible" title="编辑配件" size="md">
+      <el-form label-width="80px">
+        <el-form-item label="配件">
+          <el-input :model-value="partEditForm.partName" disabled />
+        </el-form-item>
+        <el-form-item label="数量" required>
+          <el-input-number v-model="partEditForm.quantity" :min="1" :max="9999" />
+        </el-form-item>
+        <el-form-item label="单价">
+          <el-input-number v-model="partEditForm.unitPrice" :min="0" :precision="2" :controls="false" />
+        </el-form-item>
+        <el-form-item label="供应商">
+          <RefSelect v-model="partEditForm.supplierId" link-table="supplier" placeholder="可选" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="partEditVisible = false">取消</el-button>
+        <el-button type="primary" @click="doSaveEditPart">保存</el-button>
       </template>
     </AppModal>
 
@@ -475,8 +600,34 @@ const timelineData = ref<{
 const processSegments = ref<Array<Record<string, unknown>>>([])
 const addableTypes = ref<Array<Record<string, unknown>>>([])
 const segmentVisible = ref(false)
+const editSegmentVisible = ref(false)
+const editingSegment = ref<Record<string, unknown> | null>(null)
+const editingCanAddParts = ref(false)
+const originalEditPartIds = ref<string[]>([])
+const editSegmentPartRows = ref<Array<{
+  id?: string
+  sparePartId: string
+  quantity: number
+  unitPrice?: number
+  supplierId: string
+}>>([])
 const partVisible = ref(false)
-const partForm = reactive({ segmentId: '', sparePartId: '', quantity: 1 })
+const partEditVisible = ref(false)
+const partForm = reactive({
+  segmentId: '',
+  sparePartId: '',
+  quantity: 1,
+  unitPrice: undefined as number | undefined,
+  supplierId: ''
+})
+const partEditForm = reactive({
+  segmentId: '',
+  partId: '',
+  partName: '',
+  quantity: 1,
+  unitPrice: undefined as number | undefined,
+  supplierId: ''
+})
 const segmentPartRows = ref<Array<{ sparePartId: string; quantity: number }>>([])
 const engineerRows = ref<Array<{ userId: string; workContent: string; isPrimary: boolean }>>([])
 const dispatchVisible = ref(false)
@@ -812,6 +963,10 @@ function canConfirmSegment() {
   return !['draft', 'cancelled', 'closed'].includes(s)
 }
 
+function canEditSegment(seg: Record<string, unknown>) {
+  return segmentConfirmStatus(seg) === 'pending' && can('segment')
+}
+
 function segmentConfirmStatus(seg: Record<string, unknown>) {
   if (seg.confirmed_at) return 'confirmed'
   if (seg.auto_created || seg.confirmed) return 'system'
@@ -855,6 +1010,8 @@ function openAddPart(seg: Record<string, unknown>) {
   partForm.segmentId = String(seg.id)
   partForm.sparePartId = ''
   partForm.quantity = 1
+  partForm.unitPrice = undefined
+  partForm.supplierId = ''
   partVisible.value = true
 }
 
@@ -863,9 +1020,15 @@ async function doAddPart() {
     ElMessage.warning('请选择配件')
     return
   }
+  const body: Record<string, unknown> = {
+    spare_part_id: partForm.sparePartId,
+    quantity: partForm.quantity
+  }
+  if (partForm.unitPrice != null) body.unit_price = partForm.unitPrice
+  if (partForm.supplierId) body.supplier_id = partForm.supplierId
   const { data } = await http.post(
     `/repair/workorder/${wo.value.id}/segments/${partForm.segmentId}/parts`,
-    { spare_part_id: partForm.sparePartId, quantity: partForm.quantity }
+    body
   )
   if (data.code !== 0 && data.code !== 200) {
     ElMessage.error(data.message || '添加失败')
@@ -873,6 +1036,198 @@ async function doAddPart() {
   }
   partVisible.value = false
   ElMessage.success('配件已添加')
+  await loadSegments()
+}
+
+function openEditSegment(seg: Record<string, unknown>) {
+  if (!canEditSegment(seg)) return
+  editingSegment.value = seg
+  editingCanAddParts.value = Boolean(seg.can_add_parts)
+  actionForm.segmentRemark = seg.remark != null ? String(seg.remark) : ''
+  actionForm.startedAt = fmt(seg.started_at)
+  const ended = fmt(seg.ended_at)
+  actionForm.endedAt = ended
+  actionForm.enableEndedAt = Boolean(ended)
+  const users = Array.isArray(seg.users) ? seg.users as Array<Record<string, unknown>> : []
+  if (users.length) {
+    engineerRows.value = users.map((u) => ({
+      userId: String(u.user_id ?? ''),
+      workContent: u.work_content != null ? String(u.work_content) : '',
+      isPrimary: Boolean(u.is_primary)
+    }))
+    if (!engineerRows.value.some((r) => r.isPrimary) && engineerRows.value.length) {
+      engineerRows.value[0].isPrimary = true
+    }
+  } else {
+    resetEngineerRows(String(seg.user_id ?? wo.value?.assigned_user_id ?? auth.user?.userId ?? ''))
+  }
+  const parts = Array.isArray(seg.parts) ? seg.parts as Array<Record<string, unknown>> : []
+  originalEditPartIds.value = parts.map((p) => String(p.id)).filter(Boolean)
+  editSegmentPartRows.value = parts.map((p) => ({
+    id: p.id != null ? String(p.id) : undefined,
+    sparePartId: String(p.spare_part_id ?? ''),
+    quantity: Number(p.quantity ?? 1) || 1,
+    unitPrice: p.unit_price != null && p.unit_price !== '' ? Number(p.unit_price) : undefined,
+    supplierId: p.supplier_id != null ? String(p.supplier_id) : ''
+  }))
+  editSegmentVisible.value = true
+}
+
+async function doSaveEditSegment() {
+  if (!wo.value?.id || !editingSegment.value?.id) return
+  const engineers = engineerRows.value
+    .filter((r) => r.userId)
+    .map((r, i, arr) => ({
+      userId: r.userId,
+      workContent: r.workContent || undefined,
+      isPrimary: r.isPrimary || (!arr.some((x) => x.isPrimary) && i === 0)
+    }))
+  if (!engineers.length) {
+    ElMessage.warning('请至少保留一名维修工程师')
+    return
+  }
+  if (!engineers.some((e) => e.isPrimary)) {
+    engineers[0].isPrimary = true
+  }
+  if (!actionForm.startedAt) {
+    ElMessage.warning('请填写开始时间')
+    return
+  }
+  if (actionForm.enableEndedAt && !actionForm.endedAt) {
+    ElMessage.warning('请填写结束时间')
+    return
+  }
+  if (editingCanAddParts.value) {
+    const invalid = editSegmentPartRows.value.some((r) => r.sparePartId && (!r.quantity || r.quantity < 1))
+    if (invalid) {
+      ElMessage.warning('配件数量须不少于 1')
+      return
+    }
+  }
+  const segmentId = String(editingSegment.value.id)
+  const { data } = await http.put(`/repair/workorder/${wo.value.id}/segments/${segmentId}`, {
+    remark: actionForm.segmentRemark,
+    startedAt: actionForm.startedAt,
+    enableEndedAt: actionForm.enableEndedAt,
+    endedAt: actionForm.enableEndedAt ? actionForm.endedAt : null,
+    engineers
+  })
+  if (data.code !== 0 && data.code !== 200) {
+    ElMessage.error(data.message || '保存失败')
+    return
+  }
+  if (editingCanAddParts.value) {
+    const keepIds = new Set(
+      editSegmentPartRows.value.filter((r) => r.id && r.sparePartId).map((r) => String(r.id))
+    )
+    for (const oldId of originalEditPartIds.value) {
+      if (!keepIds.has(oldId)) {
+        const del = await http.delete(`/repair/workorder/${wo.value.id}/segments/${segmentId}/parts/${oldId}`)
+        if (del.data.code !== 0 && del.data.code !== 200) {
+          ElMessage.error(del.data.message || '删除配件失败')
+          await loadSegments()
+          return
+        }
+      }
+    }
+    for (const row of editSegmentPartRows.value) {
+      if (!row.sparePartId) continue
+      if (row.id) {
+        const put = await http.put(
+          `/repair/workorder/${wo.value.id}/segments/${segmentId}/parts/${row.id}`,
+          {
+            quantity: row.quantity,
+            unit_price: row.unitPrice ?? null,
+            supplier_id: row.supplierId || null
+          }
+        )
+        if (put.data.code !== 0 && put.data.code !== 200) {
+          ElMessage.error(put.data.message || '更新配件失败')
+          await loadSegments()
+          return
+        }
+      } else {
+        const post = await http.post(
+          `/repair/workorder/${wo.value.id}/segments/${segmentId}/parts`,
+          {
+            spare_part_id: row.sparePartId,
+            quantity: row.quantity,
+            unit_price: row.unitPrice,
+            supplier_id: row.supplierId || undefined
+          }
+        )
+        if (post.data.code !== 0 && post.data.code !== 200) {
+          ElMessage.error(post.data.message || '添加配件失败')
+          await loadSegments()
+          return
+        }
+      }
+    }
+  }
+  editSegmentVisible.value = false
+  ElMessage.success('进程段已更新')
+  await refresh()
+}
+
+async function doDeleteSegment(seg: Record<string, unknown>) {
+  if (!wo.value?.id || !seg.id || !canEditSegment(seg)) return
+  await ElMessageBox.confirm('确认删除该未确认进程段？删除后不会重开上一段结束时间。', '删除进程段', {
+    type: 'warning'
+  })
+  const { data } = await http.delete(`/repair/workorder/${wo.value.id}/segments/${seg.id}`)
+  if (data.code !== 0 && data.code !== 200) {
+    ElMessage.error(data.message || '删除失败')
+    return
+  }
+  ElMessage.success('进程段已删除')
+  await refresh()
+}
+
+function openEditPart(seg: Record<string, unknown>, part: Record<string, unknown>) {
+  if (!canEditSegment(seg) || !part.id) return
+  partEditForm.segmentId = String(seg.id)
+  partEditForm.partId = String(part.id)
+  partEditForm.partName = String(part.part_name || part.spare_part_id || '')
+  partEditForm.quantity = Number(part.quantity ?? 1) || 1
+  partEditForm.unitPrice = part.unit_price != null && part.unit_price !== '' ? Number(part.unit_price) : undefined
+  partEditForm.supplierId = part.supplier_id != null ? String(part.supplier_id) : ''
+  partEditVisible.value = true
+}
+
+async function doSaveEditPart() {
+  if (!wo.value?.id || !partEditForm.segmentId || !partEditForm.partId) return
+  if (!partEditForm.quantity || partEditForm.quantity < 1) {
+    ElMessage.warning('请填写数量')
+    return
+  }
+  const { data } = await http.put(
+    `/repair/workorder/${wo.value.id}/segments/${partEditForm.segmentId}/parts/${partEditForm.partId}`,
+    {
+      quantity: partEditForm.quantity,
+      unit_price: partEditForm.unitPrice ?? null,
+      supplier_id: partEditForm.supplierId || null
+    }
+  )
+  if (data.code !== 0 && data.code !== 200) {
+    ElMessage.error(data.message || '保存失败')
+    return
+  }
+  partEditVisible.value = false
+  ElMessage.success('配件已更新')
+  await loadSegments()
+}
+
+async function doDeletePart(seg: Record<string, unknown>, part: Record<string, unknown>) {
+  if (!wo.value?.id || !seg.id || !part.id || !canEditSegment(seg)) return
+  await ElMessageBox.confirm('确认删除该配件明细？', '删除配件', { type: 'warning' })
+  const { data } = await http.delete(
+    `/repair/workorder/${wo.value.id}/segments/${seg.id}/parts/${part.id}`
+  )
+  if (data.code !== 0 && data.code !== 200) {
+    ElMessage.error(data.message || '删除失败')
+    return
+  }
+  ElMessage.success('配件已删除')
   await loadSegments()
 }
 
@@ -1287,11 +1642,18 @@ onActivated(() => {
   margin-top: 4px;
   padding-left: 8px;
 }
+.seg-part-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
 .seg-part-form-row {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 .seg-end-time {
   display: flex;

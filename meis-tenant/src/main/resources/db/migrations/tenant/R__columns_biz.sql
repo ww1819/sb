@@ -185,6 +185,32 @@ ALTER TABLE repair_workorder_segment_user ADD COLUMN IF NOT EXISTS work_content 
 COMMENT ON COLUMN repair_workorder_segment.confirmed_at IS '段确认固化时间';
 COMMENT ON COLUMN repair_workorder_segment.confirmed_by IS '段确认人';
 COMMENT ON COLUMN repair_workorder_segment_user.work_content IS '工程师工作内容（选填）';
+-- ---------- U.15 / 附录 W：配件供应商、拼音简码、业务冗余 device_* ----------
+ALTER TABLE spare_part ADD COLUMN IF NOT EXISTS pinyin_code VARCHAR(50);
+ALTER TABLE repair_workorder_segment_part ADD COLUMN IF NOT EXISTS supplier_id UUID;
+ALTER TABLE repair_workorder_segment_part ADD COLUMN IF NOT EXISTS device_id UUID;
+ALTER TABLE repair_workorder_segment_part ADD COLUMN IF NOT EXISTS device_code VARCHAR(50);
+ALTER TABLE repair_workorder_segment_part ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
+ALTER TABLE repair_workorder_segment ADD COLUMN IF NOT EXISTS device_id UUID;
+ALTER TABLE repair_workorder_segment ADD COLUMN IF NOT EXISTS device_code VARCHAR(50);
+ALTER TABLE repair_workorder_segment ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
+ALTER TABLE repair_workorder_event ADD COLUMN IF NOT EXISTS device_id UUID;
+ALTER TABLE repair_workorder_event ADD COLUMN IF NOT EXISTS device_code VARCHAR(50);
+ALTER TABLE repair_workorder_event ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
+ALTER TABLE repair_workorder_process ADD COLUMN IF NOT EXISTS device_id UUID;
+ALTER TABLE repair_workorder_process ADD COLUMN IF NOT EXISTS device_code VARCHAR(50);
+ALTER TABLE repair_workorder_process ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
+ALTER TABLE spare_part_usage ADD COLUMN IF NOT EXISTS device_id UUID;
+ALTER TABLE spare_part_usage ADD COLUMN IF NOT EXISTS device_code VARCHAR(50);
+ALTER TABLE spare_part_usage ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
+ALTER TABLE spare_part_transaction ADD COLUMN IF NOT EXISTS device_id UUID;
+ALTER TABLE spare_part_transaction ADD COLUMN IF NOT EXISTS device_code VARCHAR(50);
+ALTER TABLE spare_part_transaction ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
+COMMENT ON COLUMN spare_part.pinyin_code IS '拼音简码（检索）';
+COMMENT ON COLUMN repair_workorder_segment_part.supplier_id IS '配件行供应商';
+COMMENT ON COLUMN repair_workorder_segment.device_id IS '设备冗余（附录 W）';
+COMMENT ON COLUMN repair_workorder_event.device_id IS '设备冗余（附录 W）';
+COMMENT ON COLUMN repair_workorder_process.device_id IS '设备冗余（附录 W）';
 -- ---------- 系统配置：分类 + 编号/名称 + 值1~值6 ----------
 ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS category_code VARCHAR(20);
 ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS category_name VARCHAR(100);

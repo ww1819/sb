@@ -415,7 +415,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     listFilters: [{ key: 'status', label: '状态', dictType: 'wo_status' }]
   },
   '/repair/engineer': { title: '维修工程师管理', apiBase: '/repair', table: 'sys_user' },
-  '/repair/spare-archive': { title: '配件档案管理', apiBase: '/repair', table: 'spare_part' },
+  '/repair/spare-archive': { title: '配件档案管理', apiBase: '/repair', table: 'spare_part', pinyinCode: true },
   '/repair/fault': { title: '故障库', apiBase: '/repair', table: 'fault_type_dict',
   enableView: true
 },

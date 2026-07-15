@@ -1258,6 +1258,9 @@ CREATE TABLE repair_workorder_event (
     to_user_id UUID,
     remark TEXT,
     extra_json JSONB,
+    device_id UUID,
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 COMMENT ON TABLE repair_workorder_event IS '维修工单事件流水（时间轴）';
@@ -1300,6 +1303,9 @@ CREATE TABLE repair_workorder_process (
     skip_verify BOOLEAN,
     remark TEXT,
     extra_json JSONB,
+    device_id UUID,
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by UUID,
@@ -1320,6 +1326,9 @@ COMMENT ON COLUMN repair_workorder_process.user_id IS '相关维修负责人';
 COMMENT ON COLUMN repair_workorder_process.from_user_id IS '转派前负责人';
 COMMENT ON COLUMN repair_workorder_process.to_user_id IS '转派后负责人';
 COMMENT ON COLUMN repair_workorder_process.operator_id IS '操作人';
+COMMENT ON COLUMN repair_workorder_process.device_id IS '设备冗余（附录 W）';
+COMMENT ON COLUMN repair_workorder_process.device_code IS '设备编码快照';
+COMMENT ON COLUMN repair_workorder_process.device_name IS '设备名称快照';
 COMMENT ON COLUMN repair_workorder_process.solution_description IS '处理方案（完工）';
 COMMENT ON COLUMN repair_workorder_process.labor_cost IS '人工费';
 COMMENT ON COLUMN repair_workorder_process.parts_cost IS '配件费';
@@ -1377,6 +1386,9 @@ CREATE TABLE repair_workorder_segment (
     auto_created BOOLEAN NOT NULL DEFAULT FALSE,
     confirmed_at TIMESTAMP WITH TIME ZONE,
     confirmed_by UUID REFERENCES sys_user(id),
+    device_id UUID,
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by UUID,
@@ -1393,6 +1405,9 @@ COMMENT ON COLUMN repair_workorder_segment.started_at IS '开始时间';
 COMMENT ON COLUMN repair_workorder_segment.ended_at IS '结束时间';
 COMMENT ON COLUMN repair_workorder_segment.confirmed_at IS '段确认固化时间';
 COMMENT ON COLUMN repair_workorder_segment.confirmed_by IS '段确认人';
+COMMENT ON COLUMN repair_workorder_segment.device_id IS '设备冗余（附录 W）';
+COMMENT ON COLUMN repair_workorder_segment.device_code IS '设备编码快照';
+COMMENT ON COLUMN repair_workorder_segment.device_name IS '设备名称快照';
 
 -- 5.3.4b 维修工单进程段参与工程师（一段可多人）
 CREATE TABLE repair_workorder_segment_user (
@@ -1434,6 +1449,7 @@ CREATE TABLE spare_part (
     min_stock INTEGER,
     max_stock INTEGER,
     storage_location VARCHAR(200),
+    pinyin_code VARCHAR(50),
     remark TEXT,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -1452,6 +1468,7 @@ COMMENT ON COLUMN spare_part.stock_quantity IS 'stock quantity';
 COMMENT ON COLUMN spare_part.min_stock IS 'min stock';
 COMMENT ON COLUMN spare_part.max_stock IS 'max stock';
 COMMENT ON COLUMN spare_part.storage_location IS 'storage location';
+COMMENT ON COLUMN spare_part.pinyin_code IS '拼音简码（检索）';
 COMMENT ON COLUMN spare_part.remark IS '备注';
 COMMENT ON COLUMN spare_part.is_active IS '是否启用';
 COMMENT ON COLUMN spare_part.created_at IS '创建时间';
@@ -1466,7 +1483,10 @@ CREATE TABLE spare_part_usage (
     unit_price DECIMAL(10,2),
     total_price DECIMAL(10,2),
     used_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    operator_id UUID REFERENCES sys_user(id)
+    operator_id UUID REFERENCES sys_user(id),
+    device_id UUID,
+    device_code VARCHAR(50),
+    device_name VARCHAR(200)
 );
 COMMENT ON TABLE spare_part_usage IS '备件使用记录表';
 COMMENT ON COLUMN spare_part_usage.id IS '主键';
@@ -1477,6 +1497,7 @@ COMMENT ON COLUMN spare_part_usage.unit_price IS 'unit price';
 COMMENT ON COLUMN spare_part_usage.total_price IS '合计金额';
 COMMENT ON COLUMN spare_part_usage.used_at IS 'used时间';
 COMMENT ON COLUMN spare_part_usage.operator_id IS '关联操作人';
+COMMENT ON COLUMN spare_part_usage.device_id IS '设备冗余（附录 W）';
 
 -- 5.5.1 进程段配件明细
 CREATE TABLE repair_workorder_segment_part (
@@ -1486,6 +1507,10 @@ CREATE TABLE repair_workorder_segment_part (
     quantity INTEGER NOT NULL DEFAULT 1,
     unit_price DECIMAL(10,2),
     total_price DECIMAL(10,2),
+    supplier_id UUID REFERENCES supplier(id),
+    device_id UUID,
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -1496,6 +1521,8 @@ CREATE TABLE repair_workorder_segment_part (
     deleted_by UUID
 );
 COMMENT ON TABLE repair_workorder_segment_part IS '维修进程段配件明细';
+COMMENT ON COLUMN repair_workorder_segment_part.supplier_id IS '配件行供应商';
+COMMENT ON COLUMN repair_workorder_segment_part.device_id IS '设备冗余（附录 W）';
 
 -- ================================================================================
 -- 6. 保养管理模块
@@ -3277,6 +3304,9 @@ CREATE TABLE IF NOT EXISTS spare_part_transaction (
     operator_id UUID REFERENCES sys_user(id),
     ref_no VARCHAR(50),
     remark TEXT,
+    device_id UUID,
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 COMMENT ON TABLE spare_part_transaction IS 'spare part transaction';
@@ -3287,6 +3317,7 @@ COMMENT ON COLUMN spare_part_transaction.quantity IS '数量';
 COMMENT ON COLUMN spare_part_transaction.unit_price IS 'unit price';
 COMMENT ON COLUMN spare_part_transaction.workorder_id IS '关联workorder';
 COMMENT ON COLUMN spare_part_transaction.operator_id IS '关联操作人';
+COMMENT ON COLUMN spare_part_transaction.device_id IS '设备冗余（附录 W）';
 COMMENT ON COLUMN spare_part_transaction.created_at IS '创建时间';
 
 -- integration sync task
