@@ -368,6 +368,7 @@
 | 外键中文 | 附录 H | `refSelectConfig`、`useRefLabelMap` |
 | 字典中文 | 附录 R | `useDict`、`TableCellValue` |
 | 报修草稿/撤回 | 附录 S | `RepairWorkorderController` |
+| 维修列表功能分列 | 附录 U.14.2 | `WorkorderListPage`（handle/verify 取消操作列、功能分列） |
 | 变更记录/快照 | 附录 T（含 T.5） | `EntityChangeLogService` |
 | 主从保存 | 第 4 章 PLT-X-05 | 出入库/计划等专用保存 |
 | 业务冗余字段 | 附录 W、约定包 §6.2 / §6.3 | 设备 `device_id`+code/name；人员姓名快照（强制） |

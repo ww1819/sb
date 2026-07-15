@@ -209,11 +209,6 @@ ALTER TABLE spare_part_usage ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
 ALTER TABLE spare_part_transaction ADD COLUMN IF NOT EXISTS device_id UUID;
 ALTER TABLE spare_part_transaction ADD COLUMN IF NOT EXISTS device_code VARCHAR(50);
 ALTER TABLE spare_part_transaction ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
-COMMENT ON COLUMN spare_part.pinyin_code IS '拼音简码（检索）';
-COMMENT ON COLUMN repair_workorder_segment_part.supplier_id IS '配件行供应商';
-COMMENT ON COLUMN repair_workorder_segment.device_id IS '设备冗余（附录 W）';
-COMMENT ON COLUMN repair_workorder_event.device_id IS '设备冗余（附录 W）';
-COMMENT ON COLUMN repair_workorder_process.device_id IS '设备冗余（附录 W）';
 -- ---------- 附录 W.5：维修业务责任人姓名快照 ----------
 ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS reporter_name VARCHAR(100);
 ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS assigned_user_name VARCHAR(100);
@@ -228,6 +223,7 @@ ALTER TABLE repair_workorder_process ADD COLUMN IF NOT EXISTS to_user_name VARCH
 ALTER TABLE repair_workorder_segment ADD COLUMN IF NOT EXISTS user_name VARCHAR(100);
 ALTER TABLE repair_workorder_segment ADD COLUMN IF NOT EXISTS confirmed_by_name VARCHAR(100);
 ALTER TABLE repair_workorder_segment_user ADD COLUMN IF NOT EXISTS user_name VARCHAR(100);
+ALTER TABLE repair_workorder_segment_user ADD COLUMN IF NOT EXISTS labor_cost DECIMAL(10,2);
 ALTER TABLE spare_part_usage ADD COLUMN IF NOT EXISTS operator_name VARCHAR(100);
 -- ---------- 系统配置：分类 + 编号/名称 + 值1~值6 ----------
 ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS category_code VARCHAR(20);

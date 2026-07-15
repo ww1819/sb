@@ -310,8 +310,9 @@ public class RepairWorkorderController {
                         + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_event", null)
                         + " ORDER BY created_at ASC, id ASC", id);
 
-        List<Map<String, Object>> milestones = buildMilestones(wo, events);
-        List<Map<String, Object>> segments = buildSubStatusSegments(events);
+        List<Map<String, Object>> processSegments = segmentService.listSegments(id);
+        List<Map<String, Object>> milestones = buildMilestones(wo, events, processSegments);
+        List<Map<String, Object>> segments = buildTimelineSegmentsFromProcess(processSegments);
         Map<String, Object> summary = buildSummary(wo, events);
 
         Map<String, Object> data = new LinkedHashMap<>();
@@ -713,9 +714,8 @@ public class RepairWorkorderController {
         if (skipVerify && "verify_rejected".equals(current)) {
             throw new BizException(400, "拒绝验收返修后不可跳过验收直接结案");
         }
-        if (!skipVerify) {
-            segmentService.assertAllHistoricalConfirmed(id);
-        }
+        // U.15.2：提交验收时由 openSystemSegment(pending_verify) 自动确认未确认段；
+        // 不可在开待验段之前 assert，否则会误拦正常完工。
         String target = skipVerify ? "closed" : "pending_verify";
         processService.insertProcess(id, ProcessRecord.builder("complete")
                 .fromStatus(current).toStatus(target)
@@ -749,6 +749,7 @@ public class RepairWorkorderController {
                     p.get("spare_part_id") != null ? p.get("spare_part_id") : p.get("part_id"), p.get("quantity"), id);
         }
         processService.syncWorkorderState(id, target, null, null);
+        segmentService.recalculateWorkorderCosts(id);
         addEvent(id, "complete", current, target, str(wo.get("repair_sub_status")), null,
                 wo.get("assigned_user_id"), null, null,
                 skipVerify ? "完工直接结案" : "完工提交验收", null);
@@ -777,6 +778,7 @@ public class RepairWorkorderController {
         boolean pass = !"fail".equalsIgnoreCase(result);
         Object verifierId = blankToNull(body.get("verifier_id"));
         if (pass) {
+            OffsetDateTime lastPendingVerifyAt = segmentService.lastSegmentStartedAt(id, "pending_verify");
             processService.insertProcess(id, ProcessRecord.builder("verify_pass")
                     .fromStatus("pending_verify").toStatus("verified")
                     .operatorId(verifierId != null ? verifierId : operatorId())
@@ -786,9 +788,11 @@ public class RepairWorkorderController {
                     .remark(str(body.get("verify_comment"))).build());
             processService.insertProcess(id, ProcessRecord.builder("close")
                     .fromStatus("verified").toStatus("closed").operatorId(operatorId()).remark("验收后关闭").build());
-            processService.syncWorkorderState(id, "closed", null, null);
-            addEvent(id, "verify_pass", "pending_verify", "verified", null, null, null, null, null, str(body.get("verify_comment")), null);
-            addEvent(id, "close", "verified", "closed", null, null, null, null, null, "验收后关闭", null);
+            processService.syncWorkorderState(id, "closed", "verified", null);
+            processService.writeRepairDurationHours(id, wo,
+                    toOffset(wo.get("repair_start_time")), lastPendingVerifyAt, toOffset(wo.get("repair_end_time")));
+            addEvent(id, "verify_pass", "pending_verify", "verified", null, "verified", null, null, null, str(body.get("verify_comment")), null);
+            addEvent(id, "close", "verified", "closed", null, "verified", null, null, null, "验收后关闭", null);
             syncDeviceStatus(wo.get("device_id"), "normal");
             segmentService.openSystemSegment(id, "verified", verifierId, "验收通过", null);
         } else {
@@ -1173,7 +1177,8 @@ public class RepairWorkorderController {
         };
     }
 
-    private List<Map<String, Object>> buildMilestones(Map<String, Object> wo, List<Map<String, Object>> events) {
+    private List<Map<String, Object>> buildMilestones(Map<String, Object> wo, List<Map<String, Object>> events,
+                                                      List<Map<String, Object>> processSegments) {
         String status = str(wo.get("status"));
         boolean skippedDispatch = events.stream().anyMatch(e -> "start_repair".equals(str(e.get("event_type"))))
                 && events.stream().noneMatch(e -> "dispatch".equals(str(e.get("event_type"))));
@@ -1188,13 +1193,69 @@ public class RepairWorkorderController {
                 skippedDispatch, skippedDispatch ? "工程师直修，已跳过派单" : null));
         list.add(milestone("repairing", "开始维修", wo.get("repair_start_time"), false, null));
         list.add(milestone("complete", "维修结束", wo.get("repair_end_time"), false, null));
+
+        // U.16：插入已维修待验收 / 拒绝验收（跟随实际进程与事件，可多次）
+        int pvIdx = 0;
+        int rejectIdx = 0;
+        for (Map<String, Object> seg : processSegments) {
+            String code = str(seg.get("type_code"));
+            String name = str(seg.get("type_name"));
+            if ("pending_verify".equals(code)) {
+                list.add(milestone("pending_verify_" + (++pvIdx),
+                        name.isBlank() ? "已维修待验收" : name,
+                        seg.get("started_at"), false, null));
+            } else if ("verify_rejected".equals(code)) {
+                list.add(milestone("verify_rejected_" + (++rejectIdx),
+                        name.isBlank() ? "拒绝验收" : name,
+                        seg.get("started_at"), false, null));
+            }
+        }
+        for (Map<String, Object> e : events) {
+            String type = str(e.get("event_type"));
+            if ("submit_verify".equals(type) && pvIdx == 0) {
+                list.add(milestone("pending_verify_event", "已维修待验收", e.get("created_at"), false, null));
+            } else if ("verify_fail".equals(type) && rejectIdx == 0) {
+                list.add(milestone("verify_fail_" + e.get("id"), "拒绝验收", e.get("created_at"), false, null));
+            }
+        }
+
         list.add(milestone("verify", "科室验收", wo.get("verify_time"),
                 skippedVerify || ("closed".equals(status) && wo.get("verify_time") == null && wo.get("repair_end_time") != null),
                 skippedVerify ? "已跳过验收直接结案" : null));
         list.add(milestone("closed", "工单关闭",
                 firstNonNull(wo.get("closed_at"), "closed".equals(status) || "cancelled".equals(status) ? wo.get("updated_at") : null),
                 false, null));
+
+        list.sort((a, b) -> {
+            OffsetDateTime ta = toOffset(a.get("at"));
+            OffsetDateTime tb = toOffset(b.get("at"));
+            if (ta == null && tb == null) return 0;
+            if (ta == null) return 1;
+            if (tb == null) return -1;
+            return ta.compareTo(tb);
+        });
         return list;
+    }
+
+    /** U.16：时间轴明细跟随进程段，与详情「维修进程段」一致。 */
+    private List<Map<String, Object>> buildTimelineSegmentsFromProcess(List<Map<String, Object>> processSegments) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> seg : processSegments) {
+            OffsetDateTime start = toOffset(seg.get("started_at"));
+            OffsetDateTime end = toOffset(seg.get("ended_at"));
+            Map<String, Object> row = new LinkedHashMap<>();
+            String code = str(seg.get("type_code"));
+            String name = str(seg.get("type_name"));
+            row.put("type", code);
+            row.put("subStatus", code);
+            row.put("subStatusLabel", name.isBlank() ? code : name);
+            row.put("start", start);
+            row.put("end", end);
+            row.put("minutes", start != null && end != null ? Duration.between(start, end).toMinutes() : 0);
+            row.put("remark", seg.get("remark"));
+            out.add(row);
+        }
+        return out;
     }
 
     private Map<String, Object> milestone(String key, String label, Object at, boolean skipped, String skipReason) {

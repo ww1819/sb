@@ -1418,6 +1418,7 @@ CREATE TABLE repair_workorder_segment_user (
     user_id UUID NOT NULL REFERENCES sys_user(id),
     is_primary BOOLEAN NOT NULL DEFAULT FALSE,
     work_content TEXT,
+    labor_cost DECIMAL(10,2),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by UUID,
@@ -1432,6 +1433,7 @@ COMMENT ON COLUMN repair_workorder_segment_user.segment_id IS '进程段';
 COMMENT ON COLUMN repair_workorder_segment_user.user_id IS '参与工程师';
 COMMENT ON COLUMN repair_workorder_segment_user.is_primary IS '是否主责（同步段 user_id）';
 COMMENT ON COLUMN repair_workorder_segment_user.work_content IS '工程师工作内容（选填）';
+COMMENT ON COLUMN repair_workorder_segment_user.labor_cost IS '工程师人工费（选填）';
 
 -- 5.4 备件库表
 CREATE TABLE spare_part (

@@ -7,6 +7,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.*;
 
 /**
@@ -162,6 +166,10 @@ public class RepairWorkorderProcessService {
         if (status != null && !status.isBlank()) {
             sets.add("status = ?");
             args.add(status);
+            if (("closed".equals(status) || "cancelled".equals(status))
+                    && TableColumnCache.hasColumn(jdbc, "repair_workorder", "closed_at")) {
+                sets.add("closed_at = COALESCE(closed_at, NOW())");
+            }
         }
         if (repairSubStatus != null) {
             sets.add("repair_sub_status = ?");
@@ -180,6 +188,69 @@ public class RepairWorkorderProcessService {
         sets.add("updated_at = NOW()");
         args.add(workorderId);
         jdbc.update("UPDATE repair_workorder SET " + String.join(", ", sets) + " WHERE id = ?::uuid", args.toArray());
+    }
+
+    /** 主单到场时间为空时写入（U.16）。 */
+    public void fillArrivalTimeIfAbsent(UUID workorderId, OffsetDateTime arrivalAt) {
+        if (workorderId == null || arrivalAt == null) return;
+        if (!TableColumnCache.hasColumn(jdbc, "repair_workorder", "arrival_time")) return;
+        jdbc.update("""
+                UPDATE repair_workorder SET arrival_time = ?::timestamptz, updated_at = NOW()
+                WHERE id = ?::uuid AND arrival_time IS NULL
+                """, arrivalAt, workorderId);
+    }
+
+    /**
+     * 验收通过时写入维修工时（小时）：最后一次已维修待验收段 started_at − repair_start_time；
+     * 无待验段则用 repair_end_time − repair_start_time（U.16）。
+     */
+    public void writeRepairDurationHours(UUID workorderId, Map<String, Object> wo,
+                                         OffsetDateTime repairStart, OffsetDateTime pendingVerifyAt,
+                                         OffsetDateTime repairEnd) {
+        if (!TableColumnCache.hasColumn(jdbc, "repair_workorder", "repair_duration_hours")) return;
+        OffsetDateTime start = repairStart;
+        if (start == null && wo != null) {
+            Object v = wo.get("repair_start_time");
+            if (v instanceof OffsetDateTime o) start = o;
+            else if (v != null) {
+                try {
+                    start = OffsetDateTime.parse(String.valueOf(v).replace(" ", "T"));
+                } catch (Exception ignored) { /* skip */ }
+            }
+        }
+        if (start == null) {
+            start = firstActionAt(workorderId, "start_repair")
+                    .map(RepairWorkorderProcessService::toOffsetDateTime)
+                    .orElse(null);
+        }
+        OffsetDateTime end = pendingVerifyAt != null ? pendingVerifyAt : repairEnd;
+        if (end == null && wo != null) {
+            Object v = wo.get("repair_end_time");
+            if (v instanceof OffsetDateTime o) end = o;
+        }
+        if (end == null) {
+            end = latestByAction(workorderId, "complete")
+                    .map(p -> toOffsetDateTime(p.get("created_at")))
+                    .orElse(null);
+        }
+        if (start == null || end == null || end.isBefore(start)) return;
+        double hours = Duration.between(start, end).toMinutes() / 60.0;
+        BigDecimal value = BigDecimal.valueOf(hours).setScale(2, RoundingMode.HALF_UP);
+        jdbc.update("""
+                UPDATE repair_workorder SET repair_duration_hours = ?, updated_at = NOW()
+                WHERE id = ?::uuid
+                """, value, workorderId);
+    }
+
+    private static OffsetDateTime toOffsetDateTime(Object v) {
+        if (v == null) return null;
+        if (v instanceof OffsetDateTime o) return o;
+        if (v instanceof java.sql.Timestamp ts) return ts.toInstant().atOffset(java.time.ZoneOffset.ofHours(8));
+        try {
+            return OffsetDateTime.parse(String.valueOf(v).replace(" ", "T"));
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public void syncStatusOnly(UUID workorderId, String status) {
@@ -250,9 +321,10 @@ public class RepairWorkorderProcessService {
 
         latestByAction(id, "complete").ifPresent(p -> {
             putIfPresent(wo, "solution_description", p.get("solution_description"));
-            putIfPresent(wo, "labor_cost", p.get("labor_cost"));
-            putIfPresent(wo, "parts_cost", p.get("parts_cost"));
-            putIfPresent(wo, "total_cost", p.get("total_cost"));
+            // U.17：主单费用以进程汇总列为准，不覆盖已落库的汇总结果
+            if (wo.get("labor_cost") == null) putIfPresent(wo, "labor_cost", p.get("labor_cost"));
+            if (wo.get("parts_cost") == null) putIfPresent(wo, "parts_cost", p.get("parts_cost"));
+            if (wo.get("total_cost") == null) putIfPresent(wo, "total_cost", p.get("total_cost"));
             putIfPresent(wo, "repair_end_time", p.get("created_at"));
         });
 
@@ -272,8 +344,12 @@ public class RepairWorkorderProcessService {
             putIfPresent(wo, "repair_start_time", at);
             putIfPresent(wo, "response_time", at);
         });
-        latestByAction(id, "close", "cancel").ifPresent(p -> putIfPresent(wo, "closed_at", p.get("created_at")));
-        firstOnSiteArrival(id).ifPresent(at -> putIfPresent(wo, "arrival_time", at));
+        latestByAction(id, "close", "cancel").ifPresent(p -> {
+            if (wo.get("closed_at") == null) putIfPresent(wo, "closed_at", p.get("created_at"));
+        });
+        if (wo.get("arrival_time") == null) {
+            firstOnSiteArrival(id).ifPresent(at -> putIfPresent(wo, "arrival_time", at));
+        }
     }
 
     public void enrichWorkorders(List<Map<String, Object>> rows) {

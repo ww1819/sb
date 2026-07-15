@@ -76,17 +76,18 @@ public class RepairWorkorderSegmentService {
         String userNameSelect = hasUserNameCol
                 ? ", COALESCE(NULLIF(TRIM(s.user_name), ''), u.real_name) AS user_name"
                 : ", u.real_name AS user_name";
-        List<Map<String, Object>> segments = jdbc.queryForList("""
-                SELECT s.*, t.type_code, t.type_name, t.can_add_parts""" + userNameSelect + confirmerSelect + """
-                FROM repair_workorder_segment s
-                JOIN repair_process_type t ON t.id = s.process_type_id"""
-                + SoftDeleteSupport.notDeletedClause(jdbc, "repair_process_type", "t") + """
-                LEFT JOIN sys_user u ON u.id = s.user_id"""
-                + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "u")
-                + confirmerJoin + """
-                WHERE s.workorder_id = ?::uuid""" + segClause + """
-                ORDER BY s.started_at ASC, s.id ASC
-                """, workorderId);
+        List<Map<String, Object>> segments = jdbc.queryForList(
+                "SELECT s.*, t.type_code, t.type_name, t.can_add_parts"
+                        + userNameSelect + confirmerSelect
+                        + " FROM repair_workorder_segment s"
+                        + " JOIN repair_process_type t ON t.id = s.process_type_id"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "repair_process_type", "t")
+                        + " LEFT JOIN sys_user u ON u.id = s.user_id"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "u")
+                        + confirmerJoin
+                        + " WHERE s.workorder_id = ?::uuid" + segClause
+                        + " ORDER BY s.started_at ASC, s.id ASC",
+                workorderId);
         boolean hasSupplierId = TableColumnCache.hasColumn(jdbc, "repair_workorder_segment_part", "supplier_id");
         String supplierJoin = hasSupplierId
                 ? " LEFT JOIN supplier sup ON sup.id = p.supplier_id"
@@ -95,13 +96,15 @@ public class RepairWorkorderSegmentService {
         String supplierSelect = hasSupplierId ? ", sup.supplier_name" : "";
         for (Map<String, Object> seg : segments) {
             UUID segId = UUID.fromString(String.valueOf(seg.get("id")));
-            List<Map<String, Object>> parts = jdbc.queryForList("""
-                    SELECT p.*, sp.part_code, sp.part_name""" + supplierSelect + """
-                    FROM repair_workorder_segment_part p
-                    LEFT JOIN spare_part sp ON sp.id = p.spare_part_id"""
-                    + SoftDeleteSupport.notDeletedClause(jdbc, "spare_part", "sp")
-                    + supplierJoin
-                    + " WHERE p.segment_id = ?::uuid" + partClause + " ORDER BY p.created_at ASC", segId);
+            List<Map<String, Object>> parts = jdbc.queryForList(
+                    "SELECT p.*, sp.part_code, sp.part_name"
+                            + supplierSelect
+                            + " FROM repair_workorder_segment_part p"
+                            + " LEFT JOIN spare_part sp ON sp.id = p.spare_part_id"
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "spare_part", "sp")
+                            + supplierJoin
+                            + " WHERE p.segment_id = ?::uuid" + partClause + " ORDER BY p.created_at ASC",
+                    segId);
             seg.put("parts", parts);
             seg.put("open", seg.get("ended_at") == null);
             enrichSegmentConfirmed(seg);
@@ -155,9 +158,11 @@ public class RepairWorkorderSegmentService {
         UUID segmentId = insertSegment(workorderId, processTypeId, primaryUserId, remark, null, false, start, endedAt, wo);
         saveSegmentUsers(segmentId, engineerRows);
         applyTypeEffect(workorderId, wo, type, primaryUserId);
+        processService.fillArrivalTimeIfAbsent(workorderId, start);
         if (toBool(type.get("can_add_parts")) && parts != null) {
             saveParts(segmentId, parts, true);
         }
+        recalculateWorkorderCosts(workorderId);
         return loadSegment(segmentId);
     }
 
@@ -212,6 +217,7 @@ public class RepairWorkorderSegmentService {
         }
         assertSegmentEditable(seg);
         UUID id = insertPart(segmentId, body);
+        recalculateWorkorderCosts(UUID.fromString(String.valueOf(seg.get("workorder_id"))));
         return loadPart(id);
     }
 
@@ -394,6 +400,7 @@ public class RepairWorkorderSegmentService {
                     """ + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment", null),
                     remark, startedAt, endedAt, blankToNull(operator), segmentId, workorderId);
         }
+        recalculateWorkorderCosts(workorderId);
         return loadSegment(segmentId);
     }
 
@@ -409,6 +416,7 @@ public class RepairWorkorderSegmentService {
         assertSegmentBelongs(workorderId, seg);
         assertSegmentEditable(seg);
         SoftDeleteSupport.softDelete(jdbc, "repair_workorder_segment", segmentId.toString());
+        recalculateWorkorderCosts(workorderId);
     }
 
     @Transactional
@@ -455,6 +463,7 @@ public class RepairWorkorderSegmentService {
                     """ + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment_part", null),
                     qty, unitPrice, total, remark, blankToNull(operator), partId, segmentId);
         }
+        recalculateWorkorderCosts(UUID.fromString(String.valueOf(seg.get("workorder_id"))));
         return loadPart(partId);
     }
 
@@ -467,6 +476,7 @@ public class RepairWorkorderSegmentService {
             throw new BizException(404, "配件明细不属于该进程段");
         }
         SoftDeleteSupport.softDelete(jdbc, "repair_workorder_segment_part", partId.toString());
+        recalculateWorkorderCosts(UUID.fromString(String.valueOf(seg.get("workorder_id"))));
     }
 
     /**
@@ -492,6 +502,60 @@ public class RepairWorkorderSegmentService {
         Object confirmed = seg.get("confirmed");
         if (confirmed instanceof Boolean b) return b;
         return toBool(seg.get("auto_created"));
+    }
+
+    /**
+     * U.17：重算主单备件费 / 工时费 / 总费用。
+     */
+    public void recalculateWorkorderCosts(UUID workorderId) {
+        if (workorderId == null || !segmentTableReady()) return;
+        String segClause = SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment", "s");
+        String partClause = SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment_part", "p");
+        BigDecimal parts = jdbc.queryForObject(
+                "SELECT COALESCE(SUM(COALESCE(p.total_price, COALESCE(p.quantity, 0) * COALESCE(p.unit_price, 0))), 0)"
+                        + " FROM repair_workorder_segment_part p"
+                        + " JOIN repair_workorder_segment s ON s.id = p.segment_id" + segClause
+                        + " WHERE s.workorder_id = ?::uuid" + partClause,
+                BigDecimal.class, workorderId);
+        BigDecimal labor = BigDecimal.ZERO;
+        if (TableColumnCache.hasTable(jdbc, "repair_workorder_segment_user")
+                && TableColumnCache.hasColumn(jdbc, "repair_workorder_segment_user", "labor_cost")) {
+            String userClause = SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment_user", "su");
+            labor = jdbc.queryForObject(
+                    "SELECT COALESCE(SUM(COALESCE(su.labor_cost, 0)), 0)"
+                            + " FROM repair_workorder_segment_user su"
+                            + " JOIN repair_workorder_segment s ON s.id = su.segment_id" + segClause
+                            + " WHERE s.workorder_id = ?::uuid" + userClause,
+                    BigDecimal.class, workorderId);
+        }
+        if (parts == null) parts = BigDecimal.ZERO;
+        if (labor == null) labor = BigDecimal.ZERO;
+        BigDecimal total = parts.add(labor);
+        jdbc.update("""
+                UPDATE repair_workorder
+                SET parts_cost = ?, labor_cost = ?, total_cost = ?, updated_at = NOW()
+                WHERE id = ?::uuid
+                """, parts, labor, total, workorderId);
+    }
+
+    /**
+     * 指定进程类型最近一次段的 started_at（U.16 工时计算）。
+     */
+    public OffsetDateTime lastSegmentStartedAt(UUID workorderId, String typeCode) {
+        if (!segmentTableReady() || typeCode == null || typeCode.isBlank()) return null;
+        String segClause = SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment", "s");
+        String typeClause = SoftDeleteSupport.notDeletedClause(jdbc, "repair_process_type", "t");
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT s.started_at FROM repair_workorder_segment s"
+                        + " JOIN repair_process_type t ON t.id = s.process_type_id" + typeClause
+                        + " WHERE s.workorder_id = ?::uuid AND t.type_code = ?" + segClause
+                        + " ORDER BY s.started_at DESC NULLS LAST, s.id DESC LIMIT 1",
+                workorderId, typeCode);
+        if (rows.isEmpty()) return null;
+        Object v = rows.get(0).get("started_at");
+        if (v instanceof OffsetDateTime o) return o;
+        if (v instanceof java.sql.Timestamp ts) return ts.toInstant().atOffset(java.time.ZoneOffset.ofHours(8));
+        return null;
     }
 
     private void assertSegmentBelongs(UUID workorderId, Map<String, Object> seg) {
@@ -688,13 +752,15 @@ public class RepairWorkorderSegmentService {
         String confirmerSelect = hasConfirmedByName
                 ? ", COALESCE(NULLIF(TRIM(s.confirmed_by_name), ''), cu.real_name) AS confirmed_by_name"
                 : (hasConfirmedBy ? ", cu.real_name AS confirmed_by_name" : "");
-        List<Map<String, Object>> rows = jdbc.queryForList("""
-                SELECT s.*, t.type_code, t.type_name, t.can_add_parts""" + confirmerSelect + """
-                FROM repair_workorder_segment s
-                JOIN repair_process_type t ON t.id = s.process_type_id"""
-                + SoftDeleteSupport.notDeletedClause(jdbc, "repair_process_type", "t")
-                + confirmerJoin + """
-                WHERE s.id = ?::uuid""" + clause, segmentId);
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT s.*, t.type_code, t.type_name, t.can_add_parts"
+                        + confirmerSelect
+                        + " FROM repair_workorder_segment s"
+                        + " JOIN repair_process_type t ON t.id = s.process_type_id"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "repair_process_type", "t")
+                        + confirmerJoin
+                        + " WHERE s.id = ?::uuid" + clause,
+                segmentId);
         if (rows.isEmpty()) throw new BizException(404, "进程段不存在");
         Map<String, Object> seg = rows.get(0);
         UUID segId = UUID.fromString(String.valueOf(seg.get("id")));
@@ -720,18 +786,21 @@ public class RepairWorkorderSegmentService {
         String clause = SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment_user", "su");
         boolean hasWorkContent = TableColumnCache.hasColumn(jdbc, "repair_workorder_segment_user", "work_content");
         boolean hasUserNameCol = TableColumnCache.hasColumn(jdbc, "repair_workorder_segment_user", "user_name");
+        boolean hasLaborCost = TableColumnCache.hasColumn(jdbc, "repair_workorder_segment_user", "labor_cost");
         String workContentSelect = hasWorkContent ? ", su.work_content" : "";
+        String laborSelect = hasLaborCost ? ", su.labor_cost" : "";
         String userNameSelect = hasUserNameCol
                 ? ", COALESCE(NULLIF(TRIM(su.user_name), ''), u.real_name) AS user_name"
                 : ", u.real_name AS user_name";
-        List<Map<String, Object>> rows = jdbc.queryForList("""
-                SELECT su.user_id, su.is_primary""" + userNameSelect + workContentSelect + """
-                FROM repair_workorder_segment_user su
-                LEFT JOIN sys_user u ON u.id = su.user_id"""
-                + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "u") + """
-                WHERE su.segment_id = ?::uuid""" + clause + """
-                ORDER BY su.is_primary DESC, su.created_at ASC
-                """, segmentId);
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT su.user_id, su.is_primary"
+                        + userNameSelect + workContentSelect + laborSelect
+                        + " FROM repair_workorder_segment_user su"
+                        + " LEFT JOIN sys_user u ON u.id = su.user_id"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "u")
+                        + " WHERE su.segment_id = ?::uuid" + clause
+                        + " ORDER BY su.is_primary DESC, su.created_at ASC",
+                segmentId);
         if (rows.isEmpty() && seg.get("user_id") != null) {
             seg.put("user_ids", List.of(String.valueOf(seg.get("user_id"))));
             seg.put("user_names", seg.get("user_name") != null
@@ -787,6 +856,7 @@ public class RepairWorkorderSegmentService {
         if (rows.isEmpty()) return;
         boolean hasWorkContent = TableColumnCache.hasColumn(jdbc, "repair_workorder_segment_user", "work_content");
         boolean hasUserName = TableColumnCache.hasColumn(jdbc, "repair_workorder_segment_user", "user_name");
+        boolean hasLaborCost = TableColumnCache.hasColumn(jdbc, "repair_workorder_segment_user", "labor_cost");
         String operator = TenantContext.getUserId();
         String operatorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, operator);
         boolean anyPrimary = rows.stream().anyMatch(r -> toBool(r.get("is_primary")));
@@ -796,6 +866,7 @@ public class RepairWorkorderSegmentService {
             if (uid.isBlank()) continue;
             boolean primary = anyPrimary ? toBool(eng.get("is_primary")) : i == 0;
             Object workContent = blankToNull(eng.get("work_content"));
+            Object laborCost = eng.get("labor_cost");
             String userName = SoftDeleteSupport.resolveUserDisplayName(jdbc, uid);
             if (hasWorkContent && hasUserName) {
                 jdbc.update("""
@@ -849,6 +920,13 @@ public class RepairWorkorderSegmentService {
                         UUID.randomUUID(), segmentId, uid, primary,
                         blankToNull(operator), blankToNull(operator));
             }
+            if (hasLaborCost) {
+                jdbc.update("""
+                        UPDATE repair_workorder_segment_user SET labor_cost = ?
+                        WHERE segment_id = ?::uuid AND user_id = ?::uuid
+                        """ + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment_user", null),
+                        laborCost, segmentId, uid);
+            }
             i++;
         }
     }
@@ -888,6 +966,16 @@ public class RepairWorkorderSegmentService {
             row.put("user_id", id);
             Object wc = eng.get("work_content") != null ? eng.get("work_content") : eng.get("workContent");
             if (wc != null) row.put("work_content", String.valueOf(wc));
+            Object labor = eng.get("labor_cost") != null ? eng.get("labor_cost") : eng.get("laborCost");
+            if (labor != null && !String.valueOf(labor).isBlank()) {
+                try {
+                    row.put("labor_cost", new BigDecimal(String.valueOf(labor)));
+                } catch (NumberFormatException ignored) {
+                    row.put("labor_cost", null);
+                }
+            } else {
+                row.put("labor_cost", null);
+            }
             Object primary = eng.get("is_primary") != null ? eng.get("is_primary") : eng.get("isPrimary");
             if (primary != null) row.put("is_primary", primary);
             out.add(row);
