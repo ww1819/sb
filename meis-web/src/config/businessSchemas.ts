@@ -164,6 +164,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
       list: true,
       placeholder: '留空为一级分类'
     },
+    { prop: 'parent_name', label: '上级分类名称', list: true, readonly: true },
     { prop: 'level', label: '层级', type: 'number', list: true, readonly: true },
     { prop: 'full_path', label: '完整路径', readonly: true },
     { prop: 'sort_order', label: '排序', type: 'number', list: true },

@@ -9,6 +9,7 @@ public final class ImportFieldRegistry {
     public static final String DEPARTMENT = "department";
     public static final String SUPPLIER = "supplier";
     public static final String MANUFACTURER = "manufacturer";
+    public static final String DEVICE_CATEGORY = "medical_device_category";
 
     private static final Map<String, List<ImportFieldDef>> DEFAULTS = buildDefaults();
 
@@ -101,6 +102,13 @@ public final class ImportFieldRegistry {
                 f("is_inspection_device", "巡检设备", "boolean", "is_inspection_device", false, 186),
                 f("remark", "备注", "string", "remark", false, 190),
                 f("is_active", "启用", "boolean", "is_active", false, 200)
+        ));
+
+        map.put(DEVICE_CATEGORY, List.of(
+                f("category_code", "分类编码", "string", "category_code", true, 10),
+                f("category_name", "分类名称", "string", "category_name", true, 20),
+                f("parent_code", "上级编码", "string", "parent_code", false, 30),
+                f("sort_order", "排序", "number", "sort_order", false, 40)
         ));
 
         return Map.copyOf(map);

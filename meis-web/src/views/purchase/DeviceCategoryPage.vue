@@ -16,9 +16,10 @@
         :data="treeData"
         :props="{ label: 'label', children: 'children' }"
         :filter-node-method="filterNode"
+        :default-expanded-keys="[ALL_ID]"
         highlight-current
-        default-expand-all
         @node-click="onNodeClick"
+        @node-expand="onNodeExpand"
       />
     </aside>
     <div class="list-pane">
@@ -28,6 +29,7 @@
         :default-form-values="defaultFormValues"
         @saved="loadTree"
         @deleted="loadTree"
+        @imported="loadTree"
       >
         <template #form="{ form, fields, mode }">
           <el-form label-width="130px" :disabled="mode === 'view'">
@@ -122,7 +124,7 @@ onMounted(async () => {
 async function loadTree() {
   treeLoading.value = true
   try {
-    const { data } = await http.get('/system/medical_device_category/list', { params: { limit: 500 } })
+    const { data } = await http.get('/system/medical_device_category/list', { params: { limit: 5000 } })
     if (data.code === 0) flatRows.value = data.data ?? []
   } finally {
     treeLoading.value = false
@@ -165,6 +167,23 @@ function filterNode(value: string, data: TreeNode) {
 
 function onNodeClick(data: TreeNode) {
   selectedId.value = data.id
+}
+
+/** 同级手风琴：展开一个时收起同父节点下其它已展开兄弟（含其子孙） */
+function onNodeExpand(_data: TreeNode, node: { parent?: { childNodes?: Array<{ expanded?: boolean; childNodes?: unknown[] }> }; childNodes?: unknown[] }) {
+  const siblings = node.parent?.childNodes
+  if (!siblings?.length) return
+  for (const sibling of siblings) {
+    if (sibling === node) continue
+    if (sibling.expanded) collapseTreeNode(sibling)
+  }
+}
+
+function collapseTreeNode(node: { expanded?: boolean; childNodes?: Array<{ expanded?: boolean; childNodes?: unknown[] }> }) {
+  node.expanded = false
+  for (const child of node.childNodes ?? []) {
+    collapseTreeNode(child)
+  }
 }
 
 /** 不可选自身及子孙编码，防止成环；清空上级=一级分类 */

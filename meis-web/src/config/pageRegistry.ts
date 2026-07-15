@@ -161,6 +161,8 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'medical_device_category',
     formPlacement: 'right',
     showRowIndex: true,
+    importable: true,
+    sortableColumns: ['category_code', 'category_name', 'parent_code'],
     enableView: true
   },
   '/purchase/manufacturer': {
@@ -204,6 +206,8 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'medical_device_category',
     formPlacement: 'right',
     showRowIndex: true,
+    importable: true,
+    sortableColumns: ['category_code', 'category_name', 'parent_code'],
     enableView: true
   },
   '/dict/campus': { title: '院区管理', apiBase: '/system', table: 'campus',
@@ -688,6 +692,8 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'medical_device_category',
     formPlacement: 'right',
     showRowIndex: true,
+    importable: true,
+    sortableColumns: ['category_code', 'category_name', 'parent_code'],
     enableView: true
   },
   '/system/manufacturer': {

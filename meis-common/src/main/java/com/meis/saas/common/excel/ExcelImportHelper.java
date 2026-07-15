@@ -41,28 +41,81 @@ public final class ExcelImportHelper {
             Iterator<Row> it = sheet.iterator();
             if (!it.hasNext()) throw new BizException(400, "Excel 无表头行");
             Row headerRow = it.next();
-            List<String> headers = readRow(headerRow);
-            headers = fields == null || fields.isEmpty()
-                    ? ImportHeaderMapper.normalizeHeaders(headers, List.of())
-                    : ImportHeaderMapper.normalizeHeaders(headers, fields);
+            List<String> rawHeaders = readRow(headerRow);
 
+            // 无表头两列表：首行即为「编码 / 名称」数据
+            boolean dataFirst = isCategoryDataFirstRow(rawHeaders, fields);
+            List<String> headers;
             List<Map<String, String>> rows = new ArrayList<>();
+            if (dataFirst) {
+                headers = List.of("category_code", "category_name");
+                rows.add(rowMap(headers, rawHeaders));
+            } else {
+                headers = fields == null || fields.isEmpty()
+                        ? ImportHeaderMapper.normalizeHeaders(rawHeaders, List.of())
+                        : ImportHeaderMapper.normalizeHeaders(rawHeaders, fields);
+            }
+
             while (it.hasNext()) {
                 Row row = it.next();
                 List<String> cells = readRow(row);
                 if (cells.stream().allMatch(v -> v == null || v.isBlank())) continue;
-                Map<String, String> map = new LinkedHashMap<>();
-                for (int c = 0; c < headers.size(); c++) {
-                    String key = headers.get(c);
-                    if (key == null || key.isBlank()) continue;
-                    String val = c < cells.size() && cells.get(c) != null ? cells.get(c).trim() : "";
-                    map.put(key, val);
-                }
-                rows.add(map);
+                rows.add(rowMap(headers, cells));
             }
             if (rows.isEmpty()) throw new BizException(400, "Excel 无有效数据");
             return rows;
         }
+    }
+
+    /**
+     * 设备分类：解析后若没有 category_code 列，则把前两列当作编码/名称。
+     */
+    public static List<Map<String, String>> ensureCategoryTwoColumnRows(List<Map<String, String>> rows) {
+        if (rows == null || rows.isEmpty()) return rows;
+        boolean hasCode = rows.stream().anyMatch(r ->
+                nonBlank(r.get("category_code")) || nonBlank(r.get("分类编码")) || nonBlank(r.get("分类编码(68码)")));
+        if (hasCode) return rows;
+        List<Map<String, String>> out = new ArrayList<>();
+        for (Map<String, String> r : rows) {
+            List<String> vals = new ArrayList<>();
+            for (String v : r.values()) {
+                if (v != null && !v.isBlank()) vals.add(v.trim());
+            }
+            if (vals.size() < 2) continue;
+            Map<String, String> m = new LinkedHashMap<>();
+            m.put("category_code", vals.get(0));
+            m.put("category_name", vals.get(1));
+            out.add(m);
+        }
+        return out;
+    }
+
+    private static boolean isCategoryDataFirstRow(List<String> rawHeaders, List<ImportFieldDef> fields) {
+        if (rawHeaders == null || rawHeaders.size() < 2) return false;
+        boolean hasCategoryFields = fields != null && fields.stream().anyMatch(f -> "category_code".equals(f.getFieldKey()));
+        if (!hasCategoryFields) return false;
+        String first = rawHeaders.get(0) == null ? "" : rawHeaders.get(0).trim();
+        String second = rawHeaders.get(1) == null ? "" : rawHeaders.get(1).trim();
+        if (second.isBlank()) return false;
+        List<String> normalized = ImportHeaderMapper.normalizeHeaders(rawHeaders, fields);
+        if (normalized.stream().anyMatch("category_code"::equals)) return false;
+        String digits = first.replaceAll("\\.0$", "");
+        return digits.matches("\\d{1,6}");
+    }
+
+    private static Map<String, String> rowMap(List<String> headers, List<String> cells) {
+        Map<String, String> map = new LinkedHashMap<>();
+        for (int c = 0; c < headers.size(); c++) {
+            String key = headers.get(c);
+            if (key == null || key.isBlank()) continue;
+            String val = c < cells.size() && cells.get(c) != null ? cells.get(c).trim() : "";
+            map.put(key, val);
+        }
+        return map;
+    }
+
+    private static boolean nonBlank(String s) {
+        return s != null && !s.isBlank();
     }
 
     public static void writeTemplate(HttpServletResponse resp, String filename, List<ImportFieldDef> fields) throws IOException {
@@ -137,15 +190,19 @@ public final class ExcelImportHelper {
         return cells;
     }
 
+    private static final DataFormatter CELL_FORMATTER = new DataFormatter();
+
     private static String readCell(Cell cell) {
         if (cell == null) return "";
+        String formatted = CELL_FORMATTER.formatCellValue(cell);
+        if (formatted != null && !formatted.isBlank()) return formatted.trim();
         return switch (cell.getCellType()) {
             case STRING -> cell.getStringCellValue();
             case NUMERIC -> DateUtil.isCellDateFormatted(cell)
                     ? cell.getLocalDateTimeCellValue().toLocalDate().toString()
                     : trimNumeric(cell.getNumericCellValue());
             case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
-            case FORMULA -> cell.getCellType() == CellType.STRING ? cell.getStringCellValue() : String.valueOf(cell.getNumericCellValue());
+            case FORMULA -> CELL_FORMATTER.formatCellValue(cell);
             default -> "";
         };
     }
