@@ -50,8 +50,8 @@
       </template>
 
       <el-table v-loading="loading" :data="rows" stripe class="system-table" :height="tableHeight" row-key="id" @row-dblclick="openDetail">
-        <el-table-column prop="device_code" label="设备编码" min-width="120" show-overflow-tooltip />
-        <el-table-column prop="device_name" label="设备名称" min-width="160" show-overflow-tooltip />
+        <el-table-column prop="device_code" label="资产编码" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="device_name" label="资产名称" min-width="160" show-overflow-tooltip />
         <el-table-column prop="brand" label="品牌" min-width="100" show-overflow-tooltip />
         <el-table-column prop="model" label="型号" min-width="100" show-overflow-tooltip />
         <el-table-column prop="dept_name" label="使用科室" min-width="120" show-overflow-tooltip />

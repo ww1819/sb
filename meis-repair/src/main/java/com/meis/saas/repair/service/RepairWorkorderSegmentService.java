@@ -43,14 +43,14 @@ public class RepairWorkorderSegmentService {
     }
 
     public List<Map<String, Object>> listEngineerAddableTypes(UUID workorderId, String woStatus) {
-        // 进程类型主数据与 segment 表解耦：缺 segment 表时仍应返回类型，避免下拉静默「无数据」
+        if (!segmentTableReady()) return List.of();
         return listActiveTypes().stream()
                 .filter(t -> canEngineerAddType(t, woStatus))
                 .toList();
     }
 
     public boolean canEngineerAddType(Map<String, Object> type, String woStatus) {
-        if (!toBool(type.get("can_engineer_add"))) return false;
+        if (!Boolean.TRUE.equals(type.get("can_engineer_add"))) return false;
         String rule = str(type.get("engineer_add_rule"));
         if ("system_only".equals(rule)) return false;
         if ("verify_rejected_only".equals(rule)) {
@@ -90,8 +90,7 @@ public class RepairWorkorderSegmentService {
 
     @Transactional
     public Map<String, Object> addEngineerSegment(UUID workorderId, Map<String, Object> wo, UUID processTypeId,
-                                                  String remark, List<Map<String, Object>> parts,
-                                                  Object userIdOverride, OffsetDateTime startedAt, OffsetDateTime endedAt) {
+                                                  String remark, List<Map<String, Object>> parts) {
         if (!segmentTableReady()) {
             throw new BizException(500, "repair_workorder_segment 表不存在，请重启 meis-tenant 完成迁移");
         }
@@ -103,28 +102,15 @@ public class RepairWorkorderSegmentService {
         if (!canEngineerAddType(type, status)) {
             throw new BizException(400, "当前不可添加该进程类型: " + type.get("type_name"));
         }
-        Object userId = blankToNull(userIdOverride);
-        if (userId == null) {
-            userId = blankToNull(wo.get("assigned_user_id"));
-        }
-        if (userId == null) {
+        Object userId = wo.get("assigned_user_id");
+        if (userId == null || String.valueOf(userId).isBlank()) {
             userId = TenantContext.getUserId();
         }
-        if (userId == null || String.valueOf(userId).isBlank()) {
-            throw new BizException(400, "请选择维修工程师");
-        }
-        assertIsRepairEngineer(userId);
-
-        OffsetDateTime start = startedAt != null ? startedAt : OffsetDateTime.now();
-        if (endedAt != null && endedAt.isBefore(start)) {
-            throw new BizException(400, "结束时间不能早于开始时间");
-        }
-
-        closeOpenSegment(workorderId, start);
-        UUID segmentId = insertSegment(workorderId, processTypeId, userId, remark, null, false, start, endedAt);
+        closeOpenSegment(workorderId, OffsetDateTime.now());
+        UUID segmentId = insertSegment(workorderId, processTypeId, userId, remark, null, false);
         applyTypeEffect(workorderId, wo, type, userId);
-        if (toBool(type.get("can_add_parts")) && parts != null) {
-            saveParts(segmentId, parts);
+        if (Boolean.TRUE.equals(type.get("can_add_parts")) && parts != null) {
+            saveParts(segmentId, parts, true);
         }
         return loadSegment(segmentId);
     }
@@ -136,7 +122,7 @@ public class RepairWorkorderSegmentService {
         Map<String, Object> type = requireTypeByCode(typeCode);
         closeOpenSegment(workorderId, OffsetDateTime.now());
         UUID segmentId = insertSegment(workorderId, UUID.fromString(String.valueOf(type.get("id"))),
-                userId, remark, verifyComment, true, OffsetDateTime.now(), null);
+                userId, remark, verifyComment, true);
         Map<String, Object> wo = jdbc.queryForList(
                 "SELECT * FROM repair_workorder WHERE id = ?::uuid"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null), workorderId)
@@ -151,7 +137,7 @@ public class RepairWorkorderSegmentService {
         Map<String, Object> type = requireTypeByCode(typeCode);
         closeOpenSegment(workorderId, OffsetDateTime.now());
         UUID segmentId = insertSegment(workorderId, UUID.fromString(String.valueOf(type.get("id"))),
-                userId, remark, null, false, OffsetDateTime.now(), null);
+                userId, remark, null, false);
         Map<String, Object> wo = jdbc.queryForList(
                 "SELECT * FROM repair_workorder WHERE id = ?::uuid"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null), workorderId)
@@ -172,7 +158,7 @@ public class RepairWorkorderSegmentService {
     @Transactional
     public Map<String, Object> addPart(UUID segmentId, Map<String, Object> body) {
         Map<String, Object> seg = loadSegment(segmentId);
-        if (!toBool(seg.get("can_add_parts"))) {
+        if (!Boolean.TRUE.equals(seg.get("can_add_parts"))) {
             throw new BizException(400, "该进程段不可添加配件");
         }
         if (seg.get("ended_at") != null) {
@@ -183,17 +169,15 @@ public class RepairWorkorderSegmentService {
     }
 
     private UUID insertSegment(UUID workorderId, UUID processTypeId, Object userId,
-                               String remark, String verifyComment, boolean autoCreated,
-                               OffsetDateTime startedAt, OffsetDateTime endedAt) {
+                               String remark, String verifyComment, boolean autoCreated) {
         UUID id = UUID.randomUUID();
         String operator = TenantContext.getUserId();
-        OffsetDateTime start = startedAt != null ? startedAt : OffsetDateTime.now();
         jdbc.update("""
                 INSERT INTO repair_workorder_segment
-                (id, workorder_id, process_type_id, user_id, started_at, ended_at, remark, verify_comment, auto_created, created_by, updated_by)
-                VALUES (?::uuid,?::uuid,?::uuid,?::uuid,?::timestamptz,?::timestamptz,?,?,?,?,?::uuid,?::uuid)
+                (id, workorder_id, process_type_id, user_id, started_at, remark, verify_comment, auto_created, created_by, updated_by)
+                VALUES (?::uuid,?::uuid,?::uuid,?::uuid,NOW(),?,?,?,?,?::uuid,?::uuid)
                 """,
-                id, workorderId, processTypeId, blankToNull(userId), start, endedAt, remark, verifyComment, autoCreated,
+                id, workorderId, processTypeId, blankToNull(userId), remark, verifyComment, autoCreated,
                 blankToNull(operator), blankToNull(operator));
         return id;
     }
@@ -223,7 +207,7 @@ public class RepairWorkorderSegmentService {
         }
     }
 
-    private void saveParts(UUID segmentId, List<Map<String, Object>> parts) {
+    private void saveParts(UUID segmentId, List<Map<String, Object>> parts, boolean validateType) {
         for (Map<String, Object> p : parts) {
             insertPart(segmentId, p);
         }
@@ -282,16 +266,6 @@ public class RepairWorkorderSegmentService {
         return rows.get(0);
     }
 
-    private void assertIsRepairEngineer(Object userId) {
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT COALESCE(is_repair_engineer, false) AS is_repair_engineer FROM sys_user WHERE id = ?::uuid AND is_active = true"
-                        + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", null),
-                userId);
-        if (rows.isEmpty() || !toBool(rows.get(0).get("is_repair_engineer"))) {
-            throw new BizException(400, "所选人员不是维修工程师");
-        }
-    }
-
     private void syncDeviceStatus(Object deviceId, String status) {
         if (deviceId == null || String.valueOf(deviceId).isBlank()) return;
         jdbc.update("UPDATE medical_device SET device_status = ?, updated_at = NOW() WHERE id = ?::uuid", status, deviceId);
@@ -310,38 +284,5 @@ public class RepairWorkorderSegmentService {
 
     private static String str(Object v) {
         return v == null ? "" : String.valueOf(v);
-    }
-
-    private static boolean toBool(Object v) {
-        if (v == null) return false;
-        if (v instanceof Boolean b) return b;
-        if (v instanceof Number n) return n.intValue() != 0;
-        String s = String.valueOf(v).trim();
-        return "true".equalsIgnoreCase(s) || "t".equalsIgnoreCase(s) || "1".equals(s) || "yes".equalsIgnoreCase(s);
-    }
-
-    /** 解析前端传入的时间（支持本地 datetime / ISO） */
-    public static OffsetDateTime parseDateTime(Object raw) {
-        if (raw == null) return null;
-        String s = String.valueOf(raw).trim();
-        if (s.isEmpty() || "null".equalsIgnoreCase(s)) return null;
-        try {
-            if (s.endsWith("Z") || s.matches(".*[+-]\\d{2}:\\d{2}$")) {
-                return OffsetDateTime.parse(s);
-            }
-        } catch (Exception ignored) {
-            // fall through
-        }
-        String norm = s.replace(' ', 'T');
-        if (norm.length() == 16) {
-            norm = norm + ":00";
-        }
-        try {
-            return java.time.LocalDateTime.parse(norm)
-                    .atZone(java.time.ZoneId.systemDefault())
-                    .toOffsetDateTime();
-        } catch (Exception e) {
-            throw new BizException(400, "时间格式不正确: " + raw);
-        }
     }
 }

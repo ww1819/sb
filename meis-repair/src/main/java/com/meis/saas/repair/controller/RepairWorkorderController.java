@@ -6,7 +6,6 @@ import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
-import com.meis.saas.common.persistence.TableColumnCache;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
 import com.meis.saas.repair.service.RepairWorkorderProcessService;
@@ -186,23 +185,9 @@ public class RepairWorkorderController {
         UUID typeId = UUID.fromString(String.valueOf(rawTypeId));
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> parts = (List<Map<String, Object>>) body.getOrDefault("parts", List.of());
-        Object userId = resolveUserId(body);
-        OffsetDateTime startedAt = RepairWorkorderSegmentService.parseDateTime(
-                body.get("startedAt") != null ? body.get("startedAt") : body.get("started_at"));
-        OffsetDateTime endedAt = null;
-        Object enableEnd = body.get("enableEndedAt") != null ? body.get("enableEndedAt") : body.get("enable_ended_at");
-        Object rawEnded = body.get("endedAt") != null ? body.get("endedAt") : body.get("ended_at");
-        if (Boolean.TRUE.equals(enableEnd) || "true".equalsIgnoreCase(String.valueOf(enableEnd))
-                || (rawEnded != null && !String.valueOf(rawEnded).isBlank())) {
-            endedAt = RepairWorkorderSegmentService.parseDateTime(rawEnded);
-            if (endedAt == null) {
-                throw new BizException(400, "请填写结束时间");
-            }
-        }
-        Map<String, Object> seg = segmentService.addEngineerSegment(
-                id, wo, typeId, str(body.get("remark")), parts, userId, startedAt, endedAt);
+        Map<String, Object> seg = segmentService.addEngineerSegment(id, wo, typeId, str(body.get("remark")), parts);
         addEvent(id, "add_segment", str(wo.get("status")), str(loadWorkorder(id).get("status")),
-                null, null, seg.get("user_id"), null, null,
+                null, null, wo.get("assigned_user_id"), null, null,
                 "添加进程段: " + seg.get("type_name"), null);
         return Result.ok(seg);
     }
@@ -493,9 +478,6 @@ public class RepairWorkorderController {
     @OperationLog(module = "repair", description = "工程师抢单")
     public Result<Map<String, Object>> grab(@PathVariable UUID id, @RequestBody(required = false) Map<String, Object> body) {
         assertRepairEngineer();
-        if (!TableColumnCache.hasColumn(jdbc, "repair_workorder", "assigned_user_id")) {
-            throw new BizException(500, "库表缺少 assigned_user_id，请重启 meis-tenant 完成迁移后再抢单");
-        }
         Map<String, Object> wo = requireWo(id);
         String current = str(wo.get("status"));
         if (!Set.of("reported", "dispatching").contains(current)) {
@@ -508,11 +490,9 @@ public class RepairWorkorderController {
         String remark = body != null ? str(body.get("remark")) : "工程师抢单";
         if (remark.isBlank()) remark = "工程师抢单";
 
-        String subCol = TableColumnCache.hasColumn(jdbc, "repair_workorder", "repair_sub_status")
-                ? ", repair_sub_status = 'internal'" : "";
         int updated = jdbc.update("""
                 UPDATE repair_workorder
-                SET status = 'repairing', assigned_user_id = ?::uuid""" + subCol + """, updated_at = NOW()
+                SET status = 'repairing', assigned_user_id = ?::uuid, repair_sub_status = 'internal', updated_at = NOW()
                 WHERE id = ?::uuid AND status IN ('reported','dispatching') AND assigned_user_id IS NULL
                 """, userId, id);
         if (updated == 0) {
@@ -858,7 +838,7 @@ public class RepairWorkorderController {
                 "SELECT COALESCE(is_repair_engineer, false) AS is_repair_engineer FROM sys_user WHERE id = ?::uuid AND is_active = true"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", null),
                 uid);
-        if (rows.isEmpty() || !toBool(rows.get(0).get("is_repair_engineer"))) {
+        if (rows.isEmpty() || !Boolean.TRUE.equals(rows.get(0).get("is_repair_engineer"))) {
             throw new BizException(403, "仅维修工程师可执行此操作");
         }
     }
@@ -893,14 +873,6 @@ public class RepairWorkorderController {
 
     private static String str(Object v) {
         return v == null ? "" : String.valueOf(v);
-    }
-
-    private static boolean toBool(Object v) {
-        if (v == null) return false;
-        if (v instanceof Boolean b) return b;
-        if (v instanceof Number n) return n.intValue() != 0;
-        String s = String.valueOf(v).trim();
-        return "true".equalsIgnoreCase(s) || "t".equalsIgnoreCase(s) || "1".equals(s) || "yes".equalsIgnoreCase(s);
     }
 
     private static String mapRepairType(String sub) {

@@ -50,6 +50,9 @@ public final class ImportHeaderMapper {
         for (ImportFieldDef f : ImportFieldRegistry.get(ImportFieldRegistry.MEDICAL_DEVICE)) {
             alias.put(normalize(f.getFieldLabel()), f.getFieldKey());
         }
+        // 兼容旧模板列名
+        alias.put(normalize("设备编码"), "device_code");
+        alias.put(normalize("设备名称"), "device_name");
         return alias;
     }
 }

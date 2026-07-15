@@ -190,9 +190,9 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'is_active', label: '启用', type: 'boolean', list: true }
   ],
   medical_device: [
-    { prop: 'device_code', label: '设备编码', list: true, group: 'basic', required: true },
+    { prop: 'device_code', label: '资产编码', list: true, group: 'basic', required: true },
     { prop: 'card_code', label: '卡片编码', group: 'basic' },
-    { prop: 'device_name', label: '设备名称', list: true, group: 'basic', required: true },
+    { prop: 'device_name', label: '资产名称', list: true, group: 'basic', required: true },
     { prop: 'pinyin_code', label: '拼音简码', group: 'basic' },
     { prop: 'brand', label: '品牌', list: true, group: 'basic' },
     { prop: 'specification', label: '规格', list: true, group: 'basic' },

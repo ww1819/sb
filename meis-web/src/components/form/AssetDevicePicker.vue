@@ -5,13 +5,13 @@
         <el-input v-model="filters.deptName" clearable placeholder="科室名称" @keyup.enter="load" />
       </el-form-item>
       <el-form-item label="名称">
-        <el-input v-model="filters.deviceName" clearable placeholder="设备名称" @keyup.enter="load" />
+        <el-input v-model="filters.deviceName" clearable placeholder="资产名称" @keyup.enter="load" />
       </el-form-item>
       <el-form-item label="规格">
         <el-input v-model="filters.specification" clearable placeholder="规格" @keyup.enter="load" />
       </el-form-item>
-      <el-form-item label="设备编码">
-        <el-input v-model="filters.deviceCode" clearable placeholder="设备编码" @keyup.enter="load" />
+      <el-form-item label="资产编码">
+        <el-input v-model="filters.deviceCode" clearable placeholder="资产编码" @keyup.enter="load" />
       </el-form-item>
       <el-form-item label="流水号">
         <el-input v-model="filters.financialCode" clearable placeholder="流水号" @keyup.enter="load" />
@@ -42,7 +42,7 @@
       <el-table-column prop="dept_name" label="科室" min-width="120" show-overflow-tooltip />
       <el-table-column prop="device_name" label="名称" min-width="140" show-overflow-tooltip />
       <el-table-column prop="specification" label="规格" min-width="100" show-overflow-tooltip />
-      <el-table-column prop="device_code" label="设备编码" min-width="120" />
+      <el-table-column prop="device_code" label="资产编码" min-width="120" />
       <el-table-column prop="financial_code" label="流水号" min-width="110" />
       <el-table-column prop="serial_number" label="序列号" min-width="110" />
       <el-table-column prop="device_status" label="状态" width="90" />

@@ -191,7 +191,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     moreSearchFields: [
       { key: 'supplier_id', label: '供应商', placeholder: '供应商名称/编码', linkTable: 'supplier' },
       { key: 'manufacturer_id', label: '生产厂家', placeholder: '生产厂家名称/编码', linkTable: 'manufacturer' },
-      { key: 'device_name', label: '设备名称', placeholder: '设备名称/简码' },
+      { key: 'device_name', label: '资产名称', placeholder: '资产名称/简码' },
       { key: 'specification', label: '规格', placeholder: '规格模糊' },
       { key: 'model', label: '型号', placeholder: '型号模糊' },
       { key: 'dept_id', label: '领用科室', placeholder: '科室名称/编码', linkTable: 'department' },
@@ -227,7 +227,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     moreSearchFields: [
       { key: 'supplier_id', label: '供应商', placeholder: '供应商名称/编码', linkTable: 'supplier' },
       { key: 'manufacturer_id', label: '生产厂家', placeholder: '生产厂家名称/编码', linkTable: 'manufacturer' },
-      { key: 'device_name', label: '设备名称', placeholder: '设备名称/简码' },
+      { key: 'device_name', label: '资产名称', placeholder: '资产名称/简码' },
       { key: 'specification', label: '规格', placeholder: '规格模糊' },
       { key: 'model', label: '型号', placeholder: '型号模糊' },
       { key: 'dept_id', label: '领用科室', placeholder: '科室名称/编码', linkTable: 'department' },

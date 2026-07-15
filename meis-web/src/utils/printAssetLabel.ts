@@ -215,7 +215,7 @@ export async function printAssetLabelsBatch(rows: Record<string, unknown>[]) {
 
   const invalid = rows.filter((row) => !String(row.device_code ?? '').trim())
   if (invalid.length) {
-    throw new Error('所选设备中存在无设备编码的记录，无法打印')
+    throw new Error('所选设备中存在无资产编码的记录，无法打印')
   }
 
   await ensureRefLabelMap('department')
