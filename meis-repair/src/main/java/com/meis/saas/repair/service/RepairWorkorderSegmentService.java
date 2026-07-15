@@ -352,15 +352,39 @@ public class RepairWorkorderSegmentService {
         }
 
         String operator = TenantContext.getUserId();
+        String operatorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, operator);
+        boolean hasUserName = TableColumnCache.hasColumn(jdbc, "repair_workorder_segment", "user_name");
+        boolean hasUpdatedByName = TableColumnCache.hasColumn(jdbc, "repair_workorder_segment", "updated_by_name");
         if (primaryUserId != null) {
+            if (hasUserName && hasUpdatedByName) {
+                jdbc.update("""
+                        UPDATE repair_workorder_segment
+                        SET remark = ?, started_at = ?::timestamptz, ended_at = ?::timestamptz,
+                            user_id = ?::uuid, user_name = ?,
+                            updated_at = NOW(), updated_by = ?::uuid, updated_by_name = ?
+                        WHERE id = ?::uuid AND workorder_id = ?::uuid
+                        """ + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment", null),
+                        remark, startedAt, endedAt, primaryUserId,
+                        SoftDeleteSupport.resolveUserDisplayName(jdbc, primaryUserId),
+                        blankToNull(operator), operatorName, segmentId, workorderId);
+            } else {
+                jdbc.update("""
+                        UPDATE repair_workorder_segment
+                        SET remark = ?, started_at = ?::timestamptz, ended_at = ?::timestamptz,
+                            user_id = ?::uuid, updated_at = NOW(), updated_by = ?::uuid
+                        WHERE id = ?::uuid AND workorder_id = ?::uuid
+                        """ + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment", null),
+                        remark, startedAt, endedAt, primaryUserId, blankToNull(operator), segmentId, workorderId);
+            }
+            replaceSegmentUsers(segmentId, engineerRows);
+        } else if (hasUpdatedByName) {
             jdbc.update("""
                     UPDATE repair_workorder_segment
                     SET remark = ?, started_at = ?::timestamptz, ended_at = ?::timestamptz,
-                        user_id = ?::uuid, updated_at = NOW(), updated_by = ?::uuid
+                        updated_at = NOW(), updated_by = ?::uuid, updated_by_name = ?
                     WHERE id = ?::uuid AND workorder_id = ?::uuid
                     """ + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment", null),
-                    remark, startedAt, endedAt, primaryUserId, blankToNull(operator), segmentId, workorderId);
-            replaceSegmentUsers(segmentId, engineerRows);
+                    remark, startedAt, endedAt, blankToNull(operator), operatorName, segmentId, workorderId);
         } else {
             jdbc.update("""
                     UPDATE repair_workorder_segment
@@ -695,9 +719,13 @@ public class RepairWorkorderSegmentService {
         }
         String clause = SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment_user", "su");
         boolean hasWorkContent = TableColumnCache.hasColumn(jdbc, "repair_workorder_segment_user", "work_content");
+        boolean hasUserNameCol = TableColumnCache.hasColumn(jdbc, "repair_workorder_segment_user", "user_name");
         String workContentSelect = hasWorkContent ? ", su.work_content" : "";
+        String userNameSelect = hasUserNameCol
+                ? ", COALESCE(NULLIF(TRIM(su.user_name), ''), u.real_name) AS user_name"
+                : ", u.real_name AS user_name";
         List<Map<String, Object>> rows = jdbc.queryForList("""
-                SELECT su.user_id, su.is_primary, u.real_name AS user_name""" + workContentSelect + """
+                SELECT su.user_id, su.is_primary""" + userNameSelect + workContentSelect + """
                 FROM repair_workorder_segment_user su
                 LEFT JOIN sys_user u ON u.id = su.user_id"""
                 + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "u") + """

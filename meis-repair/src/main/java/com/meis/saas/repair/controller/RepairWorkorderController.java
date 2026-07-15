@@ -730,8 +730,21 @@ public class RepairWorkorderController {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> parts = (List<Map<String, Object>>) body.getOrDefault("spareParts", List.of());
         for (Map<String, Object> p : parts) {
-            jdbc.update("INSERT INTO spare_part_usage (id, workorder_id, part_id, quantity, unit_price) VALUES (?::uuid,?::uuid,?::uuid,?,?)",
-                    UUID.randomUUID(), id, p.get("part_id"), p.get("quantity"), p.get("unit_price"));
+            Object opId = operatorId();
+            if (TableColumnCache.hasColumn(jdbc, "spare_part_usage", "operator_name")) {
+                jdbc.update("""
+                        INSERT INTO spare_part_usage
+                        (id, workorder_id, part_id, quantity, unit_price, operator_id, operator_name,
+                         device_id, device_code, device_name)
+                        VALUES (?::uuid,?::uuid,?::uuid,?,?,?::uuid,?,?::uuid,?,?)
+                        """,
+                        UUID.randomUUID(), id, p.get("part_id"), p.get("quantity"), p.get("unit_price"),
+                        blankToNull(opId), SoftDeleteSupport.resolveUserDisplayName(jdbc, opId),
+                        blankToNull(wo.get("device_id")), blankToNull(wo.get("device_code")), blankToNull(wo.get("device_name")));
+            } else {
+                jdbc.update("INSERT INTO spare_part_usage (id, workorder_id, part_id, quantity, unit_price) VALUES (?::uuid,?::uuid,?::uuid,?,?)",
+                        UUID.randomUUID(), id, p.get("part_id"), p.get("quantity"), p.get("unit_price"));
+            }
             jdbc.update("INSERT INTO spare_part_transaction (spare_part_id, txn_type, quantity, workorder_id) VALUES (?::uuid,'out',?,?::uuid)",
                     p.get("spare_part_id") != null ? p.get("spare_part_id") : p.get("part_id"), p.get("quantity"), id);
         }
