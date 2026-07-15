@@ -185,11 +185,7 @@ public class RepairWorkorderController {
         UUID typeId = UUID.fromString(String.valueOf(rawTypeId));
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> parts = (List<Map<String, Object>>) body.getOrDefault("parts", List.of());
-        Object userId = resolveUserId(body);
-        List<String> userIds = resolveUserIds(body);
-        if (userIds.isEmpty() && userId != null) {
-            userIds = List.of(String.valueOf(userId));
-        }
+        List<Map<String, Object>> engineers = resolveEngineers(body);
         OffsetDateTime startedAt = RepairWorkorderSegmentService.parseDateTime(
                 body.get("startedAt") != null ? body.get("startedAt") : body.get("started_at"));
         OffsetDateTime endedAt = null;
@@ -203,10 +199,29 @@ public class RepairWorkorderController {
             }
         }
         Map<String, Object> seg = segmentService.addEngineerSegment(
-                id, wo, typeId, str(body.get("remark")), parts, userIds, startedAt, endedAt);
+                id, wo, typeId, str(body.get("remark")), parts, engineers, startedAt, endedAt);
         addEvent(id, "add_segment", str(wo.get("status")), str(loadWorkorder(id).get("status")),
                 null, null, seg.get("user_id"), null, null,
                 "添加进程段: " + seg.get("type_name"), null);
+        return Result.ok(seg);
+    }
+
+    @PostMapping("/{id:" + UUID_PATH + "}/segments/{segmentId:" + UUID_PATH + "}/confirm")
+    @Transactional
+    @OperationLog(module = "repair", description = "确认维修进程段")
+    public Result<Map<String, Object>> confirmSegment(@PathVariable UUID id, @PathVariable UUID segmentId) {
+        Map<String, Object> wo = requireWo(id);
+        if ("draft".equals(str(wo.get("status")))) {
+            throw new BizException(400, "草稿工单不可确认进程段");
+        }
+        String uid = operatorId();
+        if (uid == null || uid.isBlank()) {
+            throw new BizException(401, "未登录");
+        }
+        Map<String, Object> seg = segmentService.confirmSegment(id, segmentId);
+        addEvent(id, "confirm_segment", str(wo.get("status")), str(wo.get("status")),
+                null, null, seg.get("user_id"), null, null,
+                "确认进程段: " + seg.get("type_name"), null);
         return Result.ok(seg);
     }
 
@@ -604,6 +619,9 @@ public class RepairWorkorderController {
         if (skipVerify && "verify_rejected".equals(current)) {
             throw new BizException(400, "拒绝验收返修后不可跳过验收直接结案");
         }
+        if (!skipVerify) {
+            segmentService.assertAllHistoricalConfirmed(id);
+        }
         String target = skipVerify ? "closed" : "pending_verify";
         processService.insertProcess(id, ProcessRecord.builder("complete")
                 .fromStatus(current).toStatus(target)
@@ -859,6 +877,42 @@ public class RepairWorkorderController {
         return List.of();
     }
 
+    /**
+     * 解析工程师行：优先 body.engineers[{userId, workContent, isPrimary}]，否则回退 userIds / userId。
+     */
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> resolveEngineers(Map<String, Object> body) {
+        if (body == null) return List.of();
+        Object raw = body.get("engineers");
+        if (raw instanceof List<?> list && !list.isEmpty()) {
+            List<Map<String, Object>> out = new ArrayList<>();
+            for (Object o : list) {
+                if (o instanceof Map<?, ?> m) {
+                    Object uid = m.get("userId") != null ? m.get("userId") : m.get("user_id");
+                    if (uid == null || String.valueOf(uid).isBlank()) continue;
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("user_id", String.valueOf(uid));
+                    Object wc = m.get("workContent") != null ? m.get("workContent") : m.get("work_content");
+                    if (wc != null) row.put("work_content", String.valueOf(wc));
+                    Object primary = m.get("isPrimary") != null ? m.get("isPrimary") : m.get("is_primary");
+                    if (primary != null) row.put("is_primary", primary);
+                    out.add(row);
+                } else if (o != null && !String.valueOf(o).isBlank()) {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("user_id", String.valueOf(o));
+                    out.add(row);
+                }
+            }
+            if (!out.isEmpty()) return out;
+        }
+        Object userId = resolveUserId(body);
+        List<String> userIds = resolveUserIds(body);
+        if (userIds.isEmpty() && userId != null) {
+            userIds = List.of(String.valueOf(userId));
+        }
+        return RepairWorkorderSegmentService.engineersFromUserIds(userIds);
+    }
+
     private static boolean isUnassigned(Map<String, Object> wo) {
         Object v = wo.get("assigned_user_id");
         return v == null || String.valueOf(v).isBlank() || "null".equalsIgnoreCase(String.valueOf(v));
@@ -936,6 +990,7 @@ public class RepairWorkorderController {
             case "dispatch" -> "派工";
             case "grab" -> "抢单";
             case "add_segment" -> "添加进程段";
+            case "confirm_segment" -> "确认进程段";
             case "transfer" -> "转派";
             case "accept" -> "接单";
             case "reject" -> "退单";
