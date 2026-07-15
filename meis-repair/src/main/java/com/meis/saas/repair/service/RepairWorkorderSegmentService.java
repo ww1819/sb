@@ -323,7 +323,7 @@ public class RepairWorkorderSegmentService {
             jdbc.update("""
                     INSERT INTO repair_workorder_segment_user
                     (id, segment_id, user_id, is_primary, created_by, updated_by)
-                    VALUES (?::uuid,?::uuid,?::uuid,?,?,?::uuid,?::uuid)
+                    VALUES (?::uuid,?::uuid,?::uuid,?,?::uuid,?::uuid)
                     ON CONFLICT (segment_id, user_id) DO UPDATE
                     SET is_primary = EXCLUDED.is_primary, updated_at = NOW(), is_deleted = 0, deleted_at = NULL
                     """,
