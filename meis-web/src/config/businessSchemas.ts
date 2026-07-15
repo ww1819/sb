@@ -173,7 +173,13 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   asset_category: [
     { prop: 'category_code', label: '分类编码', list: true, required: true },
     { prop: 'category_name', label: '分类名称', list: true, required: true },
-    { prop: 'parent_id', label: '上级分类', linkTable: 'asset_category' },
+    {
+      prop: 'parent_id',
+      label: '上级分类',
+      linkTable: 'asset_category',
+      list: true,
+      placeholder: '留空为一级分类'
+    },
     { prop: 'depreciation_years', label: '折旧年限', type: 'number', list: true },
     { prop: 'residual_rate', label: '残值率(%)', type: 'number', list: true },
     { prop: 'sort_order', label: '排序', type: 'number', list: true },

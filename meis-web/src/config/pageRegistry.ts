@@ -218,6 +218,8 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/system',
     table: 'asset_category',
     formPlacement: 'right',
+    showRowIndex: true,
+    sortableColumns: ['category_code', 'category_name'],
     enableView: true
   },
   '/dict/finance-category': {
