@@ -1375,6 +1375,8 @@ CREATE TABLE repair_workorder_segment (
     remark TEXT,
     verify_comment TEXT,
     auto_created BOOLEAN NOT NULL DEFAULT FALSE,
+    confirmed_at TIMESTAMP WITH TIME ZONE,
+    confirmed_by UUID REFERENCES sys_user(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by UUID,
@@ -1389,6 +1391,8 @@ COMMENT ON COLUMN repair_workorder_segment.process_type_id IS '进程类型';
 COMMENT ON COLUMN repair_workorder_segment.user_id IS '负责人';
 COMMENT ON COLUMN repair_workorder_segment.started_at IS '开始时间';
 COMMENT ON COLUMN repair_workorder_segment.ended_at IS '结束时间';
+COMMENT ON COLUMN repair_workorder_segment.confirmed_at IS '段确认固化时间';
+COMMENT ON COLUMN repair_workorder_segment.confirmed_by IS '段确认人';
 
 -- 5.3.4b 维修工单进程段参与工程师（一段可多人）
 CREATE TABLE repair_workorder_segment_user (
@@ -1396,6 +1400,7 @@ CREATE TABLE repair_workorder_segment_user (
     segment_id UUID NOT NULL REFERENCES repair_workorder_segment(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES sys_user(id),
     is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+    work_content TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by UUID,
@@ -1409,6 +1414,7 @@ COMMENT ON TABLE repair_workorder_segment_user IS '维修进程段参与工程�
 COMMENT ON COLUMN repair_workorder_segment_user.segment_id IS '进程段';
 COMMENT ON COLUMN repair_workorder_segment_user.user_id IS '参与工程师';
 COMMENT ON COLUMN repair_workorder_segment_user.is_primary IS '是否主责（同步段 user_id）';
+COMMENT ON COLUMN repair_workorder_segment_user.work_content IS '工程师工作内容（选填）';
 
 -- 5.4 备件库表
 CREATE TABLE spare_part (

@@ -6,7 +6,8 @@
       detail-mode
       hide-add
       delete-url="/repair/workorder"
-      :operation-column-width="400"
+      :operation-column-width="pageMode === 'handle' ? 100 : 400"
+      :hide-operation-column="pageMode === 'handle'"
       :can-edit="canEditRow"
       :can-delete="canDeleteRow"
       @detail="openDetail"
@@ -15,12 +16,74 @@
       <template #toolbar-extra>
         <el-button v-if="showCreate" type="primary" @click="openCreate">新增报修</el-button>
       </template>
-      <template #row-actions="{ row }">
+      <template v-if="pageMode === 'handle'" #extra-columns>
+        <el-table-column label="查看" width="72" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click.stop="openDetail(row)">查看</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="派工" width="72" align="center">
+          <template #default="{ row }">
+            <el-button v-if="canOnRow('dispatch', row)" link type="primary" @click.stop="openDispatch(row)">派工</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="抢单" width="72" align="center">
+          <template #default="{ row }">
+            <el-button v-if="canOnRow('grab', row)" link type="primary" @click.stop="doGrab(row)">抢单</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="接单" width="72" align="center">
+          <template #default="{ row }">
+            <el-button v-if="canOnRow('accept', row)" link type="primary" @click.stop="doAccept(row)">接单</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="转派" width="72" align="center">
+          <template #default="{ row }">
+            <el-button v-if="canOnRow('transfer', row)" link type="primary" @click.stop="openTransfer(row)">转派</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="添加进程" width="88" align="center">
+          <template #default="{ row }">
+            <el-button v-if="canOnRow('segment', row)" link type="primary" @click.stop="openAddSegment(row)">添加进程</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="开始维修" width="88" align="center">
+          <template #default="{ row }">
+            <el-button v-if="canOnRow('start', row)" link type="success" @click.stop="doStartRepair(row)">开始</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="完工" width="72" align="center">
+          <template #default="{ row }">
+            <el-button v-if="canOnRow('complete', row)" link type="warning" @click.stop="openComplete(row)">完工</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="挂起" width="72" align="center">
+          <template #default="{ row }">
+            <el-button v-if="canOnRow('suspend', row)" link @click.stop="doSuspend(row)">挂起</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="恢复" width="72" align="center">
+          <template #default="{ row }">
+            <el-button v-if="canOnRow('resume', row)" link type="success" @click.stop="doResume(row)">恢复</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="取消" width="72" align="center">
+          <template #default="{ row }">
+            <el-button v-if="canOnRow('cancel', row)" link type="danger" @click.stop="doCancel(row)">取消</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="变更记录" width="88" align="center">
+          <template #default="{ row }">
+            <el-button v-if="canRowChangeLog(row)" link @click.stop="openChangeLog(row)">变更记录</el-button>
+          </template>
+        </el-table-column>
+      </template>
+      <template v-else #row-actions="{ row }">
         <template v-if="pageMode === 'apply' || pageMode === 'all'">
           <el-button v-if="canRowSubmit(row)" link type="primary" @click.stop="doSubmit(row)">提交</el-button>
           <el-button v-if="canRowWithdraw(row)" link type="warning" @click.stop="doWithdraw(row)">撤回</el-button>
         </template>
-        <template v-if="pageMode === 'handle' || pageMode === 'all'">
+        <template v-if="pageMode === 'all'">
           <el-button v-if="canOnRow('dispatch', row)" link type="primary" @click.stop="openDispatch(row)">派工</el-button>
           <el-button v-if="canOnRow('grab', row)" link type="primary" @click.stop="doGrab(row)">抢单</el-button>
           <el-button v-if="canOnRow('segment', row)" link type="primary" @click.stop="openAddSegment(row)">添加进程</el-button>
@@ -34,36 +97,61 @@
       <template v-if="wo">
         <GroupedFormFields :table="config.table" :model="wo" :fields="formFields" />
 
-        <FormSection v-if="wo.id && pageMode !== 'apply'" title="维修进程段" class="timeline-section">
+        <FormSection v-if="wo.id" title="维修进程段" class="timeline-section">
           <div v-if="!processSegments.length" class="muted">
             暂无进程段。
-            <span v-if="!isRepairEngineer">添加进程需当前登录账号为维修工程师（用户管理开启「是否维修工程师」），且为工单负责人或待派单可首段。</span>
+            <span v-if="pageMode !== 'apply' && !isRepairEngineer">添加进程需当前登录账号为维修工程师（用户管理开启「是否维修工程师」），且为工单负责人或待派单可首段。</span>
           </div>
           <div v-for="seg in processSegments" :key="String(seg.id)" class="seg-row">
             <div>
               <strong>{{ seg.type_name }}</strong>
               <el-tag v-if="seg.open" size="small" type="success" style="margin-left: 8px">进行中</el-tag>
-              <span v-if="seg.auto_created" class="muted"> · 系统自动</span>
+              <el-tag v-if="segmentConfirmStatus(seg) === 'confirmed'" size="small" type="info" style="margin-left: 8px">已确认</el-tag>
+              <el-tag v-else-if="segmentConfirmStatus(seg) === 'system'" size="small" type="info" style="margin-left: 8px">已确认（系统）</el-tag>
+              <el-tag v-else size="small" type="warning" style="margin-left: 8px">未确认</el-tag>
             </div>
             <div class="muted">
               {{ fmt(seg.started_at) }} ~ {{ seg.ended_at ? fmt(seg.ended_at) : '至今' }}
-              <span v-if="Array.isArray(seg.user_names) && seg.user_names.length"> · {{ (seg.user_names as string[]).filter(Boolean).join('、') }}</span>
-              <span v-else-if="seg.user_name"> · {{ seg.user_name }}</span>
+            </div>
+            <div class="muted">
+              确认状态：{{ segmentConfirmLabel(seg) }}
+              · 确认人：{{ segmentConfirmPerson(seg) }}
+              · 确认时间：{{ segmentConfirmTime(seg) }}
             </div>
             <div v-if="seg.remark || seg.verify_comment" class="muted">{{ seg.remark || seg.verify_comment }}</div>
+            <div v-if="Array.isArray(seg.users) && seg.users.length" class="seg-users">
+              <div v-for="(u, ui) in seg.users" :key="String(u.user_id ?? ui)" class="muted">
+                工程师：{{ u.user_name || u.user_id }}{{ u.is_primary ? '（主责）' : '' }}
+                <span v-if="u.work_content"> · {{ u.work_content }}</span>
+              </div>
+            </div>
+            <div v-else-if="Array.isArray(seg.user_names) && seg.user_names.length" class="muted">
+              工程师：{{ (seg.user_names as string[]).filter(Boolean).join('、') }}
+            </div>
+            <div v-else-if="seg.user_name" class="muted">工程师：{{ seg.user_name }}</div>
             <div v-if="seg.parts?.length" class="seg-parts">
               <div v-for="p in seg.parts" :key="String(p.id)" class="muted">
                 配件：{{ p.part_name || p.spare_part_id }} × {{ p.quantity }}
                 <span v-if="p.unit_price"> @ {{ p.unit_price }}</span>
               </div>
             </div>
-            <el-button
-              v-if="seg.open && seg.can_add_parts && can('segment')"
-              text
-              type="primary"
-              size="small"
-              @click="openAddPart(seg)"
-            >添加配件</el-button>
+            <div v-else class="muted">配件：无</div>
+            <template v-if="pageMode !== 'apply'">
+              <el-button
+                v-if="segmentConfirmStatus(seg) === 'pending' && canConfirmSegment()"
+                text
+                type="warning"
+                size="small"
+                @click="doConfirmSegment(seg)"
+              >确认固化</el-button>
+              <el-button
+                v-if="segmentConfirmStatus(seg) === 'pending' && seg.can_add_parts && can('segment')"
+                text
+                type="primary"
+                size="small"
+                @click="openAddPart(seg)"
+              >添加配件</el-button>
+            </template>
           </div>
         </FormSection>
 
@@ -140,21 +228,22 @@
         </el-form-item>
         <el-form-item label="维修工程师" required>
           <div class="seg-engineer-field">
-            <el-checkbox v-model="actionForm.editEngineers">修改工程师（可多选）</el-checkbox>
-            <RefSelect
-              v-if="!actionForm.editEngineers"
-              v-model="actionForm.segmentUserId"
-              link-table="repair_engineer"
-              disabled
-              placeholder="默认接单工程师"
-            />
-            <RefSelect
-              v-else
-              v-model="actionForm.segmentUserIds"
-              link-table="repair_engineer"
-              multiple
-              placeholder="请选择参与工程师（可多选）"
-            />
+            <div v-for="(row, idx) in engineerRows" :key="idx" class="seg-engineer-row">
+              <RefSelect
+                v-model="row.userId"
+                link-table="repair_engineer"
+                placeholder="选择工程师"
+                style="width: 180px"
+              />
+              <el-input
+                v-model="row.workContent"
+                placeholder="工作内容（选填）"
+                style="flex: 1"
+              />
+              <el-checkbox v-model="row.isPrimary" @change="onPrimaryChange(idx)">主责</el-checkbox>
+              <el-button text type="danger" :disabled="engineerRows.length <= 1" @click="engineerRows.splice(idx, 1)">删</el-button>
+            </div>
+            <el-button text type="primary" @click="addEngineerRow">+ 添加工程师</el-button>
           </div>
         </el-form-item>
         <el-form-item label="开始时间" required>
@@ -389,6 +478,7 @@ const segmentVisible = ref(false)
 const partVisible = ref(false)
 const partForm = reactive({ segmentId: '', sparePartId: '', quantity: 1 })
 const segmentPartRows = ref<Array<{ sparePartId: string; quantity: number }>>([])
+const engineerRows = ref<Array<{ userId: string; workContent: string; isPrimary: boolean }>>([])
 const dispatchVisible = ref(false)
 const transferVisible = ref(false)
 const completeVisible = ref(false)
@@ -414,6 +504,25 @@ const actionForm = reactive({
   verifyComment: '',
   satisfactionRating: 5
 })
+
+function addEngineerRow() {
+  engineerRows.value.push({ userId: '', workContent: '', isPrimary: false })
+}
+
+function onPrimaryChange(idx: number) {
+  if (!engineerRows.value[idx]?.isPrimary) return
+  engineerRows.value.forEach((r, i) => {
+    if (i !== idx) r.isPrimary = false
+  })
+}
+
+function resetEngineerRows(defaultUserId = '') {
+  engineerRows.value = [{
+    userId: defaultUserId,
+    workContent: '',
+    isPrimary: true
+  }]
+}
 
 const subOptions = [
   { value: 'internal', label: '院内维修' },
@@ -599,7 +708,7 @@ function openCreate() {
 }
 
 async function loadSegments() {
-  if (!wo.value?.id || pageMode.value === 'apply') {
+  if (!wo.value?.id) {
     processSegments.value = []
     return
   }
@@ -634,6 +743,7 @@ async function openAddSegment(row?: Record<string, unknown>) {
   actionForm.segmentUserId = defaultEng
   actionForm.segmentUserIds = defaultEng ? [defaultEng] : []
   actionForm.editEngineers = false
+  resetEngineerRows(defaultEng)
   actionForm.startedAt = nowText()
   actionForm.endedAt = ''
   actionForm.enableEndedAt = false
@@ -650,13 +760,19 @@ async function doAddSegment() {
     ElMessage.warning('请选择进程类型')
     return
   }
-  const userIds = (actionForm.editEngineers
-    ? actionForm.segmentUserIds
-    : [actionForm.segmentUserId || String(wo.value.assigned_user_id ?? auth.user?.userId ?? '')]
-  ).filter((x) => !!x)
-  if (!userIds.length) {
+  const engineers = engineerRows.value
+    .filter((r) => r.userId)
+    .map((r, i, arr) => ({
+      userId: r.userId,
+      workContent: r.workContent || undefined,
+      isPrimary: r.isPrimary || (!arr.some((x) => x.isPrimary) && i === 0)
+    }))
+  if (!engineers.length) {
     ElMessage.warning('请选择维修工程师')
     return
+  }
+  if (!engineers.some((e) => e.isPrimary)) {
+    engineers[0].isPrimary = true
   }
   if (!actionForm.startedAt) {
     ElMessage.warning('请填写开始时间')
@@ -669,10 +785,12 @@ async function doAddSegment() {
   const parts = segmentPartRows.value
     .filter((r) => r.sparePartId)
     .map((r) => ({ spare_part_id: r.sparePartId, quantity: r.quantity }))
+  const primary = engineers.find((e) => e.isPrimary) ?? engineers[0]
   const { data } = await http.post(`/repair/workorder/${wo.value.id}/segments`, {
     processTypeId: actionForm.processTypeId,
-    userIds,
-    userId: userIds[0],
+    engineers,
+    userIds: engineers.map((e) => e.userId),
+    userId: primary.userId,
     startedAt: actionForm.startedAt,
     enableEndedAt: actionForm.enableEndedAt,
     endedAt: actionForm.enableEndedAt ? actionForm.endedAt : undefined,
@@ -686,6 +804,51 @@ async function doAddSegment() {
   segmentVisible.value = false
   ElMessage.success('进程段已添加')
   await refresh()
+}
+
+function canConfirmSegment() {
+  if (pageMode.value === 'apply' || pageMode.value === 'verify') return false
+  const s = status.value
+  return !['draft', 'cancelled', 'closed'].includes(s)
+}
+
+function segmentConfirmStatus(seg: Record<string, unknown>) {
+  if (seg.confirmed_at) return 'confirmed'
+  if (seg.auto_created || seg.confirmed) return 'system'
+  return 'pending'
+}
+
+function segmentConfirmLabel(seg: Record<string, unknown>) {
+  const st = segmentConfirmStatus(seg)
+  if (st === 'confirmed') return '已确认'
+  if (st === 'system') return '已确认（系统）'
+  return '未确认'
+}
+
+function segmentConfirmPerson(seg: Record<string, unknown>) {
+  if (seg.confirmed_by_name) return String(seg.confirmed_by_name)
+  if (segmentConfirmStatus(seg) === 'system') return '系统'
+  return '—'
+}
+
+function segmentConfirmTime(seg: Record<string, unknown>) {
+  if (seg.confirmed_at) return fmt(seg.confirmed_at)
+  if (segmentConfirmStatus(seg) === 'system') return fmt(seg.started_at) || '—'
+  return '—'
+}
+
+async function doConfirmSegment(seg: Record<string, unknown>) {
+  if (!wo.value?.id || !seg.id) return
+  await ElMessageBox.confirm('确认后该进程段将固化，不可再修改工程师与配件。是否确认？', '确认固化', {
+    type: 'warning'
+  })
+  const { data } = await http.post(`/repair/workorder/${wo.value.id}/segments/${seg.id}/confirm`)
+  if (data.code !== 0 && data.code !== 200) {
+    ElMessage.error(data.message || '确认失败')
+    return
+  }
+  ElMessage.success('进程段已确认固化')
+  await loadSegments()
 }
 
 function openAddPart(seg: Record<string, unknown>) {
@@ -834,13 +997,19 @@ function openDispatch(row?: Record<string, unknown>) {
   dispatchVisible.value = true
 }
 
-function openTransfer() {
+function openTransfer(row?: Record<string, unknown>) {
+  if (row) {
+    wo.value = { ...row }
+  }
   resetActionForm()
   actionForm.userId = ''
   transferVisible.value = true
 }
 
-function openComplete() {
+function openComplete(row?: Record<string, unknown>) {
+  if (row) {
+    wo.value = { ...row }
+  }
   resetActionForm()
   if (status.value === 'verify_rejected') {
     actionForm.skipVerify = false
@@ -872,7 +1041,10 @@ async function doDispatch() {
   await refresh()
 }
 
-async function doStartRepair() {
+async function doStartRepair(row?: Record<string, unknown>) {
+  if (row) {
+    wo.value = { ...row }
+  }
   if (!wo.value?.id) return
   const { data } = await http.post(`/repair/workorder/${wo.value.id}/start-repair`, {
     repair_sub_status: 'internal'
@@ -900,7 +1072,10 @@ async function doGrab(row?: Record<string, unknown>) {
   await refresh()
 }
 
-async function doAccept() {
+async function doAccept(row?: Record<string, unknown>) {
+  if (row) {
+    wo.value = { ...row }
+  }
   if (!wo.value?.id) return
   const { data } = await http.post(`/repair/workorder/${wo.value.id}/accept`, { startRepair: true })
   if (data.code !== 0 && data.code !== 200) {
@@ -1008,7 +1183,10 @@ async function doVerify(result: 'pass' | 'fail') {
   await refresh()
 }
 
-async function doSuspend() {
+async function doSuspend(row?: Record<string, unknown>) {
+  if (row) {
+    wo.value = { ...row }
+  }
   if (!wo.value?.id) return
   const { value } = await ElMessageBox.prompt('请输入挂起原因', '挂起工单', { inputPlaceholder: '原因' })
   await http.post(`/repair/workorder/${wo.value.id}/suspend`, { remark: value })
@@ -1016,7 +1194,10 @@ async function doSuspend() {
   await refresh()
 }
 
-async function doResume() {
+async function doResume(row?: Record<string, unknown>) {
+  if (row) {
+    wo.value = { ...row }
+  }
   if (!wo.value?.id) return
   await http.post(`/repair/workorder/${wo.value.id}/resume`, { repair_sub_status: 'internal' })
   ElMessage.success('已恢复')
@@ -1092,6 +1273,13 @@ onActivated(() => {
   font-size: 13px;
   line-height: 1.7;
 }
+.seg-row {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.seg-row:last-child {
+  border-bottom: none;
+}
 .event-collapse {
   margin-top: 8px;
 }
@@ -1116,6 +1304,16 @@ onActivated(() => {
   flex-direction: column;
   gap: 8px;
   width: 100%;
+}
+.seg-engineer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.seg-users {
+  margin-top: 4px;
+  padding-left: 8px;
 }
 .event-time {
   display: inline-block;

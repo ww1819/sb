@@ -140,7 +140,16 @@
           <TableCellValue :field="f" :value="row[f.prop]" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" header-align="center" align="center" :width="operationWidth" fixed="right" class-name="col-operations">
+      <slot name="extra-columns" />
+      <el-table-column
+        v-if="!hideOperationColumn"
+        label="操作"
+        header-align="center"
+        align="center"
+        :width="operationWidth"
+        fixed="right"
+        class-name="col-operations"
+      >
         <template #default="{ row }">
           <div class="table-actions">
             <el-button
@@ -255,6 +264,8 @@ const props = defineProps<{
   canView?: (row: Record<string, unknown>) => boolean
   /** 操作列宽度（含自定义 row-actions 时可加大） */
   operationColumnWidth?: number
+  /** 隐藏默认「操作」列（由 extra-columns 自行挂功能列，见附录 U.14） */
+  hideOperationColumn?: boolean
 }>()
 const emit = defineEmits<{ detail: [row: Record<string, unknown>]; add: []; deleted: [row: Record<string, unknown>] }>()
 const slots = useSlots()
@@ -298,6 +309,7 @@ watch(tableHeight, () => {
 })
 
 const viewEnabled = computed(() => props.enableView === true || props.config.enableView === true)
+const hideOperationColumn = computed(() => props.hideOperationColumn === true)
 const operationWidth = computed(() => {
   if (props.operationColumnWidth) return props.operationColumnWidth
   const hasRowPrint = !!slots['row-actions']
