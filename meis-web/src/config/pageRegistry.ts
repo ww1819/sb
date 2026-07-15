@@ -258,13 +258,14 @@ export const pageRegistry: Record<string, PageConfig> = {
     importTemplateUrl: '/asset/medical_device/import/template'
   },
   '/asset/device': {
-    title: '资产管理',
+    title: '资产登记',
     apiBase: '/asset',
     table: 'medical_device',
     listPageUrl: '/asset/device/page',
     showRowIndex: true,
     showRowSelection: true,
-    sortableColumns: ['device_code', 'device_name', 'specification', 'dept_id'],
+    hideSelectionBar: true,
+    sortableColumns: ['device_code', 'device_name', 'specification', 'dept_name'],
     listFilters: [
       { key: 'enable_dateFrom', label: '起', type: 'date', actionBar: true },
       { key: 'enable_dateTo', label: '止', type: 'date', actionBar: true }
@@ -299,7 +300,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/asset/device/page',
     showRowIndex: true,
     showRowSelection: true,
-    sortableColumns: ['device_code', 'device_name', 'specification', 'dept_id'],
+    sortableColumns: ['device_code', 'device_name', 'specification', 'dept_name'],
     listFilters: [
       { key: 'warehouse_id', label: '仓库', linkTable: 'warehouse', prepend: true },
       { key: 'enable_dateFrom', label: '起', type: 'date', actionBar: true },

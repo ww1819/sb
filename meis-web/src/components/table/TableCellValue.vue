@@ -17,7 +17,7 @@ import {
   isNumericField,
   isStatusField
 } from '@/utils/tableCell'
-import { resolveRefLabel } from '@/composables/useRefLabelMap'
+import { resolveRefLabel, labelCacheVersion } from '@/composables/useRefLabelMap'
 import { useDict } from '@/composables/useDict'
 
 const props = defineProps<{
@@ -45,6 +45,8 @@ const showNumeric = computed(() => isNumericField(props.field.prop, props.field.
 
 const formattedNumber = computed(() => formatCellNumber(props.value, showAmount.value))
 const displayText = computed(() => {
+  // 订阅外键标签缓存版本，预加载完成后触发重绘（避免一直显示 UUID）
+  void labelCacheVersion.value
   if (props.value === null || props.value === undefined || props.value === '') return '-'
   const fromDict = resolveDictLabel(props.field.dictType, props.value)
   if (fromDict) return fromDict

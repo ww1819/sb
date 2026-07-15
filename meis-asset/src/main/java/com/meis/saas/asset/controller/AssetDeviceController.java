@@ -63,8 +63,9 @@ public class AssetDeviceController {
         appendUuidEq(where, args, "d.warehouse_id", warehouse_id);
         boolean needSupplier = hasText(supplier_name);
         boolean needManufacturer = hasText(manufacturer_name) && !hasText(manufacturer_id);
-        boolean needUseDept = hasText(dept_name) || "dept_id".equals(query.getSortBy());
-        boolean needManageDept = hasText(manage_dept_name) && !hasText(manage_dept_id);
+        // 列表须带出科室名称；按科室名排序/筛选也依赖 join
+        boolean needUseDept = true;
+        boolean needManageDept = true;
         if (hasText(supplier_name)) {
             appendSupplierSearch(where, args, supplier_name);
         }
@@ -96,7 +97,9 @@ public class AssetDeviceController {
         args.add(query.getSize());
         args.add(offset);
         var rows = jdbc.queryForList("""
-                SELECT d.*
+                SELECT d.*,
+                       use_dept.dept_name AS dept_name,
+                       mgr_dept.dept_name AS manage_dept_name
                 """ + from + where + buildOrderBy(query) + " LIMIT ? OFFSET ?", args.toArray());
         MedicalDeviceDeleteGuard.enrichCanDelete(jdbc, rows);
         return Result.ok(new PageResult<>(rows, total, query.getPage(), query.getSize()));
@@ -171,7 +174,7 @@ public class AssetDeviceController {
             case "device_code" -> "d.device_code";
             case "device_name" -> "d.device_name";
             case "specification" -> "d.specification";
-            case "dept_id" -> "use_dept.dept_name";
+            case "dept_id", "dept_name" -> "use_dept.dept_name";
             default -> null;
         };
         if (column == null) {

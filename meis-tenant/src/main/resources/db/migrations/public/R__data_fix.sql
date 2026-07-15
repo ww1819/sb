@@ -18,7 +18,7 @@ INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_o
 ('purchase_project', 'mod_purchase', '采购项目', 'menu', '/purchase/project', 2),
 ('purchase_contract', 'mod_purchase', '采购合同', 'menu', '/purchase/contract', 3),
 ('mod_asset', NULL, '资产台账', 'module', NULL, 4),
-('asset_device', 'mod_asset', '设备台账', 'menu', '/asset/device', 1),
+('asset_device', 'mod_asset', '资产登记', 'menu', '/asset/device', 1),
 ('asset_entry', 'mod_asset', '设备入库', 'menu', '/asset/entry', 2),
 ('asset_outbound', 'mod_asset', '设备出库', 'menu', '/asset/outbound', 3),
 ('asset_transfer', 'mod_asset', '资产流转', 'menu', '/asset/transfer', 4),
@@ -128,7 +128,7 @@ WHERE m.menu_code IN (
 ON CONFLICT DO NOTHING;
 
 -- ---------- from V6__asset_ledger_menus.sql ----------
--- 模块2：资产台账 — 菜单（导入 / 综合查询 / 资产管理）
+-- 模块2：资产台账 — 菜单（导入 / 综合查询 / 资产登记）
 UPDATE sys_menu SET menu_name = '资产台账' WHERE menu_code = 'mod_asset';
 
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
@@ -141,7 +141,7 @@ ON CONFLICT (menu_code) DO UPDATE SET
     sort_order = EXCLUDED.sort_order,
     is_active = TRUE;
 
-UPDATE sys_menu SET menu_name = '资产管理', sort_order = 3 WHERE menu_code = 'asset_device';
+UPDATE sys_menu SET menu_name = '资产登记', sort_order = 3 WHERE menu_code = 'asset_device';
 UPDATE sys_menu SET sort_order = 4 WHERE menu_code = 'asset_entry';
 UPDATE sys_menu SET sort_order = 5 WHERE menu_code = 'asset_outbound';
 UPDATE sys_menu SET sort_order = 6 WHERE menu_code = 'asset_transfer';
