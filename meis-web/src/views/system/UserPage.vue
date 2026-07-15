@@ -10,7 +10,7 @@
     @page-change="onPageChange"
   >
     <template #actions>
-      <el-button :disabled="selectedCount === 0" @click="openBatch">批量修改（{{ selectedCount }}）</el-button>
+      <el-button @click="openBatch">批量修改<span v-if="selectedCount">（{{ selectedCount }}）</span></el-button>
       <el-button type="primary" :icon="Plus" @click="openCreate">新建用户</el-button>
     </template>
 
@@ -70,6 +70,13 @@
         </template>
       </PageFilterBar>
     </template>
+
+    <ListSelectionBar
+      :count="selectedCount"
+      :has-current-page-rows="rows.length > 0"
+      @select-page="onSelectPage"
+      @clear="onClearSelection"
+    />
 
     <el-table
       v-if="rows.length || loading"
@@ -388,12 +395,21 @@ import { fetchPage, usePagedList } from '@/composables/usePagedList'
 import PermissionEditor, { type PermissionModel } from '@/components/PermissionEditor.vue'
 import AppModal from '@/components/AppModal.vue'
 import EntityChangeHistoryDrawer from '@/components/EntityChangeHistoryDrawer.vue'
+import ListSelectionBar from '@/components/ListSelectionBar.vue'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
 import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
+import { promptListActionScope, assertScopeSelection, type ListActionScope } from '@/composables/useListActionScope'
 
 const tableHeight = useSystemTableHeight()
 const tableRef = ref()
-const { selectedCount, syncFromTable, selectedIds, clear: clearSelection } = useCrossPageSelection()
+const {
+  selectedCount,
+  syncFromTable,
+  selectedIds,
+  selectCurrentPage,
+  clearAll
+} = useCrossPageSelection()
+const batchScope = ref<ListActionScope>('selected')
 
 const filterActive = ref<boolean | ''>('')
 const filterDeptId = ref('')
@@ -449,11 +465,20 @@ function resetSearch() {
   filterRepairEngineer.value = ''
   filterRoleId.value = ''
   filterPermissionMode.value = ''
+  onClearSelection()
   search()
 }
 
 function onSelectionChange(selection: Record<string, unknown>[]) {
   syncFromTable(selection)
+}
+
+function onSelectPage() {
+  selectCurrentPage(tableRef.value, rows.value as Record<string, unknown>[])
+}
+
+function onClearSelection() {
+  clearAll(tableRef.value)
 }
 
 function avatarText(name?: string) {
@@ -506,11 +531,10 @@ function openEdit(row: any) {
   formVisible.value = true
 }
 
-function openBatch() {
-  if (selectedCount.value === 0) {
-    ElMessage.warning('请先勾选用户')
-    return
-  }
+async function openBatch() {
+  const scope = await promptListActionScope(selectedCount.value, '批量修改')
+  if (!scope || !assertScopeSelection(scope, selectedCount.value)) return
+  batchScope.value = scope
   batchForm.setDept = false
   batchForm.dept_id = ''
   batchForm.setActive = false
@@ -525,29 +549,42 @@ async function saveBatch() {
     ElMessage.warning('请至少勾选一项要修改的字段')
     return
   }
-  const ids = selectedIds()
-  await ElMessageBox.confirm(`将对 ${ids.length} 名用户批量修改已勾选字段，是否继续？`, '批量修改', {
+  const scopeHint =
+    batchScope.value === 'all'
+      ? '当前查询条件下的全部用户'
+      : `已勾选的 ${selectedIds().length} 名用户`
+  await ElMessageBox.confirm(`将对${scopeHint}批量修改已勾选字段，是否继续？`, '批量修改', {
     type: 'warning'
   })
   savingBatch.value = true
   try {
-    const { data } = await http.post('/system/users/batch-update', {
-      userIds: ids,
+    const payload: Record<string, unknown> = {
       setDept: batchForm.setDept,
       dept_id: batchForm.setDept ? (batchForm.dept_id || null) : undefined,
       setActive: batchForm.setActive,
       is_active: batchForm.setActive ? batchForm.is_active : undefined,
       setRepairEngineer: batchForm.setRepairEngineer,
       is_repair_engineer: batchForm.setRepairEngineer ? batchForm.is_repair_engineer : undefined
-    })
+    }
+    if (batchScope.value === 'all') {
+      payload.all = true
+      if (keyword.value) payload.keyword = keyword.value
+      if (filterActive.value !== '') payload.isActive = filterActive.value
+      if (filterDeptId.value) payload.deptId = filterDeptId.value
+      if (filterRepairEngineer.value !== '') payload.isRepairEngineer = filterRepairEngineer.value
+      if (filterRoleId.value) payload.roleId = filterRoleId.value
+      if (filterPermissionMode.value) payload.permissionMode = filterPermissionMode.value
+    } else {
+      payload.userIds = selectedIds()
+    }
+    const { data } = await http.post('/system/users/batch-update', payload)
     if (data.code !== 0 && data.code !== 200) {
       ElMessage.error(data.message || '批量修改失败')
       return
     }
-    ElMessage.success(`已更新 ${data.data?.updated ?? ids.length} 名用户`)
+    ElMessage.success(`已更新 ${data.data?.updated ?? 0} 名用户`)
     batchVisible.value = false
-    clearSelection()
-    tableRef.value?.clearSelection()
+    onClearSelection()
     await load()
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.message || '批量修改失败')

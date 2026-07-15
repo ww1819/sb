@@ -7,7 +7,6 @@
   >
     <template #toolbar-extra>
       <el-button v-if="selectedId" @click="printPlan">打印计划</el-button>
-      <el-button @click="exportPlan">导出列表</el-button>
     </template>
   </MasterDetailPage>
 </template>
@@ -30,9 +29,5 @@ async function printPlan() {
   if (data.code !== 0 || !data.data) return
   const p = data.data
   printPlanDoc(p)
-}
-
-function exportPlan() {
-  window.open('/api/purchase/purchase_plan/export', '_blank')
 }
 </script>

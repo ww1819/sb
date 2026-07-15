@@ -1,6 +1,11 @@
 import { ref } from 'vue'
 
-/** 跨页勾选：用 Set 缓存已选 id，配合 el-table reserve-selection */
+type ElTableLike = {
+  clearSelection?: () => void
+  toggleRowSelection?: (row: Record<string, unknown>, selected?: boolean) => void
+}
+
+/** 跨页勾选：用 Set 缓存已选 id，配合 el-table row-key + reserve-selection */
 export function useCrossPageSelection(rowKey = 'id') {
   const selectedIdSet = ref(new Set<string>())
   const selectedCount = ref(0)
@@ -25,5 +30,29 @@ export function useCrossPageSelection(rowKey = 'id') {
     selectedCount.value = 0
   }
 
-  return { selectedIdSet, selectedCount, syncFromTable, selectedIds, clear }
+  /** 全选当页：把当前页每一行设为选中（不清除其它页已选） */
+  function selectCurrentPage(
+    tableRef: ElTableLike | null | undefined,
+    pageRows: Record<string, unknown>[]
+  ) {
+    if (!tableRef?.toggleRowSelection) return
+    for (const row of pageRows) {
+      tableRef.toggleRowSelection(row, true)
+    }
+  }
+
+  function clearAll(tableRef: ElTableLike | null | undefined) {
+    clear()
+    tableRef?.clearSelection?.()
+  }
+
+  return {
+    selectedIdSet,
+    selectedCount,
+    syncFromTable,
+    selectedIds,
+    clear,
+    selectCurrentPage,
+    clearAll
+  }
 }

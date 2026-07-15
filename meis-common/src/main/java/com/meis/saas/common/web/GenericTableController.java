@@ -170,9 +170,12 @@ public abstract class GenericTableController {
     }
 
     @GetMapping("/{table}/export")
-    public void export(@PathVariable String table, HttpServletResponse resp) throws IOException {
+    public void export(@PathVariable String table,
+                       @RequestParam(required = false) String ids,
+                       @RequestParam(required = false) String keyword,
+                       HttpServletResponse resp) throws IOException {
         check(table);
-        ExcelExportHelper.exportCsv(jdbc(), table, resp);
+        ExcelExportHelper.exportCsv(jdbc(), table, resp, ids, keyword);
     }
 
     @GetMapping("/{table}/import/template")
