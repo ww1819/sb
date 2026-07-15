@@ -726,17 +726,18 @@ ON CONFLICT DO NOTHING;
 -- 院区/供应商/设备分类/生产厂商 → 基础字典（与 dict_* 主数据并列）
 UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '院区管理', path = '/dict/campus', sort_order = 1, is_active = TRUE
 WHERE menu_code = 'system_campus';
-UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '供应商管理', path = '/dict/supplier', sort_order = 2, is_active = TRUE
+UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '仓库维护', path = '/dict/warehouse', sort_order = 2, is_active = TRUE
+WHERE menu_code = 'dict_warehouse';
+UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '科室维护', path = '/dict/dept', sort_order = 3, is_active = TRUE
+WHERE menu_code = 'dict_dept';
+UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '供应商管理', path = '/dict/supplier', sort_order = 4, is_active = TRUE
 WHERE menu_code = 'purchase_supplier';
-UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '生产厂商', path = '/dict/manufacturer', sort_order = 3, is_active = TRUE
+UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '生产厂商', path = '/dict/manufacturer', sort_order = 5, is_active = TRUE
 WHERE menu_code = 'purchase_manufacturer';
-UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '设备分类', path = '/dict/category', sort_order = 4, is_active = TRUE
+UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '设备分类', path = '/dict/category', sort_order = 6, is_active = TRUE
 WHERE menu_code = 'purchase_category';
-
-UPDATE sys_menu SET sort_order = 5, is_active = TRUE WHERE menu_code = 'dict_asset_category';
-UPDATE sys_menu SET sort_order = 6, is_active = TRUE WHERE menu_code = 'dict_finance_category';
-UPDATE sys_menu SET sort_order = 7, is_active = TRUE WHERE menu_code = 'dict_dept';
-UPDATE sys_menu SET sort_order = 8, is_active = TRUE WHERE menu_code = 'dict_warehouse';
+UPDATE sys_menu SET sort_order = 7, is_active = TRUE WHERE menu_code = 'dict_asset_category';
+UPDATE sys_menu SET sort_order = 8, is_active = TRUE WHERE menu_code = 'dict_finance_category';
 UPDATE sys_menu SET sort_order = 9, is_active = TRUE WHERE menu_code = 'dict_unit';
 
 INSERT INTO sys_package_menu (package_code, menu_code)
@@ -807,12 +808,19 @@ ON CONFLICT DO NOTHING;
 UPDATE sys_menu SET is_active = TRUE WHERE menu_code = 'dict_warehouse';
 UPDATE sys_menu SET is_active = FALSE WHERE menu_code IN ('warehouse_setting', 'system_warehouse');
 
--- 再次确保四项主数据挂在基础字典（防止上文排序段被覆盖）
+-- 再次确保四项主数据挂在基础字典，并按定稿顺序排列
 UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '院区管理', path = '/dict/campus', sort_order = 1, is_active = TRUE
 WHERE menu_code = 'system_campus';
-UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '供应商管理', path = '/dict/supplier', sort_order = 2, is_active = TRUE
+UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '仓库维护', path = '/dict/warehouse', sort_order = 2, is_active = TRUE
+WHERE menu_code = 'dict_warehouse';
+UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '科室维护', path = '/dict/dept', sort_order = 3, is_active = TRUE
+WHERE menu_code = 'dict_dept';
+UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '供应商管理', path = '/dict/supplier', sort_order = 4, is_active = TRUE
 WHERE menu_code = 'purchase_supplier';
-UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '生产厂商', path = '/dict/manufacturer', sort_order = 3, is_active = TRUE
+UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '生产厂商', path = '/dict/manufacturer', sort_order = 5, is_active = TRUE
 WHERE menu_code = 'purchase_manufacturer';
-UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '设备分类', path = '/dict/category', sort_order = 4, is_active = TRUE
+UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '设备分类', path = '/dict/category', sort_order = 6, is_active = TRUE
 WHERE menu_code = 'purchase_category';
+UPDATE sys_menu SET sort_order = 7, is_active = TRUE WHERE menu_code = 'dict_asset_category';
+UPDATE sys_menu SET sort_order = 8, is_active = TRUE WHERE menu_code = 'dict_finance_category';
+UPDATE sys_menu SET sort_order = 9, is_active = TRUE WHERE menu_code = 'dict_unit';
