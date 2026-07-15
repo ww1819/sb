@@ -126,7 +126,7 @@ export function relocateMenusToSystem(modules: NavModule[]): NavModule[] {
   return trimmed
 }
 
-/** 补齐库存查询、仓库维护菜单（兼容数据库未迁移） */
+/** 补齐库存查询菜单（兼容数据库未迁移；仓库主数据入口仅基础字典） */
 export function ensureExtraMenus(modules: NavModule[]): NavModule[] {
   const result = modules.map((m) => ({
     ...m,
@@ -146,22 +146,6 @@ export function ensureExtraMenus(modules: NavModule[]): NavModule[] {
       else items.push(stockItem)
       groups[0] = { ...groups[0], items }
       result[assetIdx] = { ...asset, groups }
-    }
-  }
-
-  const systemIdx = result.findIndex((m) => m.id === 'system')
-  if (systemIdx >= 0) {
-    const system = result[systemIdx]
-    const groups = system.groups?.length ? [...system.groups] : [{ title: '', items: [] as NavMenuItem[] }]
-    const items = [...groups[0].items]
-    const hasWh = items.some((i) => i.path === '/system/warehouse' || i.title === '仓库维护')
-    if (!hasWh) {
-      const campusIdx = items.findIndex((i) => i.path === '/system/campus' || i.title.includes('院区'))
-      const whItem: NavMenuItem = { id: 'system-warehouse', title: '仓库维护', path: '/system/warehouse' }
-      if (campusIdx >= 0) items.splice(campusIdx + 1, 0, whItem)
-      else items.unshift(whItem)
-      groups[0] = { ...groups[0], items }
-      result[systemIdx] = { ...system, groups }
     }
   }
 
