@@ -141,13 +141,16 @@ export const pageRegistry: Record<string, PageConfig> = {
   '/purchase/manufacturer': { title: '生产厂商', apiBase: '/system', table: 'manufacturer', importable: true, pinyinCode: true,
   enableView: true
 },
-  '/dict/supplier': { title: '供应商维护', apiBase: '/system', table: 'supplier', importable: true, pinyinCode: true,
+  '/dict/supplier': { title: '供应商管理', apiBase: '/system', table: 'supplier', importable: true, pinyinCode: true,
   enableView: true
 },
-  '/dict/manufacturer': { title: '生产厂家维护', apiBase: '/system', table: 'manufacturer', importable: true, pinyinCode: true,
+  '/dict/manufacturer': { title: '生产厂商', apiBase: '/system', table: 'manufacturer', importable: true, pinyinCode: true,
   enableView: true
 },
-  '/dict/category': { title: '设备68档案', apiBase: '/system', table: 'medical_device_category',
+  '/dict/category': { title: '设备分类', apiBase: '/system', table: 'medical_device_category',
+  enableView: true
+},
+  '/dict/campus': { title: '院区管理', apiBase: '/system', table: 'campus',
   enableView: true
 },
   '/dict/asset-category': { title: '资产分类', apiBase: '/system', table: 'asset_category',
