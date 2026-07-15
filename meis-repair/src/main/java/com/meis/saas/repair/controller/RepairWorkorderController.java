@@ -185,9 +185,23 @@ public class RepairWorkorderController {
         UUID typeId = UUID.fromString(String.valueOf(rawTypeId));
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> parts = (List<Map<String, Object>>) body.getOrDefault("parts", List.of());
-        Map<String, Object> seg = segmentService.addEngineerSegment(id, wo, typeId, str(body.get("remark")), parts);
+        Object userId = resolveUserId(body);
+        OffsetDateTime startedAt = RepairWorkorderSegmentService.parseDateTime(
+                body.get("startedAt") != null ? body.get("startedAt") : body.get("started_at"));
+        OffsetDateTime endedAt = null;
+        Object enableEnd = body.get("enableEndedAt") != null ? body.get("enableEndedAt") : body.get("enable_ended_at");
+        Object rawEnded = body.get("endedAt") != null ? body.get("endedAt") : body.get("ended_at");
+        if (Boolean.TRUE.equals(enableEnd) || "true".equalsIgnoreCase(String.valueOf(enableEnd))
+                || (rawEnded != null && !String.valueOf(rawEnded).isBlank())) {
+            endedAt = RepairWorkorderSegmentService.parseDateTime(rawEnded);
+            if (endedAt == null) {
+                throw new BizException(400, "请填写结束时间");
+            }
+        }
+        Map<String, Object> seg = segmentService.addEngineerSegment(
+                id, wo, typeId, str(body.get("remark")), parts, userId, startedAt, endedAt);
         addEvent(id, "add_segment", str(wo.get("status")), str(loadWorkorder(id).get("status")),
-                null, null, wo.get("assigned_user_id"), null, null,
+                null, null, seg.get("user_id"), null, null,
                 "添加进程段: " + seg.get("type_name"), null);
         return Result.ok(seg);
     }
