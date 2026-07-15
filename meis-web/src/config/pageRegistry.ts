@@ -232,6 +232,9 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/system',
     table: 'unit_dict',
     formPlacement: 'right',
+    showRowSelection: true,
+    showRowIndex: true,
+    sortableColumns: ['unit_code', 'unit_name'],
     enableView: true
   },
   '/purchase/dashboard': { title: '采购看板', apiBase: '/purchase', table: 'purchase_plan' },
