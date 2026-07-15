@@ -155,12 +155,24 @@ export const pageRegistry: Record<string, PageConfig> = {
     sortableColumns: ['supplier_code', 'supplier_name'],
     enableView: true
   },
-  '/purchase/category': { title: '设备分类', apiBase: '/system', table: 'medical_device_category',
-  enableView: true
-},
-  '/purchase/manufacturer': { title: '生产厂商', apiBase: '/system', table: 'manufacturer', importable: true, pinyinCode: true,
-  enableView: true
-},
+  '/purchase/category': {
+    title: '设备分类',
+    apiBase: '/system',
+    table: 'medical_device_category',
+    formPlacement: 'right',
+    enableView: true
+  },
+  '/purchase/manufacturer': {
+    title: '生产厂商',
+    apiBase: '/system',
+    table: 'manufacturer',
+    importable: true,
+    pinyinCode: true,
+    hideSelectionBar: true,
+    toolbarLayout: 'actions-row',
+    formPlacement: 'right',
+    enableView: true
+  },
   '/dict/supplier': {
     title: '供应商管理',
     apiBase: '/system',
@@ -174,30 +186,54 @@ export const pageRegistry: Record<string, PageConfig> = {
     sortableColumns: ['supplier_code', 'supplier_name'],
     enableView: true
   },
-  '/dict/manufacturer': { title: '生产厂商', apiBase: '/system', table: 'manufacturer', importable: true, pinyinCode: true,
-  enableView: true
-},
-  '/dict/category': { title: '设备分类', apiBase: '/system', table: 'medical_device_category',
-  enableView: true
-},
+  '/dict/manufacturer': {
+    title: '生产厂商',
+    apiBase: '/system',
+    table: 'manufacturer',
+    importable: true,
+    pinyinCode: true,
+    hideSelectionBar: true,
+    toolbarLayout: 'actions-row',
+    formPlacement: 'right',
+    enableView: true
+  },
+  '/dict/category': {
+    title: '设备分类',
+    apiBase: '/system',
+    table: 'medical_device_category',
+    formPlacement: 'right',
+    enableView: true
+  },
   '/dict/campus': { title: '院区管理', apiBase: '/system', table: 'campus',
   enableView: true
 },
-  '/dict/asset-category': { title: '资产分类', apiBase: '/system', table: 'asset_category',
-  enableView: true
-},
-  '/dict/finance-category': { title: '财务分类', apiBase: '/system', table: 'finance_category',
-  enableView: true
-},
+  '/dict/asset-category': {
+    title: '资产分类',
+    apiBase: '/system',
+    table: 'asset_category',
+    formPlacement: 'right',
+    enableView: true
+  },
+  '/dict/finance-category': {
+    title: '财务分类',
+    apiBase: '/system',
+    table: 'finance_category',
+    formPlacement: 'right',
+    enableView: true
+  },
   '/dict/dept': { title: '科室维护', apiBase: '/system', table: 'department', pinyinCode: true,
   enableView: true
 },
   '/dict/warehouse': { title: '仓库维护', apiBase: '/system', table: 'warehouse',
   enableView: true
 },
-  '/dict/unit': { title: '单位维护', apiBase: '/system', table: 'unit_dict',
-  enableView: true
-},
+  '/dict/unit': {
+    title: '单位维护',
+    apiBase: '/system',
+    table: 'unit_dict',
+    formPlacement: 'right',
+    enableView: true
+  },
   '/purchase/dashboard': { title: '采购看板', apiBase: '/purchase', table: 'purchase_plan' },
   '/purchase/trace': { title: '业务追溯', apiBase: '/purchase', table: 'purchase_plan' },
   '/asset/query': { title: '资产综合查询', apiBase: '/asset', table: 'medical_device' },
@@ -640,12 +676,24 @@ export const pageRegistry: Record<string, PageConfig> = {
     sortableColumns: ['supplier_code', 'supplier_name'],
     enableView: true
   },
-  '/system/category': { title: '设备分类', apiBase: '/system', table: 'medical_device_category',
-  enableView: true
-},
-  '/system/manufacturer': { title: '生产厂商', apiBase: '/system', table: 'manufacturer', importable: true, pinyinCode: true,
-  enableView: true
-},
+  '/system/category': {
+    title: '设备分类',
+    apiBase: '/system',
+    table: 'medical_device_category',
+    formPlacement: 'right',
+    enableView: true
+  },
+  '/system/manufacturer': {
+    title: '生产厂商',
+    apiBase: '/system',
+    table: 'manufacturer',
+    importable: true,
+    pinyinCode: true,
+    hideSelectionBar: true,
+    toolbarLayout: 'actions-row',
+    formPlacement: 'right',
+    enableView: true
+  },
   '/system/config': { title: '系统配置', apiBase: '/system', table: 'sys_config',
   enableView: true
 }
