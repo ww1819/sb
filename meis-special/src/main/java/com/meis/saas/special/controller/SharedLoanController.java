@@ -53,7 +53,7 @@ public class SharedLoanController {
                 INSERT INTO shared_device_loan (id, loan_no, device_id, device_code, device_name,
                 from_dept_id, to_dept_id, applicant_id, loan_start, loan_end,
                 fee_mode, fee_time_unit, fee_unit_price, reason, status, approval_status)
-                VALUES (?::uuid,?,?,?::uuid,?,?,?::uuid,?::uuid,?::uuid,?,?,?,?,?,?,?,?)
+                VALUES (?::uuid,?,?::uuid,?,?,?::uuid,?::uuid,?::uuid,?,?,?,?,?,?,?,?)
                 """, id, body.getOrDefault("loan_no", "SL" + System.currentTimeMillis()),
                     body.get("device_id"), body.get("device_code"), body.get("device_name"),
                     body.get("from_dept_id"), body.get("to_dept_id"), body.get("applicant_id"),

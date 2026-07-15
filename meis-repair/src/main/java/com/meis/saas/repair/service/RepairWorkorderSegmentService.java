@@ -84,6 +84,7 @@ public class RepairWorkorderSegmentService {
                     + " WHERE p.segment_id = ?::uuid" + partClause + " ORDER BY p.created_at ASC", segId);
             seg.put("parts", parts);
             seg.put("open", seg.get("ended_at") == null);
+            attachSegmentUsers(seg, segId);
         }
         return segments;
     }
@@ -91,7 +92,7 @@ public class RepairWorkorderSegmentService {
     @Transactional
     public Map<String, Object> addEngineerSegment(UUID workorderId, Map<String, Object> wo, UUID processTypeId,
                                                   String remark, List<Map<String, Object>> parts,
-                                                  Object userIdOverride, OffsetDateTime startedAt, OffsetDateTime endedAt) {
+                                                  List<String> userIds, OffsetDateTime startedAt, OffsetDateTime endedAt) {
         if (!segmentTableReady()) {
             throw new BizException(500, "repair_workorder_segment 表不存在，请重启 meis-tenant 完成迁移");
         }
@@ -103,17 +104,21 @@ public class RepairWorkorderSegmentService {
         if (!canEngineerAddType(type, status)) {
             throw new BizException(400, "当前不可添加该进程类型: " + type.get("type_name"));
         }
-        Object userId = blankToNull(userIdOverride);
-        if (userId == null) {
-            userId = blankToNull(wo.get("assigned_user_id"));
+        List<String> engineers = normalizeUserIds(userIds);
+        if (engineers.isEmpty()) {
+            Object fallback = blankToNull(wo.get("assigned_user_id"));
+            if (fallback == null) fallback = TenantContext.getUserId();
+            if (fallback != null && !String.valueOf(fallback).isBlank()) {
+                engineers = List.of(String.valueOf(fallback));
+            }
         }
-        if (userId == null) {
-            userId = TenantContext.getUserId();
-        }
-        if (userId == null || String.valueOf(userId).isBlank()) {
+        if (engineers.isEmpty()) {
             throw new BizException(400, "请选择维修工程师");
         }
-        assertIsRepairEngineer(userId);
+        for (String uid : engineers) {
+            assertIsRepairEngineer(uid);
+        }
+        String primaryUserId = engineers.get(0);
 
         OffsetDateTime start = startedAt != null ? startedAt : OffsetDateTime.now();
         if (endedAt != null && endedAt.isBefore(start)) {
@@ -121,8 +126,9 @@ public class RepairWorkorderSegmentService {
         }
 
         closeOpenSegment(workorderId, start);
-        UUID segmentId = insertSegment(workorderId, processTypeId, userId, remark, null, false, start, endedAt);
-        applyTypeEffect(workorderId, wo, type, userId);
+        UUID segmentId = insertSegment(workorderId, processTypeId, primaryUserId, remark, null, false, start, endedAt);
+        saveSegmentUsers(segmentId, engineers);
+        applyTypeEffect(workorderId, wo, type, primaryUserId);
         if (toBool(type.get("can_add_parts")) && parts != null) {
             saveParts(segmentId, parts, true);
         }
@@ -137,6 +143,9 @@ public class RepairWorkorderSegmentService {
         closeOpenSegment(workorderId, OffsetDateTime.now());
         UUID segmentId = insertSegment(workorderId, UUID.fromString(String.valueOf(type.get("id"))),
                 userId, remark, verifyComment, true, OffsetDateTime.now(), null);
+        if (userId != null) {
+            saveSegmentUsers(segmentId, List.of(String.valueOf(userId)));
+        }
         Map<String, Object> wo = jdbc.queryForList(
                 "SELECT * FROM repair_workorder WHERE id = ?::uuid"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null), workorderId)
@@ -152,6 +161,9 @@ public class RepairWorkorderSegmentService {
         closeOpenSegment(workorderId, OffsetDateTime.now());
         UUID segmentId = insertSegment(workorderId, UUID.fromString(String.valueOf(type.get("id"))),
                 userId, remark, null, false, OffsetDateTime.now(), null);
+        if (userId != null) {
+            saveSegmentUsers(segmentId, List.of(String.valueOf(userId)));
+        }
         Map<String, Object> wo = jdbc.queryForList(
                 "SELECT * FROM repair_workorder WHERE id = ?::uuid"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null), workorderId)
@@ -191,7 +203,7 @@ public class RepairWorkorderSegmentService {
         jdbc.update("""
                 INSERT INTO repair_workorder_segment
                 (id, workorder_id, process_type_id, user_id, started_at, ended_at, remark, verify_comment, auto_created, created_by, updated_by)
-                VALUES (?::uuid,?::uuid,?::uuid,?::uuid,?::timestamptz,?::timestamptz,?,?,?,?,?::uuid,?::uuid)
+                VALUES (?::uuid,?::uuid,?::uuid,?::uuid,?::timestamptz,?::timestamptz,?,?,?,?::uuid,?::uuid)
                 """,
                 id, workorderId, processTypeId, blankToNull(userId), start, endedAt, remark, verifyComment, autoCreated,
                 blankToNull(operator), blankToNull(operator));
@@ -255,7 +267,80 @@ public class RepairWorkorderSegmentService {
                 + SoftDeleteSupport.notDeletedClause(jdbc, "repair_process_type", "t") + """
                 WHERE s.id = ?::uuid""" + clause, segmentId);
         if (rows.isEmpty()) throw new BizException(404, "进程段不存在");
-        return rows.get(0);
+        Map<String, Object> seg = rows.get(0);
+        UUID segId = UUID.fromString(String.valueOf(seg.get("id")));
+        attachSegmentUsers(seg, segId);
+        return seg;
+    }
+
+    private void attachSegmentUsers(Map<String, Object> seg, UUID segmentId) {
+        if (!TableColumnCache.hasTable(jdbc, "repair_workorder_segment_user")) {
+            Object uid = seg.get("user_id");
+            if (uid != null) {
+                seg.put("user_ids", List.of(String.valueOf(uid)));
+                if (seg.get("user_name") != null) {
+                    seg.put("user_names", List.of(String.valueOf(seg.get("user_name"))));
+                }
+            } else {
+                seg.put("user_ids", List.of());
+                seg.put("user_names", List.of());
+            }
+            return;
+        }
+        String clause = SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment_user", "su");
+        List<Map<String, Object>> rows = jdbc.queryForList("""
+                SELECT su.user_id, su.is_primary, u.real_name AS user_name
+                FROM repair_workorder_segment_user su
+                LEFT JOIN sys_user u ON u.id = su.user_id"""
+                + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "u") + """
+                WHERE su.segment_id = ?::uuid""" + clause + """
+                ORDER BY su.is_primary DESC, su.created_at ASC
+                """, segmentId);
+        if (rows.isEmpty() && seg.get("user_id") != null) {
+            seg.put("user_ids", List.of(String.valueOf(seg.get("user_id"))));
+            seg.put("user_names", seg.get("user_name") != null
+                    ? List.of(String.valueOf(seg.get("user_name"))) : List.of());
+            return;
+        }
+        List<String> ids = new ArrayList<>();
+        List<String> names = new ArrayList<>();
+        for (Map<String, Object> r : rows) {
+            if (r.get("user_id") != null) ids.add(String.valueOf(r.get("user_id")));
+            names.add(r.get("user_name") != null ? String.valueOf(r.get("user_name")) : "");
+        }
+        seg.put("user_ids", ids);
+        seg.put("user_names", names);
+        seg.put("users", rows);
+    }
+
+    private void saveSegmentUsers(UUID segmentId, List<String> userIds) {
+        if (!TableColumnCache.hasTable(jdbc, "repair_workorder_segment_user")) return;
+        String operator = TenantContext.getUserId();
+        int i = 0;
+        for (String uid : userIds) {
+            if (uid == null || uid.isBlank()) continue;
+            boolean primary = i == 0;
+            jdbc.update("""
+                    INSERT INTO repair_workorder_segment_user
+                    (id, segment_id, user_id, is_primary, created_by, updated_by)
+                    VALUES (?::uuid,?::uuid,?::uuid,?,?,?::uuid,?::uuid)
+                    ON CONFLICT (segment_id, user_id) DO UPDATE
+                    SET is_primary = EXCLUDED.is_primary, updated_at = NOW(), is_deleted = 0, deleted_at = NULL
+                    """,
+                    UUID.randomUUID(), segmentId, uid, primary, blankToNull(operator), blankToNull(operator));
+            i++;
+        }
+    }
+
+    private static List<String> normalizeUserIds(List<String> raw) {
+        if (raw == null || raw.isEmpty()) return new ArrayList<>();
+        LinkedHashSet<String> set = new LinkedHashSet<>();
+        for (String s : raw) {
+            if (s != null && !s.isBlank() && !"null".equalsIgnoreCase(s)) {
+                set.add(s.trim());
+            }
+        }
+        return new ArrayList<>(set);
     }
 
     private Map<String, Object> loadPart(UUID partId) {

@@ -46,7 +46,7 @@ public class DeviceScrapController {
         } else {
             jdbc.update("""
                 INSERT INTO device_scrap (id, scrap_no, device_id, device_code, device_name, scrap_reason, scrap_type,
-                applicant_id, application_date, status, approval_status) VALUES (?::uuid,?,?,?::uuid,?,?,?,?::uuid,?,?)
+                applicant_id, application_date, status, approval_status) VALUES (?::uuid,?,?::uuid,?,?,?,?,?::uuid,?,?,?)
                 """, id, body.getOrDefault("scrap_no", "SC" + System.currentTimeMillis()), body.get("device_id"),
                     body.get("device_code"), body.get("device_name"), body.get("scrap_reason"), body.get("scrap_type"),
                     body.get("applicant_id"), body.get("application_date"), "draft", "draft");

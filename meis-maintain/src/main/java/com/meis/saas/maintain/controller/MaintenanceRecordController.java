@@ -40,7 +40,7 @@ public class MaintenanceRecordController {
             jdbc.update("""
                 INSERT INTO maintenance_record (id, record_no, plan_id, device_id, maintenance_level, template_id,
                     executor_id, execute_start_time, items_result, overall_result, signature_url, status)
-                VALUES (?::uuid,?,?,?::uuid,?::uuid,?,?::uuid,?::uuid,?,?::jsonb,?,?,?)
+                VALUES (?::uuid,?,?::uuid,?::uuid,?,?::uuid,?::uuid,?::timestamptz,?::jsonb,?,?,?)
                 """, id, body.getOrDefault("record_no", "MR" + System.currentTimeMillis()), body.get("plan_id"),
                     body.get("device_id"), body.getOrDefault("maintenance_level", "L1"), body.get("template_id"),
                     body.get("executor_id"), Instant.now(), itemsJson, body.get("overall_result"),

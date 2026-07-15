@@ -40,7 +40,7 @@ public class MaintenanceExecutionGenerator {
         jdbc.update("""
                 INSERT INTO maintenance_execution (id, execution_no, plan_id, template_id, maintenance_level_id,
                     planned_date, assigned_engineer_id, status, created_by)
-                VALUES (?::uuid,?,?,?::uuid,?::uuid,?::uuid,?,?::uuid,?,?)
+                VALUES (?::uuid,?,?::uuid,?::uuid,?::uuid,?,?::uuid,?,?::uuid)
                 """, execId, execNo, planId, p.get("template_id"), p.get("maintenance_level_id"),
                 body.getOrDefault("planned_date", p.get("next_due_date")),
                 p.get("assigned_engineer_id"), "pending", body.get("created_by"));

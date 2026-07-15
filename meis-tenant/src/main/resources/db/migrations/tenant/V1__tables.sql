@@ -1390,6 +1390,26 @@ COMMENT ON COLUMN repair_workorder_segment.user_id IS '负责人';
 COMMENT ON COLUMN repair_workorder_segment.started_at IS '开始时间';
 COMMENT ON COLUMN repair_workorder_segment.ended_at IS '结束时间';
 
+-- 5.3.4b 维修工单进程段参与工程师（一段可多人）
+CREATE TABLE repair_workorder_segment_user (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    segment_id UUID NOT NULL REFERENCES repair_workorder_segment(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES sys_user(id),
+    is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID,
+    UNIQUE (segment_id, user_id)
+);
+COMMENT ON TABLE repair_workorder_segment_user IS '维修进程段参与工程师';
+COMMENT ON COLUMN repair_workorder_segment_user.segment_id IS '进程段';
+COMMENT ON COLUMN repair_workorder_segment_user.user_id IS '参与工程师';
+COMMENT ON COLUMN repair_workorder_segment_user.is_primary IS '是否主责（同步段 user_id）';
+
 -- 5.4 备件库表
 CREATE TABLE spare_part (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

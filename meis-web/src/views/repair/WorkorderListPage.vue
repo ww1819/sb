@@ -47,7 +47,8 @@
             </div>
             <div class="muted">
               {{ fmt(seg.started_at) }} ~ {{ seg.ended_at ? fmt(seg.ended_at) : '至今' }}
-              <span v-if="seg.user_name"> · {{ seg.user_name }}</span>
+              <span v-if="Array.isArray(seg.user_names) && seg.user_names.length"> · {{ (seg.user_names as string[]).filter(Boolean).join('、') }}</span>
+              <span v-else-if="seg.user_name"> · {{ seg.user_name }}</span>
             </div>
             <div v-if="seg.remark || seg.verify_comment" class="muted">{{ seg.remark || seg.verify_comment }}</div>
             <div v-if="seg.parts?.length" class="seg-parts">
@@ -138,7 +139,23 @@
           </el-select>
         </el-form-item>
         <el-form-item label="维修工程师" required>
-          <RefSelect v-model="actionForm.segmentUserId" link-table="repair_engineer" placeholder="请选择工程师" />
+          <div class="seg-engineer-field">
+            <el-checkbox v-model="actionForm.editEngineers">修改工程师（可多选）</el-checkbox>
+            <RefSelect
+              v-if="!actionForm.editEngineers"
+              v-model="actionForm.segmentUserId"
+              link-table="repair_engineer"
+              disabled
+              placeholder="默认接单工程师"
+            />
+            <RefSelect
+              v-else
+              v-model="actionForm.segmentUserIds"
+              link-table="repair_engineer"
+              multiple
+              placeholder="请选择参与工程师（可多选）"
+            />
+          </div>
         </el-form-item>
         <el-form-item label="开始时间" required>
           <el-date-picker
@@ -380,6 +397,8 @@ const verifyVisible = ref(false)
 const actionForm = reactive({
   userId: '' as string,
   segmentUserId: '' as string,
+  segmentUserIds: [] as string[],
+  editEngineers: false,
   startRepair: false,
   keepRepairing: false,
   skipVerify: false,
@@ -611,7 +630,10 @@ async function openAddSegment(row?: Record<string, unknown>) {
   }
   actionForm.processTypeId = ''
   actionForm.segmentRemark = ''
-  actionForm.segmentUserId = String(wo.value.assigned_user_id ?? auth.user?.userId ?? '')
+  const defaultEng = String(wo.value.assigned_user_id ?? auth.user?.userId ?? '')
+  actionForm.segmentUserId = defaultEng
+  actionForm.segmentUserIds = defaultEng ? [defaultEng] : []
+  actionForm.editEngineers = false
   actionForm.startedAt = nowText()
   actionForm.endedAt = ''
   actionForm.enableEndedAt = false
@@ -628,7 +650,11 @@ async function doAddSegment() {
     ElMessage.warning('请选择进程类型')
     return
   }
-  if (!actionForm.segmentUserId) {
+  const userIds = (actionForm.editEngineers
+    ? actionForm.segmentUserIds
+    : [actionForm.segmentUserId || String(wo.value.assigned_user_id ?? auth.user?.userId ?? '')]
+  ).filter((x) => !!x)
+  if (!userIds.length) {
     ElMessage.warning('请选择维修工程师')
     return
   }
@@ -645,7 +671,8 @@ async function doAddSegment() {
     .map((r) => ({ spare_part_id: r.sparePartId, quantity: r.quantity }))
   const { data } = await http.post(`/repair/workorder/${wo.value.id}/segments`, {
     processTypeId: actionForm.processTypeId,
-    userId: actionForm.segmentUserId,
+    userIds,
+    userId: userIds[0],
     startedAt: actionForm.startedAt,
     enableEndedAt: actionForm.enableEndedAt,
     endedAt: actionForm.enableEndedAt ? actionForm.endedAt : undefined,
@@ -1079,6 +1106,12 @@ onActivated(() => {
   margin-bottom: 8px;
 }
 .seg-end-time {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.seg-engineer-field {
   display: flex;
   flex-direction: column;
   gap: 8px;
