@@ -37,7 +37,43 @@ public class RepairWorkorderProcessService {
                         + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null), workorderId)
                 .stream().findFirst().orElse(Map.of());
         boolean hasDevice = TableColumnCache.hasColumn(jdbc, "repair_workorder_process", "device_id");
-        if (hasDevice) {
+        boolean hasNames = TableColumnCache.hasColumn(jdbc, "repair_workorder_process", "operator_name");
+        String operatorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, record.operatorId());
+        String userName = SoftDeleteSupport.resolveUserDisplayName(jdbc, record.userId());
+        String fromUserName = SoftDeleteSupport.resolveUserDisplayName(jdbc, record.fromUserId());
+        String toUserName = SoftDeleteSupport.resolveUserDisplayName(jdbc, record.toUserId());
+        String creatorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, userId);
+        if (hasDevice && hasNames) {
+            jdbc.update("""
+                    INSERT INTO repair_workorder_process
+                    (id, workorder_id, action_type, from_status, to_status, from_sub_status, to_sub_status,
+                     user_id, from_user_id, to_user_id, operator_id,
+                     user_name, from_user_name, to_user_name, operator_name,
+                     solution_description, labor_cost, parts_cost, total_cost,
+                     verify_result, verify_comment, satisfaction_rating, satisfaction_comment,
+                     skip_verify, remark, extra_json, device_id, device_code, device_name,
+                     created_by, updated_by, created_by_name, updated_by_name)
+                    VALUES (?::uuid,?::uuid,?,?,?,?,?,
+                            ?::uuid,?::uuid,?::uuid,?::uuid,
+                            ?,?,?,?,
+                            ?,?,?,?,
+                            ?,?,?,?,
+                            ?,?,CAST(? AS jsonb),?::uuid,?,?,
+                            ?::uuid,?::uuid,?,?)
+                    """,
+                    id, workorderId, record.actionType(),
+                    blankToNull(record.fromStatus()), blankToNull(record.toStatus()),
+                    blankToNull(record.fromSubStatus()), blankToNull(record.toSubStatus()),
+                    blankToNull(record.userId()), blankToNull(record.fromUserId()),
+                    blankToNull(record.toUserId()), blankToNull(record.operatorId()),
+                    userName, fromUserName, toUserName, operatorName,
+                    record.solutionDescription(), record.laborCost(), record.partsCost(), record.totalCost(),
+                    blankToNull(record.verifyResult()), record.verifyComment(),
+                    record.satisfactionRating(), record.satisfactionComment(),
+                    record.skipVerify(), blankToNull(record.remark()), record.extraJson(),
+                    blankToNull(wo.get("device_id")), blankToNull(wo.get("device_code")), blankToNull(wo.get("device_name")),
+                    blankToNull(userId), blankToNull(userId), creatorName, creatorName);
+        } else if (hasDevice) {
             jdbc.update("""
                     INSERT INTO repair_workorder_process
                     (id, workorder_id, action_type, from_status, to_status, from_sub_status, to_sub_status,
@@ -62,6 +98,33 @@ public class RepairWorkorderProcessService {
                     record.skipVerify(), blankToNull(record.remark()), record.extraJson(),
                     blankToNull(wo.get("device_id")), blankToNull(wo.get("device_code")), blankToNull(wo.get("device_name")),
                     blankToNull(userId), blankToNull(userId));
+        } else if (hasNames) {
+            jdbc.update("""
+                    INSERT INTO repair_workorder_process
+                    (id, workorder_id, action_type, from_status, to_status, from_sub_status, to_sub_status,
+                     user_id, from_user_id, to_user_id, operator_id,
+                     user_name, from_user_name, to_user_name, operator_name,
+                     solution_description, labor_cost, parts_cost, total_cost,
+                     verify_result, verify_comment, satisfaction_rating, satisfaction_comment,
+                     skip_verify, remark, extra_json, created_by, updated_by, created_by_name, updated_by_name)
+                    VALUES (?::uuid,?::uuid,?,?,?,?,?,
+                            ?::uuid,?::uuid,?::uuid,?::uuid,
+                            ?,?,?,?,
+                            ?,?,?,?,
+                            ?,?,?,?,
+                            ?,?,CAST(? AS jsonb),?::uuid,?::uuid,?,?)
+                    """,
+                    id, workorderId, record.actionType(),
+                    blankToNull(record.fromStatus()), blankToNull(record.toStatus()),
+                    blankToNull(record.fromSubStatus()), blankToNull(record.toSubStatus()),
+                    blankToNull(record.userId()), blankToNull(record.fromUserId()),
+                    blankToNull(record.toUserId()), blankToNull(record.operatorId()),
+                    userName, fromUserName, toUserName, operatorName,
+                    record.solutionDescription(), record.laborCost(), record.partsCost(), record.totalCost(),
+                    blankToNull(record.verifyResult()), record.verifyComment(),
+                    record.satisfactionRating(), record.satisfactionComment(),
+                    record.skipVerify(), blankToNull(record.remark()), record.extraJson(),
+                    blankToNull(userId), blankToNull(userId), creatorName, creatorName);
         } else {
             jdbc.update("""
                     INSERT INTO repair_workorder_process
@@ -109,6 +172,10 @@ public class RepairWorkorderProcessService {
         if (userId != null) {
             sets.add("assigned_user_id = ?::uuid");
             args.add(blankToNull(userId));
+            if (TableColumnCache.hasColumn(jdbc, "repair_workorder", "assigned_user_name")) {
+                sets.add("assigned_user_name = ?");
+                args.add(SoftDeleteSupport.resolveUserDisplayName(jdbc, userId));
+            }
         }
         sets.add("updated_at = NOW()");
         args.add(workorderId);

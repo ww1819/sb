@@ -400,7 +400,7 @@ public abstract class GenericTableController {
             sets.add(k + " = " + placeholder(k));
             args.add(v);
         });
-        SoftDeleteSupport.appendUpdateAuditSets(cols, sets, args);
+        SoftDeleteSupport.appendUpdateAuditSets(jdbc(), cols, sets, args);
         if (sets.isEmpty()) return;
         args.add(id);
         jdbc().update("UPDATE " + table + " SET " + String.join(",", sets) + " WHERE id = ?::uuid", args.toArray());

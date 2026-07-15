@@ -9,8 +9,9 @@ import java.util.*;
 /**
  * 软删除与审计字段填充。
  * <p>标准七列（强制）：{@code created_at, updated_at, created_by, updated_by, is_deleted, deleted_at, deleted_by}</p>
+ * <p>配套姓名快照（附录 W.5）：{@code created_by_name, updated_by_name, deleted_by_name}</p>
  * <ul>
- *   <li>删除：写 is_deleted=1、deleted_at / deleted_by，有 is_active 时同步置 false</li>
+ *   <li>删除：写 is_deleted=1、deleted_at / deleted_by / deleted_by_name，有 is_active 时同步置 false</li>
  *   <li>查询：默认 is_deleted=0（兼容仅有 deleted_at 的旧表）</li>
  *   <li>新建：若命中已软删行的唯一键，恢复为未删除并走 UPDATE</li>
  *   <li>UPDATE：id / created_* / updated_* 禁止进入业务 SET，updated_* 仅由 appendUpdateAuditSets 写入</li>
@@ -24,12 +25,14 @@ public final class SoftDeleteSupport {
      * 软删恢复字段 is_deleted / deleted_* 允许在 prepareRestore 后写入。
      */
     public static final Set<String> UPDATE_SKIP_COLUMNS = Set.of(
-            "id", "created_at", "created_by", "updated_at", "updated_by");
+            "id", "created_at", "created_by", "created_by_name",
+            "updated_at", "updated_by", "updated_by_name");
 
     /** 普通 PUT 时从请求体剔除，防止客户端伪造软删状态或审计字段。 */
     public static final Set<String> CLIENT_UPDATE_STRIP = Set.of(
-            "id", "created_at", "created_by", "updated_at", "updated_by",
-            "deleted_at", "deleted_by", "is_deleted");
+            "id", "created_at", "created_by", "created_by_name",
+            "updated_at", "updated_by", "updated_by_name",
+            "deleted_at", "deleted_by", "deleted_by_name", "is_deleted");
 
     public static boolean isUpdateSkipColumn(String column) {
         return column != null && UPDATE_SKIP_COLUMNS.contains(column);
@@ -39,6 +42,23 @@ public final class SoftDeleteSupport {
         if (body == null) return;
         for (String col : CLIENT_UPDATE_STRIP) {
             body.remove(col);
+        }
+    }
+
+    /**
+     * 工作人员展示名：优先 real_name，空则 username（附录 W.5）。
+     */
+    public static String resolveUserDisplayName(JdbcTemplate jdbc, Object userId) {
+        if (jdbc == null || userId == null) return null;
+        String id = String.valueOf(userId).trim();
+        if (id.isEmpty() || "null".equalsIgnoreCase(id)) return null;
+        try {
+            List<String> names = jdbc.query(
+                    "SELECT COALESCE(NULLIF(TRIM(real_name), ''), username) FROM sys_user WHERE id = ?::uuid",
+                    (rs, rowNum) -> rs.getString(1), id);
+            return names.isEmpty() ? null : names.get(0);
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -80,10 +100,14 @@ public final class SoftDeleteSupport {
             sets.add("deleted_by = ?::uuid");
             args.add(userId);
         }
+        if (cols.contains("deleted_by_name")) {
+            sets.add("deleted_by_name = ?");
+            args.add(resolveUserDisplayName(jdbc, userId));
+        }
         if (cols.contains("is_active")) {
             sets.add("is_active = FALSE");
         }
-        appendUpdateAuditSets(cols, sets, args);
+        appendUpdateAuditSets(jdbc, cols, sets, args);
         args.add(id);
         String notDeletedWhere = cols.contains("is_deleted")
                 ? "is_deleted = 0"
@@ -99,6 +123,10 @@ public final class SoftDeleteSupport {
         if (cols.contains("created_by") && !body.containsKey("created_by") && userId != null) {
             body.put("created_by", userId);
         }
+        if (cols.contains("created_by_name") && body.get("created_by") != null
+                && (body.get("created_by_name") == null || String.valueOf(body.get("created_by_name")).isBlank())) {
+            body.put("created_by_name", resolveUserDisplayName(jdbc, body.get("created_by")));
+        }
         // updated_by / updated_at 不在 INSERT body 中预填：INSERT 可省略；UPDATE 恢复由 appendUpdateAuditSets 写入，避免 SET 列重复
         if (cols.contains("is_deleted") && !body.containsKey("is_deleted")) {
             body.put("is_deleted", 0);
@@ -108,6 +136,9 @@ public final class SoftDeleteSupport {
         }
         if (cols.contains("deleted_by")) {
             body.put("deleted_by", null);
+        }
+        if (cols.contains("deleted_by_name")) {
+            body.put("deleted_by_name", null);
         }
         if (cols.contains("is_active") && !body.containsKey("is_active")) {
             body.put("is_active", true);
@@ -137,11 +168,14 @@ public final class SoftDeleteSupport {
         if (cols.contains("updated_by") && TenantContext.getUserId() != null) {
             parts.add("updated_by = ?::uuid");
         }
+        if (cols.contains("updated_by_name") && TenantContext.getUserId() != null) {
+            parts.add("updated_by_name = ?");
+        }
         return String.join(", ", parts);
     }
 
-    /** 向 UPDATE 的 SET 列表追加 updated_at / updated_by。调用方勿再把这两列放入 sets。 */
-    public static void appendUpdateAuditSets(Set<String> cols, List<String> sets, List<Object> args) {
+    /** 向 UPDATE 的 SET 列表追加 updated_at / updated_by[/name]。调用方勿再把这些列放入 sets。 */
+    public static void appendUpdateAuditSets(JdbcTemplate jdbc, Set<String> cols, List<String> sets, List<Object> args) {
         if (cols.contains("updated_at")) {
             sets.add("updated_at = NOW()");
         }
@@ -149,7 +183,17 @@ public final class SoftDeleteSupport {
         if (cols.contains("updated_by") && userId != null) {
             sets.add("updated_by = ?::uuid");
             args.add(userId);
+            if (cols.contains("updated_by_name")) {
+                sets.add("updated_by_name = ?");
+                args.add(resolveUserDisplayName(jdbc, userId));
+            }
         }
+    }
+
+    /** @deprecated 无 JdbcTemplate 时无法写 updated_by_name；请改用带 jdbc 的重载。 */
+    @Deprecated
+    public static void appendUpdateAuditSets(Set<String> cols, List<String> sets, List<Object> args) {
+        appendUpdateAuditSets(null, cols, sets, args);
     }
 
     /** 手工 SQL 恢复软删行时追加的 SET 片段（不含尾逗号）；updated_by 需另绑参。 */
@@ -158,6 +202,7 @@ public final class SoftDeleteSupport {
         if (cols.contains("is_deleted")) parts.add("is_deleted = 0");
         if (cols.contains("deleted_at")) parts.add("deleted_at = NULL");
         if (cols.contains("deleted_by")) parts.add("deleted_by = NULL");
+        if (cols.contains("deleted_by_name")) parts.add("deleted_by_name = NULL");
         if (cols.contains("updated_at")) parts.add("updated_at = NOW()");
         if (includeUpdatedByPlaceholder && cols.contains("updated_by")) {
             parts.add("updated_by = ?::uuid");
@@ -176,6 +221,9 @@ public final class SoftDeleteSupport {
         if (cols.contains("deleted_by")) {
             sets.add("deleted_by = NULL");
         }
+        if (cols.contains("deleted_by_name")) {
+            sets.add("deleted_by_name = NULL");
+        }
     }
 
     /**
@@ -185,8 +233,10 @@ public final class SoftDeleteSupport {
         body.remove("id");
         body.remove("created_at");
         body.remove("created_by");
+        body.remove("created_by_name");
         body.remove("updated_at");
         body.remove("updated_by");
+        body.remove("updated_by_name");
         if (cols.contains("is_deleted")) {
             body.put("is_deleted", 0);
         }
@@ -195,6 +245,9 @@ public final class SoftDeleteSupport {
         }
         if (cols.contains("deleted_by")) {
             body.put("deleted_by", null);
+        }
+        if (cols.contains("deleted_by_name")) {
+            body.put("deleted_by_name", null);
         }
         if (cols.contains("is_active")) {
             body.put("is_active", true);

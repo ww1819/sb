@@ -1239,3 +1239,36 @@ BEGIN
         END;
     END LOOP;
 END $fix_is_deleted_defaults$;
+
+-- =============================================================================
+-- 审计姓名快照：有 created_by / updated_by / deleted_by 则配套 *_by_name（附录 W.5）
+-- =============================================================================
+DO $ensure_audit_by_names$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN
+        SELECT t.table_name,
+               c.column_name AS by_col,
+               c.column_name || '_name' AS name_col
+        FROM information_schema.tables t
+        JOIN information_schema.columns c
+          ON c.table_schema = t.table_schema
+         AND c.table_name = t.table_name
+        WHERE t.table_schema = current_schema()
+          AND t.table_type = 'BASE TABLE'
+          AND t.table_name NOT LIKE 'flyway_%'
+          AND c.column_name IN ('created_by', 'updated_by', 'deleted_by')
+          AND NOT EXISTS (
+              SELECT 1 FROM information_schema.columns n
+              WHERE n.table_schema = t.table_schema
+                AND n.table_name = t.table_name
+                AND n.column_name = c.column_name || '_name'
+          )
+    LOOP
+        EXECUTE format(
+            'ALTER TABLE %I ADD COLUMN %I VARCHAR(100)',
+            r.table_name, r.name_col
+        );
+    END LOOP;
+END $ensure_audit_by_names$;

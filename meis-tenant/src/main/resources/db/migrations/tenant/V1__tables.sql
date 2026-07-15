@@ -16,8 +16,10 @@
 --   is_deleted  SMALLINT NOT NULL DEFAULT 0            -- 删除标志：0未删除 / 1已删除
 --   deleted_at  TIMESTAMPTZ                            -- 删除时间
 --   deleted_by  UUID                                   -- 删除者
+-- 配套姓名快照（有对应 *_by 时必有，附录 W.5）：
+--   created_by_name / updated_by_name / deleted_by_name  VARCHAR(100)
 -- 老租户缺列由 R__columns_audit.sql 幂等补全。
--- 详见 docs/meis-requirements.md 附录 G.0。
+-- 详见 docs/meis-requirements.md 附录 G.0 / W.5。
 -- ================================================================================
 -- 启用扩展
 -- UUID 生成扩展

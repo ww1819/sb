@@ -64,14 +64,20 @@ public class RepairWorkorderSegmentService {
         String segClause = SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment", "s");
         String partClause = SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment_part", "p");
         boolean hasConfirmedBy = TableColumnCache.hasColumn(jdbc, "repair_workorder_segment", "confirmed_by");
+        boolean hasConfirmedByName = TableColumnCache.hasColumn(jdbc, "repair_workorder_segment", "confirmed_by_name");
+        boolean hasUserNameCol = TableColumnCache.hasColumn(jdbc, "repair_workorder_segment", "user_name");
         String confirmerJoin = hasConfirmedBy
                 ? " LEFT JOIN sys_user cu ON cu.id = s.confirmed_by"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "cu")
                 : "";
-        String confirmerSelect = hasConfirmedBy ? ", cu.real_name AS confirmed_by_name" : "";
+        String confirmerSelect = hasConfirmedByName
+                ? ", COALESCE(NULLIF(TRIM(s.confirmed_by_name), ''), cu.real_name) AS confirmed_by_name"
+                : (hasConfirmedBy ? ", cu.real_name AS confirmed_by_name" : "");
+        String userNameSelect = hasUserNameCol
+                ? ", COALESCE(NULLIF(TRIM(s.user_name), ''), u.real_name) AS user_name"
+                : ", u.real_name AS user_name";
         List<Map<String, Object>> segments = jdbc.queryForList("""
-                SELECT s.*, t.type_code, t.type_name, t.can_add_parts,
-                       u.real_name AS user_name""" + confirmerSelect + """
+                SELECT s.*, t.type_code, t.type_name, t.can_add_parts""" + userNameSelect + confirmerSelect + """
                 FROM repair_workorder_segment s
                 JOIN repair_process_type t ON t.id = s.process_type_id"""
                 + SoftDeleteSupport.notDeletedClause(jdbc, "repair_process_type", "t") + """
@@ -232,14 +238,26 @@ public class RepairWorkorderSegmentService {
         if (operator == null || operator.isBlank()) {
             throw new BizException(401, "未登录");
         }
-        jdbc.update("""
-                UPDATE repair_workorder_segment
-                SET confirmed_at = NOW(), confirmed_by = ?::uuid,
-                    ended_at = COALESCE(ended_at, NOW()),
-                    updated_at = NOW(), updated_by = ?::uuid
-                WHERE id = ?::uuid AND workorder_id = ?::uuid AND confirmed_at IS NULL
-                """ + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment", null),
-                operator, operator, segmentId, workorderId);
+        String operatorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, operator);
+        if (TableColumnCache.hasColumn(jdbc, "repair_workorder_segment", "confirmed_by_name")) {
+            jdbc.update("""
+                    UPDATE repair_workorder_segment
+                    SET confirmed_at = NOW(), confirmed_by = ?::uuid, confirmed_by_name = ?,
+                        ended_at = COALESCE(ended_at, NOW()),
+                        updated_at = NOW(), updated_by = ?::uuid, updated_by_name = ?
+                    WHERE id = ?::uuid AND workorder_id = ?::uuid AND confirmed_at IS NULL
+                    """ + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment", null),
+                    operator, operatorName, operator, operatorName, segmentId, workorderId);
+        } else {
+            jdbc.update("""
+                    UPDATE repair_workorder_segment
+                    SET confirmed_at = NOW(), confirmed_by = ?::uuid,
+                        ended_at = COALESCE(ended_at, NOW()),
+                        updated_at = NOW(), updated_by = ?::uuid
+                    WHERE id = ?::uuid AND workorder_id = ?::uuid AND confirmed_at IS NULL
+                    """ + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment", null),
+                    operator, operator, segmentId, workorderId);
+        }
         return loadSegment(segmentId);
     }
 
@@ -256,16 +274,30 @@ public class RepairWorkorderSegmentService {
         if (operator == null || operator.isBlank()) {
             throw new BizException(401, "未登录");
         }
-        jdbc.update("""
-                UPDATE repair_workorder_segment
-                SET confirmed_at = NOW(), confirmed_by = ?::uuid,
-                    ended_at = COALESCE(ended_at, NOW()),
-                    updated_at = NOW(), updated_by = ?::uuid
-                WHERE workorder_id = ?::uuid
-                  AND confirmed_at IS NULL
-                  AND COALESCE(auto_created, false) = false
-                """ + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment", null),
-                operator, operator, workorderId);
+        String operatorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, operator);
+        if (TableColumnCache.hasColumn(jdbc, "repair_workorder_segment", "confirmed_by_name")) {
+            jdbc.update("""
+                    UPDATE repair_workorder_segment
+                    SET confirmed_at = NOW(), confirmed_by = ?::uuid, confirmed_by_name = ?,
+                        ended_at = COALESCE(ended_at, NOW()),
+                        updated_at = NOW(), updated_by = ?::uuid, updated_by_name = ?
+                    WHERE workorder_id = ?::uuid
+                      AND confirmed_at IS NULL
+                      AND COALESCE(auto_created, false) = false
+                    """ + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment", null),
+                    operator, operatorName, operator, operatorName, workorderId);
+        } else {
+            jdbc.update("""
+                    UPDATE repair_workorder_segment
+                    SET confirmed_at = NOW(), confirmed_by = ?::uuid,
+                        ended_at = COALESCE(ended_at, NOW()),
+                        updated_at = NOW(), updated_by = ?::uuid
+                    WHERE workorder_id = ?::uuid
+                      AND confirmed_at IS NULL
+                      AND COALESCE(auto_created, false) = false
+                    """ + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment", null),
+                    operator, operator, workorderId);
+        }
     }
 
     /**
@@ -503,10 +535,22 @@ public class RepairWorkorderSegmentService {
             placeholders.append(",?");
             args.add(blankToNull(snap.get("device_name")));
         }
+        if (TableColumnCache.hasColumn(jdbc, "repair_workorder_segment", "user_name")) {
+            cols.append(", user_name");
+            placeholders.append(",?");
+            args.add(SoftDeleteSupport.resolveUserDisplayName(jdbc, userId));
+        }
         cols.append(", created_by, updated_by");
         placeholders.append(",?::uuid,?::uuid");
         args.add(blankToNull(operator));
         args.add(blankToNull(operator));
+        if (TableColumnCache.hasColumn(jdbc, "repair_workorder_segment", "created_by_name")) {
+            String opName = SoftDeleteSupport.resolveUserDisplayName(jdbc, operator);
+            cols.append(", created_by_name, updated_by_name");
+            placeholders.append(",?,?");
+            args.add(opName);
+            args.add(opName);
+        }
         jdbc.update("INSERT INTO repair_workorder_segment (" + cols + ") VALUES (" + placeholders + ")",
                 args.toArray());
         return id;
@@ -612,11 +656,14 @@ public class RepairWorkorderSegmentService {
     private Map<String, Object> loadSegment(UUID segmentId) {
         String clause = SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment", "s");
         boolean hasConfirmedBy = TableColumnCache.hasColumn(jdbc, "repair_workorder_segment", "confirmed_by");
+        boolean hasConfirmedByName = TableColumnCache.hasColumn(jdbc, "repair_workorder_segment", "confirmed_by_name");
         String confirmerJoin = hasConfirmedBy
                 ? " LEFT JOIN sys_user cu ON cu.id = s.confirmed_by"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "cu")
                 : "";
-        String confirmerSelect = hasConfirmedBy ? ", cu.real_name AS confirmed_by_name" : "";
+        String confirmerSelect = hasConfirmedByName
+                ? ", COALESCE(NULLIF(TRIM(s.confirmed_by_name), ''), cu.real_name) AS confirmed_by_name"
+                : (hasConfirmedBy ? ", cu.real_name AS confirmed_by_name" : "");
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 SELECT s.*, t.type_code, t.type_name, t.can_add_parts""" + confirmerSelect + """
                 FROM repair_workorder_segment s
@@ -711,7 +758,9 @@ public class RepairWorkorderSegmentService {
         List<Map<String, Object>> rows = normalizeEngineers(engineers);
         if (rows.isEmpty()) return;
         boolean hasWorkContent = TableColumnCache.hasColumn(jdbc, "repair_workorder_segment_user", "work_content");
+        boolean hasUserName = TableColumnCache.hasColumn(jdbc, "repair_workorder_segment_user", "user_name");
         String operator = TenantContext.getUserId();
+        String operatorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, operator);
         boolean anyPrimary = rows.stream().anyMatch(r -> toBool(r.get("is_primary")));
         int i = 0;
         for (Map<String, Object> eng : rows) {
@@ -719,7 +768,23 @@ public class RepairWorkorderSegmentService {
             if (uid.isBlank()) continue;
             boolean primary = anyPrimary ? toBool(eng.get("is_primary")) : i == 0;
             Object workContent = blankToNull(eng.get("work_content"));
-            if (hasWorkContent) {
+            String userName = SoftDeleteSupport.resolveUserDisplayName(jdbc, uid);
+            if (hasWorkContent && hasUserName) {
+                jdbc.update("""
+                        INSERT INTO repair_workorder_segment_user
+                        (id, segment_id, user_id, user_name, is_primary, work_content, created_by, updated_by, created_by_name, updated_by_name)
+                        VALUES (?::uuid,?::uuid,?::uuid,?,?,?,?::uuid,?::uuid,?,?)
+                        ON CONFLICT (segment_id, user_id) DO UPDATE
+                        SET is_primary = EXCLUDED.is_primary,
+                            work_content = EXCLUDED.work_content,
+                            user_name = COALESCE(EXCLUDED.user_name, repair_workorder_segment_user.user_name),
+                            updated_at = NOW(), updated_by = EXCLUDED.updated_by,
+                            updated_by_name = EXCLUDED.updated_by_name,
+                            is_deleted = 0, deleted_at = NULL
+                        """,
+                        UUID.randomUUID(), segmentId, uid, userName, primary, workContent,
+                        blankToNull(operator), blankToNull(operator), operatorName, operatorName);
+            } else if (hasWorkContent) {
                 jdbc.update("""
                         INSERT INTO repair_workorder_segment_user
                         (id, segment_id, user_id, is_primary, work_content, created_by, updated_by)
@@ -731,6 +796,20 @@ public class RepairWorkorderSegmentService {
                         """,
                         UUID.randomUUID(), segmentId, uid, primary, workContent,
                         blankToNull(operator), blankToNull(operator));
+            } else if (hasUserName) {
+                jdbc.update("""
+                        INSERT INTO repair_workorder_segment_user
+                        (id, segment_id, user_id, user_name, is_primary, created_by, updated_by, created_by_name, updated_by_name)
+                        VALUES (?::uuid,?::uuid,?::uuid,?,?,?::uuid,?::uuid,?,?)
+                        ON CONFLICT (segment_id, user_id) DO UPDATE
+                        SET is_primary = EXCLUDED.is_primary,
+                            user_name = COALESCE(EXCLUDED.user_name, repair_workorder_segment_user.user_name),
+                            updated_at = NOW(), updated_by = EXCLUDED.updated_by,
+                            updated_by_name = EXCLUDED.updated_by_name,
+                            is_deleted = 0, deleted_at = NULL
+                        """,
+                        UUID.randomUUID(), segmentId, uid, userName, primary,
+                        blankToNull(operator), blankToNull(operator), operatorName, operatorName);
             } else {
                 jdbc.update("""
                         INSERT INTO repair_workorder_segment_user

@@ -180,7 +180,7 @@ public final class MedicalDeviceCategoryImporter {
             sets.add(k + " = " + placeholder(k));
             args.add(v);
         });
-        SoftDeleteSupport.appendUpdateAuditSets(dbColumns, sets, args);
+        SoftDeleteSupport.appendUpdateAuditSets(jdbc, dbColumns, sets, args);
         if (sets.isEmpty()) return;
         args.add(UUID.fromString(id));
         jdbc.update("UPDATE medical_device_category SET " + String.join(",", sets) + " WHERE id = ?::uuid", args.toArray());

@@ -425,3 +425,101 @@ UPDATE spare_part_transaction t
 SET device_id = w.device_id, device_code = w.device_code, device_name = w.device_name
 FROM repair_workorder w
 WHERE t.workorder_id = w.id AND t.device_id IS NULL AND w.device_id IS NOT NULL;
+
+-- =============================================================================
+-- 附录 W.5：审计 *_by_name 与维修责任人姓名回填
+-- =============================================================================
+DO $backfill_audit_by_names$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN
+        SELECT t.table_name, c.column_name AS by_col, c.column_name || '_name' AS name_col
+        FROM information_schema.tables t
+        JOIN information_schema.columns c
+          ON c.table_schema = t.table_schema AND c.table_name = t.table_name
+        JOIN information_schema.columns n
+          ON n.table_schema = t.table_schema AND n.table_name = t.table_name
+         AND n.column_name = c.column_name || '_name'
+        WHERE t.table_schema = current_schema()
+          AND t.table_type = 'BASE TABLE'
+          AND t.table_name NOT LIKE 'flyway_%'
+          AND c.column_name IN ('created_by', 'updated_by', 'deleted_by')
+    LOOP
+        EXECUTE format(
+            'UPDATE %I t SET %I = COALESCE(NULLIF(TRIM(u.real_name), ''''), u.username) '
+            || 'FROM sys_user u WHERE t.%I = u.id AND (t.%I IS NULL OR TRIM(t.%I) = '''')',
+            r.table_name, r.name_col, r.by_col, r.name_col, r.name_col
+        );
+    END LOOP;
+END $backfill_audit_by_names$;
+
+UPDATE repair_workorder t
+SET reporter_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
+FROM sys_user u
+WHERE t.reporter_id = u.id AND (t.reporter_name IS NULL OR TRIM(t.reporter_name) = '');
+
+UPDATE repair_workorder t
+SET assigned_user_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
+FROM sys_user u
+WHERE t.assigned_user_id = u.id AND (t.assigned_user_name IS NULL OR TRIM(t.assigned_user_name) = '');
+
+UPDATE repair_workorder_event t
+SET operator_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
+FROM sys_user u
+WHERE t.operator_id = u.id AND (t.operator_name IS NULL OR TRIM(t.operator_name) = '');
+
+UPDATE repair_workorder_event t
+SET user_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
+FROM sys_user u
+WHERE t.user_id = u.id AND (t.user_name IS NULL OR TRIM(t.user_name) = '');
+
+UPDATE repair_workorder_event t
+SET from_user_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
+FROM sys_user u
+WHERE t.from_user_id = u.id AND (t.from_user_name IS NULL OR TRIM(t.from_user_name) = '');
+
+UPDATE repair_workorder_event t
+SET to_user_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
+FROM sys_user u
+WHERE t.to_user_id = u.id AND (t.to_user_name IS NULL OR TRIM(t.to_user_name) = '');
+
+UPDATE repair_workorder_process t
+SET operator_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
+FROM sys_user u
+WHERE t.operator_id = u.id AND (t.operator_name IS NULL OR TRIM(t.operator_name) = '');
+
+UPDATE repair_workorder_process t
+SET user_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
+FROM sys_user u
+WHERE t.user_id = u.id AND (t.user_name IS NULL OR TRIM(t.user_name) = '');
+
+UPDATE repair_workorder_process t
+SET from_user_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
+FROM sys_user u
+WHERE t.from_user_id = u.id AND (t.from_user_name IS NULL OR TRIM(t.from_user_name) = '');
+
+UPDATE repair_workorder_process t
+SET to_user_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
+FROM sys_user u
+WHERE t.to_user_id = u.id AND (t.to_user_name IS NULL OR TRIM(t.to_user_name) = '');
+
+UPDATE repair_workorder_segment t
+SET user_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
+FROM sys_user u
+WHERE t.user_id = u.id AND (t.user_name IS NULL OR TRIM(t.user_name) = '');
+
+UPDATE repair_workorder_segment t
+SET confirmed_by_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
+FROM sys_user u
+WHERE t.confirmed_by = u.id AND (t.confirmed_by_name IS NULL OR TRIM(t.confirmed_by_name) = '');
+
+UPDATE repair_workorder_segment_user t
+SET user_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
+FROM sys_user u
+WHERE t.user_id = u.id AND (t.user_name IS NULL OR TRIM(t.user_name) = '');
+
+UPDATE spare_part_usage t
+SET operator_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
+FROM sys_user u
+WHERE t.operator_id = u.id AND (t.operator_name IS NULL OR TRIM(t.operator_name) = '');

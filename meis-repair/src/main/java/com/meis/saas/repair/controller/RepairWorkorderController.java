@@ -335,16 +335,31 @@ public class RepairWorkorderController {
         assertDeviceAvailable(body.get("device_id"), null);
         UUID id = UUID.randomUUID();
         String woNo = "WO" + System.currentTimeMillis();
-        jdbc.update("""
-            INSERT INTO repair_workorder (id, wo_no, device_id, device_code, device_name, reporter_id, report_dept_id,
-                report_method, report_time, fault_description, urgency_level, fault_type_id, remark, status)
-            VALUES (?::uuid,?,?::uuid,?,?,?::uuid,?::uuid,?,?::timestamptz,?,?,?::uuid,?,?)
-            """,
-                id, woNo, body.get("device_id"), body.get("device_code"), body.get("device_name"),
-                blankToNull(body.get("reporter_id")), blankToNull(body.get("report_dept_id")),
-                body.getOrDefault("report_method", "web"), body.get("report_time"),
-                body.get("fault_description"), body.getOrDefault("urgency_level", "normal"),
-                blankToNull(body.get("fault_type_id")), blankToNull(body.get("remark")), "draft");
+        Object reporterId = blankToNull(body.get("reporter_id"));
+        String reporterName = SoftDeleteSupport.resolveUserDisplayName(jdbc, reporterId);
+        if (TableColumnCache.hasColumn(jdbc, "repair_workorder", "reporter_name")) {
+            jdbc.update("""
+                INSERT INTO repair_workorder (id, wo_no, device_id, device_code, device_name, reporter_id, reporter_name, report_dept_id,
+                    report_method, report_time, fault_description, urgency_level, fault_type_id, remark, status)
+                VALUES (?::uuid,?,?::uuid,?,?,?::uuid,?,?::uuid,?,?::timestamptz,?,?,?::uuid,?,?)
+                """,
+                    id, woNo, body.get("device_id"), body.get("device_code"), body.get("device_name"),
+                    reporterId, reporterName, blankToNull(body.get("report_dept_id")),
+                    body.getOrDefault("report_method", "web"), body.get("report_time"),
+                    body.get("fault_description"), body.getOrDefault("urgency_level", "normal"),
+                    blankToNull(body.get("fault_type_id")), blankToNull(body.get("remark")), "draft");
+        } else {
+            jdbc.update("""
+                INSERT INTO repair_workorder (id, wo_no, device_id, device_code, device_name, reporter_id, report_dept_id,
+                    report_method, report_time, fault_description, urgency_level, fault_type_id, remark, status)
+                VALUES (?::uuid,?,?::uuid,?,?,?::uuid,?::uuid,?,?::timestamptz,?,?,?::uuid,?,?)
+                """,
+                    id, woNo, body.get("device_id"), body.get("device_code"), body.get("device_name"),
+                    reporterId, blankToNull(body.get("report_dept_id")),
+                    body.getOrDefault("report_method", "web"), body.get("report_time"),
+                    body.get("fault_description"), body.getOrDefault("urgency_level", "normal"),
+                    blankToNull(body.get("fault_type_id")), blankToNull(body.get("remark")), "draft");
+        }
         Map<String, Object> row = requireWo(id);
         addEvent(id, "created", null, "draft", null, null, null, null, null, "保存草稿", null);
         changeLog.recordCreate("repair_workorder", id, row);
@@ -376,6 +391,10 @@ public class RepairWorkorderController {
             if ("device_id".equals(col) || col.endsWith("_id")) {
                 sets.add(col + " = ?::uuid");
                 args.add(blankToNull(v));
+                if ("reporter_id".equals(col) && TableColumnCache.hasColumn(jdbc, "repair_workorder", "reporter_name")) {
+                    sets.add("reporter_name = ?");
+                    args.add(SoftDeleteSupport.resolveUserDisplayName(jdbc, v));
+                }
             } else if ("report_time".equals(col)) {
                 sets.add(col + " = ?::timestamptz");
                 args.add(v);
@@ -588,11 +607,21 @@ public class RepairWorkorderController {
         String remark = body != null ? str(body.get("remark")) : "工程师抢单";
         if (remark.isBlank()) remark = "工程师抢单";
 
-        int updated = jdbc.update("""
-                UPDATE repair_workorder
-                SET status = 'repairing', assigned_user_id = ?::uuid, repair_sub_status = 'internal', updated_at = NOW()
-                WHERE id = ?::uuid AND status IN ('reported','dispatching') AND assigned_user_id IS NULL
-                """, userId, id);
+        int updated;
+        if (TableColumnCache.hasColumn(jdbc, "repair_workorder", "assigned_user_name")) {
+            updated = jdbc.update("""
+                    UPDATE repair_workorder
+                    SET status = 'repairing', assigned_user_id = ?::uuid, assigned_user_name = ?,
+                        repair_sub_status = 'internal', updated_at = NOW()
+                    WHERE id = ?::uuid AND status IN ('reported','dispatching') AND assigned_user_id IS NULL
+                    """, userId, SoftDeleteSupport.resolveUserDisplayName(jdbc, userId), id);
+        } else {
+            updated = jdbc.update("""
+                    UPDATE repair_workorder
+                    SET status = 'repairing', assigned_user_id = ?::uuid, repair_sub_status = 'internal', updated_at = NOW()
+                    WHERE id = ?::uuid AND status IN ('reported','dispatching') AND assigned_user_id IS NULL
+                    """, userId, id);
+        }
         if (updated == 0) {
             throw new BizException(409, "工单已被他人抢单或已派单，请刷新后重试");
         }
@@ -905,7 +934,30 @@ public class RepairWorkorderController {
                           Object fromUser, Object toUser, String remark, String extraJson) {
         Map<String, Object> wo = loadWorkorder(woId);
         boolean hasDevice = TableColumnCache.hasColumn(jdbc, "repair_workorder_event", "device_id");
-        if (hasDevice) {
+        boolean hasNames = TableColumnCache.hasColumn(jdbc, "repair_workorder_event", "operator_name");
+        Object opId = blankToNull(operatorId());
+        String opName = SoftDeleteSupport.resolveUserDisplayName(jdbc, opId);
+        String userName = SoftDeleteSupport.resolveUserDisplayName(jdbc, userId);
+        String fromUserName = SoftDeleteSupport.resolveUserDisplayName(jdbc, fromUser);
+        String toUserName = SoftDeleteSupport.resolveUserDisplayName(jdbc, toUser);
+        if (hasDevice && hasNames) {
+            jdbc.update("""
+                INSERT INTO repair_workorder_event
+                (id, workorder_id, event_type, from_status, to_status, from_sub_status, to_sub_status,
+                 operator_id, user_id, from_user_id, to_user_id,
+                 operator_name, user_name, from_user_name, to_user_name,
+                 remark, extra_json, device_id, device_code, device_name)
+                VALUES (?::uuid,?::uuid,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?::uuid,
+                        ?,?,?,?,
+                        ?,CAST(? AS jsonb),?::uuid,?,?)
+                """,
+                    UUID.randomUUID(), woId, type, blankToNull(fromStatus), blankToNull(toStatus),
+                    blankToNull(fromSub), blankToNull(toSub),
+                    opId, blankToNull(userId), blankToNull(fromUser), blankToNull(toUser),
+                    opName, userName, fromUserName, toUserName,
+                    blankToNull(remark), extraJson,
+                    blankToNull(wo.get("device_id")), blankToNull(wo.get("device_code")), blankToNull(wo.get("device_name")));
+        } else if (hasDevice) {
             jdbc.update("""
                 INSERT INTO repair_workorder_event
                 (id, workorder_id, event_type, from_status, to_status, from_sub_status, to_sub_status,
@@ -916,10 +968,25 @@ public class RepairWorkorderController {
                 """,
                     UUID.randomUUID(), woId, type, blankToNull(fromStatus), blankToNull(toStatus),
                     blankToNull(fromSub), blankToNull(toSub),
-                    blankToNull(operatorId()), blankToNull(userId),
-                    blankToNull(fromUser), blankToNull(toUser),
+                    opId, blankToNull(userId), blankToNull(fromUser), blankToNull(toUser),
                     blankToNull(remark), extraJson,
                     blankToNull(wo.get("device_id")), blankToNull(wo.get("device_code")), blankToNull(wo.get("device_name")));
+        } else if (hasNames) {
+            jdbc.update("""
+                INSERT INTO repair_workorder_event
+                (id, workorder_id, event_type, from_status, to_status, from_sub_status, to_sub_status,
+                 operator_id, user_id, from_user_id, to_user_id,
+                 operator_name, user_name, from_user_name, to_user_name,
+                 remark, extra_json)
+                VALUES (?::uuid,?::uuid,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?::uuid,
+                        ?,?,?,?,
+                        ?,CAST(? AS jsonb))
+                """,
+                    UUID.randomUUID(), woId, type, blankToNull(fromStatus), blankToNull(toStatus),
+                    blankToNull(fromSub), blankToNull(toSub),
+                    opId, blankToNull(userId), blankToNull(fromUser), blankToNull(toUser),
+                    opName, userName, fromUserName, toUserName,
+                    blankToNull(remark), extraJson);
         } else {
             jdbc.update("""
                 INSERT INTO repair_workorder_event
@@ -929,8 +996,7 @@ public class RepairWorkorderController {
                 """,
                     UUID.randomUUID(), woId, type, blankToNull(fromStatus), blankToNull(toStatus),
                     blankToNull(fromSub), blankToNull(toSub),
-                    blankToNull(operatorId()), blankToNull(userId),
-                    blankToNull(fromUser), blankToNull(toUser),
+                    opId, blankToNull(userId), blankToNull(fromUser), blankToNull(toUser),
                     blankToNull(remark), extraJson);
         }
     }

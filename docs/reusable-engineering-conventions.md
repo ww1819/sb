@@ -4,7 +4,7 @@
 > **来源**：`docs/meis-requirements.md` 附录 Q / C / D / E / F / G / H / I / R / S / T 等。  
 > **用法**：新系统可整份复制后，按「落地映射」改路径与模块名；MEIS 专属细节见文末附录。
 
-**版本**：1.4（2026-07-15）
+**版本**：1.5（2026-07-15）
 
 ---
 
@@ -272,6 +272,15 @@
 - 纯字典/模板配置表勿铺设备冗余。
 - 按设备查询的表建 `device_id` 索引；老数据可回填。
 
+### 6.3 工作人员姓名冗余（操作责任快照）
+
+- **目的**：操作记录背书、责任落实到人；避免用户改名后 join 导致追溯展示漂移。
+- **取值**：优先真实姓名，空则回退登录名（如 `COALESCE(NULLIF(TRIM(real_name), ''), username)`）。
+- **标准审计**：有 `created_by` / `updated_by` / `deleted_by` 时配套 `*_by_name`；写 UUID 的同一事务写姓名；软删恢复清空删除人姓名。
+- **业务责任人**：报修人、派工/接单、确认人、经办人等有明确操作语义的字段，同步冗余 `{role}_name` / `{field}_name`。
+- **快照语义**：写入时拷贝；**不**因事后改名级联更新历史行。
+- 客户端禁止伪造审计姓名列；老数据可按 UUID 回填。
+
 ---
 
 ## 7. 交付验收清单（通用）
@@ -356,7 +365,7 @@
 | 报修草稿/撤回 | 附录 S | `RepairWorkorderController` |
 | 变更记录/快照 | 附录 T（含 T.5） | `EntityChangeLogService` |
 | 主从保存 | 第 4 章 PLT-X-05 | 出入库/计划等专用保存 |
-| 业务冗余字段 | 附录 W、约定包 §6.2 | 维修子表/执行表 `device_id`+code/name |
+| 业务冗余字段 | 附录 W、约定包 §6.2 / §6.3 | 设备 `device_id`+code/name；人员 `*_by_name` / 责任人姓名 |
 | 验收清单 | 附录 E | 开发面板热加载 |
 | 列表勾选 / 批量作用域 | 附录 V、约定包 §5.4 | `useCrossPageSelection`、`ListSelectionBar`、`promptListActionScope`；`CrudPage`/用户/科室/工程师候选等 |
 
