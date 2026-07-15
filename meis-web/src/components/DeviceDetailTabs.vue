@@ -63,7 +63,7 @@
       </el-table>
     </el-tab-pane>
     <el-tab-pane label="二维码" name="qrcode">
-      <p>设备编码：{{ device.device_code }}</p>
+      <p>资产编码：{{ device.device_code }}</p>
       <el-button @click="printLabel">打印标签</el-button>
     </el-tab-pane>
     <el-tab-pane label="关联合同" name="contract"><el-empty description="维保合同关联" /></el-tab-pane>

@@ -1,9 +1,9 @@
 /** 设备台账等详情页字段中文标签 */
 export const deviceFieldLabels: Record<string, string> = {
   id: 'ID',
-  device_code: '设备编码',
+  device_code: '资产编码',
   card_code: '卡片编码',
-  device_name: '设备名称',
+  device_name: '资产名称',
   brand: '品牌',
   model: '型号',
   serial_number: '序列号(SN)',

@@ -1,6 +1,6 @@
 <template>
   <AppModal v-model="visible" title="选择盘点设备" size="xl" @close="onClose">
-    <PageFilterBar v-model:keyword="keyword" placeholder="设备编码/名称" @search="load" @reset="onReset" />
+    <PageFilterBar v-model:keyword="keyword" placeholder="资产编码/名称" @search="load" @reset="onReset" />
     <el-table
       v-loading="loading"
       :data="rows"
@@ -9,8 +9,8 @@
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" reserve-selection />
-      <el-table-column prop="device_code" label="设备编码" min-width="120" />
-      <el-table-column prop="device_name" label="设备名称" min-width="140" show-overflow-tooltip />
+      <el-table-column prop="device_code" label="资产编码" min-width="120" />
+      <el-table-column prop="device_name" label="资产名称" min-width="140" show-overflow-tooltip />
       <el-table-column prop="brand" label="品牌" min-width="100" />
       <el-table-column prop="specification" label="规格" min-width="100" />
       <el-table-column prop="model" label="型号" min-width="100" />

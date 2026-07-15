@@ -4,19 +4,19 @@
       type="info"
       :closable="false"
       show-icon
-      title="二维码载荷为设备编码（创建后不可修改），请勿使用名称、科室等可改字段。"
+      title="二维码载荷为资产编码（创建后不可修改），请勿使用名称、科室等可改字段。"
       class="device-label-panel__alert"
     />
 
     <div class="device-label-panel__preview">
       <div ref="printAreaRef" class="device-label-panel__card">
         <div class="device-label-panel__qr">
-          <img v-if="qrDataUrl" :src="qrDataUrl" alt="设备二维码" />
-          <el-empty v-else description="无设备编码，无法生成二维码" :image-size="64" />
+          <img v-if="qrDataUrl" :src="qrDataUrl" alt="资产二维码" />
+          <el-empty v-else description="无资产编码，无法生成二维码" :image-size="64" />
         </div>
         <div class="device-label-panel__meta">
-          <div><span>设备编码</span><strong>{{ deviceCode || '—' }}</strong></div>
-          <div><span>设备名称</span><strong>{{ deviceName || '—' }}</strong></div>
+          <div><span>资产编码</span><strong>{{ deviceCode || '—' }}</strong></div>
+          <div><span>资产名称</span><strong>{{ deviceName || '—' }}</strong></div>
         </div>
       </div>
       <div class="device-label-panel__actions" v-if="deviceId">
@@ -28,7 +28,7 @@
     <div class="device-label-panel__history">
       <h4>打印记录</h4>
       <el-table :data="prints" border stripe size="small" max-height="280" v-loading="loading">
-        <el-table-column prop="device_code" label="设备编码" min-width="120" />
+        <el-table-column prop="device_code" label="资产编码" min-width="120" />
         <el-table-column prop="printed_at" label="打印时间" min-width="160" />
         <el-table-column prop="template_code" label="模板" width="100" />
         <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
