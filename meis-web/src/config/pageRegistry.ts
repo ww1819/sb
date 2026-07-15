@@ -219,6 +219,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/system',
     table: 'finance_category',
     formPlacement: 'right',
+    showRowIndex: true,
     enableView: true
   },
   '/dict/dept': { title: '科室维护', apiBase: '/system', table: 'department', pinyinCode: true,

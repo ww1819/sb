@@ -196,7 +196,7 @@
 | 生产厂商 | `/dict/manufacturer` | 支持导入、拼音简码 |
 | 设备分类 | `/dict/category` | 医疗器械 68 分类 |
 | 资产分类 | `/dict/asset-category` | |
-| 财务分类 | `/dict/finance-category` | |
+| 财务分类 | `/dict/finance-category` | 左侧多级树（按 `parent_id`）；点节点筛下级；新增默认上级为当前选中 |
 | 单位维护 | `/dict/unit` | |
 
 **需求摘要（待补充）**：
@@ -204,6 +204,8 @@
 - [x] DICT-M-01 院区/供应商/设备分类/生产厂商菜单归入基础字典（自系统管理迁出）
 - [x] DICT-UI-01 科室维护：操作按钮下行排列；新增右侧抽屉；隐藏 ListSelectionBar；列表底部分页
 - [x] DICT-UI-02 供应商：查询贴搜索框；导入/生成简码在导出后；新增右侧抽屉；隐藏 ListSelectionBar（**仅 supplier 路径启用 `toolbarLayout`/`formPlacement`，不波及通用 CrudPage 默认页**）
+- [x] DICT-UI-03 财务分类：左侧多级树状分类 + 右侧列表按树节点联动（本级+直接下级，`tree_node_id`）；新增默认挂当前选中节点；列表含序号；列名为分类编码/分类名称，会计科目前展示上级分类；上级分类可改/可清空（清空=一级），不可选自身及子孙
+- [x] DICT-UI-04 通用保存：校验 `Result.code===0`（后端失败常 HTTP 200）；HTTP 拦截器拒绝业务失败，避免“提示成功但未入库”
 - [ ] DICT-F-01 字典数据全院共享，变更需审计
 - [ ] DICT-F-02 拼音简码批量生成
 - [ ] DICT-B-01 已被业务引用的字典项不可物理删除
@@ -916,6 +918,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 |------|------|------|----------|
 <<<<<<< HEAD
 <<<<<<< HEAD
+| 1.48 | 2026-07-15 | — | 财务分类左侧多级树；通用分页支持扁平筛选参数（parent_id 等） |
 | 1.47 | 2026-07-15 | — | 供应商列表：序号列；编码/名称表头升序降序（通用分页支持 sortBy） |
 =======
 | 1.47 | 2026-07-15 17:36:00 | — | 附录 Q.9 文档时间颗粒度；附录 U.14 维修列表功能分列/进程展示与段确认固化 |
@@ -2296,9 +2299,9 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 | 字段名 | 类型 | 中文注释 |
 |---|---|---|
-| `finance_code` | `VARCHAR(50)` | 财务编码 |
-| `finance_name` | `VARCHAR(200)` | 财务名称 |
-| `parent_id` | `UUID` | 上级分类 |
+| `finance_code` | `VARCHAR(50)` | 分类编码（列表展示名） |
+| `finance_name` | `VARCHAR(200)` | 分类名称（列表展示名） |
+| `parent_id` | `UUID` | 上级分类（列表展示于会计科目前） |
 | `account_subject` | `VARCHAR(50)` | 会计科目 |
 | `fund_source` | `VARCHAR(50)` | 资金来源 |
 | `sort_order` | `INTEGER` | 排序号 |

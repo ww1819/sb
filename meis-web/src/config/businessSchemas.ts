@@ -174,9 +174,15 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'is_active', label: '启用', type: 'boolean', list: true }
   ],
   finance_category: [
-    { prop: 'finance_code', label: '财务编码', list: true, required: true },
-    { prop: 'finance_name', label: '财务名称', list: true, required: true },
-    { prop: 'parent_id', label: '上级分类', linkTable: 'finance_category' },
+    { prop: 'finance_code', label: '分类编码', list: true, required: true },
+    { prop: 'finance_name', label: '分类名称', list: true, required: true },
+    {
+      prop: 'parent_id',
+      label: '上级分类',
+      linkTable: 'finance_category',
+      list: true,
+      placeholder: '留空为一级分类'
+    },
     { prop: 'account_subject', label: '会计科目', list: true },
     { prop: 'fund_source', label: '资金来源', dictType: 'fund_source', list: true },
     { prop: 'sort_order', label: '排序', type: 'number', list: true },

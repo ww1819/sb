@@ -74,6 +74,7 @@ const pageMap: Record<string, ReturnType<typeof defineAsyncComponent>> = {
   '/dict/supplier': defineAsyncComponent(() => import('@/views/purchase/SupplierPage.vue')),
   '/dict/manufacturer': defineAsyncComponent(() => import('@/views/purchase/ManufacturerPage.vue')),
   '/dict/category': defineAsyncComponent(() => import('@/views/purchase/DeviceCategoryPage.vue')),
+  '/dict/finance-category': defineAsyncComponent(() => import('@/views/dict/FinanceCategoryPage.vue')),
   '/dict/dept': defineAsyncComponent(() => import('@/views/system/DeptPage.vue')),
   '/dict/warehouse': defineAsyncComponent(() => import('@/views/system/WarehousePage.vue')),
   '/system/warehouse': defineAsyncComponent(() => import('@/views/system/WarehousePage.vue')),

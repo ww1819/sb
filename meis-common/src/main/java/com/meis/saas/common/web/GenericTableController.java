@@ -51,10 +51,22 @@ public abstract class GenericTableController {
             @PathVariable String table,
             com.meis.saas.common.page.PageQuery query,
             @RequestParam(required = false) String sortBy,
-            @RequestParam(required = false) String sortOrder) {
+            @RequestParam(required = false) String sortOrder,
+            @RequestParam Map<String, String> allParams) {
         check(table);
         if (sortBy != null && !sortBy.isBlank()) query.setSortBy(sortBy.trim());
         if (sortOrder != null && !sortOrder.isBlank()) query.setSortOrder(sortOrder.trim());
+        // 扁平查询参数写入 filters（如 parent_id），供树选/列表筛选使用
+        if (allParams != null) {
+            Set<String> reserved = Set.of("page", "size", "keyword", "sortBy", "sortOrder");
+            for (Map.Entry<String, String> e : allParams.entrySet()) {
+                String key = e.getKey();
+                String val = e.getValue();
+                if (key == null || reserved.contains(key) || val == null || val.isBlank()) continue;
+                if (!key.matches("^[a-z][a-z0-9_]*$")) continue;
+                query.getFilters().put(key, val);
+            }
+        }
         return Result.ok(com.meis.saas.common.page.PageableJdbc.query(jdbc(), table, query));
     }
 

@@ -16,7 +16,11 @@ export const refSelectConfig: Record<string, RefSelectMeta> = {
   manufacturer: { url: '/system/manufacturer/list', labelKey: 'manufacturer_name', codeKey: 'manufacturer_code', lookupUrl: '/system/manufacturer/lookup' },
   medical_device_category: { url: '/system/medical_device_category/list', labelKey: 'category_name' },
   asset_category: { url: '/system/asset_category/list', labelKey: 'category_name' },
-  finance_category: { url: '/system/finance_category/list', labelKey: 'finance_name' },
+  finance_category: {
+    url: '/system/finance_category/list',
+    labelKey: 'finance_name',
+    codeKey: 'finance_code'
+  },
   unit_dict: { url: '/system/unit_dict/list', labelKey: 'unit_name' },
   medical_device: { url: '/asset/medical_device/list', labelKey: 'device_name', codeKey: 'device_code' },
   device_outbound: { url: '/asset/device_outbound/list', labelKey: 'outbound_no', codeKey: 'outbound_no' },

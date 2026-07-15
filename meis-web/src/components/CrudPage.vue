@@ -266,8 +266,17 @@ const props = defineProps<{
   operationColumnWidth?: number
   /** 隐藏默认「操作」列（由 extra-columns 自行挂功能列，见附录 U.14） */
   hideOperationColumn?: boolean
+  /** 追加到列表查询的参数（如左侧树选中节点） */
+  extraQuery?: Record<string, string | number | boolean | undefined | null>
+  /** 新增表单默认值 */
+  defaultFormValues?: Record<string, unknown>
 }>()
-const emit = defineEmits<{ detail: [row: Record<string, unknown>]; add: []; deleted: [row: Record<string, unknown>] }>()
+const emit = defineEmits<{
+  detail: [row: Record<string, unknown>]
+  add: []
+  deleted: [row: Record<string, unknown>]
+  saved: [payload: Record<string, unknown>]
+}>()
 const slots = useSlots()
 const { loadDict, preloadDictTypes } = useDict()
 
@@ -447,6 +456,9 @@ async function load() {
     for (const [k, v] of Object.entries(props.config.listParams ?? {})) {
       if (v !== undefined && v !== null && v !== '') params[k] = v
     }
+    for (const [k, v] of Object.entries(props.extraQuery ?? {})) {
+      if (v !== undefined && v !== null && v !== '') params[k] = v as string | number | boolean
+    }
     if (sortField.value && sortOrder.value) {
       params.sortBy = sortField.value
       params.sortOrder = sortOrder.value
@@ -485,10 +497,27 @@ function onReset() {
 }
 
 function openForm(row?: Record<string, unknown>, mode: 'create' | 'edit' | 'view' = 'create') {
-  form.value = row ? { ...row } : {}
+  form.value = row ? { ...row } : { ...(props.defaultFormValues ?? {}) }
   formMode.value = mode
   formTitle.value = mode === 'view' ? '查看' : mode === 'edit' ? '编辑' : '新增'
   formVisible.value = true
+}
+
+/** 空串 UUID 外键转为 null（如上级分类清空 = 一级） */
+function normalizeSaveBody(src: Record<string, unknown>) {
+  const body: Record<string, unknown> = { ...src }
+  for (const [k, v] of Object.entries(body)) {
+    if (!(k === 'id' || k.endsWith('_id') || k.endsWith('_by'))) continue
+    if (v === undefined || v === '') body[k] = null
+  }
+  return body
+}
+
+function isApiOk(data: { code?: number; success?: boolean } | undefined) {
+  if (!data) return false
+  if (typeof data.code === 'number') return data.code === 0
+  if (typeof data.success === 'boolean') return data.success
+  return true
 }
 
 async function save() {
@@ -501,19 +530,28 @@ async function save() {
     return
   }
   try {
-    const id = form.value.id
+    const payload = normalizeSaveBody(form.value)
+    const id = payload.id
+    let data: { code?: number; success?: boolean; message?: string } | undefined
     if (props.config.saveUrl) {
-      await http.post(props.config.saveUrl, form.value)
+      data = (await http.post(props.config.saveUrl, payload)).data
     } else if (id) {
-      await http.put(`${props.config.apiBase}/${props.config.table}/${id}`, form.value)
+      data = (await http.put(`${props.config.apiBase}/${props.config.table}/${id}`, payload)).data
     } else {
-      await http.post(`${props.config.apiBase}/${props.config.table}`, form.value)
+      data = (await http.post(`${props.config.apiBase}/${props.config.table}`, payload)).data
+    }
+    // 后端业务失败常仍返回 HTTP 200 + code!=0，必须校验，否则会出现“成功但库中无数据”
+    if (!isApiOk(data)) {
+      ElMessage.error(data?.message || '保存失败')
+      return
     }
     formVisible.value = false
     ElMessage.success('保存成功')
+    emit('saved', { ...form.value })
     load()
-  } catch {
-    ElMessage.error('保存失败')
+  } catch (e: unknown) {
+    const err = e as { isBizError?: boolean; message?: string; response?: { data?: { message?: string } } }
+    ElMessage.error(err?.response?.data?.message || err?.message || '保存失败')
   }
 }
 
@@ -662,6 +700,17 @@ onMounted(async () => {
 onActivated(() => {
   if (initialized) load()
 })
+
+watch(
+  () => props.extraQuery,
+  () => {
+    if (!initialized) return
+    page.value = 1
+    onClearSelection()
+    void load()
+  },
+  { deep: true }
+)
 
 function getSelectedRows() {
   return selectedRows.value

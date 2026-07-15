@@ -20,10 +20,23 @@ public final class PageableJdbc {
             appendKeywordFilter(jdbc, table, where, args, q.getKeyword().trim());
         }
         q.getFilters().forEach((k, v) -> {
-            if (v != null && !v.isBlank()) {
-                where.append(" AND ").append(k).append(" = ? ");
-                args.add(v);
+            if (v == null || v.isBlank()) return;
+            if (!k.matches("^[a-z][a-z0-9_]*$")) return;
+            // 树选节点：本级 + 直接下级（避免叶子节点右侧无数据）
+            if ("tree_node_id".equals(k)) {
+                if (TableColumnCache.hasColumn(jdbc, table, "parent_id")) {
+                    where.append(" AND (id = ?::uuid OR parent_id = ?::uuid) ");
+                    args.add(v);
+                    args.add(v);
+                } else {
+                    where.append(" AND id = ?::uuid ");
+                    args.add(v);
+                }
+                return;
             }
+            boolean uuidCol = "id".equals(k) || k.endsWith("_id") || k.endsWith("_by");
+            where.append(" AND ").append(k).append(uuidCol ? " = ?::uuid " : " = ? ");
+            args.add(v);
         });
         Long total = jdbc.queryForObject("SELECT COUNT(*) FROM " + table + where, Long.class, args.toArray());
         List<Object> pageArgs = new ArrayList<>(args);
@@ -83,7 +96,7 @@ public final class PageableJdbc {
             case "manufacturer" -> new String[]{"manufacturer_code", "manufacturer_name", "pinyin_code"};
             case "medical_device_category" -> new String[]{"category_code", "category_name"};
             case "asset_category" -> new String[]{"category_code", "category_name"};
-            case "finance_category" -> new String[]{"category_code", "category_name"};
+            case "finance_category" -> new String[]{"finance_code", "finance_name"};
             case "unit_dict" -> new String[]{"unit_code", "unit_name"};
             case "warehouse" -> new String[]{"warehouse_code", "warehouse_name"};
             case "campus" -> new String[]{"campus_code", "campus_name"};
