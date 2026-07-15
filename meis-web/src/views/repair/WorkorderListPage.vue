@@ -22,6 +22,7 @@
         </template>
         <template v-if="pageMode === 'handle' || pageMode === 'all'">
           <el-button v-if="canOnRow('dispatch', row)" link type="primary" @click.stop="openDispatch(row)">派工</el-button>
+          <el-button v-if="canOnRow('grab', row)" link type="primary" @click.stop="doGrab(row)">抢单</el-button>
           <el-button v-if="canOnRow('segment', row)" link type="primary" @click.stop="openAddSegment(row)">添加进程</el-button>
           <el-button v-if="canOnRow('cancel', row)" link type="danger" @click.stop="doCancel(row)">取消</el-button>
         </template>
@@ -130,11 +131,38 @@
     />
 
     <AppModal v-model="segmentVisible" title="添加维修进程" size="md">
-      <el-form label-width="100px">
+      <el-form label-width="120px">
         <el-form-item label="进程类型" required>
           <el-select v-model="actionForm.processTypeId" placeholder="请选择" style="width: 100%">
             <el-option v-for="t in addableTypes" :key="String(t.id)" :label="String(t.type_name)" :value="String(t.id)" />
           </el-select>
+        </el-form-item>
+        <el-form-item label="维修工程师" required>
+          <RefSelect v-model="actionForm.segmentUserId" link-table="repair_engineer" placeholder="请选择工程师" />
+        </el-form-item>
+        <el-form-item label="开始时间" required>
+          <el-date-picker
+            v-model="actionForm.startedAt"
+            type="datetime"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            format="YYYY-MM-DD HH:mm:ss"
+            placeholder="开始时间"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="结束时间">
+          <div class="seg-end-time">
+            <el-checkbox v-model="actionForm.enableEndedAt">填写结束时间（补录）</el-checkbox>
+            <el-date-picker
+              v-model="actionForm.endedAt"
+              type="datetime"
+              value-format="YYYY-MM-DD HH:mm:ss"
+              format="YYYY-MM-DD HH:mm:ss"
+              placeholder="结束时间"
+              style="width: 100%"
+              :disabled="!actionForm.enableEndedAt"
+            />
+          </div>
         </el-form-item>
         <el-form-item v-if="selectedAddableType?.can_add_parts" label="配件">
           <div v-for="(row, idx) in segmentPartRows" :key="idx" class="seg-part-form-row">
@@ -351,6 +379,7 @@ const subVisible = ref(false)
 const verifyVisible = ref(false)
 const actionForm = reactive({
   userId: '' as string,
+  segmentUserId: '' as string,
   startRepair: false,
   keepRepairing: false,
   skipVerify: false,
@@ -358,6 +387,9 @@ const actionForm = reactive({
   remark: '',
   segmentRemark: '',
   processTypeId: '',
+  startedAt: '',
+  endedAt: '',
+  enableEndedAt: false,
   subStatus: 'internal',
   verifyResult: 'pass' as 'pass' | 'fail',
   verifyComment: '',
@@ -579,8 +611,15 @@ async function openAddSegment(row?: Record<string, unknown>) {
   }
   actionForm.processTypeId = ''
   actionForm.segmentRemark = ''
+  actionForm.segmentUserId = String(wo.value.assigned_user_id ?? auth.user?.userId ?? '')
+  actionForm.startedAt = nowText()
+  actionForm.endedAt = ''
+  actionForm.enableEndedAt = false
   segmentPartRows.value = []
   await loadAddableTypes()
+  if (!addableTypes.value.length) {
+    ElMessage.warning('暂无可添加的进程类型，请确认已迁移并写入进程类型种子（重启 meis-tenant）')
+  }
   segmentVisible.value = true
 }
 
@@ -589,11 +628,27 @@ async function doAddSegment() {
     ElMessage.warning('请选择进程类型')
     return
   }
+  if (!actionForm.segmentUserId) {
+    ElMessage.warning('请选择维修工程师')
+    return
+  }
+  if (!actionForm.startedAt) {
+    ElMessage.warning('请填写开始时间')
+    return
+  }
+  if (actionForm.enableEndedAt && !actionForm.endedAt) {
+    ElMessage.warning('请填写结束时间')
+    return
+  }
   const parts = segmentPartRows.value
     .filter((r) => r.sparePartId)
     .map((r) => ({ spare_part_id: r.sparePartId, quantity: r.quantity }))
   const { data } = await http.post(`/repair/workorder/${wo.value.id}/segments`, {
     processTypeId: actionForm.processTypeId,
+    userId: actionForm.segmentUserId,
+    startedAt: actionForm.startedAt,
+    enableEndedAt: actionForm.enableEndedAt,
+    endedAt: actionForm.enableEndedAt ? actionForm.endedAt : undefined,
     remark: actionForm.segmentRemark,
     parts
   })
@@ -803,7 +858,10 @@ async function doStartRepair() {
   await refresh()
 }
 
-async function doGrab() {
+async function doGrab(row?: Record<string, unknown>) {
+  if (row?.id) {
+    await openDetail(row)
+  }
   if (!wo.value?.id) return
   await ElMessageBox.confirm('确认抢单？抢单后您将成为负责人并直接开始维修。', '抢单', { type: 'warning' })
   const { data } = await http.post(`/repair/workorder/${wo.value.id}/grab`, { remark: '工程师抢单' })
@@ -1019,6 +1077,12 @@ onActivated(() => {
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
+}
+.seg-end-time {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
 }
 .event-time {
   display: inline-block;
