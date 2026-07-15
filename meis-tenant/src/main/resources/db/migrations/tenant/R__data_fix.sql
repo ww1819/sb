@@ -524,3 +524,16 @@ UPDATE spare_part_usage t
 SET operator_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
 FROM sys_user u
 WHERE t.operator_id = u.id AND (t.operator_name IS NULL OR TRIM(t.operator_name) = '');
+
+-- AST-UI-02：device_unit 文本按名称/编码匹配 unit_dict → unit_id；匹配不上留空
+UPDATE medical_device d
+SET unit_id = u.id,
+    updated_at = NOW()
+FROM unit_dict u
+WHERE d.unit_id IS NULL
+  AND NULLIF(TRIM(d.device_unit), '') IS NOT NULL
+  AND COALESCE(u.is_deleted, 0) = 0
+  AND (
+    LOWER(TRIM(u.unit_name)) = LOWER(TRIM(d.device_unit))
+    OR LOWER(TRIM(u.unit_code)) = LOWER(TRIM(d.device_unit))
+  );

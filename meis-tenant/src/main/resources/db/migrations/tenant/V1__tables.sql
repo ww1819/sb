@@ -661,6 +661,7 @@ CREATE TABLE medical_device (
     brand VARCHAR(100),
     model VARCHAR(100),
     serial_number VARCHAR(100),
+    unit_id UUID REFERENCES unit_dict(id),
     category_id UUID REFERENCES medical_device_category(id),
     asset_category_id UUID REFERENCES asset_category(id),
     finance_category_id UUID REFERENCES finance_category(id),
@@ -735,7 +736,8 @@ COMMENT ON COLUMN medical_device.device_name IS '设备名称';
 COMMENT ON COLUMN medical_device.brand IS '品牌';
 COMMENT ON COLUMN medical_device.model IS '型号';
 COMMENT ON COLUMN medical_device.serial_number IS '出厂序列号';
-COMMENT ON COLUMN medical_device.category_id IS '设备分类';
+COMMENT ON COLUMN medical_device.unit_id IS '计量单位（unit_dict）';
+COMMENT ON COLUMN medical_device.category_id IS '设备分类(68)';
 COMMENT ON COLUMN medical_device.manufacturer_id IS '生产厂商';
 COMMENT ON COLUMN medical_device.supplier_id IS '供应商';
 COMMENT ON COLUMN medical_device.country_of_origin IS '原产国';

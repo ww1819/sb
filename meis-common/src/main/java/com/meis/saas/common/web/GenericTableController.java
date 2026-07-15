@@ -1,5 +1,7 @@
 package com.meis.saas.common.web;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.meis.saas.common.asset.MedicalDeviceDeleteGuard;
 import com.meis.saas.common.asset.SparePartDeleteGuard;
 import com.meis.saas.common.audit.EntityChangeLogService;
@@ -30,6 +32,12 @@ import java.util.*;
  * 通用表 CRUD（租户 Schema 内），供各业务微服务快速暴露 API。
  */
 public abstract class GenericTableController {
+    private static final ObjectMapper JSON = new ObjectMapper();
+    /** JSONB 列：Map/List 回写须序列化为字符串并以 ?::jsonb 绑定，否则驱动误走 hstore。 */
+    private static final Set<String> JSONB_COLUMNS = Set.of(
+            "extension_data", "manual_files", "certificate_files",
+            "changed_fields", "snapshot_json", "permissions");
+
     @Autowired(required = false)
     private ImportProfileService importProfileService;
 
@@ -140,6 +148,8 @@ public abstract class GenericTableController {
         }
         prepareInsertDefaults(table, body);
         normalizeUuidFields(body);
+        normalizeTemporalFields(body);
+        normalizeJsonbFields(body);
         applyCategoryHierarchyDefaults(table, body);
         SoftDeleteSupport.applyInsertAudit(jdbc(), table, body);
         var cols = TableColumnCache.columns(jdbc(), table);
@@ -180,6 +190,8 @@ public abstract class GenericTableController {
             body.remove("device_code");
         }
         normalizeUuidFields(body);
+        normalizeTemporalFields(body);
+        normalizeJsonbFields(body);
         applyCategoryHierarchyDefaults(table, body);
         if (body.isEmpty()) return Result.ok();
         Map<String, Object> before = loadTracked(table, id);
@@ -329,14 +341,57 @@ public abstract class GenericTableController {
         }
     }
 
+    /** 日期/时间列空串转 null；前端常回传 ""。 */
+    private static void normalizeTemporalFields(Map<String, Object> body) {
+        for (Map.Entry<String, Object> e : body.entrySet()) {
+            if (!isDateColumn(e.getKey()) && !isTimestampColumn(e.getKey())) continue;
+            Object v = e.getValue();
+            if (v instanceof String s && s.isBlank()) e.setValue(null);
+        }
+    }
+
+    /** Map/List 形态的 JSONB 字段序列化为 JSON 字符串，避免 JDBC 按 hstore 绑定失败。 */
+    private static void normalizeJsonbFields(Map<String, Object> body) {
+        for (Map.Entry<String, Object> e : body.entrySet()) {
+            if (!isJsonbColumn(e.getKey())) continue;
+            Object v = e.getValue();
+            if (v == null || v instanceof String || v instanceof org.postgresql.util.PGobject) continue;
+            if (v instanceof Map || v instanceof Collection || v.getClass().isArray()) {
+                try {
+                    e.setValue(JSON.writeValueAsString(v));
+                } catch (JsonProcessingException ex) {
+                    throw new BizException(400, "无法序列化 JSON 字段：" + e.getKey());
+                }
+            }
+        }
+    }
+
     private static boolean isUuidColumn(String column) {
         return "id".equals(column)
                 || column.endsWith("_id")
                 || column.endsWith("_by");
     }
 
+    private static boolean isDateColumn(String column) {
+        return column.endsWith("_date") || "delivery_deadline".equals(column);
+    }
+
+    private static boolean isTimestampColumn(String column) {
+        return column.endsWith("_at")
+                || column.endsWith("_time")
+                || column.endsWith("_datetime");
+    }
+
+    private static boolean isJsonbColumn(String column) {
+        return JSONB_COLUMNS.contains(column) || column.endsWith("_json") || column.endsWith("_files");
+    }
+
     private static String placeholder(String column) {
-        return isUuidColumn(column) ? "?::uuid" : "?";
+        if (isUuidColumn(column)) return "?::uuid";
+        if (isJsonbColumn(column)) return "?::jsonb";
+        if (isDateColumn(column)) return "?::date";
+        if (isTimestampColumn(column)) return "?::timestamptz";
+        return "?";
     }
 
     private static boolean isBlank(Object v) {

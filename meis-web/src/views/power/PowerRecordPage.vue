@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <SystemPageCard title="监测记录" :loading="loading" show-pager v-model:page="page" v-model:size="size" :total="total" @page-change="load">
     <template #filterBar>
       <PageFilterBar v-model:keyword="keyword" placeholder="设备编码 / 名称" @search="onSearch" @reset="onReset">
@@ -26,7 +26,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import http from '@/api/http'
-import SystemPageCard from '@/components/SystemPageCard.vue'
+import SystemPageCard from '@/components/system/SystemPageCard.vue'
 import PageFilterBar from '@/components/PageFilterBar.vue'
 
 const loading = ref(false)

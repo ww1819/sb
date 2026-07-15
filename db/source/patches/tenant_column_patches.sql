@@ -215,6 +215,7 @@ ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS standard_function_count INTE
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS purchase_expected_benefit VARCHAR(200);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS rated_workload VARCHAR(100);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS device_unit VARCHAR(30);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS unit_id UUID;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS manage_dept_id UUID;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS location_floor VARCHAR(50);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS room_number VARCHAR(50);

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="purchase-approval-page">
     <SystemPageCard title="采购审批" :loading="loading" show-pager v-model:page="page" v-model:size="size" :total="total" @page-change="load">
       <template #filterBar>
@@ -67,7 +67,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import http from '@/api/http'
-import SystemPageCard from '@/components/SystemPageCard.vue'
+import SystemPageCard from '@/components/system/SystemPageCard.vue'
 import PageFilterBar from '@/components/PageFilterBar.vue'
 import AppModal from '@/components/AppModal.vue'
 import ApprovalPanel from '@/components/ApprovalPanel.vue'

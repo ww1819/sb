@@ -80,26 +80,45 @@ export function ensureSystemConfigMenu(modules: NavModule[]): NavModule[] {
   return result
 }
 
-/** 补齐库存查询菜单（兼容数据库未迁移；仓库主数据入口仅基础字典） */
+/** 补齐库存查询菜单（兼容数据库未迁移；挂在库房管理 → 设备入库之后） */
 export function ensureExtraMenus(modules: NavModule[]): NavModule[] {
   const result = modules.map((m) => ({
     ...m,
     groups: (m.groups ?? []).map((g) => ({ ...g, items: [...g.items] }))
   }))
 
-  const assetIdx = result.findIndex((m) => m.id === 'asset')
+  // 若仍挂在资产台账下，移到库房管理
+  const assetIdx = result.findIndex((m) => m.id === 'asset' || m.title === '资产台账')
   if (assetIdx >= 0) {
     const asset = result[assetIdx]
     const groups = asset.groups?.length ? [...asset.groups] : [{ title: '', items: [] as NavMenuItem[] }]
     const items = [...groups[0].items]
+    const stockIdx = items.findIndex((i) => i.path === '/asset/stock' || i.title === '库存查询')
+    if (stockIdx >= 0) {
+      items.splice(stockIdx, 1)
+      groups[0] = { ...groups[0], items }
+      result[assetIdx] = { ...asset, groups }
+    }
+  }
+
+  const whIdx = result.findIndex((m) => m.id === 'warehouse' || m.title === '库房管理')
+  if (whIdx >= 0) {
+    const wh = result[whIdx]
+    const groups = wh.groups?.length ? [...wh.groups] : [{ title: '', items: [] as NavMenuItem[] }]
+    const items = [...groups[0].items]
     const hasStock = items.some((i) => i.path === '/asset/stock' || i.title === '库存查询')
     if (!hasStock) {
-      const entryIdx = items.findIndex((i) => i.path === '/asset/entry' || i.title.includes('设备入库'))
+      const entryIdx = items.findIndex(
+        (i) =>
+          i.path === '/warehouse/entry' ||
+          i.title.includes('设备入库') ||
+          i.title.includes('备货入库')
+      )
       const stockItem: NavMenuItem = { id: 'asset-stock-query', title: '库存查询', path: '/asset/stock' }
       if (entryIdx >= 0) items.splice(entryIdx + 1, 0, stockItem)
       else items.push(stockItem)
       groups[0] = { ...groups[0], items }
-      result[assetIdx] = { ...asset, groups }
+      result[whIdx] = { ...wh, groups }
     }
   }
 

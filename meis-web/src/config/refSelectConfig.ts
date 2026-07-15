@@ -29,7 +29,7 @@ export const refSelectConfig: Record<string, RefSelectMeta> = {
     labelKey: 'finance_name',
     codeKey: 'finance_code'
   },
-  unit_dict: { url: '/system/unit_dict/list', labelKey: 'unit_name' },
+  unit_dict: { url: '/system/unit_dict/list', labelKey: 'unit_name', codeKey: 'unit_code' },
   medical_device: { url: '/asset/medical_device/list', labelKey: 'device_name', codeKey: 'device_code' },
   device_outbound: { url: '/asset/device_outbound/list', labelKey: 'outbound_no', codeKey: 'outbound_no' },
   inspection_plan: { url: '/inspect/inspection_plan/list', labelKey: 'plan_name', codeKey: 'plan_code' },
