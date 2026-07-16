@@ -5,18 +5,20 @@
     </FormSection>
     <FormSection :title="detailTitle">
       <slot name="detail" />
-      <el-table :data="items" border class="detail-table">
-        <el-table-column v-if="showRowIndex" label="序号" width="60" align="center" fixed="left">
-          <template #default="{ $index }">{{ $index + 1 }}</template>
-        </el-table-column>
-        <slot name="detail-columns" />
-        <el-table-column label="操作" width="80" align="center" fixed="right">
-          <template #default="{ $index }">
-            <el-button link type="danger" @click="items.splice($index, 1)">删</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <el-button class="add-btn" @click="$emit('add-item')">添加明细</el-button>
+      <div class="detail-table-wrap">
+        <el-table :data="items" border class="detail-table" :height="tableHeight">
+          <el-table-column v-if="showRowIndex" label="序号" width="60" align="center" fixed="left">
+            <template #default="{ $index }">{{ $index + 1 }}</template>
+          </el-table-column>
+          <slot name="detail-columns" />
+          <el-table-column label="操作" width="88" align="center" fixed="right">
+            <template #default="{ $index }">
+              <el-button link type="danger" @click="items.splice($index, 1)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <el-button v-if="showAddButton" class="add-btn" @click="$emit('add-item')">添加明细</el-button>
     </FormSection>
   </div>
 </template>
@@ -29,8 +31,11 @@ withDefaults(
     items: Record<string, unknown>[]
     detailTitle?: string
     showRowIndex?: boolean
+    showAddButton?: boolean
+    /** 明细表固定高度（含表头），超出后上下滚动；列过多时左右滚动 */
+    tableHeight?: number
   }>(),
-  { detailTitle: '明细信息', showRowIndex: true }
+  { detailTitle: '明细信息', showRowIndex: true, showAddButton: true, tableHeight: 420 }
 )
 defineEmits<{ 'add-item': [] }>()
 </script>
@@ -39,6 +44,10 @@ defineEmits<{ 'add-item': [] }>()
 .master-detail {
   display: flex;
   flex-direction: column;
+}
+.detail-table-wrap {
+  width: 100%;
+  overflow: hidden;
 }
 .detail-table {
   width: 100%;
@@ -52,9 +61,6 @@ defineEmits<{ 'add-item': [] }>()
   padding: 0 10px;
   color: var(--meis-text-primary, #303133);
   font-weight: 600;
-}
-.master-detail :deep(.detail-table .el-table__body-wrapper) {
-  max-height: 360px;
 }
 .add-btn {
   margin-top: 8px;

@@ -226,7 +226,13 @@ function gridItemStyle(field: FieldSchema, group: FieldGroup) {
   const cols = groupColumns(group)
   if (!cols) return undefined
   if (field.span && field.span >= 24) return { gridColumn: '1 / -1' }
-  if (field.type === 'textarea') return { gridColumn: '1 / -1' }
+  if (field.type === 'textarea') {
+    if (field.span && field.span < 24) {
+      const spanCols = Math.max(1, Math.floor((cols * field.span) / 24))
+      return { gridColumn: `span ${spanCols}` }
+    }
+    return { gridColumn: '1 / -1' }
+  }
   return undefined
 }
 

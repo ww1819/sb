@@ -90,11 +90,25 @@ export const pageRegistry: Record<string, PageConfig> = {
     saveUrl: '/purchase/plan',
     showRowIndex: true,
     showRowSelection: true,
+    columns: [
+      'plan_code',
+      'plan_year',
+      'dept_name',
+      'applicant_name',
+      'fill_date',
+      'total_budget',
+      'plan_type',
+      'approved_by_name',
+      'approved_at',
+      'approval_status',
+      'benefit_analysis_url',
+      'dept_argument_url'
+    ],
     listFilters: [
       { key: 'approval_status', label: '审批状态', dictType: 'approval_status' },
       { key: 'plan_year', label: '计划年度', type: 'number' }
     ],
-    formGroupColumns: { basic: 5 }
+    formGroupColumns: { basic: 6 }
   },
   '/purchase/apply': {
     title: '采购申请',
@@ -107,11 +121,25 @@ export const pageRegistry: Record<string, PageConfig> = {
     saveUrl: '/purchase/plan',
     showRowIndex: true,
     showRowSelection: true,
+    columns: [
+      'plan_code',
+      'plan_year',
+      'dept_name',
+      'applicant_name',
+      'fill_date',
+      'total_budget',
+      'plan_type',
+      'approved_by_name',
+      'approved_at',
+      'approval_status',
+      'benefit_analysis_url',
+      'dept_argument_url'
+    ],
     listFilters: [
       { key: 'approval_status', label: '审批状态', dictType: 'approval_status' },
       { key: 'plan_year', label: '计划年度', type: 'number' }
     ],
-    formGroupColumns: { basic: 5 }
+    formGroupColumns: { basic: 6 }
   },
   '/purchase/approval': {
     title: '采购审批',

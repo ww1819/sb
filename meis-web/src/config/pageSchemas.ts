@@ -31,6 +31,10 @@ export interface FieldSchema {
   width?: number
   span?: number
   placeholder?: string
+  /** 是否出现在表单，默认 true；false 仅列表等展示 */
+  form?: boolean
+  /** textarea 行数，默认 3 */
+  rows?: number
 }
 
 export const tableSchemas: Record<string, FieldSchema[]> = {

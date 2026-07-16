@@ -116,6 +116,7 @@
         :prop="f.prop"
         :label="f.label"
         :align="columnAlign(f.prop, f.type)"
+        :width="f.width"
         :min-width="f.width ?? 120"
         show-overflow-tooltip
       >
@@ -129,7 +130,15 @@
           />
         </template>
         <template #default="{ row }">
-          <TableCellValue :field="f" :value="row[f.prop]" />
+          <TableFileCell
+            v-if="f.type === 'file'"
+            :value="row[f.prop]"
+            :prop="f.prop"
+            :row-id="row.id != null ? String(row.id) : ''"
+            :save-base="config.saveUrl"
+            @updated="(url) => onFileFieldUpdated(row, f.prop, url)"
+          />
+          <TableCellValue v-else :field="f" :value="row[f.prop]" />
         </template>
       </el-table-column>
       <slot name="extra-columns" />
@@ -233,6 +242,7 @@ import SystemPageCard from './system/SystemPageCard.vue'
 import PageFilterBar from './system/PageFilterBar.vue'
 import MoreSearchPanel from './system/MoreSearchPanel.vue'
 import TableCellValue from './table/TableCellValue.vue'
+import TableFileCell from './table/TableFileCell.vue'
 import TableColumnSortHeader from './table/TableColumnSortHeader.vue'
 import PageEmpty from './table/PageEmpty.vue'
 import type { PageConfig } from '@/config/pageRegistry'
@@ -364,7 +374,12 @@ function rowSerial(index: number) {
 
 const schema = computed(() => getSchema(props.config.table))
 const listFields = computed(() => {
-  const s = getListFields(props.config.table)
+  let s = getListFields(props.config.table)
+  const cols = props.config.columns
+  if (cols?.length) {
+    const map = new Map(s.map((f) => [f.prop, f]))
+    s = cols.map((p) => map.get(p)).filter((f): f is NonNullable<typeof f> => !!f)
+  }
   if (s.length) return s
   const first = rows.value[0]
   if (!first) return [{ prop: 'id', label: 'id' }]
@@ -372,11 +387,11 @@ const listFields = computed(() => {
 })
 const formFields = computed(() => {
   if (formMode.value === 'view') {
-    const all = schema.value
+    const all = schema.value.filter((f) => f.form !== false)
     if (all.length) return all
     return listFields.value
   }
-  const s = schema.value.filter((f) => !f.readonly)
+  const s = schema.value.filter((f) => !f.readonly && f.form !== false)
   if (s.length) return s
   return listFields.value
 })
@@ -398,6 +413,10 @@ function canDeleteRow(row: Record<string, unknown>) {
 
 function canViewRow(row: Record<string, unknown>) {
   return props.canView ? props.canView(row) : true
+}
+
+function onFileFieldUpdated(row: Record<string, unknown>, prop: string, url: string) {
+  row[prop] = url
 }
 
 async function loadRefLabels() {

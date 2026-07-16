@@ -289,6 +289,18 @@ BEGIN
     END IF;
 END $rep03_rename_event$;
 -- ---------- purchase_plan（采购申请基本信息扩展 PUR-UI-01） ----------
+ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS campus_id UUID;
+DO $purchase_plan_campus_fk$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'purchase_plan_campus_id_fkey'
+    ) THEN
+        ALTER TABLE purchase_plan
+            ADD CONSTRAINT purchase_plan_campus_id_fkey
+            FOREIGN KEY (campus_id) REFERENCES campus(id);
+    END IF;
+END $purchase_plan_campus_fk$;
 ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
 ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS unit VARCHAR(20);
 ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS model VARCHAR(100);

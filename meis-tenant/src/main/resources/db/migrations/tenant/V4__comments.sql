@@ -126,6 +126,7 @@ COMMENT ON TABLE purchase_plan IS '采购计划表';
 COMMENT ON COLUMN purchase_plan.id IS '主键';
 COMMENT ON COLUMN purchase_plan.plan_code IS '订阅计划编码';
 COMMENT ON COLUMN purchase_plan.plan_year IS '计划年度';
+COMMENT ON COLUMN purchase_plan.campus_id IS '所属院区';
 COMMENT ON COLUMN purchase_plan.dept_id IS '所属科室';
 COMMENT ON COLUMN purchase_plan.applicant_id IS '关联申请人';
 COMMENT ON COLUMN purchase_plan.total_budget IS '总预算';

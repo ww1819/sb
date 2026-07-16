@@ -58,7 +58,7 @@ public class PurchasePlanController {
         if (exists) {
             PurchaseValidators.checkVersion(jdbc, "purchase_plan", id, body.get("version"));
             jdbc.update("""
-                UPDATE purchase_plan SET plan_code=?, plan_year=?, dept_id=?::uuid, applicant_id=?::uuid,
+                UPDATE purchase_plan SET plan_code=?, plan_year=?, campus_id=?::uuid, dept_id=?::uuid, applicant_id=?::uuid,
                 total_budget=?, justification=?, remark=?, plan_type=?, fund_source=?,
                 is_large_equipment=?, large_equipment_class=?, benefit_analysis_url=?, dept_argument_url=?,
                 device_name=?, unit=?, model=?, fill_date=?::date, existing_device_status=?,
@@ -68,7 +68,7 @@ public class PurchasePlanController {
                 prefer_import=?, approval_status=?, version=COALESCE(version,1)+1, updated_at=NOW()
                 WHERE id=?::uuid
                 """,
-                    planCode, body.get("plan_year"), body.get("dept_id"), body.get("applicant_id"),
+                    planCode, body.get("plan_year"), body.get("campus_id"), body.get("dept_id"), body.get("applicant_id"),
                     body.get("total_budget"), body.get("justification"), body.get("remark"),
                     body.getOrDefault("plan_type", "annual"), body.get("fund_source"),
                     body.getOrDefault("is_large_equipment", false), body.get("large_equipment_class"),
@@ -83,16 +83,16 @@ public class PurchasePlanController {
                     body.getOrDefault("approval_status", "draft"), id);
         } else {
             jdbc.update("""
-                INSERT INTO purchase_plan (id, plan_code, plan_year, dept_id, applicant_id, total_budget,
+                INSERT INTO purchase_plan (id, plan_code, plan_year, campus_id, dept_id, applicant_id, total_budget,
                 justification, remark, plan_type, fund_source, approval_status,
                 is_large_equipment, large_equipment_class, benefit_analysis_url, dept_argument_url, business_chain_no,
                 device_name, unit, model, fill_date, existing_device_status, existing_device_usage_freq,
                 reference_manufacturer, specification, brand, quantity, similar_device_count, demand_level,
                 product_attribute_req, other_condition_confirm, unit_budget_price, category_id, demand_nature,
                 prefer_import)
-                VALUES (?::uuid,?,?,?::uuid,?::uuid,?,?,?,?,?,?,?,?,?,?,?,?,?,?::date,?,?,?,?,?,?,?,?,?,?,?::uuid,?,?)
+                VALUES (?::uuid,?,?,?::uuid,?::uuid,?::uuid,?,?,?,?,?,?,?,?,?,?,?,?,?,?::date,?,?,?,?,?,?,?,?,?,?,?,?::uuid,?,?)
                 """,
-                    id, planCode, body.get("plan_year"), body.get("dept_id"), body.get("applicant_id"),
+                    id, planCode, body.get("plan_year"), body.get("campus_id"), body.get("dept_id"), body.get("applicant_id"),
                     body.get("total_budget"), body.get("justification"), body.get("remark"),
                     body.getOrDefault("plan_type", "annual"), body.get("fund_source"), "draft",
                     body.getOrDefault("is_large_equipment", false), body.get("large_equipment_class"),
@@ -147,6 +147,28 @@ public class PurchasePlanController {
         if (!exists) {
             PurchaseChainService.ensurePlanChain(jdbc, id, planCode);
         }
+        return get(id);
+    }
+
+    @PatchMapping("/{id}/attachment")
+    @Transactional
+    @OperationLog(module = "purchase", description = "更新采购计划附件")
+    public Result<Map<String, Object>> updateAttachment(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
+        Object fieldObj = body.get("field");
+        if (fieldObj == null || fieldObj.toString().isBlank()) {
+            throw new BizException(400, "缺少附件字段");
+        }
+        String field = fieldObj.toString();
+        if (!Set.of("benefit_analysis_url", "dept_argument_url").contains(field)) {
+            throw new BizException(400, "不支持的附件字段");
+        }
+        boolean exists = !jdbc.queryForList(
+                "SELECT 1 FROM purchase_plan WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", null), id).isEmpty();
+        if (!exists) throw new BizException(404, "plan not found");
+        Object url = body.get("url");
+        String urlVal = url == null || url.toString().isBlank() ? null : url.toString();
+        jdbc.update("UPDATE purchase_plan SET " + field + " = ?, updated_at = NOW() WHERE id = ?::uuid", urlVal, id);
         return get(id);
     }
 
