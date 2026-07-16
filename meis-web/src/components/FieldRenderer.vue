@@ -21,6 +21,7 @@
     v-else-if="field.linkTable"
     v-model="model"
     :link-table="field.linkTable"
+    :value-key="field.linkValueKey"
     :placeholder="field.placeholder || '请选择' + field.label"
     :disabled="field.readonly"
     :exclude-values="linkExcludeValues"

@@ -106,7 +106,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     ],
     listFilters: [
       { key: 'approval_status', label: '审批状态', dictType: 'approval_status' },
-      { key: 'plan_year', label: '计划年度', type: 'number' }
+      { key: 'plan_type', label: '计划类型', dictType: 'plan_type' }
     ],
     formGroupColumns: { basic: 6 }
   },
@@ -137,7 +137,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     ],
     listFilters: [
       { key: 'approval_status', label: '审批状态', dictType: 'approval_status' },
-      { key: 'plan_year', label: '计划年度', type: 'number' }
+      { key: 'plan_type', label: '计划类型', dictType: 'plan_type' }
     ],
     formGroupColumns: { basic: 6 }
   },

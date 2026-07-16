@@ -27,8 +27,9 @@ public class PurchasePlanController {
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(PageQuery query,
             @RequestParam(required = false) String approval_status,
-            @RequestParam(required = false) Integer plan_year) {
-        return Result.ok(PurchasePageQueries.planPage(jdbc, query, approval_status, plan_year));
+            @RequestParam(required = false) Integer plan_year,
+            @RequestParam(required = false) String plan_type) {
+        return Result.ok(PurchasePageQueries.planPage(jdbc, query, approval_status, plan_year, plan_type));
     }
 
     @GetMapping("/{id}")
@@ -42,6 +43,16 @@ public class PurchasePlanController {
                 "SELECT * FROM purchase_plan_item WHERE plan_id = ?::uuid"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan_item", null), id);
         backfillPlanFromFirstItem(plan, items);
+        if (plan.get("fill_date") == null && plan.get("created_at") != null) {
+            Object created = plan.get("created_at");
+            if (created instanceof java.sql.Timestamp ts) {
+                plan.put("fill_date", ts.toLocalDateTime().toLocalDate().toString());
+            } else if (created instanceof java.time.OffsetDateTime odt) {
+                plan.put("fill_date", odt.toLocalDate().toString());
+            } else if (created instanceof java.time.LocalDateTime ldt) {
+                plan.put("fill_date", ldt.toLocalDate().toString());
+            }
+        }
         plan.put("items", items);
         return Result.ok(plan);
     }
@@ -55,6 +66,9 @@ public class PurchasePlanController {
                 "SELECT 1 FROM purchase_plan WHERE id = ?::uuid"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", null), id).isEmpty();
         String planCode = body.getOrDefault("plan_code", "PP" + System.currentTimeMillis()).toString();
+        if (isBlank(body.get("fill_date"))) {
+            body.put("fill_date", java.time.LocalDate.now().toString());
+        }
         if (exists) {
             PurchaseValidators.checkVersion(jdbc, "purchase_plan", id, body.get("version"));
             jdbc.update("""
@@ -111,6 +125,7 @@ public class PurchasePlanController {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> items = new ArrayList<>(
                 (List<Map<String, Object>>) body.getOrDefault("items", List.of()));
+        validateAndNormalizeItems(items);
         double totalBudget = resolveTotalBudget(body, items);
         if (body.get("plan_year") != null && !body.get("plan_year").toString().isBlank()) {
             int year = parseInt(body.get("plan_year"));
@@ -125,6 +140,10 @@ public class PurchasePlanController {
         jdbc.update("DELETE FROM purchase_plan_item WHERE plan_id = ?::uuid", id);
         for (Map<String, Object> item : items) {
             if (isBlank(item.get("device_name"))) continue;
+            double qty = toDouble(item.get("quantity"), 0);
+            double price = toDouble(item.get("estimated_price"), 0);
+            double lineTotal = Math.round(qty * price * 100.0) / 100.0;
+            item.put("total_price", lineTotal);
             jdbc.update("""
                 INSERT INTO purchase_plan_item (id, plan_id, device_name, category_id, quantity, estimated_price,
                 total_price, specification, priority, justification, use_dept_id, is_imported, registration_no,
@@ -135,8 +154,7 @@ public class PurchasePlanController {
                 VALUES (?::uuid,?::uuid,?,?::uuid,?,?,?,?,?,?,?::uuid,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                     UUID.randomUUID(), id, item.get("device_name"), uuidOrNull(item.get("category_id")),
-                    item.get("quantity") != null ? item.get("quantity") : 0,
-                    item.get("estimated_price"), item.get("total_price"), item.get("specification"),
+                    qty, price, lineTotal, item.get("specification"),
                     item.getOrDefault("priority", 1), item.get("justification"), uuidOrNull(item.get("use_dept_id")),
                     item.getOrDefault("is_imported", false), item.get("registration_no"),
                     item.get("unit"), item.get("brand_intent"), item.getOrDefault("is_metrology", false),
@@ -243,6 +261,44 @@ public class PurchasePlanController {
             total = qty.doubleValue() * price.doubleValue();
         }
         return total;
+    }
+
+    private static void validateAndNormalizeItems(List<Map<String, Object>> items) {
+        int line = 0;
+        for (Map<String, Object> item : items) {
+            if (isBlank(item.get("device_name"))) continue;
+            line++;
+            if (isBlank(item.get("specification"))) {
+                throw new BizException(400, "第 " + line + " 行请填写规格型号");
+            }
+            double qty = toDouble(item.get("quantity"), Double.NaN);
+            if (Double.isNaN(qty) || !(qty > 0)) {
+                throw new BizException(400, "第 " + line + " 行数量须大于 0");
+            }
+            Double price = nullableDouble(item.get("estimated_price"));
+            if (price == null) {
+                throw new BizException(400, "第 " + line + " 行请填写预估单价");
+            }
+            double lineTotal = Math.round(qty * price * 100.0) / 100.0;
+            item.put("quantity", qty);
+            item.put("estimated_price", price);
+            item.put("total_price", lineTotal);
+        }
+    }
+
+    private static double toDouble(Object value, double defaultValue) {
+        Double n = nullableDouble(value);
+        return n != null ? n : defaultValue;
+    }
+
+    private static Double nullableDouble(Object value) {
+        if (value == null || (value instanceof String s && s.isBlank())) return null;
+        if (value instanceof Number n) return n.doubleValue();
+        try {
+            return Double.parseDouble(value.toString().trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private static void copyIfBlank(Map<String, Object> plan, Map<String, Object> item, String key) {

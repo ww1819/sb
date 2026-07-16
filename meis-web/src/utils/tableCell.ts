@@ -15,8 +15,10 @@ export function isAmountField(prop: string, type?: string) {
 }
 
 export function isNumericField(prop: string, type?: string) {
+  if (type === 'date' || type === 'datetime' || type === 'file') return false
   if (type === 'number') return true
-  return /sort_order|year|month|day|count|quantity|num/i.test(prop)
+  // 用边界匹配，避免 fill_date 被 day、plan_year 以外误伤
+  return /(^|_)(sort_order|year|month|day|count|quantity|num)(_|$)/i.test(prop)
 }
 
 export function isBooleanField(prop: string, value: unknown) {

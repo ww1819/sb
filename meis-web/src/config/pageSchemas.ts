@@ -22,12 +22,18 @@ export interface FieldSchema {
   type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'textarea' | 'boolean' | 'json' | 'file'
   dictType?: string
   linkTable?: string
+  /** 覆盖 RefSelect 的 valueKey（如 unit 存 unit_name） */
+  linkValueKey?: string
   widget?: 'repairDevicePicker' | 'devicePicker' | 'stationPicker'
   group?: FieldGroup
   required?: boolean
   readonly?: boolean
   list?: boolean
   detail?: boolean
+  /** 明细表是否可本地升/降序 */
+  detailSortable?: boolean
+  /** 数量等：保存时须严格大于该值（如 0） */
+  minExclusive?: number
   width?: number
   span?: number
   placeholder?: string

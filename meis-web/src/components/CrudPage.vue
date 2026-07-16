@@ -153,6 +153,7 @@
       >
         <template #default="{ row }">
           <div class="table-actions">
+            <slot name="row-actions-before" :row="row" />
             <el-button
               v-if="viewEnabled && canViewRow(row)"
               link
@@ -328,8 +329,9 @@ const hideOperationColumn = computed(() => props.hideOperationColumn === true)
 const operationWidth = computed(() => {
   if (props.operationColumnWidth) return props.operationColumnWidth
   const hasRowPrint = !!slots['row-actions']
-  if (viewEnabled.value) return hasRowPrint ? 236 : 200
-  return hasRowPrint ? 200 : 168
+  const hasBefore = !!slots['row-actions-before']
+  if (viewEnabled.value) return hasRowPrint || hasBefore ? 260 : 200
+  return hasRowPrint || hasBefore ? 220 : 168
 })
 const changeLogEnabled = computed(() => props.config.enableChangeLog !== false && viewEnabled.value)
 const showRowIndex = computed(() => props.config.showRowIndex === true)

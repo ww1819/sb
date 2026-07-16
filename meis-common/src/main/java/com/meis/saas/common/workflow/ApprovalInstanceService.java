@@ -63,8 +63,98 @@ public class ApprovalInstanceService {
     }
 
     public List<Map<String, Object>> records(UUID instanceId) {
-        return jdbc.queryForList(
-                "SELECT * FROM sys_approval_record WHERE instance_id = ?::uuid ORDER BY acted_at", instanceId);
+        return jdbc.queryForList("""
+                SELECT r.*, COALESCE(u.real_name, u.username) AS approver_name
+                FROM sys_approval_record r
+                LEFT JOIN sys_user u ON u.id = r.approver_id
+                WHERE r.instance_id = ?::uuid
+                ORDER BY r.acted_at
+                """, instanceId);
+    }
+
+    /**
+     * 业务单据审批进度：流程节点 + 实例状态 + 审批记录（供列表「进度」抽屉）。
+     */
+    public Map<String, Object> progressByBusiness(String businessType, UUID businessId) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        Map<String, Object> flow = flowService.getFlowByBusinessType(businessType);
+        Map<String, Object> instance = getByBusiness(businessType, businessId);
+        List<Map<String, Object>> nodes = List.of();
+        if (flow != null && flow.get("id") != null) {
+            nodes = flowService.listNodes(UUID.fromString(flow.get("id").toString()));
+        } else if (instance != null && instance.get("flow_id") != null) {
+            nodes = flowService.listNodes(UUID.fromString(instance.get("flow_id").toString()));
+        }
+        String status = instance == null ? null : String.valueOf(instance.get("status"));
+        int currentOrder = 0;
+        if (instance != null && instance.get("current_node_order") instanceof Number n) {
+            currentOrder = n.intValue();
+        }
+        List<Map<String, Object>> records = instance != null && instance.get("id") != null
+                ? records(UUID.fromString(instance.get("id").toString()))
+                : List.of();
+        Map<Integer, Map<String, Object>> lastRecordByNode = new HashMap<>();
+        for (Map<String, Object> rec : records) {
+            if (rec.get("node_order") instanceof Number no) {
+                lastRecordByNode.put(no.intValue(), rec);
+            }
+        }
+        List<Map<String, Object>> enriched = new ArrayList<>();
+        for (Map<String, Object> node : nodes) {
+            Map<String, Object> row = new LinkedHashMap<>(node);
+            int order = node.get("node_order") instanceof Number n ? n.intValue() : 0;
+            String nodeStatus = resolveNodeStatus(status, currentOrder, order, lastRecordByNode.get(order));
+            row.put("node_status", nodeStatus);
+            row.put("node_status_label", nodeStatusLabel(nodeStatus));
+            Map<String, Object> rec = lastRecordByNode.get(order);
+            if (rec != null) {
+                row.put("acted_at", rec.get("acted_at"));
+                row.put("approver_name", rec.get("approver_name"));
+                row.put("action", rec.get("action"));
+                row.put("comment", rec.get("comment"));
+            }
+            enriched.add(row);
+        }
+        out.put("flow", flow);
+        out.put("instance", instance);
+        out.put("nodes", enriched);
+        out.put("records", records);
+        return out;
+    }
+
+    private static String resolveNodeStatus(String instanceStatus, int currentOrder, int nodeOrder,
+            Map<String, Object> lastRecord) {
+        if (instanceStatus == null || instanceStatus.isBlank()
+                || "draft".equals(instanceStatus) || "withdrawn".equals(instanceStatus)) {
+            return "pending_submit";
+        }
+        if ("approved".equals(instanceStatus)) {
+            return "approved";
+        }
+        if ("rejected".equals(instanceStatus)) {
+            if (lastRecord != null && "reject".equals(String.valueOf(lastRecord.get("action")))) {
+                return "rejected";
+            }
+            if (nodeOrder < currentOrder) return "approved";
+            if (nodeOrder == currentOrder) return "rejected";
+            return "cancelled";
+        }
+        // pending
+        if (nodeOrder < currentOrder) return "approved";
+        if (nodeOrder == currentOrder) return "current";
+        return "waiting";
+    }
+
+    private static String nodeStatusLabel(String status) {
+        return switch (status) {
+            case "pending_submit" -> "未提交";
+            case "approved" -> "已通过";
+            case "rejected" -> "已驳回";
+            case "current" -> "审批中";
+            case "waiting" -> "待审批";
+            case "cancelled" -> "已跳过";
+            default -> status;
+        };
     }
 
     private Map<String, Object> act(UUID instanceId, UUID approverId, String action, String comment) {
