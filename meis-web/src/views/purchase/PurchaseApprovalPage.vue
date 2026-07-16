@@ -68,7 +68,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
-import PageFilterBar from '@/components/PageFilterBar.vue'
+import PageFilterBar from '@/components/system/PageFilterBar.vue'
 import AppModal from '@/components/AppModal.vue'
 import ApprovalPanel from '@/components/ApprovalPanel.vue'
 
