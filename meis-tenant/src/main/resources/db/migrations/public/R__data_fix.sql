@@ -163,7 +163,7 @@ WHERE m.menu_code IN ('asset_query', 'asset_import')
 ON CONFLICT DO NOTHING;
 
 -- ---------- from V7__repair_module_menus.sql ----------
--- 模块3：维修管理 — 菜单拆分（报修/处理/配件档案/验收）
+-- 模块3：维修管理 — 菜单拆分；终态挂在 ops_repair 分组下见文末 REP-UI-01
 
 UPDATE sys_menu SET menu_name = '运维管理' WHERE menu_code = 'mod_ops';
 
@@ -176,11 +176,10 @@ INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_o
 ('repair_process_type', 'mod_ops', '维修进程类型', 'menu', '/repair/process-type', 6),
 ('repair_engineer', 'mod_ops', '维修工程师管理', 'menu', '/repair/engineer', 7)
 ON CONFLICT (menu_code) DO UPDATE SET
-    parent_code = EXCLUDED.parent_code,
     menu_name = EXCLUDED.menu_name,
     path = EXCLUDED.path,
-    sort_order = EXCLUDED.sort_order,
     is_active = TRUE;
+-- 注意：parent_code / sort_order 由文末 REP-UI-01 块定为 ops_repair 下 1~7，此处勿覆盖 parent_code
 
 UPDATE sys_menu SET is_active = FALSE WHERE menu_code IN ('repair_workorder', 'repair_spare');
 
@@ -576,15 +575,14 @@ WHERE m.menu_code IN ('analytics_mapping', 'analytics_sync', 'analytics_summary'
 ON CONFLICT DO NOTHING;
 
 -- ---------- from V18__power_module_menus.sql ----------
--- 模块14：电流监测 — 独立菜单模块
+-- 模块14：电流监测 — 历史独立模块；终态改为运维下二级分组见文末 PWR-UI-01
 
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
 ('mod_power', NULL, '电流监测', 'module', NULL, 11)
 ON CONFLICT (menu_code) DO UPDATE SET
     menu_name = EXCLUDED.menu_name,
-    menu_type = EXCLUDED.menu_type,
-    sort_order = EXCLUDED.sort_order,
     is_active = TRUE;
+-- 注意：parent_code / menu_type / sort_order 由文末 PWR-UI-01 定为 mod_ops 下 group
 
 UPDATE sys_menu SET sort_order = 12 WHERE menu_code = 'mod_system';
 
@@ -842,7 +840,7 @@ UPDATE sys_menu SET sort_order = 9, is_active = TRUE WHERE menu_code = 'dict_uni
 UPDATE sys_menu SET menu_name = '调配中心' WHERE menu_code = 'mod_shared';
 
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
-('ops_maintain', 'mod_ops', '保养管理', 'group', NULL, 8)
+('ops_maintain', 'mod_ops', '保养管理', 'group', NULL, 2)
 ON CONFLICT (menu_code) DO UPDATE SET
     parent_code = EXCLUDED.parent_code,
     menu_name = EXCLUDED.menu_name,
@@ -880,8 +878,8 @@ ON CONFLICT DO NOTHING;
 
 -- ---------- INS-UI-01 / MET-UI-01：运维下巡检管理、计量管理二级分组（与保养管理同级） ----------
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
-('ops_inspect', 'mod_ops', '巡检管理', 'group', NULL, 9),
-('ops_metrology', 'mod_ops', '计量管理', 'group', NULL, 10)
+('ops_inspect', 'mod_ops', '巡检管理', 'group', NULL, 3),
+('ops_metrology', 'mod_ops', '计量管理', 'group', NULL, 4)
 ON CONFLICT (menu_code) DO UPDATE SET
     parent_code = EXCLUDED.parent_code,
     menu_name = EXCLUDED.menu_name,
@@ -928,4 +926,60 @@ SELECT t.id, m.menu_code
 FROM sys_tenant t
 CROSS JOIN sys_menu m
 WHERE m.menu_code IN ('ops_inspect', 'ops_metrology')
+ON CONFLICT DO NOTHING;
+
+-- ---------- REP-UI-01 / PWR-UI-01：运维下维修管理置顶；电流监测迁入运维（计量后） ----------
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('ops_repair', 'mod_ops', '维修管理', 'group', NULL, 1)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    menu_type = EXCLUDED.menu_type,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+UPDATE sys_menu SET parent_code = 'ops_repair', menu_name = '报修申请', path = '/repair/apply',
+    sort_order = 1, is_active = TRUE
+WHERE menu_code = 'repair_apply';
+UPDATE sys_menu SET parent_code = 'ops_repair', menu_name = '维修处理', path = '/repair/handle',
+    sort_order = 2, is_active = TRUE
+WHERE menu_code = 'repair_handle';
+UPDATE sys_menu SET parent_code = 'ops_repair', menu_name = '配件档案管理', path = '/repair/spare-archive',
+    sort_order = 3, is_active = TRUE
+WHERE menu_code = 'repair_spare_archive';
+UPDATE sys_menu SET parent_code = 'ops_repair', menu_name = '维修验收', path = '/repair/verify',
+    sort_order = 4, is_active = TRUE
+WHERE menu_code = 'repair_verify';
+UPDATE sys_menu SET parent_code = 'ops_repair', menu_name = '故障库', path = '/repair/fault',
+    sort_order = 5, is_active = TRUE
+WHERE menu_code = 'repair_fault';
+UPDATE sys_menu SET parent_code = 'ops_repair', menu_name = '维修进程类型', path = '/repair/process-type',
+    sort_order = 6, is_active = TRUE
+WHERE menu_code = 'repair_process_type';
+UPDATE sys_menu SET parent_code = 'ops_repair', menu_name = '维修工程师管理', path = '/repair/engineer',
+    sort_order = 7, is_active = TRUE
+WHERE menu_code = 'repair_engineer';
+
+-- 电流监测：由一级模块改为运维下二级分组（仍用 menu_code=mod_power，子菜单不变）
+UPDATE sys_menu SET parent_code = 'mod_ops', menu_name = '电流监测', menu_type = 'group',
+    path = NULL, sort_order = 5, is_active = TRUE
+WHERE menu_code = 'mod_power';
+
+UPDATE sys_menu SET sort_order = 2, is_active = TRUE WHERE menu_code = 'ops_maintain';
+UPDATE sys_menu SET sort_order = 3, is_active = TRUE WHERE menu_code = 'ops_inspect';
+UPDATE sys_menu SET sort_order = 4, is_active = TRUE WHERE menu_code = 'ops_metrology';
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code = 'ops_repair'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code = 'ops_repair'
 ON CONFLICT DO NOTHING;
