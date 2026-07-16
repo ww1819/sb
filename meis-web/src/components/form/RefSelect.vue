@@ -21,11 +21,12 @@ import { computed, onMounted, ref, watch } from 'vue'
 import http from '@/api/http'
 import { refSelectConfig, type RefSelectMeta } from '@/config/refSelectConfig'
 
-function refRowLabel(row: Record<string, unknown>, meta: RefSelectMeta): string {
+function refRowLabel(row: Record<string, unknown>, meta: RefSelectMeta, hideCode = false): string {
   const vk = meta.valueKey ?? 'id'
   const name = row[meta.labelKey]
   const code = meta.codeKey ? row[meta.codeKey] : null
-  if (code != null && code !== '' && name != null && name !== '') return `${code} ${name}`
+  const withCode = !hideCode && meta.showCode !== false
+  if (withCode && code != null && code !== '' && name != null && name !== '') return `${code} ${name}`
   if (name != null && name !== '') return String(name)
   if (code != null && code !== '') return String(code)
   return String(row[vk] ?? '')
@@ -40,10 +41,12 @@ const props = withDefaults(
     multiple?: boolean
     /** 覆盖 refSelectConfig.valueKey（如 parent_code 用 category_code） */
     valueKey?: string
+    /** 强制只显示名称，不拼编码 */
+    hideCode?: boolean
     /** 不出现在选项中的值（如编辑时排除自身及子孙，避免成环） */
     excludeValues?: string[]
   }>(),
-  { multiple: false, excludeValues: () => [] }
+  { multiple: false, excludeValues: () => [], hideCode: false }
 )
 const emit = defineEmits<{ 'update:modelValue': [v: unknown] }>()
 
@@ -71,8 +74,9 @@ async function load() {
     const { data } = await http.get(meta.url, { params: { limit: 500 } })
     const rows = data.data?.records ?? data.data ?? []
     const vk = props.valueKey || meta.valueKey || 'id'
+    const hideCode = props.hideCode || meta.showCode === false
     allOptions.value = rows.map((r: Record<string, unknown>) => ({
-      label: refRowLabel(r, meta),
+      label: refRowLabel(r, meta, hideCode),
       value: String(r[vk] ?? '')
     }))
     loaded.value = true

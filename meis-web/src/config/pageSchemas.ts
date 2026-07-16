@@ -24,6 +24,8 @@ export interface FieldSchema {
   linkTable?: string
   /** 覆盖 RefSelect 的 valueKey（如 unit 存 unit_name） */
   linkValueKey?: string
+  /** 外键下拉标签不拼编码，只显示名称（如申报人只显示姓名） */
+  linkHideCode?: boolean
   widget?: 'repairDevicePicker' | 'devicePicker' | 'stationPicker'
   group?: FieldGroup
   required?: boolean

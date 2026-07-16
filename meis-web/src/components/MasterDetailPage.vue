@@ -85,7 +85,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FieldSchema } from '@/config/pageSchemas'
 import http from '@/api/http'
@@ -118,7 +118,12 @@ const progressTitle = ref('审批进度')
 const showApproval = computed(() => !!props.businessType)
 const detailFields = computed(() => getDetailFields(props.config.detailTable ?? `${props.config.table}_item`))
 const masterFormFields = computed(() =>
-  getSchema(props.config.table).filter((f) => !f.readonly && f.form !== false)
+  getSchema(props.config.table).filter((f) => {
+    if (f.form === false) return false
+    // 默认只读冗余字段不进表单；显式 form:true 的只读字段仍展示（如总金额汇总）
+    if (f.readonly && f.form !== true) return false
+    return true
+  })
 )
 const basicFormFields = computed(() => masterFormFields.value.filter((f) => (f.group ?? 'other') === 'basic'))
 const extraFormFields = computed(() =>
@@ -175,9 +180,24 @@ function recalcLineAmount(row: Record<string, unknown>) {
   row.total_price = Math.round(qty * price * 100) / 100
 }
 
+/** 主表总金额 = 明细金额合计（只读，不手工录入） */
+function syncTotalBudget() {
+  if (!master.value) return
+  let sum = 0
+  for (const row of items.value) {
+    const name = row.device_name
+    if (name == null || String(name).trim() === '') continue
+    recalcLineAmount(row)
+    const line = toNumber(row.total_price)
+    if (line != null) sum += line
+  }
+  master.value.total_budget = Math.round(sum * 100) / 100
+}
+
 function onDetailFieldChange(row: Record<string, unknown>, prop: string) {
   if (prop === 'quantity' || prop === 'estimated_price') {
     recalcLineAmount(row)
+    syncTotalBudget()
   }
 }
 
@@ -247,11 +267,12 @@ async function loadDetail(row: Record<string, unknown>) {
     recalcLineAmount(rowItem)
     return rowItem
   })
+  syncTotalBudget()
   detailVisible.value = true
   await loadApprovalState()
 }
 
-function openCreate() {
+async function openCreate() {
   selectedId.value = ''
   approvalInstanceId.value = ''
   const defaults: Record<string, unknown> = { approval_status: 'draft', is_active: true }
@@ -260,14 +281,35 @@ function openCreate() {
     defaults[f.prop] = f.type === 'number' ? undefined : f.type === 'boolean' ? false : ''
   }
   applyCurrentUserDefaults(defaults)
+  if (props.config.table === 'purchase_plan') {
+    // 计划年度默认当前自然年；计划编号由后端按 CG-日期+流水生成
+    defaults.plan_year = new Date().getFullYear()
+    try {
+      const { data } = await http.get(`${props.saveUrl}/next-code`)
+      if (data.data?.plan_code) defaults.plan_code = data.data.plan_code
+      if (data.data?.plan_year != null) defaults.plan_year = data.data.plan_year
+    } catch {
+      // 编号接口失败时仍可打开表单，保存时后端会兜底生成
+    }
+  }
   master.value = defaults
   items.value = []
+  syncTotalBudget()
   detailVisible.value = true
 }
 
 function addItem() {
   items.value.push(defaultItem())
+  syncTotalBudget()
 }
+
+watch(
+  items,
+  () => {
+    syncTotalBudget()
+  },
+  { deep: true }
+)
 
 function openProgress(row: Record<string, unknown>) {
   progressBusinessId.value = String(row.id ?? '')
@@ -281,6 +323,7 @@ async function saveMaster() {
   applyCurrentUserDefaults(master.value)
   const missing = basicFormFields.value.filter((f) => {
     if (!f.required) return false
+    if (f.prop === 'total_budget') return false // 由明细自动汇总
     const v = master.value![f.prop]
     return v === null || v === undefined || v === ''
   })
@@ -302,6 +345,7 @@ async function saveMaster() {
     return
   }
   for (const row of payloadItems) recalcLineAmount(row)
+  syncTotalBudget()
   const planYear = master.value.plan_year
   const yearNum =
     typeof planYear === 'number'
@@ -376,6 +420,7 @@ async function reloadMaster() {
     recalcLineAmount(rowItem)
     return rowItem
   })
+  syncTotalBudget()
   await loadApprovalState()
 }
 

@@ -22,6 +22,7 @@
     v-model="model"
     :link-table="field.linkTable"
     :value-key="field.linkValueKey"
+    :hide-code="field.linkHideCode"
     :placeholder="field.placeholder || '请选择' + field.label"
     :disabled="field.readonly"
     :exclude-values="linkExcludeValues"
@@ -114,7 +115,9 @@ const attrs = computed(() => {
   }
   if (props.field.type === 'date') return { ...base, type: 'date', valueFormat: 'YYYY-MM-DD', style: 'width:100%' }
   if (props.field.type === 'datetime') return { ...base, type: 'datetime', valueFormat: 'YYYY-MM-DD HH:mm:ss', style: 'width:100%' }
-  if (props.field.type === 'number') return { ...base, style: 'width:100%' }
+  if (props.field.type === 'number') {
+    return { ...base, controls: false, style: 'width:100%' }
+  }
   if (props.field.dictType) return { ...base, clearable: true, style: 'width:100%' }
   return { ...base, style: 'width:100%' }
 })
