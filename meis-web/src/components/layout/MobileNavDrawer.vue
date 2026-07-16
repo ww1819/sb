@@ -34,12 +34,18 @@
             <el-icon><component :is="moduleIcon(mod.id)" /></el-icon>
             <span>{{ mod.title }}</span>
           </template>
-          <template v-for="group in mod.groups" :key="`${mod.id}-${group.title || 'default'}`">
-            <el-menu-item-group v-if="group.title" :title="group.title">
+          <template v-for="(group, gi) in mod.groups" :key="`${mod.id}-${group.id || group.title || gi}`">
+            <el-sub-menu
+              v-if="group.title"
+              :index="`${mod.id}/${group.id || group.title || `g${gi}`}`"
+            >
+              <template #title>
+                <span>{{ group.title }}</span>
+              </template>
               <el-menu-item v-for="item in group.items" :key="item.path" :index="item.path">
                 {{ item.title }}
               </el-menu-item>
-            </el-menu-item-group>
+            </el-sub-menu>
             <el-menu-item v-for="item in group.items" v-else :key="item.path" :index="item.path">
               {{ item.title }}
             </el-menu-item>

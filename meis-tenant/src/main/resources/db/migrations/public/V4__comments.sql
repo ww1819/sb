@@ -37,7 +37,7 @@ COMMENT ON COLUMN sys_menu.id IS '主键';
 COMMENT ON COLUMN sys_menu.menu_code IS '菜单编码';
 COMMENT ON COLUMN sys_menu.parent_code IS '上级分类编码';
 COMMENT ON COLUMN sys_menu.menu_name IS '菜单名称';
-COMMENT ON COLUMN sys_menu.menu_type IS '菜单类型';
+COMMENT ON COLUMN sys_menu.menu_type IS '菜单类型：module/group/menu';
 COMMENT ON COLUMN sys_menu.path IS '前端路由路径';
 COMMENT ON COLUMN sys_menu.icon IS '菜单图标';
 COMMENT ON COLUMN sys_menu.sort_order IS '排序号';
