@@ -167,7 +167,7 @@ public class ApprovalInstanceService {
 
         if ("reject".equals(action)) {
             jdbc.update("UPDATE sys_approval_instance SET status = 'rejected', updated_at = NOW() WHERE id = ?::uuid", instanceId);
-            updateBusinessStatus(inst.get("business_type").toString(), UUID.fromString(inst.get("business_id").toString()), "rejected");
+            updateBusinessStatus(inst.get("business_type").toString(), UUID.fromString(inst.get("business_id").toString()), "rejected", approverId);
             NotificationHelper.push(jdbc, "审批驳回", inst.get("title") + " 已被驳回", "approval");
             return getInstance(instanceId);
         }
@@ -177,7 +177,7 @@ public class ApprovalInstanceService {
                 inst.get("flow_id"), nodeOrder);
         if (nextNodes.isEmpty()) {
             jdbc.update("UPDATE sys_approval_instance SET status = 'approved', updated_at = NOW() WHERE id = ?::uuid", instanceId);
-            updateBusinessStatus(inst.get("business_type").toString(), UUID.fromString(inst.get("business_id").toString()), "approved");
+            updateBusinessStatus(inst.get("business_type").toString(), UUID.fromString(inst.get("business_id").toString()), "approved", approverId);
             NotificationHelper.push(jdbc, "审批通过", inst.get("title") + " 审批已通过", "approval");
         } else {
             int next = ((Number) nextNodes.get(0).get("node_order")).intValue();
@@ -187,8 +187,21 @@ public class ApprovalInstanceService {
     }
 
     private void updateBusinessStatus(String businessType, UUID businessId, String status) {
+        updateBusinessStatus(businessType, businessId, status, null);
+    }
+
+    private void updateBusinessStatus(String businessType, UUID businessId, String status, UUID actorId) {
         switch (businessType) {
-            case "purchase_plan" -> jdbc.update("UPDATE purchase_plan SET approval_status = ? WHERE id = ?::uuid", status, businessId);
+            case "purchase_plan" -> {
+                if ("approved".equals(status) && actorId != null) {
+                    jdbc.update("""
+                            UPDATE purchase_plan SET approval_status = ?, approved_by = ?::uuid, approved_at = NOW()
+                            WHERE id = ?::uuid
+                            """, status, actorId, businessId);
+                } else {
+                    jdbc.update("UPDATE purchase_plan SET approval_status = ? WHERE id = ?::uuid", status, businessId);
+                }
+            }
             case "purchase_contract" -> {
                 jdbc.update("UPDATE purchase_contract SET approval_status = ? WHERE id = ?::uuid", status, businessId);
                 if ("approved".equals(status)) createPurchaseAcceptance(businessId);

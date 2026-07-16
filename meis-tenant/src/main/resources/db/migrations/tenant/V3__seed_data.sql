@@ -36,7 +36,7 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('urgency', 'low', '低', 'low', 4),
 ('purchase_method', 'public_bidding', '公开招标', 'public_bidding', 1),
 ('purchase_method', 'inquiry', '询价采购', 'inquiry', 2),
-('approval_status', 'draft', '草稿', 'draft', 1),
+('approval_status', 'draft', '未提交', 'draft', 1),
 ('approval_status', 'pending', '审批中', 'pending', 2),
 ('approval_status', 'approved', '已通过', 'approved', 3),
 ('approval_status', 'rejected', '已驳回', 'rejected', 4)

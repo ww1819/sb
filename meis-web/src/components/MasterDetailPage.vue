@@ -1,14 +1,31 @@
 <template>
   <div class="master-detail-page">
-    <CrudPage ref="crudRef" :config="config" detail-mode @detail="loadDetail" @add="openCreate">
+    <CrudPage
+      ref="crudRef"
+      :config="config"
+      detail-mode
+      :can-edit="canEditRow"
+      :can-delete="canDeleteRow"
+      @detail="loadDetail"
+      @add="openCreate"
+    >
+      <template #actions-after>
+        <el-button v-if="showApproval" type="primary" @click="submitApproval">提交</el-button>
+        <el-button v-if="showApproval" @click="withdrawApproval">撤回审批</el-button>
+        <slot name="actions-after" :master="master" :reload="reloadMaster" :selected-id="selectedId" />
+      </template>
       <template #toolbar-extra>
-        <el-button v-if="selectedId" type="warning" @click="saveMaster">保存主从</el-button>
-        <el-button v-if="selectedId && showApproval && canSubmit" type="primary" @click="submitApproval">提交审批</el-button>
-        <el-button v-if="selectedId && showApproval && canWithdraw" @click="withdrawApproval">撤回审批</el-button>
         <slot name="toolbar-extra" :master="master" :reload="reloadMaster" />
       </template>
       <template v-if="showApproval" #row-actions-before="{ row }">
-        <el-button link type="primary" @click.stop="openProgress(row)">进度</el-button>
+        <el-button
+          v-if="showProgressAction(row)"
+          link
+          type="primary"
+          @click.stop="openProgress(row)"
+        >
+          进度
+        </el-button>
       </template>
     </CrudPage>
 
@@ -132,14 +149,43 @@ const extraFormFields = computed(() =>
     return g !== 'basic' && g !== 'approval'
   })
 )
-const canSubmit = computed(() => {
-  const status = master.value?.approval_status
-  return !status || status === 'draft' || status === 'rejected'
-})
-const canWithdraw = computed(() => master.value?.approval_status === 'pending')
 const canApprove = computed(
   () => !!selectedId.value && !!props.businessType && !!approvalInstanceId.value && master.value?.approval_status === 'pending'
 )
+
+function approvalStatusOf(row: Record<string, unknown> | null | undefined) {
+  return String(row?.approval_status ?? 'draft')
+}
+
+function canEditRow(row: Record<string, unknown>) {
+  const s = approvalStatusOf(row)
+  return s === 'draft' || s === 'rejected'
+}
+
+function canDeleteRow(row: Record<string, unknown>) {
+  return canEditRow(row)
+}
+
+/** 未提交不显示进度；已提交（审批中/已通过/已驳回）显示 */
+function showProgressAction(row: Record<string, unknown>) {
+  return approvalStatusOf(row) !== 'draft'
+}
+
+function resolveTargetRow(): Record<string, unknown> | null {
+  if (selectedId.value && master.value?.id && String(master.value.id) === selectedId.value) {
+    return master.value
+  }
+  const selected = crudRef.value?.getSelectedRows?.() ?? []
+  if (selected.length === 1) return selected[0]
+  if (selected.length > 1) {
+    ElMessage.warning('请只勾选一条单据')
+    return null
+  }
+  if (selectedId.value) {
+    return { id: selectedId.value, approval_status: master.value?.approval_status }
+  }
+  return null
+}
 
 function todayStr() {
   const d = new Date()
@@ -372,17 +418,38 @@ async function saveMaster() {
 }
 
 async function submitApproval() {
-  if (!selectedId.value) return
-  await http.post(`${props.saveUrl}/${selectedId.value}/submit`, { applicantId: auth.user?.userId })
+  const row = resolveTargetRow()
+  if (!row?.id) {
+    ElMessage.warning('请先勾选一条单据')
+    return
+  }
+  const status = approvalStatusOf(row)
+  if (status !== 'draft' && status !== 'rejected') {
+    ElMessage.warning(status === 'pending' ? '该单据已在审批中' : '该单据不可再提交')
+    return
+  }
+  const id = String(row.id)
+  await http.post(`${props.saveUrl}/${id}/submit`, { applicantId: auth.user?.userId })
   ElMessage.success('已提交审批')
+  selectedId.value = id
   await reloadMaster()
   crudRef.value?.load()
 }
 
 async function withdrawApproval() {
-  if (!selectedId.value) return
-  await http.post(`${props.saveUrl}/${selectedId.value}/withdraw`, { applicantId: auth.user?.userId })
+  const row = resolveTargetRow()
+  if (!row?.id) {
+    ElMessage.warning('请先勾选一条单据')
+    return
+  }
+  if (approvalStatusOf(row) !== 'pending') {
+    ElMessage.warning('仅审批中的单据可撤回')
+    return
+  }
+  const id = String(row.id)
+  await http.post(`${props.saveUrl}/${id}/withdraw`, { applicantId: auth.user?.userId })
   ElMessage.success('已撤回审批')
+  selectedId.value = id
   await reloadMaster()
   crudRef.value?.load()
 }
@@ -424,7 +491,7 @@ async function reloadMaster() {
   await loadApprovalState()
 }
 
-defineExpose({ selectedId })
+defineExpose({ selectedId, resolveTargetRow })
 </script>
 
 <style scoped>

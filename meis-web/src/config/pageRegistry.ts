@@ -92,11 +92,12 @@ export const pageRegistry: Record<string, PageConfig> = {
     showRowSelection: true,
     columns: [
       'plan_code',
-      'plan_year',
+      'campus_name',
       'dept_name',
       'applicant_name',
       'fill_date',
       'total_budget',
+      'plan_year',
       'plan_type',
       'approved_by_name',
       'approved_at',
@@ -123,11 +124,12 @@ export const pageRegistry: Record<string, PageConfig> = {
     showRowSelection: true,
     columns: [
       'plan_code',
-      'plan_year',
+      'campus_name',
       'dept_name',
       'applicant_name',
       'fill_date',
       'total_budget',
+      'plan_year',
       'plan_type',
       'approved_by_name',
       'approved_at',
@@ -148,7 +150,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/purchase/approval/page'
   },
   '/purchase/project': {
-    title: '采购项目',
+    title: '设备采购计划表',
     apiBase: '/purchase',
     table: 'purchase_project',
     listPageUrl: '/purchase/project/page',

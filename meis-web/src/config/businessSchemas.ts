@@ -3,9 +3,10 @@ import type { FieldSchema } from './pageSchemas'
 /** 第一期核心业务完整字段 schema */
 export const businessSchemas: Record<string, FieldSchema[]> = {
   purchase_plan: [
-    { prop: 'plan_code', label: '计划编号', list: true, group: 'basic', required: true, readonly: true, form: true, width: 140 },
+    { prop: 'plan_code', label: '计划编号', list: true, group: 'basic', required: true, readonly: true, form: true, width: 180 },
     { prop: 'business_chain_no', label: '业务链编号', group: 'basic', readonly: true },
     { prop: 'campus_id', label: '院区', linkTable: 'campus', linkHideCode: true, group: 'basic', required: true },
+    { prop: 'campus_name', label: '院区', list: true, group: 'basic', readonly: true, width: 110 },
     { prop: 'dept_id', label: '科室名称', linkTable: 'department', linkHideCode: true, group: 'basic', required: true },
     { prop: 'dept_name', label: '科室名称', list: true, group: 'basic', readonly: true, width: 120 },
     { prop: 'total_budget', label: '总金额(预算/元)', list: true, group: 'basic', required: true, readonly: true, form: true, width: 140 },
@@ -21,7 +22,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'approval_status', label: '审批状态', dictType: 'approval_status', list: true, group: 'approval', readonly: true, width: 110 },
     { prop: 'approved_by', label: '审核人', linkTable: 'sys_user', group: 'approval', readonly: true },
     { prop: 'approved_by_name', label: '审核人', list: true, group: 'approval', readonly: true, width: 100 },
-    { prop: 'approved_at', label: '审核日期', type: 'datetime', list: true, group: 'approval', readonly: true, width: 160 },
+    { prop: 'approved_at', label: '审核日期', type: 'date', list: true, group: 'approval', readonly: true, width: 120 },
   ],
   purchase_plan_item: [
     { prop: 'device_name', label: '设备名称', list: true, detail: true, required: true, detailSortable: true, width: 140 },

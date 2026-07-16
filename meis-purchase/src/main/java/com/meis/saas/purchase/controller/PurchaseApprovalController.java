@@ -25,44 +25,86 @@ public class PurchaseApprovalController {
             PageQuery query,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String businessType) {
-        StringBuilder where = new StringBuilder(" WHERE i.business_type IN (");
+        // 同一业务单据可能有多条审批实例（撤回重提等），列表按单据去重只保留最新一条
+        StringBuilder instWhere = new StringBuilder(" WHERE i0.business_type IN (");
         List<Object> args = new ArrayList<>();
         for (int i = 0; i < PURCHASE_TYPES.size(); i++) {
-            if (i > 0) where.append(",");
-            where.append("?");
+            if (i > 0) instWhere.append(",");
+            instWhere.append("?");
             args.add(PURCHASE_TYPES.get(i));
         }
-        where.append(") ");
-        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "sys_approval_instance", "i"));
+        instWhere.append(") ");
+        instWhere.append(SoftDeleteSupport.notDeletedClause(jdbc, "sys_approval_instance", "i0"));
         if (status != null && !status.isBlank()) {
-            where.append(" AND i.status = ? ");
+            instWhere.append(" AND i0.status = ? ");
             args.add(status);
-        } else {
-            where.append(" AND i.status = 'pending' ");
         }
         if (businessType != null && !businessType.isBlank()) {
-            where.append(" AND i.business_type = ? ");
+            instWhere.append(" AND i0.business_type = ? ");
             args.add(businessType);
         }
+
+        StringBuilder outerWhere = new StringBuilder(" WHERE 1=1 ");
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
             String kw = "%" + query.getKeyword().trim() + "%";
-            where.append(" AND (i.business_no ILIKE ? OR i.title ILIKE ?) ");
+            outerWhere.append("""
+                     AND (i.business_no ILIKE ? OR i.title ILIKE ?
+                      OR p.plan_code ILIKE ? OR d.dept_name ILIKE ? OR c.campus_name ILIKE ?
+                      OR u.real_name ILIKE ?)
+                    """);
+            args.add(kw);
+            args.add(kw);
+            args.add(kw);
+            args.add(kw);
             args.add(kw);
             args.add(kw);
         }
-        long total = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM sys_approval_instance i" + where, Long.class, args.toArray());
+
+        String from = """
+                FROM (
+                    SELECT DISTINCT ON (i0.business_type, i0.business_id)
+                           i0.id, i0.business_type, i0.business_id, i0.business_no, i0.title,
+                           i0.status, i0.created_at, i0.applicant_id, i0.flow_id, i0.current_node_order
+                    FROM sys_approval_instance i0
+                    """ + instWhere + """
+                    ORDER BY i0.business_type, i0.business_id, i0.created_at DESC NULLS LAST
+                ) i
+                LEFT JOIN sys_user u ON u.id = i.applicant_id
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "u") + """
+                LEFT JOIN purchase_plan p ON i.business_type = 'purchase_plan' AND p.id = i.business_id
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", "p") + """
+                LEFT JOIN campus c ON c.id = p.campus_id
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "campus", "c") + """
+                LEFT JOIN department d ON d.id = p.dept_id
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "department", "d") + """
+                LEFT JOIN sys_user au ON au.id = p.approved_by
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "au") + """
+                LEFT JOIN LATERAL (
+                    SELECT r.comment
+                    FROM sys_approval_record r
+                    WHERE r.instance_id = i.id
+                    ORDER BY r.acted_at DESC NULLS LAST
+                    LIMIT 1
+                ) last_rec ON TRUE
+                """;
+
+        long total = jdbc.queryForObject("SELECT COUNT(*) " + from + outerWhere, Long.class, args.toArray());
         List<Object> pageArgs = new ArrayList<>(args);
         pageArgs.add(query.limit());
         pageArgs.add(query.offset());
         var rows = jdbc.queryForList("""
-                SELECT i.*, u.real_name AS applicant_name, n.node_name AS current_node_name, n.approver_role
-                FROM sys_approval_instance i
-                LEFT JOIN sys_user u ON u.id = i.applicant_id
-                """ + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "u") + """
-                LEFT JOIN sys_approval_node n ON n.flow_id = i.flow_id AND n.node_order = i.current_node_order
-                """ + SoftDeleteSupport.notDeletedClause(jdbc, "sys_approval_node", "n")
-                + where + " ORDER BY i.created_at DESC LIMIT ? OFFSET ?", pageArgs.toArray());
+                SELECT i.id, i.business_type, i.business_id, i.business_no, i.title, i.status,
+                       i.created_at AS submitted_at,
+                       i.applicant_id, u.real_name AS applicant_name,
+                       COALESCE(p.plan_code, i.business_no) AS plan_code,
+                       p.campus_id, c.campus_name,
+                       p.dept_id, d.dept_name,
+                       p.total_budget, p.plan_year, p.plan_type,
+                       p.approved_by, au.real_name AS approved_by_name, p.approved_at,
+                       COALESCE(p.approval_status, i.status) AS approval_status,
+                       last_rec.comment AS approval_comment,
+                       p.benefit_analysis_url, p.dept_argument_url
+                """ + from + outerWhere + " ORDER BY i.created_at DESC LIMIT ? OFFSET ?", pageArgs.toArray());
         return Result.ok(PageResult.of(rows, total, query.getPage(), query.getSize()));
     }
 

@@ -16,9 +16,11 @@ export function isAmountField(prop: string, type?: string) {
 
 export function isNumericField(prop: string, type?: string) {
   if (type === 'date' || type === 'datetime' || type === 'file') return false
+  // 年度按普通文本展示，避免 toLocaleString 千分位（如 2,026）
+  if (/(^|_)year$/i.test(prop)) return false
   if (type === 'number') return true
   // 用边界匹配，避免 fill_date 被 day、plan_year 以外误伤
-  return /(^|_)(sort_order|year|month|day|count|quantity|num)(_|$)/i.test(prop)
+  return /(^|_)(sort_order|month|day|count|quantity|num)(_|$)/i.test(prop)
 }
 
 export function isBooleanField(prop: string, value: unknown) {
@@ -41,10 +43,12 @@ export function statusTagType(value: unknown): StatusTagType {
   if (value === false || value === 'false' || value === 0 || value === '0') return 'info'
 
   const s = String(value ?? '').toLowerCase()
+  // 未提交/草稿：中性灰蓝，与「审批中」橙色区分（须先于泛匹配「待」）
+  if (s === 'draft' || s.includes('未提交') || s === '草稿') return 'info'
   if (['active', 'enabled', 'approved', 'completed', 'done', 'normal', '在用', '启用', '正常', '已通过', '已完成'].some((k) => s.includes(k))) {
     return 'success'
   }
-  if (['pending', 'processing', 'draft', 'waiting', '待', '审批中', '处理中', '进行中'].some((k) => s.includes(k))) {
+  if (['pending', 'processing', 'waiting', '审批中', '处理中', '进行中', '待'].some((k) => s.includes(k))) {
     return 'warning'
   }
   if (['disabled', 'rejected', 'cancelled', 'failed', 'closed', 'scrap', '停用', '驳回', '取消', '报废', '关闭'].some((k) => s.includes(k))) {

@@ -33,6 +33,8 @@ public final class PurchasePageQueries {
         PurchaseDataScope.applyPlanFilter(where, args, jdbc);
         String from = """
             FROM purchase_plan p
+            LEFT JOIN campus c ON c.id = p.campus_id
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "campus", "c") + """
             LEFT JOIN department d ON d.id = p.dept_id
             """ + SoftDeleteSupport.notDeletedClause(jdbc, "department", "d") + """
             LEFT JOIN sys_user u ON u.id = p.applicant_id
@@ -40,7 +42,7 @@ public final class PurchasePageQueries {
             LEFT JOIN sys_user au ON au.id = p.approved_by
             """ + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "au");
         PageResult<Map<String, Object>> result = page(jdbc, from, where, args, q, "p.created_at DESC NULLS LAST",
-                "p.*, d.dept_name, u.real_name AS applicant_name, au.real_name AS approved_by_name");
+                "p.*, c.campus_name, d.dept_name, u.real_name AS applicant_name, au.real_name AS approved_by_name");
         for (Map<String, Object> row : result.getRecords()) {
             fillDateFallback(row);
         }
