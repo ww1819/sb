@@ -45,19 +45,17 @@ public class MenuService {
         List<Map<String, Object>> result = new ArrayList<>();
         for (Map<String, Object> mod : modules) {
             String modCode = mod.get("menu_code").toString();
-            List<Map<String, Object>> children = allMenus.stream()
-                    .filter(m -> modCode.equals(m.get("parent_code")) && "menu".equals(m.get("menu_type"))
-                            && allowed.contains(m.get("menu_code")))
-                    .toList();
-            if (children.isEmpty() && mod.get("path") != null) {
+            List<Map<String, Object>> groups = buildGroups(modCode, allMenus, allowed);
+            if (groups.isEmpty() && mod.get("path") != null) {
                 result.add(singleModule(mod));
                 continue;
             }
+            if (groups.isEmpty()) continue;
             Map<String, Object> module = new LinkedHashMap<>();
             module.put("id", modCode.replace("mod_", ""));
             module.put("title", mod.get("menu_name"));
             if (mod.get("path") != null) module.put("path", mod.get("path"));
-            module.put("groups", buildGroups(modCode, children, allMenus));
+            module.put("groups", groups);
             result.add(module);
         }
         return result;
@@ -83,10 +81,19 @@ public class MenuService {
 
     private boolean isModuleVisible(String modCode, Set<String> allowed, List<Map<String, Object>> allMenus) {
         if (allowed.contains(modCode)) return true;
-        return allMenus.stream()
-                .anyMatch(m -> modCode.equals(m.get("parent_code"))
-                        && "menu".equals(m.get("menu_type"))
-                        && allowed.contains(m.get("menu_code").toString()));
+        return allMenus.stream().anyMatch(m -> {
+            if (!"menu".equals(m.get("menu_type"))) return false;
+            if (!allowed.contains(m.get("menu_code").toString())) return false;
+            Object parent = m.get("parent_code");
+            if (parent == null) return false;
+            String parentCode = parent.toString();
+            if (modCode.equals(parentCode)) return true;
+            // menu under a group under this module
+            return allMenus.stream().anyMatch(g ->
+                    "group".equals(g.get("menu_type"))
+                            && modCode.equals(String.valueOf(g.get("parent_code")))
+                            && parentCode.equals(g.get("menu_code").toString()));
+        });
     }
 
     public List<Map<String, Object>> platformMenuTree() {
@@ -164,41 +171,80 @@ public class MenuService {
         List<Map<String, Object>> result = new ArrayList<>();
         for (Map<String, Object> mod : modules) {
             String modCode = mod.get("menu_code").toString();
-            List<Map<String, Object>> children = allMenus.stream()
-                    .filter(m -> modCode.equals(m.get("parent_code")) && "menu".equals(m.get("menu_type"))
-                            && allowed.contains(m.get("menu_code")))
-                    .toList();
             Map<String, Object> module = new LinkedHashMap<>();
             module.put("id", modCode.replace("mod_", ""));
             module.put("title", mod.get("menu_name"));
             if (mod.get("path") != null) module.put("path", mod.get("path"));
-            module.put("groups", List.of(Map.of("title", "", "items", children.stream().map(this::toLeaf).toList())));
+            module.put("groups", buildGroups(modCode, allMenus, allowed));
             result.add(module);
         }
         return result;
     }
 
-    private List<Map<String, Object>> buildGroups(String modCode, List<Map<String, Object>> menus,
-                                                   List<Map<String, Object>> allMenus) {
-        Map<String, List<Map<String, Object>>> byParent = menus.stream()
-                .collect(Collectors.groupingBy(m -> m.get("parent_code").toString()));
+    /**
+     * 组装导航分组：模块下可直接挂 menu，也可挂 menu_type=group 的二级分组，
+     * 分组下再挂三级 menu。按直接子节点 sort_order 交错输出。
+     */
+    private List<Map<String, Object>> buildGroups(String modCode, List<Map<String, Object>> allMenus,
+                                                   Set<String> allowed) {
+        List<Map<String, Object>> directChildren = allMenus.stream()
+                .filter(m -> modCode.equals(String.valueOf(m.get("parent_code"))))
+                .filter(m -> {
+                    String type = String.valueOf(m.get("menu_type"));
+                    String code = m.get("menu_code").toString();
+                    if ("menu".equals(type)) return allowed.contains(code);
+                    if ("group".equals(type)) {
+                        return allowed.contains(code) || hasVisibleMenuUnder(code, allMenus, allowed);
+                    }
+                    return false;
+                })
+                .sorted(Comparator.comparingInt(m -> ((Number) m.getOrDefault("sort_order", 0)).intValue()))
+                .toList();
+
         List<Map<String, Object>> groups = new ArrayList<>();
-        List<Map<String, Object>> items = menus.stream().map(this::toLeaf).toList();
-        if (!items.isEmpty()) {
-            Map<String, Object> g = new LinkedHashMap<>();
-            g.put("title", groupTitle(modCode));
-            g.put("items", items);
-            groups.add(g);
+        List<Map<String, Object>> pendingDirect = new ArrayList<>();
+
+        for (Map<String, Object> child : directChildren) {
+            String type = String.valueOf(child.get("menu_type"));
+            if ("menu".equals(type)) {
+                pendingDirect.add(child);
+                continue;
+            }
+            flushUntitledGroup(groups, pendingDirect);
+            pendingDirect.clear();
+            String groupCode = child.get("menu_code").toString();
+            List<Map<String, Object>> items = allMenus.stream()
+                    .filter(m -> groupCode.equals(String.valueOf(m.get("parent_code")))
+                            && "menu".equals(m.get("menu_type"))
+                            && allowed.contains(m.get("menu_code").toString()))
+                    .sorted(Comparator.comparingInt(m -> ((Number) m.getOrDefault("sort_order", 0)).intValue()))
+                    .map(this::toLeaf)
+                    .collect(Collectors.toCollection(ArrayList::new));
+            if (!items.isEmpty()) {
+                Map<String, Object> g = new LinkedHashMap<>();
+                g.put("id", groupCode.replace('_', '-'));
+                g.put("title", child.get("menu_name"));
+                g.put("items", items);
+                groups.add(g);
+            }
         }
+        flushUntitledGroup(groups, pendingDirect);
         return groups;
     }
 
-    private String groupTitle(String modCode) {
-        return switch (modCode) {
-            case "mod_ops" -> "";
-            case "mod_quality" -> "";
-            default -> "";
-        };
+    private void flushUntitledGroup(List<Map<String, Object>> groups, List<Map<String, Object>> pendingDirect) {
+        if (pendingDirect.isEmpty()) return;
+        Map<String, Object> g = new LinkedHashMap<>();
+        g.put("title", "");
+        g.put("items", pendingDirect.stream().map(this::toLeaf).toList());
+        groups.add(g);
+    }
+
+    private boolean hasVisibleMenuUnder(String groupCode, List<Map<String, Object>> allMenus, Set<String> allowed) {
+        return allMenus.stream().anyMatch(m ->
+                groupCode.equals(String.valueOf(m.get("parent_code")))
+                        && "menu".equals(m.get("menu_type"))
+                        && allowed.contains(m.get("menu_code").toString()));
     }
 
     private Map<String, Object> singleModule(Map<String, Object> mod) {

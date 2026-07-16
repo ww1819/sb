@@ -7,6 +7,8 @@ export interface NavMenuItem {
 }
 
 export interface NavMenuGroup {
+  /** 二级分组稳定 id（来自 menu_code，如 ops-maintain）；有 title 时为可折叠子菜单 */
+  id?: string
   title: string
   items: NavMenuItem[]
 }

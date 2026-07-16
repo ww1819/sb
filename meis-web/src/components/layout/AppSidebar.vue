@@ -36,12 +36,15 @@
               <el-icon><component :is="moduleIcon(mod.id)" /></el-icon>
               <span>{{ mod.title }}</span>
             </template>
-            <template v-for="group in mod.groups" :key="`${mod.id}-${group.title || 'default'}`">
-              <el-menu-item-group v-if="group.title" :title="group.title">
+            <template v-for="(group, gi) in mod.groups" :key="`${mod.id}-${group.id || group.title || gi}`">
+              <el-sub-menu v-if="group.title" :index="groupSubIndex(mod.id, group, gi)">
+                <template #title>
+                  <span>{{ group.title }}</span>
+                </template>
                 <el-menu-item v-for="item in group.items" :key="item.path" :index="item.path">
                   {{ item.title }}
                 </el-menu-item>
-              </el-menu-item-group>
+              </el-sub-menu>
               <el-menu-item v-for="item in group.items" v-else :key="item.path" :index="item.path">
                 {{ item.title }}
               </el-menu-item>
@@ -77,6 +80,7 @@ interface MenuItem {
 }
 
 interface MenuGroup {
+  id?: string
   title: string
   items: MenuItem[]
 }
@@ -105,30 +109,35 @@ const emit = defineEmits<{
 
 const menuRef = ref<MenuInstance>()
 
-function findModuleIdByPath(path: string): string | null {
+function groupSubIndex(modId: string, group: MenuGroup, gi: number) {
+  return `${modId}/${group.id || group.title || `g${gi}`}`
+}
+
+/** 当前路径对应需展开的一级模块 + 二级分组 index */
+function findOpenIndexes(path: string): string[] {
   for (const mod of props.modules) {
-    if (mod.path === path) return null
-    for (const group of mod.groups ?? []) {
+    if (mod.path === path) return []
+    for (const [gi, group] of (mod.groups ?? []).entries()) {
       if (group.items.some((item) => item.path === path)) {
-        return mod.id
+        const idxs = [mod.id]
+        if (group.title) idxs.push(groupSubIndex(mod.id, group, gi))
+        return idxs
       }
     }
   }
-  return null
+  return []
 }
 
-const openedModules = computed(() => {
-  const modId = findModuleIdByPath(props.activePath)
-  return modId ? [modId] : []
-})
+const openedModules = computed(() => findOpenIndexes(props.activePath))
 
 watch(
   () => props.activePath,
   (path) => {
     if (!path) return
     menuRef.value?.updateActiveIndex(path)
-    const modId = findModuleIdByPath(path)
-    if (modId) menuRef.value?.open(modId)
+    for (const idx of findOpenIndexes(path)) {
+      menuRef.value?.open(idx)
+    }
   }
 )
 
@@ -236,12 +245,6 @@ function moduleIcon(id: string): Component {
   color: #fff;
 }
 
-.sidebar-menu :deep(.el-menu-item-group__title) {
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 12px;
-  padding-left: 20px !important;
-}
-
 .sidebar-menu :deep(.el-sub-menu .el-menu-item) {
   min-width: auto;
   background: transparent;
@@ -249,6 +252,17 @@ function moduleIcon(id: string): Component {
 
 .sidebar-menu :deep(.el-sub-menu .el-menu) {
   background: rgba(0, 0, 0, 0.15);
+}
+
+/* 二级分组（如保养管理）：与一级子项同色，右侧有展开箭头可收起 */
+.sidebar-menu :deep(.el-sub-menu .el-sub-menu .el-sub-menu__title) {
+  padding-left: 44px !important;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 14px;
+}
+
+.sidebar-menu :deep(.el-sub-menu .el-sub-menu .el-menu-item) {
+  padding-left: 60px !important;
 }
 
 .collapsed .brand-text {
