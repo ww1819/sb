@@ -192,7 +192,12 @@
       </div>
       <slot name="form" :form="form" :fields="formFields" :mode="formMode">
         <el-form label-width="120px" :disabled="formMode === 'view'">
-          <GroupedFormFields :table="config.table" :model="form" :fields="formFields" />
+          <GroupedFormFields
+            :table="config.table"
+            :model="form"
+            :fields="formFields"
+            :group-columns="config.formGroupColumns"
+          />
         </el-form>
       </slot>
     </FormDrawer>

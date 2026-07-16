@@ -428,7 +428,25 @@ CREATE TABLE purchase_plan (
     large_equipment_class VARCHAR(20),
     benefit_analysis_url VARCHAR(500),
     dept_argument_url VARCHAR(500),
-    version INTEGER DEFAULT 1
+    version INTEGER DEFAULT 1,
+    device_name VARCHAR(200),
+    unit VARCHAR(20),
+    model VARCHAR(100),
+    fill_date DATE,
+    existing_device_status VARCHAR(50),
+    existing_device_usage_freq VARCHAR(50),
+    reference_manufacturer VARCHAR(200),
+    specification TEXT,
+    brand VARCHAR(100),
+    quantity INTEGER,
+    similar_device_count INTEGER,
+    demand_level VARCHAR(30),
+    product_attribute_req TEXT,
+    other_condition_confirm TEXT,
+    unit_budget_price DECIMAL(15,2),
+    category_id UUID REFERENCES medical_device_category(id),
+    demand_nature VARCHAR(30),
+    prefer_import BOOLEAN DEFAULT false
 );
 COMMENT ON TABLE purchase_plan IS '采购计划表';
 COMMENT ON COLUMN purchase_plan.id IS '主键';
@@ -453,6 +471,24 @@ COMMENT ON COLUMN purchase_plan.large_equipment_class IS '大型设备分类';
 COMMENT ON COLUMN purchase_plan.benefit_analysis_url IS '效益分析附件URL';
 COMMENT ON COLUMN purchase_plan.dept_argument_url IS '科室论证附件URL';
 COMMENT ON COLUMN purchase_plan.version IS '乐观锁版本号';
+COMMENT ON COLUMN purchase_plan.device_name IS '设备名称';
+COMMENT ON COLUMN purchase_plan.unit IS '单位';
+COMMENT ON COLUMN purchase_plan.model IS '型号';
+COMMENT ON COLUMN purchase_plan.fill_date IS '填报日期';
+COMMENT ON COLUMN purchase_plan.existing_device_status IS '现有设备运行状态';
+COMMENT ON COLUMN purchase_plan.existing_device_usage_freq IS '现有设备使用频次';
+COMMENT ON COLUMN purchase_plan.reference_manufacturer IS '参考厂家';
+COMMENT ON COLUMN purchase_plan.specification IS '规格型号';
+COMMENT ON COLUMN purchase_plan.brand IS '品牌';
+COMMENT ON COLUMN purchase_plan.quantity IS '数量';
+COMMENT ON COLUMN purchase_plan.similar_device_count IS '同类设备数量';
+COMMENT ON COLUMN purchase_plan.demand_level IS '需求程度';
+COMMENT ON COLUMN purchase_plan.product_attribute_req IS '产品属性要求';
+COMMENT ON COLUMN purchase_plan.other_condition_confirm IS '其他条件确认';
+COMMENT ON COLUMN purchase_plan.unit_budget_price IS '单价(预算/元)';
+COMMENT ON COLUMN purchase_plan.category_id IS '类别';
+COMMENT ON COLUMN purchase_plan.demand_nature IS '需求性质';
+COMMENT ON COLUMN purchase_plan.prefer_import IS '是否首选进口产品';
 
 -- 3.2 采购计划明细表
 CREATE TABLE purchase_plan_item (
@@ -473,7 +509,17 @@ CREATE TABLE purchase_plan_item (
     unit VARCHAR(20),
     brand_intent VARCHAR(100),
     is_metrology BOOLEAN DEFAULT false,
-    udi_code VARCHAR(100)
+    udi_code VARCHAR(100),
+    similar_device_count INTEGER,
+    demand_level VARCHAR(30),
+    product_attribute_req TEXT,
+    fund_source VARCHAR(30),
+    demand_nature VARCHAR(30),
+    existing_device_status VARCHAR(50),
+    existing_device_usage_freq VARCHAR(50),
+    other_condition_confirm TEXT,
+    is_large_equipment BOOLEAN DEFAULT false,
+    large_equipment_class VARCHAR(20)
 );
 COMMENT ON TABLE purchase_plan_item IS '采购计划明细表';
 COMMENT ON COLUMN purchase_plan_item.id IS '主键';
@@ -494,6 +540,16 @@ COMMENT ON COLUMN purchase_plan_item.unit IS '计量单位';
 COMMENT ON COLUMN purchase_plan_item.brand_intent IS '意向品牌';
 COMMENT ON COLUMN purchase_plan_item.is_metrology IS '是否计量器具';
 COMMENT ON COLUMN purchase_plan_item.udi_code IS 'UDI唯一器械标识';
+COMMENT ON COLUMN purchase_plan_item.similar_device_count IS '同类设备数量';
+COMMENT ON COLUMN purchase_plan_item.demand_level IS '需求程度';
+COMMENT ON COLUMN purchase_plan_item.product_attribute_req IS '产品属性要求';
+COMMENT ON COLUMN purchase_plan_item.fund_source IS '资金来源';
+COMMENT ON COLUMN purchase_plan_item.demand_nature IS '需求性质';
+COMMENT ON COLUMN purchase_plan_item.existing_device_status IS '现有设备运行状态';
+COMMENT ON COLUMN purchase_plan_item.existing_device_usage_freq IS '现有设备使用频次';
+COMMENT ON COLUMN purchase_plan_item.other_condition_confirm IS '其他条件确认';
+COMMENT ON COLUMN purchase_plan_item.is_large_equipment IS '是否大型设备';
+COMMENT ON COLUMN purchase_plan_item.large_equipment_class IS '大型设备分类';
 
 -- 3.3 采购项目表
 CREATE TABLE purchase_project (

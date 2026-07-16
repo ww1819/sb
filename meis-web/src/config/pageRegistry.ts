@@ -1,3 +1,5 @@
+import type { FieldGroup } from './pageSchemas'
+
 export interface ListFilterOption {
   value: string
   label: string
@@ -72,6 +74,8 @@ export interface PageConfig {
   formPlacement?: 'center' | 'right'
   /** 支持表头升序/降序的列 prop */
   sortableColumns?: string[]
+  /** 分组表单每行列数（如基本信息 5 列） */
+  formGroupColumns?: Partial<Record<FieldGroup, number>>
 }
 
 export const pageRegistry: Record<string, PageConfig> = {
@@ -89,7 +93,8 @@ export const pageRegistry: Record<string, PageConfig> = {
     listFilters: [
       { key: 'approval_status', label: '审批状态', dictType: 'approval_status' },
       { key: 'plan_year', label: '计划年度', type: 'number' }
-    ]
+    ],
+    formGroupColumns: { basic: 5 }
   },
   '/purchase/apply': {
     title: '采购申请',
@@ -105,7 +110,8 @@ export const pageRegistry: Record<string, PageConfig> = {
     listFilters: [
       { key: 'approval_status', label: '审批状态', dictType: 'approval_status' },
       { key: 'plan_year', label: '计划年度', type: 'number' }
-    ]
+    ],
+    formGroupColumns: { basic: 5 }
   },
   '/purchase/approval': {
     title: '采购审批',

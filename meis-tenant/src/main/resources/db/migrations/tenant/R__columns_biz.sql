@@ -288,3 +288,46 @@ BEGIN
         ALTER TABLE repair_workorder_event RENAME COLUMN to_engineer_id TO to_user_id;
     END IF;
 END $rep03_rename_event$;
+-- ---------- purchase_plan（采购申请基本信息扩展 PUR-UI-01） ----------
+ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
+ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS unit VARCHAR(20);
+ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS model VARCHAR(100);
+ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS fill_date DATE;
+ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS existing_device_status VARCHAR(50);
+ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS existing_device_usage_freq VARCHAR(50);
+ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS reference_manufacturer VARCHAR(200);
+ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS specification TEXT;
+ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS brand VARCHAR(100);
+ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS quantity INTEGER;
+ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS similar_device_count INTEGER;
+ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS demand_level VARCHAR(30);
+ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS product_attribute_req TEXT;
+ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS other_condition_confirm TEXT;
+ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS unit_budget_price DECIMAL(15,2);
+ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS category_id UUID;
+ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS demand_nature VARCHAR(30);
+ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS prefer_import BOOLEAN DEFAULT false;
+DO $purchase_plan_category_fk$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE table_schema = current_schema()
+          AND table_name = 'purchase_plan'
+          AND constraint_name = 'purchase_plan_category_id_fkey'
+    ) THEN
+        ALTER TABLE purchase_plan
+            ADD CONSTRAINT purchase_plan_category_id_fkey
+            FOREIGN KEY (category_id) REFERENCES medical_device_category(id);
+    END IF;
+END $purchase_plan_category_fk$;
+-- ---------- purchase_plan_item（明细扩展字段 PUR-UI-01） ----------
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS similar_device_count INTEGER;
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS demand_level VARCHAR(30);
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS product_attribute_req TEXT;
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS fund_source VARCHAR(30);
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS demand_nature VARCHAR(30);
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS existing_device_status VARCHAR(50);
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS existing_device_usage_freq VARCHAR(50);
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS other_condition_confirm TEXT;
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS is_large_equipment BOOLEAN DEFAULT false;
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS large_equipment_class VARCHAR(20);

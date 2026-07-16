@@ -1,6 +1,6 @@
 <template>
   <div class="master-detail-page">
-    <CrudPage ref="crudRef" :config="config" @detail="loadDetail">
+    <CrudPage ref="crudRef" :config="config" detail-mode @detail="loadDetail" @add="openCreate">
       <template #toolbar-extra>
         <el-button v-if="selectedId" type="warning" @click="saveMaster">保存主从</el-button>
         <el-button v-if="selectedId && showApproval && canSubmit" type="primary" @click="submitApproval">提交审批</el-button>
@@ -11,7 +11,12 @@
 
     <AppModal v-model="detailVisible" :title="config.title + ' 编辑'" size="xl">
       <template v-if="master">
-        <GroupedFormFields :table="config.table" :model="master" />
+        <GroupedFormFields
+          :table="config.table"
+          :model="master"
+          :fields="basicFormFields"
+          :group-columns="config.formGroupColumns"
+        />
         <MasterDetailForm :items="items" @add-item="addItem">
           <template #detail-columns>
             <el-table-column
@@ -20,7 +25,8 @@
               :prop="f.prop"
               :label="f.label"
               :width="f.width"
-              :min-width="f.width ? undefined : 120"
+              :min-width="f.width ?? Math.max(120, f.label.length * 14 + 24)"
+              show-overflow-tooltip
             >
               <template #default="{ row }">
                 <FieldRenderer v-if="f.linkTable || f.dictType || f.type === 'boolean'" v-model="row[f.prop]" :field="f" />
@@ -31,6 +37,12 @@
             </el-table-column>
           </template>
         </MasterDetailForm>
+        <GroupedFormFields
+          v-if="extraFormFields.length"
+          :table="config.table"
+          :model="master"
+          :fields="extraFormFields"
+        />
         <ApprovalPanel
           v-if="selectedId && businessType"
           :business-type="businessType"
@@ -58,7 +70,7 @@ import ApprovalPanel from './ApprovalPanel.vue'
 import AppModal from './AppModal.vue'
 import GroupedFormFields from './form/GroupedFormFields.vue'
 import type { PageConfig } from '@/config/pageRegistry'
-import { getDetailFields } from '@/config/pageSchemas'
+import { getDetailFields, getSchema } from '@/config/pageSchemas'
 
 const props = defineProps<{
   config: PageConfig
@@ -74,6 +86,14 @@ const items = ref<Record<string, unknown>[]>([])
 const selectedId = ref('')
 const showApproval = computed(() => !!props.businessType)
 const detailFields = computed(() => getDetailFields(props.config.detailTable ?? `${props.config.table}_item`))
+const masterFormFields = computed(() => getSchema(props.config.table).filter((f) => !f.readonly))
+const basicFormFields = computed(() => masterFormFields.value.filter((f) => (f.group ?? 'other') === 'basic'))
+const extraFormFields = computed(() =>
+  masterFormFields.value.filter((f) => {
+    const g = f.group ?? 'other'
+    return g !== 'basic' && g !== 'approval'
+  })
+)
 const canSubmit = computed(() => {
   const status = master.value?.approval_status
   return !status || status === 'draft' || status === 'rejected'
@@ -93,6 +113,18 @@ async function loadDetail(row: Record<string, unknown>) {
   const { data } = await http.get(`${props.saveUrl}/${row.id}`)
   master.value = data.data
   items.value = (data.data?.items as Record<string, unknown>[]) ?? []
+  detailVisible.value = true
+}
+
+function openCreate() {
+  selectedId.value = ''
+  const defaults: Record<string, unknown> = { approval_status: 'draft', is_active: true }
+  for (const f of masterFormFields.value) {
+    if (defaults[f.prop] !== undefined) continue
+    defaults[f.prop] = f.type === 'number' ? undefined : f.type === 'boolean' ? false : ''
+  }
+  master.value = defaults
+  items.value = []
   detailVisible.value = true
 }
 
