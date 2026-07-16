@@ -1,0 +1,6 @@
+BOOT-INF/classes/com/meis/saas/asset/controller/AssetDeviceController.class
+BOOT-INF/classes/com/meis/saas/asset/controller/DeviceEntryController.class
+BOOT-INF/classes/com/meis/saas/asset/controller/DeviceOutboundController.class
+BOOT-INF/classes/com/meis/saas/asset/controller/InventoryCheckController.class
+BOOT-INF/classes/com/meis/saas/asset/controller/MedicalDeviceQueryController.class
+BOOT-INF/classes/com/meis/saas/web/DomainController.class

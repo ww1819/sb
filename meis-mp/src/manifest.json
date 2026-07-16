@@ -1,0 +1,20 @@
+{
+  "name": "meis-mp",
+  "appid": "__UNI__MEISMP",
+  "description": "MEIS设备管理小程序",
+  "versionName": "1.0.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "mp-weixin": {
+    "appid": "",
+    "setting": {
+      "urlCheck": true,
+      "es6": true,
+      "minified": true
+    },
+    "usingComponents": true,
+    "permission": {},
+    "requiredPrivateInfos": []
+  },
+  "vueVersion": "3"
+}

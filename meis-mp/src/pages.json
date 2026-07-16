@@ -1,0 +1,41 @@
+{
+  "pages": [
+    {
+      "path": "pages/login/index",
+      "style": {
+        "navigationBarTitleText": "登录",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/home/index",
+      "style": {
+        "navigationBarTitleText": "MEIS设备助手"
+      }
+    },
+    {
+      "path": "pages/asset/list",
+      "style": {
+        "navigationBarTitleText": "资产查询"
+      }
+    },
+    {
+      "path": "pages/asset/detail",
+      "style": {
+        "navigationBarTitleText": "设备详情"
+      }
+    },
+    {
+      "path": "pages/repair/scan",
+      "style": {
+        "navigationBarTitleText": "扫码报修"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "MEIS",
+    "navigationBarBackgroundColor": "#ffffff",
+    "backgroundColor": "#f5f7fa"
+  }
+}

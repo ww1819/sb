@@ -176,9 +176,58 @@ public class AssetDeviceController {
         return " ORDER BY " + column + " " + dir + " NULLS LAST, d.device_code ASC";
     }
 
+    /**
+     * 精确按设备编码查台账（小程序扫码报修用）。
+     * 返回 can_report / cannot_report_reason，便于前端提示。
+     */
+    @GetMapping("/by-code/{deviceCode}")
+    public Result<Map<String, Object>> byCode(@PathVariable String deviceCode) {
+        if (deviceCode == null || deviceCode.isBlank()) {
+            throw new BizException(400, "设备编码不能为空");
+        }
+        String code = deviceCode.trim();
+        String notDeleted = SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d");
+        var rows = jdbc.queryForList("""
+                SELECT d.*, dept.dept_name
+                FROM medical_device d
+                LEFT JOIN department dept ON dept.id = d.dept_id
+                WHERE d.device_code = ?
+                """ + notDeleted + " LIMIT 1", code);
+        if (rows.isEmpty()) {
+            throw new BizException(404, "未找到设备: " + code);
+        }
+        Map<String, Object> d = new LinkedHashMap<>(rows.get(0));
+        String status = Objects.toString(d.get("device_status"), "");
+        boolean blockedByStatus = Set.of("maintenance", "pending_verify", "scrap").contains(status);
+        boolean busy = !jdbc.queryForList("""
+                SELECT id FROM repair_workorder
+                WHERE device_id = ?::uuid
+                  AND status IN ('reported','dispatching','pending_accept','accepted','repairing','pending_verify','suspended','verify_rejected')
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null) + " LIMIT 1",
+                d.get("id")).isEmpty();
+        boolean canReport = !blockedByStatus && !busy
+                && !Boolean.FALSE.equals(d.get("is_active"));
+        d.put("can_report", canReport);
+        if (!canReport) {
+            if (blockedByStatus) {
+                d.put("cannot_report_reason", "设备当前不可报修: " + status);
+            } else if (busy) {
+                d.put("cannot_report_reason", "该设备已有进行中的报修单");
+            } else {
+                d.put("cannot_report_reason", "设备未启用，不可报修");
+            }
+        }
+        return Result.ok(d);
+    }
+
     @GetMapping("/{id}/detail")
     public Result<Map<String, Object>> detail(@PathVariable UUID id) {
-        var device = jdbc.queryForList("SELECT * FROM medical_device WHERE id = ?::uuid", id);
+        var device = jdbc.queryForList("""
+                SELECT d.*, dept.dept_name
+                FROM medical_device d
+                LEFT JOIN department dept ON dept.id = d.dept_id
+                WHERE d.id = ?::uuid
+                """, id);
         if (device.isEmpty()) return Result.ok(null);
         Map<String, Object> d = device.get(0);
         d.put("can_delete", !MedicalDeviceDeleteGuard.hasBusinessData(jdbc, id.toString()));
