@@ -38,3 +38,11 @@ scripts/db-config.bat
 
 # Legacy local overrides (do not commit)
 scripts/meis-services.ps1
+meis-mobile/.vs/slnx.sqlite
+meis-mobile/.vs/VSWorkspaceState.json
+meis-mobile/.vs/meis-mobile.slnx/FileContentIndex/7d64e24b-d741-480f-b4fd-6c9384ad07d9.vsidx
+meis-mp/project.private.config.json
+meis-mp/project.config.json
+meis-mobile/.vs/meis-mobile.slnx/v18/DocumentLayout.json
+meis-mobile/.vs/meis-mobile.slnx/v18/DocumentLayout.backup.json
+meis-mobile/.vs/meis-mobile.slnx/v18/.wsuo
