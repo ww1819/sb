@@ -1,8 +1,10 @@
-﻿-- flyway:executeInTransaction=false
+-- flyway:executeInTransaction=false
 -- =============================================================================
--- 标准审计/软删字段补全（老租户幂等）
+-- 标准审计/软删字段补全（老租户幂等）— 槽位 R__columns_audit.sql
+-- =============================================================================
 -- 约定七列：created_at, updated_at, created_by, updated_by, is_deleted, deleted_at, deleted_by
 -- 逐条 ALTER，非事务执行，避免长时间锁表
+-- 合并自原 R__audit_columns.sql + R__is_deleted_columns.sql
 -- 新建表请在 V1__tables.sql 的 CREATE TABLE 中直接包含上述七列
 -- =============================================================================
 ALTER TABLE adverse_event ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
@@ -909,3 +911,364 @@ ALTER TABLE warehouse ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFA
 ALTER TABLE warehouse ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 ALTER TABLE warehouse ADD COLUMN IF NOT EXISTS deleted_by UUID;
 UPDATE warehouse SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+
+-- =============================================================================
+-- is_deleted 兼容补列 + 动态兜底 + 存量默认值修正
+-- =============================================================================
+ALTER TABLE adverse_event ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE adverse_event SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE asset_category ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE asset_category SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE asset_transfer SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE benefit_mapping ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE benefit_mapping SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE building ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE building SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE campus ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE campus SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE contract_payment ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE contract_payment SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE department ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE department SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE device_accessory ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE device_accessory SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE device_benefit_summary ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE device_benefit_summary SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE device_cost_record ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE device_cost_record SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE device_entry ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE device_entry SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE device_entry_item SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE device_outbound ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE device_outbound SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE device_outbound_item ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE device_outbound_item SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE device_return ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE device_return SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE device_return_item ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE device_return_item SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE device_scrap ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE device_scrap SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE device_usage_record ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE device_usage_record SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE emergency_device_allocation ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE emergency_device_allocation SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE emergency_device_pool ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE emergency_device_pool SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE engineer ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE engineer SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE fault_type_dict ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE fault_type_dict SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE finance_category ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE finance_category SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE import_profile_binding ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE import_profile_binding SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE import_template_field ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE import_template_field SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE inspection_execution ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE inspection_execution SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE inspection_execution_item ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE inspection_execution_item SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE inspection_execution_result ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE inspection_execution_result SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE inspection_plan SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE inspection_record ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE inspection_record SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE inspection_record_item ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE inspection_record_item SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE inspection_template ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE inspection_template SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE inspection_template_item ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE inspection_template_item SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE inspection_type ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE inspection_type SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE integration_sync_task ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE integration_sync_task SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE inventory_check SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE inventory_check_item ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE inventory_check_item SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE leased_device ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE leased_device SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE life_support_device ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE life_support_device SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE maintenance_contract ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE maintenance_contract SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE maintenance_contract_fulfillment ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE maintenance_contract_fulfillment SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE maintenance_contract_payment ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE maintenance_contract_payment SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE maintenance_execution SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE maintenance_execution_item SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE maintenance_execution_result ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE maintenance_execution_result SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE maintenance_level ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE maintenance_level SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE maintenance_plan SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE maintenance_record ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE maintenance_record SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE maintenance_template ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE maintenance_template SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE maintenance_template_item ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE maintenance_template_item SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE manufacturer ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE manufacturer SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE medical_device SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE medical_device_category ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE medical_device_category SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE metrology_category ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE metrology_category SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE metrology_type ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE metrology_type SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE metrology_execution ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE metrology_execution SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE metrology_execution_item ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE metrology_execution_item SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE metrology_execution_result ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE metrology_execution_result SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE metrology_org ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE metrology_org SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE metrology_plan ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE metrology_plan SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE metrology_record ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE metrology_record SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE metrology_template ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE metrology_template SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE metrology_template_item ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE metrology_template_item SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE notification_message ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE notification_message SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE performance_test ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE performance_test SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE pm_execution ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE pm_execution SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE pm_execution_item ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE pm_execution_item SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE pm_execution_result ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE pm_execution_result SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE pm_plan ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE pm_plan SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE pm_template ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE pm_template SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE pm_template_item ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE pm_template_item SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE pm_type ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE pm_type SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE power_base_station ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE power_base_station SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE power_current_reading ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE power_current_reading SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE power_device_status ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE power_device_status SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE power_monitor_record ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE power_monitor_record SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE power_tag SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE power_tag_bind_log ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE power_tag_bind_log SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE purchase_acceptance ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE purchase_acceptance SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE purchase_acceptance_item ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE purchase_acceptance_item SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE purchase_acceptance_member ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE purchase_acceptance_member SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE purchase_alert_snapshot ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE purchase_alert_snapshot SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE purchase_bidder ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE purchase_bidder SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE purchase_complaint ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE purchase_complaint SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE purchase_contract ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE purchase_contract SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE purchase_plan SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE purchase_plan_item SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE purchase_project ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE purchase_project SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE purchase_project_event ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE purchase_project_event SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE repair_workorder SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE repair_workorder_event ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE repair_workorder_event SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE risk_assessment ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE risk_assessment SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE shared_device_fee ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE shared_device_fee SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE shared_device_loan SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE shared_device_return ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE shared_device_return SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE spare_part ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE spare_part SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE spare_part_transaction ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE spare_part_transaction SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE spare_part_usage ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE spare_part_usage SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE special_device ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE special_device SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE supplier ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE supplier SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE sys_approval_flow ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE sys_approval_flow SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE sys_approval_instance ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE sys_approval_instance SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE sys_approval_node ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE sys_approval_node SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE sys_approval_record ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE sys_approval_record SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE sys_config SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE sys_dict ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE sys_dict SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE sys_notification ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE sys_notification SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE sys_operation_log ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE sys_operation_log SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE sys_role ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE sys_role SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE sys_user ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE sys_user SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE unit_dict ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE unit_dict SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE warehouse ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+UPDATE warehouse SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+
+-- 枚举表遗漏项（显式）
+ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS deleted_by UUID;
+ALTER TABLE sys_entity_change_log ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE sys_entity_change_log ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE sys_entity_change_log ADD COLUMN IF NOT EXISTS deleted_by UUID;
+
+-- =============================================================================
+-- 动态补齐：当前 schema 任意基表若缺 is_deleted 则补列（排除 flyway_*）
+-- 同时补 deleted_at / deleted_by，便于 SoftDeleteSupport.softDelete
+-- =============================================================================
+DO $ensure_is_deleted_all$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN
+        SELECT t.table_name
+        FROM information_schema.tables t
+        WHERE t.table_schema = current_schema()
+          AND t.table_type = 'BASE TABLE'
+          AND t.table_name NOT LIKE 'flyway_%'
+          AND NOT EXISTS (
+              SELECT 1 FROM information_schema.columns c
+              WHERE c.table_schema = t.table_schema
+                AND c.table_name = t.table_name
+                AND c.column_name = 'is_deleted'
+          )
+    LOOP
+        EXECUTE format(
+            'ALTER TABLE %I ADD COLUMN is_deleted SMALLINT NOT NULL DEFAULT 0',
+            r.table_name
+        );
+        EXECUTE format(
+            'ALTER TABLE %I ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ',
+            r.table_name
+        );
+        EXECUTE format(
+            'ALTER TABLE %I ADD COLUMN IF NOT EXISTS deleted_by UUID',
+            r.table_name
+        );
+        EXECUTE format(
+            'UPDATE %I SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0',
+            r.table_name
+        );
+    END LOOP;
+END $ensure_is_deleted_all$;
+
+-- =============================================================================
+-- 存量数据：未删除行 is_deleted 统一为 0；列默认值保证为 0；必要时补 NOT NULL
+-- （覆盖「补列时未带默认值/可空」的历史情况；无 deleted_at 的表跳过相关 UPDATE）
+-- =============================================================================
+DO $fix_is_deleted_defaults$
+DECLARE
+    r RECORD;
+    has_deleted_at BOOLEAN;
+BEGIN
+    FOR r IN
+        SELECT c.table_name
+        FROM information_schema.columns c
+        JOIN information_schema.tables t
+          ON t.table_schema = c.table_schema
+         AND t.table_name = c.table_name
+         AND t.table_type = 'BASE TABLE'
+        WHERE c.table_schema = current_schema()
+          AND c.column_name = 'is_deleted'
+          AND c.table_name NOT LIKE 'flyway_%'
+    LOOP
+        SELECT EXISTS (
+            SELECT 1 FROM information_schema.columns x
+            WHERE x.table_schema = current_schema()
+              AND x.table_name = r.table_name
+              AND x.column_name = 'deleted_at'
+        ) INTO has_deleted_at;
+
+        IF has_deleted_at THEN
+            EXECUTE format(
+                'UPDATE %I SET is_deleted = 0 WHERE deleted_at IS NULL AND COALESCE(is_deleted, 0) <> 0',
+                r.table_name
+            );
+            EXECUTE format(
+                'UPDATE %I SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND COALESCE(is_deleted, 0) = 0',
+                r.table_name
+            );
+        END IF;
+        EXECUTE format(
+            'UPDATE %I SET is_deleted = 0 WHERE is_deleted IS NULL',
+            r.table_name
+        );
+        EXECUTE format('ALTER TABLE %I ALTER COLUMN is_deleted SET DEFAULT 0', r.table_name);
+        BEGIN
+            EXECUTE format('ALTER TABLE %I ALTER COLUMN is_deleted SET NOT NULL', r.table_name);
+        EXCEPTION WHEN others THEN
+            NULL;
+        END;
+    END LOOP;
+END $fix_is_deleted_defaults$;
+
+-- =============================================================================
+-- 审计姓名快照：有 created_by / updated_by / deleted_by 则配套 *_by_name（附录 W.5）
+-- =============================================================================
+DO $ensure_audit_by_names$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN
+        SELECT t.table_name,
+               c.column_name AS by_col,
+               c.column_name || '_name' AS name_col
+        FROM information_schema.tables t
+        JOIN information_schema.columns c
+          ON c.table_schema = t.table_schema
+         AND c.table_name = t.table_name
+        WHERE t.table_schema = current_schema()
+          AND t.table_type = 'BASE TABLE'
+          AND t.table_name NOT LIKE 'flyway_%'
+          AND c.column_name IN ('created_by', 'updated_by', 'deleted_by')
+          AND NOT EXISTS (
+              SELECT 1 FROM information_schema.columns n
+              WHERE n.table_schema = t.table_schema
+                AND n.table_name = t.table_name
+                AND n.column_name = c.column_name || '_name'
+          )
+    LOOP
+        EXECUTE format(
+            'ALTER TABLE %I ADD COLUMN %I VARCHAR(100)',
+            r.table_name, r.name_col
+        );
+    END LOOP;
+END $ensure_audit_by_names$;

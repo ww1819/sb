@@ -1,7 +1,8 @@
-﻿-- =============================================================================
--- 租户 schema 业务补列手工镜像（与 R__tenant_schema_sync.sql 同步）
+-- =============================================================================
+-- 租户 schema 业务补列手工镜像（历史；权威见 R__columns_biz.sql）
+-- 【DEPRECATED】勿在此新增语句。新补列请写 Flyway 槽位。
 -- 标准七列（created_at/updated_at/created_by/updated_by/is_deleted/deleted_at/deleted_by）
--- 由 R__audit_columns.sql 维护，勿在此文件重复散落。详见 docs 附录 G.0。
+-- 由 R__columns_audit.sql 维护，勿在此文件重复散落。详见 docs 附录 G.0。
 -- =============================================================================
 
 ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS audit_status VARCHAR(20) DEFAULT 'pending';
@@ -214,6 +215,7 @@ ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS standard_function_count INTE
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS purchase_expected_benefit VARCHAR(200);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS rated_workload VARCHAR(100);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS device_unit VARCHAR(30);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS unit_id UUID;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS manage_dept_id UUID;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS location_floor VARCHAR(50);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS room_number VARCHAR(50);
@@ -236,5 +238,5 @@ ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS value5 TEXT;
 ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS value6 TEXT;
 ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
 
--- 软删除与审计字段补列见 tenant/R__audit_columns.sql（非业务逐表 ALTER）
+-- 软删除与审计字段补列见 tenant/R__columns_audit.sql（非业务逐表 ALTER）
 

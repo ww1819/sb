@@ -1,6 +1,9 @@
 package com.meis.saas.common.web;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.meis.saas.common.asset.MedicalDeviceDeleteGuard;
+import com.meis.saas.common.asset.SparePartDeleteGuard;
 import com.meis.saas.common.audit.EntityChangeLogService;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
@@ -13,6 +16,7 @@ import com.meis.saas.common.excel.ImportFieldRegistry;
 import com.meis.saas.common.excel.ImportProfileService;
 import com.meis.saas.common.excel.ImportResult;
 import com.meis.saas.common.excel.MedicalDeviceFieldHelper;
+import com.meis.saas.common.excel.MedicalDeviceCategoryImporter;
 import com.meis.saas.common.excel.SimpleTableImporter;
 import com.meis.saas.common.result.Result;
 import jakarta.servlet.http.HttpServletResponse;
@@ -28,6 +32,12 @@ import java.util.*;
  * 通用表 CRUD（租户 Schema 内），供各业务微服务快速暴露 API。
  */
 public abstract class GenericTableController {
+    private static final ObjectMapper JSON = new ObjectMapper();
+    /** JSONB 列：Map/List 回写须序列化为字符串并以 ?::jsonb 绑定，否则驱动误走 hstore。 */
+    private static final Set<String> JSONB_COLUMNS = Set.of(
+            "extension_data", "manual_files", "certificate_files",
+            "changed_fields", "snapshot_json", "permissions");
+
     @Autowired(required = false)
     private ImportProfileService importProfileService;
 
@@ -48,8 +58,25 @@ public abstract class GenericTableController {
 
     @GetMapping("/{table}/page")
     public Result<com.meis.saas.common.page.PageResult<Map<String, Object>>> page(
-            @PathVariable String table, com.meis.saas.common.page.PageQuery query) {
+            @PathVariable String table,
+            com.meis.saas.common.page.PageQuery query,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false) String sortOrder,
+            @RequestParam Map<String, String> allParams) {
         check(table);
+        if (sortBy != null && !sortBy.isBlank()) query.setSortBy(sortBy.trim());
+        if (sortOrder != null && !sortOrder.isBlank()) query.setSortOrder(sortOrder.trim());
+        // 扁平查询参数写入 filters（如 parent_id），供树选/列表筛选使用
+        if (allParams != null) {
+            Set<String> reserved = Set.of("page", "size", "keyword", "sortBy", "sortOrder");
+            for (Map.Entry<String, String> e : allParams.entrySet()) {
+                String key = e.getKey();
+                String val = e.getValue();
+                if (key == null || reserved.contains(key) || val == null || val.isBlank()) continue;
+                if (!key.matches("^[a-z][a-z0-9_]*$")) continue;
+                query.getFilters().put(key, val);
+            }
+        }
         return Result.ok(com.meis.saas.common.page.PageableJdbc.query(jdbc(), table, query));
     }
 
@@ -58,7 +85,8 @@ public abstract class GenericTableController {
                                                    @RequestParam(defaultValue = "50") int limit) {
         check(table);
         String where = " WHERE 1=1 " + SoftDeleteSupport.notDeletedClause(jdbc(), table, null);
-        return Result.ok(jdbc().queryForList("SELECT * FROM " + table + where + " LIMIT " + Math.min(limit, 500)));
+        int lim = Math.min(Math.max(limit, 1), 5000);
+        return Result.ok(jdbc().queryForList("SELECT * FROM " + table + where + " LIMIT " + lim));
     }
 
     @GetMapping("/{table}/lookup")
@@ -120,6 +148,9 @@ public abstract class GenericTableController {
         }
         prepareInsertDefaults(table, body);
         normalizeUuidFields(body);
+        normalizeTemporalFields(body);
+        normalizeJsonbFields(body);
+        applyCategoryHierarchyDefaults(table, body);
         SoftDeleteSupport.applyInsertAudit(jdbc(), table, body);
         var cols = TableColumnCache.columns(jdbc(), table);
         var softDeletedId = SoftDeleteSupport.findSoftDeletedId(jdbc(), table, body);
@@ -159,6 +190,9 @@ public abstract class GenericTableController {
             body.remove("device_code");
         }
         normalizeUuidFields(body);
+        normalizeTemporalFields(body);
+        normalizeJsonbFields(body);
+        applyCategoryHierarchyDefaults(table, body);
         if (body.isEmpty()) return Result.ok();
         Map<String, Object> before = loadTracked(table, id);
         executeUpdate(table, id, body);
@@ -170,9 +204,12 @@ public abstract class GenericTableController {
     }
 
     @GetMapping("/{table}/export")
-    public void export(@PathVariable String table, HttpServletResponse resp) throws IOException {
+    public void export(@PathVariable String table,
+                       @RequestParam(required = false) String ids,
+                       @RequestParam(required = false) String keyword,
+                       HttpServletResponse resp) throws IOException {
         check(table);
-        ExcelExportHelper.exportCsv(jdbc(), table, resp);
+        ExcelExportHelper.exportCsv(jdbc(), table, resp, ids, keyword);
     }
 
     @GetMapping("/{table}/import/template")
@@ -194,10 +231,15 @@ public abstract class GenericTableController {
         String biz = importBusinessType(table);
         if (biz == null) throw new BizException(400, "table import not supported: " + table);
         var fields = resolveImportFields(biz, profile);
+        List<Map<String, String>> parsed = ExcelImportHelper.parseRows(file, fields);
+        if ("medical_device_category".equals(table)) {
+            parsed = ExcelImportHelper.ensureCategoryTwoColumnRows(parsed);
+            return Result.ok(MedicalDeviceCategoryImporter.importRows(jdbc(), parsed));
+        }
         var columns = importProfileService != null
                 ? importProfileService.standardColumns(biz, fields)
                 : new LinkedHashSet<>(fields.stream().map(ImportFieldDef::effectiveColumn).filter(Objects::nonNull).toList());
-        ImportResult result = SimpleTableImporter.importRows(jdbc(), table, ExcelImportHelper.parseRows(file, fields), columns);
+        ImportResult result = SimpleTableImporter.importRows(jdbc(), table, parsed, columns);
         return Result.ok(result);
     }
 
@@ -233,6 +275,9 @@ public abstract class GenericTableController {
         guardInventoryCheckMutable(table, id);
         if ("medical_device".equals(table)) {
             MedicalDeviceDeleteGuard.assertDeletable(jdbc(), id);
+        }
+        if ("spare_part".equals(table)) {
+            SparePartDeleteGuard.assertDeletable(jdbc(), id);
         }
         Map<String, Object> before = loadTracked(table, id);
         int n = SoftDeleteSupport.softDelete(jdbc(), table, id);
@@ -296,18 +341,108 @@ public abstract class GenericTableController {
         }
     }
 
+    /** 日期/时间列空串转 null；前端常回传 ""。 */
+    private static void normalizeTemporalFields(Map<String, Object> body) {
+        for (Map.Entry<String, Object> e : body.entrySet()) {
+            if (!isDateColumn(e.getKey()) && !isTimestampColumn(e.getKey())) continue;
+            Object v = e.getValue();
+            if (v instanceof String s && s.isBlank()) e.setValue(null);
+        }
+    }
+
+    /** Map/List 形态的 JSONB 字段序列化为 JSON 字符串，避免 JDBC 按 hstore 绑定失败。 */
+    private static void normalizeJsonbFields(Map<String, Object> body) {
+        for (Map.Entry<String, Object> e : body.entrySet()) {
+            if (!isJsonbColumn(e.getKey())) continue;
+            Object v = e.getValue();
+            if (v == null || v instanceof String || v instanceof org.postgresql.util.PGobject) continue;
+            if (v instanceof Map || v instanceof Collection || v.getClass().isArray()) {
+                try {
+                    e.setValue(JSON.writeValueAsString(v));
+                } catch (JsonProcessingException ex) {
+                    throw new BizException(400, "无法序列化 JSON 字段：" + e.getKey());
+                }
+            }
+        }
+    }
+
     private static boolean isUuidColumn(String column) {
         return "id".equals(column)
                 || column.endsWith("_id")
                 || column.endsWith("_by");
     }
 
+    private static boolean isDateColumn(String column) {
+        return column.endsWith("_date") || "delivery_deadline".equals(column);
+    }
+
+    private static boolean isTimestampColumn(String column) {
+        return column.endsWith("_at")
+                || column.endsWith("_time")
+                || column.endsWith("_datetime");
+    }
+
+    private static boolean isJsonbColumn(String column) {
+        return JSONB_COLUMNS.contains(column) || column.endsWith("_json") || column.endsWith("_files");
+    }
+
     private static String placeholder(String column) {
-        return isUuidColumn(column) ? "?::uuid" : "?";
+        if (isUuidColumn(column)) return "?::uuid";
+        if (isJsonbColumn(column)) return "?::jsonb";
+        if (isDateColumn(column)) return "?::date";
+        if (isTimestampColumn(column)) return "?::timestamptz";
+        return "?";
     }
 
     private static boolean isBlank(Object v) {
         return v == null || (v instanceof String s && s.isBlank());
+    }
+
+    /**
+     * 设备分类（parent_code 树）：空上级=一级；补齐 level / full_path，避免 NOT NULL 失败。
+     */
+    private void applyCategoryHierarchyDefaults(String table, Map<String, Object> body) {
+        if (!"medical_device_category".equals(table)) return;
+        Object pc = body.get("parent_code");
+        if (pc instanceof String s && s.isBlank()) {
+            body.put("parent_code", null);
+            pc = null;
+        }
+        String parentCode = pc == null ? null : String.valueOf(pc).trim();
+        if (parentCode != null && parentCode.isEmpty()) {
+            body.put("parent_code", null);
+            parentCode = null;
+        }
+        String name = body.get("category_name") == null ? null : String.valueOf(body.get("category_name")).trim();
+
+        if (parentCode == null) {
+            if (isBlank(body.get("level"))) body.put("level", 1);
+            if (isBlank(body.get("full_path")) && name != null && !name.isEmpty()) {
+                body.put("full_path", name);
+            }
+            return;
+        }
+        List<Map<String, Object>> parents = jdbc().queryForList(
+                """
+                SELECT level, full_path, category_name FROM medical_device_category
+                WHERE category_code = ? AND COALESCE(is_deleted, 0) = 0 LIMIT 1
+                """,
+                parentCode);
+        if (parents.isEmpty()) {
+            throw new BizException(400, "上级分类不存在：" + parentCode);
+        }
+        Map<String, Object> parent = parents.get(0);
+        if (isBlank(body.get("level"))) {
+            int parentLevel = parent.get("level") instanceof Number n ? n.intValue() : 1;
+            body.put("level", parentLevel + 1);
+        }
+        if (isBlank(body.get("full_path")) && name != null && !name.isEmpty()) {
+            Object pfp = parent.get("full_path");
+            String prefix = pfp != null && !String.valueOf(pfp).isBlank()
+                    ? String.valueOf(pfp)
+                    : String.valueOf(parent.get("category_name"));
+            body.put("full_path", prefix + "/" + name);
+        }
     }
 
     /** 由 SoftDeleteSupport.appendUpdateAuditSets 统一写入，禁止进入 SET 以免列重复。 */
@@ -320,7 +455,7 @@ public abstract class GenericTableController {
             sets.add(k + " = " + placeholder(k));
             args.add(v);
         });
-        SoftDeleteSupport.appendUpdateAuditSets(cols, sets, args);
+        SoftDeleteSupport.appendUpdateAuditSets(jdbc(), cols, sets, args);
         if (sets.isEmpty()) return;
         args.add(id);
         jdbc().update("UPDATE " + table + " SET " + String.join(",", sets) + " WHERE id = ?::uuid", args.toArray());
@@ -339,6 +474,7 @@ public abstract class GenericTableController {
         return switch (table) {
             case "supplier" -> ImportFieldRegistry.SUPPLIER;
             case "manufacturer" -> ImportFieldRegistry.MANUFACTURER;
+            case "medical_device_category" -> ImportFieldRegistry.DEVICE_CATEGORY;
             default -> null;
         };
     }

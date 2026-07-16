@@ -4,6 +4,7 @@ import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ public class AdverseEventController {
             @RequestParam(required = false) String deviceCode,
             @RequestParam(required = false) Boolean openOnly) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "adverse_event", "a"));
         List<Object> args = new ArrayList<>();
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
             where.append(" AND (a.event_no ILIKE ? OR a.device_name ILIKE ? OR a.device_code ILIKE ? OR a.event_description ILIKE ?) ");
@@ -85,18 +87,24 @@ public class AdverseEventController {
 
     @GetMapping("/summary")
     public Result<Map<String, Object>> summary() {
+        String nd = SoftDeleteSupport.notDeletedClause(jdbc, "adverse_event", null);
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("total", jdbc.queryForObject("SELECT COUNT(*) FROM adverse_event", Long.class));
-        result.put("open_count", jdbc.queryForObject("SELECT COUNT(*) FROM adverse_event WHERE status <> 'closed'", Long.class));
-        result.put("reported_count", jdbc.queryForObject("SELECT COUNT(*) FROM adverse_event WHERE status = 'reported'", Long.class));
+        result.put("total", jdbc.queryForObject("SELECT COUNT(*) FROM adverse_event WHERE 1=1" + nd, Long.class));
+        result.put("open_count", jdbc.queryForObject(
+                "SELECT COUNT(*) FROM adverse_event WHERE status <> 'closed'" + nd, Long.class));
+        result.put("reported_count", jdbc.queryForObject(
+                "SELECT COUNT(*) FROM adverse_event WHERE status = 'reported'" + nd, Long.class));
         result.put("authority_count", jdbc.queryForObject(
-                "SELECT COUNT(*) FROM adverse_event WHERE reported_to_authority = true", Long.class));
+                "SELECT COUNT(*) FROM adverse_event WHERE reported_to_authority = true" + nd, Long.class));
         result.put("by_status", jdbc.queryForList(
-                "SELECT status, COUNT(*) AS count FROM adverse_event GROUP BY status ORDER BY count DESC"));
+                "SELECT status, COUNT(*) AS count FROM adverse_event WHERE 1=1" + nd
+                        + " GROUP BY status ORDER BY count DESC"));
         result.put("by_severity", jdbc.queryForList(
-                "SELECT severity_level, COUNT(*) AS count FROM adverse_event GROUP BY severity_level ORDER BY count DESC"));
+                "SELECT severity_level, COUNT(*) AS count FROM adverse_event WHERE 1=1" + nd
+                        + " GROUP BY severity_level ORDER BY count DESC"));
         result.put("by_type", jdbc.queryForList(
-                "SELECT event_type, COUNT(*) AS count FROM adverse_event GROUP BY event_type ORDER BY count DESC"));
+                "SELECT event_type, COUNT(*) AS count FROM adverse_event WHERE 1=1" + nd
+                        + " GROUP BY event_type ORDER BY count DESC"));
         return Result.ok(result);
     }
 
@@ -112,7 +120,7 @@ public class AdverseEventController {
             LEFT JOIN sys_user handler ON handler.id = a.handler_id
             LEFT JOIN sys_user reviewer ON reviewer.id = a.reviewer_id
             WHERE a.id = ?::uuid
-            """, id);
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "adverse_event", "a"), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         return Result.ok(rows.get(0));
     }
@@ -123,7 +131,9 @@ public class AdverseEventController {
     public Result<Map<String, Object>> save(@RequestBody Map<String, Object> body) {
         UUID id = body.containsKey("id") && body.get("id") != null && !body.get("id").toString().isBlank()
                 ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
-        boolean exists = !jdbc.queryForList("SELECT 1 FROM adverse_event WHERE id = ?::uuid", id).isEmpty();
+        boolean exists = !jdbc.queryForList(
+                "SELECT 1 FROM adverse_event WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "adverse_event", null), id).isEmpty();
         fillDeviceSnapshot(body);
         String userId = TenantContext.getUserId();
         Object reporterId = body.get("reporter_id") != null ? body.get("reporter_id")
@@ -159,7 +169,9 @@ public class AdverseEventController {
     @Transactional
     @OperationLog(module = "qc", description = "不良事件状态流转")
     public Result<Map<String, Object>> transition(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
-        var rows = jdbc.queryForList("SELECT status FROM adverse_event WHERE id = ?::uuid", id);
+        var rows = jdbc.queryForList(
+                "SELECT status FROM adverse_event WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "adverse_event", null), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         String cur = String.valueOf(rows.get(0).get("status"));
         String target = String.valueOf(body.get("status"));
@@ -200,7 +212,8 @@ public class AdverseEventController {
     private void fillDeviceSnapshot(Map<String, Object> body) {
         if (body.get("device_id") == null) return;
         var devices = jdbc.queryForList(
-                "SELECT device_code, device_name FROM medical_device WHERE id = ?::uuid", body.get("device_id"));
+                "SELECT device_code, device_name FROM medical_device WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", null), body.get("device_id"));
         if (!devices.isEmpty()) {
             if (body.get("device_code") == null) body.put("device_code", devices.get(0).get("device_code"));
             if (body.get("device_name") == null) body.put("device_name", devices.get(0).get("device_name"));

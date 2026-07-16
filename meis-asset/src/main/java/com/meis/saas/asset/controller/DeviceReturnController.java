@@ -4,6 +4,7 @@ import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.workflow.ApprovalInstanceService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ public class DeviceReturnController {
     public Result<PageResult<Map<String, Object>>> page(PageQuery query,
             @RequestParam(required = false) String status) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "device_return", "r"));
         List<Object> args = new ArrayList<>();
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
             where.append(" AND (r.return_no ILIKE ? OR o.outbound_no ILIKE ?) ");
@@ -35,11 +37,11 @@ public class DeviceReturnController {
             where.append(" AND r.status = ? ");
             args.add(status);
         }
-        String from = """
-            FROM device_return r
-            LEFT JOIN device_outbound o ON o.id = r.outbound_id
-            LEFT JOIN warehouse w ON w.id = r.warehouse_id
-            """;
+        String from = " FROM device_return r "
+                + " LEFT JOIN device_outbound o ON o.id = r.outbound_id"
+                + SoftDeleteSupport.notDeletedClause(jdbc, "device_outbound", "o")
+                + " LEFT JOIN warehouse w ON w.id = r.warehouse_id"
+                + SoftDeleteSupport.notDeletedClause(jdbc, "warehouse", "w");
         Long total = jdbc.queryForObject("SELECT COUNT(*) " + from + where, Long.class, args.toArray());
         List<Object> pageArgs = new ArrayList<>(args);
         pageArgs.add(query.limit());
@@ -56,12 +58,16 @@ public class DeviceReturnController {
             SELECT r.*, o.outbound_no, w.warehouse_name
             FROM device_return r
             LEFT JOIN device_outbound o ON o.id = r.outbound_id
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "device_outbound", "o") + """
             LEFT JOIN warehouse w ON w.id = r.warehouse_id
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "warehouse", "w") + """
             WHERE r.id = ?::uuid
-            """, id);
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "device_return", "r"), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> r = rows.get(0);
-        r.put("items", jdbc.queryForList("SELECT * FROM device_return_item WHERE return_id = ?::uuid", id));
+        r.put("items", jdbc.queryForList(
+                "SELECT * FROM device_return_item WHERE return_id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "device_return_item", null), id));
         return Result.ok(r);
     }
 
@@ -120,13 +126,17 @@ public class DeviceReturnController {
     @Transactional
     @OperationLog(module = "asset", description = "退货入库")
     public Result<Map<String, Object>> complete(@PathVariable UUID id) {
-        var row = jdbc.queryForList("SELECT * FROM device_return WHERE id = ?::uuid", id);
+        var row = jdbc.queryForList(
+                "SELECT * FROM device_return WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "device_return", null), id);
         if (row.isEmpty()) throw new BizException(404, "not found");
         if ("returned".equals(String.valueOf(row.get(0).get("status")))) {
             throw new BizException(400, "退货单已完成");
         }
         Object warehouseId = row.get(0).get("warehouse_id");
-        var items = jdbc.queryForList("SELECT device_id FROM device_return_item WHERE return_id = ?::uuid", id);
+        var items = jdbc.queryForList(
+                "SELECT device_id FROM device_return_item WHERE return_id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "device_return_item", null), id);
         for (Map<String, Object> item : items) {
             if (item.get("device_id") != null) {
                 jdbc.update("""

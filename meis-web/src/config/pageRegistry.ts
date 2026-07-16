@@ -62,6 +62,14 @@ export interface PageConfig {
   showRowIndex?: boolean
   /** 序号列前显示多选框 */
   showRowSelection?: boolean
+  /**
+   * 工具栏布局：
+   * - standard（默认）：导入/生成简码在搜索行，查询/重置/新增/导出在第二行（原行为）
+   * - actions-row：查询/重置跟搜索框；新增/导出/导入/生成简码单独第二行（如供应商维护）
+   */
+  toolbarLayout?: 'standard' | 'actions-row'
+  /** 表单抽屉位置：center（默认）| right（右侧贴边，不挡顶栏） */
+  formPlacement?: 'center' | 'right'
   /** 支持表头升序/降序的列 prop */
   sortableColumns?: string[]
 }
@@ -119,6 +127,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'purchase_contract',
     listPageUrl: '/purchase/contract/page',
     saveUrl: '/purchase/contract',
+    showRowSelection: true,
     listFilters: [
       { key: 'approval_status', label: '审批状态', dictType: 'approval_status' },
       { key: 'acceptance_status', label: '验收状态', dictType: 'acceptance_status' }
@@ -131,39 +140,106 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/purchase/acceptance/page',
     listFilters: [{ key: 'acceptance_status', label: '验收状态', dictType: 'acceptance_status' }]
   },
-  '/purchase/supplier': { title: '供应商管理', apiBase: '/system', table: 'supplier', importable: true, pinyinCode: true,
+  '/purchase/supplier': {
+    title: '供应商管理',
+    apiBase: '/system',
+    table: 'supplier',
+    importable: true,
+    pinyinCode: true,
+    toolbarLayout: 'actions-row',
+    formPlacement: 'right',
+    showRowIndex: true,
+    sortableColumns: ['supplier_code', 'supplier_name'],
+    enableView: true
+  },
+  '/purchase/category': {
+    title: '设备分类',
+    apiBase: '/system',
+    table: 'medical_device_category',
+    formPlacement: 'right',
+    showRowIndex: true,
+    importable: true,
+    sortableColumns: ['category_code', 'category_name', 'parent_code'],
+    enableView: true
+  },
+  '/purchase/manufacturer': {
+    title: '生产厂商',
+    apiBase: '/system',
+    table: 'manufacturer',
+    importable: true,
+    pinyinCode: true,
+    toolbarLayout: 'actions-row',
+    formPlacement: 'right',
+    enableView: true
+  },
+  '/dict/supplier': {
+    title: '供应商管理',
+    apiBase: '/system',
+    table: 'supplier',
+    importable: true,
+    pinyinCode: true,
+    toolbarLayout: 'actions-row',
+    formPlacement: 'right',
+    showRowIndex: true,
+    sortableColumns: ['supplier_code', 'supplier_name'],
+    enableView: true
+  },
+  '/dict/manufacturer': {
+    title: '生产厂商',
+    apiBase: '/system',
+    table: 'manufacturer',
+    importable: true,
+    pinyinCode: true,
+    toolbarLayout: 'actions-row',
+    formPlacement: 'right',
+    enableView: true
+  },
+  '/dict/category': {
+    title: '设备分类',
+    apiBase: '/system',
+    table: 'medical_device_category',
+    formPlacement: 'right',
+    showRowIndex: true,
+    importable: true,
+    sortableColumns: ['category_code', 'category_name', 'parent_code'],
+    enableView: true
+  },
+  '/dict/campus': { title: '院区管理', apiBase: '/system', table: 'campus',
   enableView: true
 },
-  '/purchase/category': { title: '设备分类', apiBase: '/system', table: 'medical_device_category',
-  enableView: true
-},
-  '/purchase/manufacturer': { title: '生产厂商', apiBase: '/system', table: 'manufacturer', importable: true, pinyinCode: true,
-  enableView: true
-},
-  '/dict/supplier': { title: '供应商维护', apiBase: '/system', table: 'supplier', importable: true, pinyinCode: true,
-  enableView: true
-},
-  '/dict/manufacturer': { title: '生产厂家维护', apiBase: '/system', table: 'manufacturer', importable: true, pinyinCode: true,
-  enableView: true
-},
-  '/dict/category': { title: '设备68档案', apiBase: '/system', table: 'medical_device_category',
-  enableView: true
-},
-  '/dict/asset-category': { title: '资产分类', apiBase: '/system', table: 'asset_category',
-  enableView: true
-},
-  '/dict/finance-category': { title: '财务分类', apiBase: '/system', table: 'finance_category',
-  enableView: true
-},
+  '/dict/asset-category': {
+    title: '资产分类',
+    apiBase: '/system',
+    table: 'asset_category',
+    formPlacement: 'right',
+    showRowIndex: true,
+    sortableColumns: ['category_code', 'category_name'],
+    enableView: true
+  },
+  '/dict/finance-category': {
+    title: '财务分类',
+    apiBase: '/system',
+    table: 'finance_category',
+    formPlacement: 'right',
+    showRowIndex: true,
+    enableView: true
+  },
   '/dict/dept': { title: '科室维护', apiBase: '/system', table: 'department', pinyinCode: true,
   enableView: true
 },
   '/dict/warehouse': { title: '仓库维护', apiBase: '/system', table: 'warehouse',
   enableView: true
 },
-  '/dict/unit': { title: '单位维护', apiBase: '/system', table: 'unit_dict',
-  enableView: true
-},
+  '/dict/unit': {
+    title: '单位维护',
+    apiBase: '/system',
+    table: 'unit_dict',
+    formPlacement: 'right',
+    showRowSelection: true,
+    showRowIndex: true,
+    sortableColumns: ['unit_code', 'unit_name'],
+    enableView: true
+  },
   '/purchase/dashboard': { title: '采购看板', apiBase: '/purchase', table: 'purchase_plan' },
   '/purchase/trace': { title: '业务追溯', apiBase: '/purchase', table: 'purchase_plan' },
   '/asset/query': { title: '资产综合查询', apiBase: '/asset', table: 'medical_device' },
@@ -176,13 +252,13 @@ export const pageRegistry: Record<string, PageConfig> = {
     importTemplateUrl: '/asset/medical_device/import/template'
   },
   '/asset/device': {
-    title: '资产管理',
+    title: '资产登记',
     apiBase: '/asset',
     table: 'medical_device',
     listPageUrl: '/asset/device/page',
     showRowIndex: true,
     showRowSelection: true,
-    sortableColumns: ['device_code', 'device_name', 'specification', 'dept_id'],
+    sortableColumns: ['device_code', 'device_name', 'specification', 'dept_name'],
     listFilters: [
       { key: 'enable_dateFrom', label: '起', type: 'date', actionBar: true },
       { key: 'enable_dateTo', label: '止', type: 'date', actionBar: true }
@@ -190,7 +266,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     moreSearchFields: [
       { key: 'supplier_id', label: '供应商', placeholder: '供应商名称/编码', linkTable: 'supplier' },
       { key: 'manufacturer_id', label: '生产厂家', placeholder: '生产厂家名称/编码', linkTable: 'manufacturer' },
-      { key: 'device_name', label: '设备名称', placeholder: '设备名称/简码' },
+      { key: 'device_name', label: '资产名称', placeholder: '资产名称/简码' },
       { key: 'specification', label: '规格', placeholder: '规格模糊' },
       { key: 'model', label: '型号', placeholder: '型号模糊' },
       { key: 'dept_id', label: '领用科室', placeholder: '科室名称/编码', linkTable: 'department' },
@@ -217,7 +293,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/asset/device/page',
     showRowIndex: true,
     showRowSelection: true,
-    sortableColumns: ['device_code', 'device_name', 'specification', 'dept_id'],
+    sortableColumns: ['device_code', 'device_name', 'specification', 'dept_name'],
     listFilters: [
       { key: 'warehouse_id', label: '仓库', linkTable: 'warehouse', prepend: true },
       { key: 'enable_dateFrom', label: '起', type: 'date', actionBar: true },
@@ -226,7 +302,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     moreSearchFields: [
       { key: 'supplier_id', label: '供应商', placeholder: '供应商名称/编码', linkTable: 'supplier' },
       { key: 'manufacturer_id', label: '生产厂家', placeholder: '生产厂家名称/编码', linkTable: 'manufacturer' },
-      { key: 'device_name', label: '设备名称', placeholder: '设备名称/简码' },
+      { key: 'device_name', label: '资产名称', placeholder: '资产名称/简码' },
       { key: 'specification', label: '规格', placeholder: '规格模糊' },
       { key: 'model', label: '型号', placeholder: '型号模糊' },
       { key: 'dept_id', label: '领用科室', placeholder: '科室名称/编码', linkTable: 'department' },
@@ -339,7 +415,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     listFilters: [{ key: 'status', label: '状态', dictType: 'wo_status' }]
   },
   '/repair/engineer': { title: '维修工程师管理', apiBase: '/repair', table: 'sys_user' },
-  '/repair/spare-archive': { title: '配件档案管理', apiBase: '/repair', table: 'spare_part' },
+  '/repair/spare-archive': { title: '配件档案管理', apiBase: '/repair', table: 'spare_part', pinyinCode: true },
   '/repair/fault': { title: '故障库', apiBase: '/repair', table: 'fault_type_dict',
   enableView: true
 },
@@ -593,15 +669,38 @@ export const pageRegistry: Record<string, PageConfig> = {
   '/system/dict': { title: '数据字典', apiBase: '/system', table: 'sys_dict' },
   '/system/log': { title: '操作日志', apiBase: '/system', table: 'sys_operation_log' },
   '/system/approval': { title: '审批配置', apiBase: '/system', table: 'sys_approval_flow' },
-  '/system/supplier': { title: '供应商管理', apiBase: '/system', table: 'supplier', importable: true, pinyinCode: true,
-  enableView: true
-},
-  '/system/category': { title: '设备分类', apiBase: '/system', table: 'medical_device_category',
-  enableView: true
-},
-  '/system/manufacturer': { title: '生产厂商', apiBase: '/system', table: 'manufacturer', importable: true, pinyinCode: true,
-  enableView: true
-},
+  '/system/supplier': {
+    title: '供应商管理',
+    apiBase: '/system',
+    table: 'supplier',
+    importable: true,
+    pinyinCode: true,
+    toolbarLayout: 'actions-row',
+    formPlacement: 'right',
+    showRowIndex: true,
+    sortableColumns: ['supplier_code', 'supplier_name'],
+    enableView: true
+  },
+  '/system/category': {
+    title: '设备分类',
+    apiBase: '/system',
+    table: 'medical_device_category',
+    formPlacement: 'right',
+    showRowIndex: true,
+    importable: true,
+    sortableColumns: ['category_code', 'category_name', 'parent_code'],
+    enableView: true
+  },
+  '/system/manufacturer': {
+    title: '生产厂商',
+    apiBase: '/system',
+    table: 'manufacturer',
+    importable: true,
+    pinyinCode: true,
+    toolbarLayout: 'actions-row',
+    formPlacement: 'right',
+    enableView: true
+  },
   '/system/config': { title: '系统配置', apiBase: '/system', table: 'sys_config',
   enableView: true
 }

@@ -1,11 +1,12 @@
 -- =============================================================================
--- public schema 同步（可重复迁移 R__）
+-- public schema 数据更正 / 菜单目录（可重复迁移 R__）
 -- =============================================================================
+-- 槽位：R__data_fix.sql
 -- 约定：
---   1. 建表 / 索引 → 只改 V1__tables.sql、V2__extensions.sql
---   2. 本文件：菜单目录幂等同步（INSERT ON CONFLICT / UPDATE）
+--   1. 建表 / 索引 → 只改 V1__tables.sql、V2__indexes.sql
+--   2. 本文件：菜单目录幂等同步（INSERT ON CONFLICT / UPDATE）与数据更正
 --   3. 已有表加列 → 单独一行 ALTER TABLE ... ADD COLUMN IF NOT EXISTS
---   4. 不要在本文件 COMMENT ON（注释在 V1/V4）
+--   4. 不要在本文件 COMMENT ON（注释在 V1/V4）；禁止再新建 V5+/V20+
 -- =============================================================================
 
 -- ---------- 菜单：基础模块（工作台 / 采购 / 资产 / 运维 / 质控 / 决策 / 系统） ----------
@@ -17,7 +18,7 @@ INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_o
 ('purchase_project', 'mod_purchase', '采购项目', 'menu', '/purchase/project', 2),
 ('purchase_contract', 'mod_purchase', '采购合同', 'menu', '/purchase/contract', 3),
 ('mod_asset', NULL, '资产台账', 'module', NULL, 4),
-('asset_device', 'mod_asset', '设备台账', 'menu', '/asset/device', 1),
+('asset_device', 'mod_asset', '资产登记', 'menu', '/asset/device', 1),
 ('asset_entry', 'mod_asset', '设备入库', 'menu', '/asset/entry', 2),
 ('asset_outbound', 'mod_asset', '设备出库', 'menu', '/asset/outbound', 3),
 ('asset_transfer', 'mod_asset', '资产流转', 'menu', '/asset/transfer', 4),
@@ -127,12 +128,12 @@ WHERE m.menu_code IN (
 ON CONFLICT DO NOTHING;
 
 -- ---------- from V6__asset_ledger_menus.sql ----------
--- 模块2：资产台账 — 菜单（导入 / 综合查询 / 资产管理）
+-- 模块2：资产台账 — 菜单（登记 / 综合查询 / 导入）；终态排序见文末「资产台账菜单顺序」块
 UPDATE sys_menu SET menu_name = '资产台账' WHERE menu_code = 'mod_asset';
 
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
-('asset_query', 'mod_asset', '资产综合查询', 'menu', '/asset/query', 1),
-('asset_import', 'mod_asset', '资产导入', 'menu', '/asset/import', 2)
+('asset_query', 'mod_asset', '资产综合查询', 'menu', '/asset/query', 2),
+('asset_import', 'mod_asset', '资产导入', 'menu', '/asset/import', 3)
 ON CONFLICT (menu_code) DO UPDATE SET
     parent_code = EXCLUDED.parent_code,
     menu_name = EXCLUDED.menu_name,
@@ -140,7 +141,7 @@ ON CONFLICT (menu_code) DO UPDATE SET
     sort_order = EXCLUDED.sort_order,
     is_active = TRUE;
 
-UPDATE sys_menu SET menu_name = '资产管理', sort_order = 3 WHERE menu_code = 'asset_device';
+UPDATE sys_menu SET menu_name = '资产登记', sort_order = 1 WHERE menu_code = 'asset_device';
 UPDATE sys_menu SET sort_order = 4 WHERE menu_code = 'asset_entry';
 UPDATE sys_menu SET sort_order = 5 WHERE menu_code = 'asset_outbound';
 UPDATE sys_menu SET sort_order = 6 WHERE menu_code = 'asset_transfer';
@@ -352,9 +353,12 @@ ON CONFLICT (menu_code) DO UPDATE SET
     sort_order = EXCLUDED.sort_order,
     is_active = TRUE;
 
+-- 与库房管理重复的资产侧出入库/调拨/盘点/报废：停用菜单（入口保留在 mod_warehouse）
 UPDATE sys_menu SET is_active = FALSE WHERE menu_code IN (
     'asset_entry', 'asset_outbound', 'asset_transfer', 'asset_inventory', 'asset_scrap'
 );
+-- 仓库主数据入口统一在「基础字典 → 仓库维护」(dict_warehouse)，停用库房侧重复菜单
+UPDATE sys_menu SET is_active = FALSE WHERE menu_code = 'warehouse_setting';
 
 INSERT INTO sys_package_menu (package_code, menu_code)
 SELECT pkg, m.menu_code
@@ -362,7 +366,7 @@ FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
 CROSS JOIN sys_menu m
 WHERE m.menu_code IN (
     'mod_warehouse',
-    'warehouse_setting', 'warehouse_entry', 'warehouse_outbound', 'warehouse_return',
+    'warehouse_entry', 'asset_stock_query', 'warehouse_outbound', 'warehouse_return',
     'warehouse_transfer', 'warehouse_inventory', 'warehouse_scrap'
 )
 ON CONFLICT DO NOTHING;
@@ -373,7 +377,7 @@ FROM sys_tenant t
 CROSS JOIN sys_menu m
 WHERE m.menu_code IN (
     'mod_warehouse',
-    'warehouse_setting', 'warehouse_entry', 'warehouse_outbound', 'warehouse_return',
+    'warehouse_entry', 'asset_stock_query', 'warehouse_outbound', 'warehouse_return',
     'warehouse_transfer', 'warehouse_inventory', 'warehouse_scrap'
 )
 ON CONFLICT DO NOTHING;
@@ -462,10 +466,10 @@ WHERE m.menu_code IN ('mod_special', 'special_radiation', 'special_alerts')
 ON CONFLICT DO NOTHING;
 
 -- ---------- from V15__shared_module_menus.sql ----------
--- 模块11：公用设备借调 — 独立菜单模块
+-- 模块11：借调中心（原「公用设备借调」）— 独立菜单模块
 
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
-('mod_shared', NULL, '公用设备借调', 'module', NULL, 7)
+('mod_shared', NULL, '借调中心', 'module', NULL, 7)
 ON CONFLICT (menu_code) DO UPDATE SET
     menu_name = EXCLUDED.menu_name,
     menu_type = EXCLUDED.menu_type,
@@ -695,40 +699,64 @@ WHERE menu_code IN ('maintain_device', 'inspect_device', 'metrology_device', 'pm
 DELETE FROM sys_tenant_menu
 WHERE menu_code IN ('maintain_device', 'inspect_device', 'metrology_device', 'pm_device');
 
--- ---------- 系统管理：归并供应商/设备分类/生产厂商，新增系统配置 ----------
-UPDATE sys_menu SET parent_code = 'mod_system', menu_name = '供应商管理', path = '/system/supplier', sort_order = 8, is_active = TRUE
+-- ---------- 系统管理：仅保留账号/权限/配置类；主数据归基础字典 ----------
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('system_config', 'mod_system', '系统配置', 'menu', '/system/config', 6)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship'), ('professional')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code = 'system_config'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code = 'system_config'
+ON CONFLICT DO NOTHING;
+
+-- 院区/供应商/设备分类/生产厂商 → 基础字典（与 dict_* 主数据并列）
+UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '院区管理', path = '/dict/campus', sort_order = 1, is_active = TRUE
+WHERE menu_code = 'system_campus';
+UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '仓库维护', path = '/dict/warehouse', sort_order = 2, is_active = TRUE
+WHERE menu_code = 'dict_warehouse';
+UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '科室维护', path = '/dict/dept', sort_order = 3, is_active = TRUE
+WHERE menu_code = 'dict_dept';
+UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '供应商管理', path = '/dict/supplier', sort_order = 4, is_active = TRUE
 WHERE menu_code = 'purchase_supplier';
-UPDATE sys_menu SET parent_code = 'mod_system', menu_name = '设备分类', path = '/system/category', sort_order = 9, is_active = TRUE
-WHERE menu_code = 'purchase_category';
-UPDATE sys_menu SET parent_code = 'mod_system', menu_name = '生产厂商', path = '/system/manufacturer', sort_order = 10, is_active = TRUE
+UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '生产厂商', path = '/dict/manufacturer', sort_order = 5, is_active = TRUE
 WHERE menu_code = 'purchase_manufacturer';
-
-INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
-('system_config', 'mod_system', '系统配置', 'menu', '/system/config', 11)
-ON CONFLICT (menu_code) DO UPDATE SET
-    parent_code = EXCLUDED.parent_code,
-    menu_name = EXCLUDED.menu_name,
-    path = EXCLUDED.path,
-    sort_order = EXCLUDED.sort_order,
-    is_active = TRUE;
+UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '设备分类', path = '/dict/category', sort_order = 6, is_active = TRUE
+WHERE menu_code = 'purchase_category';
+UPDATE sys_menu SET sort_order = 7, is_active = TRUE WHERE menu_code = 'dict_asset_category';
+UPDATE sys_menu SET sort_order = 8, is_active = TRUE WHERE menu_code = 'dict_finance_category';
+UPDATE sys_menu SET sort_order = 9, is_active = TRUE WHERE menu_code = 'dict_unit';
 
 INSERT INTO sys_package_menu (package_code, menu_code)
 SELECT pkg, m.menu_code
 FROM (VALUES ('standard'), ('flagship'), ('professional')) AS p(pkg)
 CROSS JOIN sys_menu m
-WHERE m.menu_code = 'system_config'
+WHERE m.menu_code = 'system_campus'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO sys_tenant_menu (tenant_id, menu_code)
 SELECT t.id, m.menu_code
 FROM sys_tenant t
 CROSS JOIN sys_menu m
-WHERE m.menu_code = 'system_config'
+WHERE m.menu_code = 'system_campus'
 ON CONFLICT DO NOTHING;
 
--- ---------- 库存查询 + 仓库维护 ----------
+-- ---------- 库存查询：迁至库房管理，挂在设备入库（备货入库）之后 ----------
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
-('asset_stock_query', 'mod_asset', '库存查询', 'menu', '/asset/stock', 3)
+('asset_stock_query', 'mod_warehouse', '库存查询', 'menu', '/asset/stock', 3)
 ON CONFLICT (menu_code) DO UPDATE SET
     parent_code = EXCLUDED.parent_code,
     menu_name = EXCLUDED.menu_name,
@@ -736,44 +764,77 @@ ON CONFLICT (menu_code) DO UPDATE SET
     sort_order = EXCLUDED.sort_order,
     is_active = TRUE;
 
-UPDATE sys_menu SET sort_order = 1 WHERE menu_code = 'asset_device';
-UPDATE sys_menu SET sort_order = 2, is_active = TRUE WHERE menu_code = 'asset_entry';
-UPDATE sys_menu SET sort_order = 4 WHERE menu_code = 'asset_outbound';
-UPDATE sys_menu SET sort_order = 5 WHERE menu_code = 'asset_transfer';
-UPDATE sys_menu SET sort_order = 6 WHERE menu_code = 'asset_inventory';
-UPDATE sys_menu SET sort_order = 7 WHERE menu_code = 'asset_scrap';
+-- AST-UI-03：资产台账启用菜单终态顺序（登记 → 综合查询 → 导入）
+UPDATE sys_menu SET menu_name = '资产登记', sort_order = 1, is_active = TRUE WHERE menu_code = 'asset_device';
+UPDATE sys_menu SET sort_order = 2, is_active = TRUE WHERE menu_code = 'asset_query';
+UPDATE sys_menu SET sort_order = 3, is_active = TRUE WHERE menu_code = 'asset_import';
+-- 设备入库/出库等与库房管理重复：保持停用，入口统一在 mod_warehouse
+UPDATE sys_menu SET sort_order = 4, is_active = FALSE WHERE menu_code = 'asset_entry';
+UPDATE sys_menu SET sort_order = 5, is_active = FALSE WHERE menu_code = 'asset_outbound';
+UPDATE sys_menu SET sort_order = 6, is_active = FALSE WHERE menu_code = 'asset_transfer';
+UPDATE sys_menu SET sort_order = 7, is_active = FALSE WHERE menu_code = 'asset_inventory';
+UPDATE sys_menu SET sort_order = 8, is_active = FALSE WHERE menu_code = 'asset_scrap';
 
-INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
-('system_warehouse', 'mod_system', '仓库维护', 'menu', '/system/warehouse', 2)
+-- AST-UI-04 / SHR-UI-01：借调中心更名；库存查询迁库房（入库后）
+UPDATE sys_menu SET menu_name = '借调中心' WHERE menu_code = 'mod_shared';
+UPDATE sys_menu SET parent_code = 'mod_warehouse', menu_name = '库存查询', path = '/asset/stock',
+    sort_order = 3, is_active = TRUE
+WHERE menu_code = 'asset_stock_query';
+UPDATE sys_menu SET sort_order = 2, is_active = TRUE WHERE menu_code = 'warehouse_entry';
+UPDATE sys_menu SET sort_order = 4, is_active = TRUE WHERE menu_code = 'warehouse_outbound';
+UPDATE sys_menu SET sort_order = 5, is_active = TRUE WHERE menu_code = 'warehouse_return';
+UPDATE sys_menu SET sort_order = 6, is_active = TRUE WHERE menu_code = 'warehouse_transfer';
+UPDATE sys_menu SET sort_order = 7, is_active = TRUE WHERE menu_code = 'warehouse_inventory';
+UPDATE sys_menu SET sort_order = 8, is_active = TRUE WHERE menu_code = 'warehouse_scrap';
+-- 系统管理侧「仓库维护」：保留菜单定义但不启用（与基础字典 /dict/warehouse 重复）
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order, is_active) VALUES
+('system_warehouse', 'mod_system', '仓库维护', 'menu', '/system/warehouse', 2, FALSE)
 ON CONFLICT (menu_code) DO UPDATE SET
     parent_code = EXCLUDED.parent_code,
     menu_name = EXCLUDED.menu_name,
     path = EXCLUDED.path,
     sort_order = EXCLUDED.sort_order,
-    is_active = TRUE;
+    is_active = FALSE;
 
-UPDATE sys_menu SET sort_order = 1 WHERE menu_code = 'system_campus';
-UPDATE sys_menu SET sort_order = 3 WHERE menu_code = 'system_dept';
-UPDATE sys_menu SET sort_order = 4 WHERE menu_code = 'system_user';
-UPDATE sys_menu SET sort_order = 5 WHERE menu_code = 'system_role';
-UPDATE sys_menu SET sort_order = 6 WHERE menu_code = 'system_dict';
-UPDATE sys_menu SET sort_order = 7 WHERE menu_code = 'system_log';
-UPDATE sys_menu SET sort_order = 8 WHERE menu_code = 'system_approval';
-UPDATE sys_menu SET sort_order = 9 WHERE menu_code = 'purchase_supplier';
-UPDATE sys_menu SET sort_order = 10 WHERE menu_code = 'purchase_category';
-UPDATE sys_menu SET sort_order = 11 WHERE menu_code = 'purchase_manufacturer';
-UPDATE sys_menu SET sort_order = 12 WHERE menu_code = 'system_config';
+-- 系统管理：用户/角色/字典值/日志/审批/配置
+UPDATE sys_menu SET sort_order = 1 WHERE menu_code = 'system_user';
+UPDATE sys_menu SET sort_order = 2 WHERE menu_code = 'system_role';
+UPDATE sys_menu SET sort_order = 3 WHERE menu_code = 'system_dict';
+UPDATE sys_menu SET sort_order = 4 WHERE menu_code = 'system_log';
+UPDATE sys_menu SET sort_order = 5 WHERE menu_code = 'system_approval';
+UPDATE sys_menu SET sort_order = 6 WHERE menu_code = 'system_config';
 
 INSERT INTO sys_package_menu (package_code, menu_code)
 SELECT pkg, m.menu_code
 FROM (VALUES ('standard'), ('flagship'), ('professional')) AS p(pkg)
 CROSS JOIN sys_menu m
-WHERE m.menu_code IN ('asset_stock_query', 'system_warehouse')
+WHERE m.menu_code IN ('asset_stock_query')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO sys_tenant_menu (tenant_id, menu_code)
 SELECT t.id, m.menu_code
 FROM sys_tenant t
 CROSS JOIN sys_menu m
-WHERE m.menu_code IN ('asset_stock_query', 'system_warehouse')
+WHERE m.menu_code IN ('asset_stock_query')
 ON CONFLICT DO NOTHING;
+
+-- 仓库主数据：仅「基础字典 → 仓库维护」生效
+UPDATE sys_menu SET is_active = TRUE WHERE menu_code = 'dict_warehouse';
+UPDATE sys_menu SET is_active = FALSE WHERE menu_code IN ('warehouse_setting', 'system_warehouse');
+
+-- 再次确保四项主数据挂在基础字典，并按定稿顺序排列
+UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '院区管理', path = '/dict/campus', sort_order = 1, is_active = TRUE
+WHERE menu_code = 'system_campus';
+UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '仓库维护', path = '/dict/warehouse', sort_order = 2, is_active = TRUE
+WHERE menu_code = 'dict_warehouse';
+UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '科室维护', path = '/dict/dept', sort_order = 3, is_active = TRUE
+WHERE menu_code = 'dict_dept';
+UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '供应商管理', path = '/dict/supplier', sort_order = 4, is_active = TRUE
+WHERE menu_code = 'purchase_supplier';
+UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '生产厂商', path = '/dict/manufacturer', sort_order = 5, is_active = TRUE
+WHERE menu_code = 'purchase_manufacturer';
+UPDATE sys_menu SET parent_code = 'mod_dict', menu_name = '设备分类', path = '/dict/category', sort_order = 6, is_active = TRUE
+WHERE menu_code = 'purchase_category';
+UPDATE sys_menu SET sort_order = 7, is_active = TRUE WHERE menu_code = 'dict_asset_category';
+UPDATE sys_menu SET sort_order = 8, is_active = TRUE WHERE menu_code = 'dict_finance_category';
+UPDATE sys_menu SET sort_order = 9, is_active = TRUE WHERE menu_code = 'dict_unit';

@@ -2,6 +2,7 @@ package com.meis.saas.maintain.controller;
 
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.maintain.pm.PmExecutionGenerator;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +29,7 @@ public class PmPlanController {
                 LEFT JOIN medical_device d ON d.id = p.device_id
                 LEFT JOIN department dept ON dept.id = p.dept_id
                 WHERE p.id = ?::uuid
-                """, id);
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "pm_plan", "p"), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         return Result.ok(rows.get(0));
     }
@@ -38,7 +39,9 @@ public class PmPlanController {
     @OperationLog(module = "pm", description = "保存预防性维护计划")
     public Result<Map<String, Object>> save(@RequestBody Map<String, Object> body) {
         UUID id = body.containsKey("id") ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
-        boolean exists = !jdbc.queryForList("SELECT 1 FROM pm_plan WHERE id = ?::uuid", id).isEmpty();
+        boolean exists = !jdbc.queryForList(
+                "SELECT 1 FROM pm_plan WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "pm_plan", null), id).isEmpty();
         if (exists) {
             jdbc.update("""
                 UPDATE pm_plan SET plan_name=?, template_id=?::uuid, device_id=?::uuid, dept_id=?::uuid,
@@ -97,7 +100,9 @@ public class PmPlanController {
     @OperationLog(module = "pm", description = "从模板生成预防性维护计划")
     public Result<List<Map<String, Object>>> generate(@RequestBody Map<String, Object> body) {
         UUID templateId = UUID.fromString(body.get("templateId").toString());
-        var template = jdbc.queryForList("SELECT * FROM pm_template WHERE id = ?::uuid", templateId);
+        var template = jdbc.queryForList(
+                "SELECT * FROM pm_template WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "pm_template", null), templateId);
         if (template.isEmpty()) throw new BizException(404, "template not found");
         @SuppressWarnings("unchecked")
         List<String> deviceIds = (List<String>) body.getOrDefault("deviceIds", List.of());
@@ -114,7 +119,9 @@ public class PmPlanController {
                     body.getOrDefault("cycle_days", 30),
                     body.getOrDefault("next_due_date", LocalDate.now().plusMonths(1)),
                     "active", "draft", body.get("created_by"));
-            created.add(jdbc.queryForList("SELECT * FROM pm_plan WHERE id = ?::uuid", id).get(0));
+            created.add(jdbc.queryForList(
+                    "SELECT * FROM pm_plan WHERE id = ?::uuid "
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "pm_plan", null), id).get(0));
         }
         return Result.ok(created);
     }
@@ -134,6 +141,7 @@ public class PmPlanController {
                 LEFT JOIN medical_device d ON d.id = p.device_id
                 WHERE p.status = 'active' AND p.approval_status = 'approved'
                   AND p.next_due_date <= CURRENT_DATE + 7
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "pm_plan", "p") + """
                 ORDER BY p.next_due_date
                 """));
     }

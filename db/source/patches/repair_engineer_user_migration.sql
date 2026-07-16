@@ -1,5 +1,5 @@
 -- REP-03：维修工程师改 sys_user.is_repair_engineer；维修工单负责人改 assigned_user_id
--- 镜像：meis-tenant/.../R__tenant_schema_sync.sql 末尾同名段落
+-- 镜像（历史）：meis-tenant/.../R__data_fix.sql 工程师迁移段落；【DEPRECATED】勿再扩展
 
 ALTER TABLE sys_user ADD COLUMN IF NOT EXISTS is_repair_engineer BOOLEAN NOT NULL DEFAULT FALSE;
 

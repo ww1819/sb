@@ -155,17 +155,17 @@ const basicGroupKeys = new Set(['basic', 'finance', 'location', 'vendor', 'time'
 
 const basicFormRows = [
   ['device_code', 'card_code', 'device_name', 'pinyin_code', 'brand'],
-  ['specification', 'model', 'serial_number', 'device_unit'],
+  ['specification', 'model', 'serial_number', 'unit_id', 'category_id'],
   ['asset_category_id', 'finance_category_id', 'standby_current_max_ma', 'standby_current_min_ma'],
   ['country_of_origin', 'use_dept_head', 'dept_id', 'manage_dept_head', 'manage_dept_id'],
-  ['registration_no', 'category_id']
+  ['registration_no']
 ]
 
 const basicFormPanel = {
   inner: ['is_imported']
 }
 
-const highlightLabels = ['device_code', 'device_name', 'device_unit', 'dept_id']
+const highlightLabels = ['device_code', 'device_name', 'unit_id', 'dept_id']
 
 const vendorFormRows = [
   ['supplier_uscc', 'supplier_id', 'supplier_contact', 'supplier_phone'],

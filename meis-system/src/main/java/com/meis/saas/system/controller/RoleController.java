@@ -115,12 +115,16 @@ public class RoleController {
     public Result<Map<String, Object>> syncPermissions(@PathVariable UUID id,
                                                        @RequestHeader(value = "X-Tenant-Id", required = false) String tenantId) {
         if (tenantId == null) tenantId = TenantContext.getTenantId();
-        List<Map<String, Object>> roles = jdbc.queryForList("SELECT permissions FROM sys_role WHERE id = ?::uuid", id);
+        List<Map<String, Object>> roles = jdbc.queryForList(
+                "SELECT permissions FROM sys_role WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "sys_role", null),
+                id);
         if (roles.isEmpty()) throw new BizException(404, "role not found");
         String permsJson = permissionService.toJson(
                 permissionService.parsePermissions(roles.get(0).get("permissions")));
         int updated = jdbc.update(
-                "UPDATE sys_user SET permissions = ?::jsonb, permission_mode = 'synced', updated_at = NOW(), updated_by = ?::uuid WHERE role_ids IS NOT NULL AND ?::uuid = ANY(role_ids)",
+                "UPDATE sys_user SET permissions = ?::jsonb, permission_mode = 'synced', updated_at = NOW(), updated_by = ?::uuid WHERE role_ids IS NOT NULL AND ?::uuid = ANY(role_ids)"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", null),
                 permsJson, SoftDeleteSupport.currentUserId(), id);
         cacheEviction.evictTenantPermissions(tenantId);
         return Result.ok(Map.of("updatedCount", updated));
@@ -130,7 +134,9 @@ public class RoleController {
     @OperationLog(module = "system", description = "删除角色")
     public Result<Void> delete(@PathVariable UUID id) {
         List<Map<String, Object>> users = jdbc.queryForList(
-                "SELECT 1 FROM sys_user WHERE role_ids IS NOT NULL AND ?::uuid = ANY(role_ids) LIMIT 1", id);
+                "SELECT 1 FROM sys_user WHERE role_ids IS NOT NULL AND ?::uuid = ANY(role_ids) "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", null)
+                        + " LIMIT 1", id);
         if (!users.isEmpty()) throw new BizException(400, "role in use by users");
         Map<String, Object> before = changeLog.loadRow("sys_role", id);
         SoftDeleteSupport.softDelete(jdbc, "sys_role", id.toString());

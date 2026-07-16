@@ -1,6 +1,6 @@
 <template>
   <SystemPageCard title="院区管理" subtitle="维护医院院区基础信息" :loading="loading" show-search @search="applyFilter" @reset="resetFilter" v-model:keyword="keyword">
-    <template #actions>
+    <template #filter>
       <el-button type="primary" @click="openForm()">新增院区</el-button>
     </template>
     <el-table :data="filteredList" border stripe class="system-table" :height="tableHeight">
@@ -26,7 +26,12 @@
         </template>
       </el-table-column>
     </el-table>
-    <el-dialog v-model="visible" :title="form.id ? '编辑院区' : '新增院区'" width="480px" destroy-on-close>
+    <AppModal
+      v-model="visible"
+      :title="form.id ? '编辑院区' : '新增院区'"
+      size="sm"
+      placement="right"
+    >
       <el-form :model="form" label-width="90px">
         <el-form-item label="院区编码" required><el-input v-model="form.campus_code" maxlength="1" /></el-form-item>
         <el-form-item label="院区名称" required><el-input v-model="form.campus_name" /></el-form-item>
@@ -38,7 +43,7 @@
         <el-button @click="visible = false">取消</el-button>
         <el-button type="primary" @click="save">保存</el-button>
       </template>
-    </el-dialog>
+    </AppModal>
     <EntityChangeHistoryDrawer v-model="changeLogVisible" entity-type="campus" :entity-id="changeLogId" />
   </SystemPageCard>
 </template>
@@ -48,6 +53,7 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
+import AppModal from '@/components/AppModal.vue'
 import EntityChangeHistoryDrawer from '@/components/EntityChangeHistoryDrawer.vue'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
 

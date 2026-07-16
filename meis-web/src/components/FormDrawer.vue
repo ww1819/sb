@@ -3,6 +3,7 @@
     :model-value="modelValue"
     :title="title"
     :size="size"
+    :placement="placement"
     @update:model-value="$emit('update:modelValue', $event)"
   >
     <slot />
@@ -23,9 +24,10 @@ withDefaults(
     modelValue: boolean
     title: string
     size?: 'sm' | 'md' | 'lg' | 'xl'
+    placement?: 'center' | 'right'
     showSave?: boolean
   }>(),
-  { size: 'md', showSave: true }
+  { size: 'md', placement: 'center', showSave: true }
 )
 
 defineEmits<{ 'update:modelValue': [v: boolean]; save: [] }>()

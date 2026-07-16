@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="emergency-pool-page">
     <el-tabs v-model="activeTab">
       <el-tab-pane label="应急设备库" name="pool">
@@ -61,7 +61,7 @@ import { ElMessage } from 'element-plus'
 import http from '@/api/http'
 import CrudPage from '@/components/CrudPage.vue'
 import AppModal from '@/components/AppModal.vue'
-import SystemPageCard from '@/components/SystemPageCard.vue'
+import SystemPageCard from '@/components/system/SystemPageCard.vue'
 import PageFilterBar from '@/components/PageFilterBar.vue'
 import GroupedFormFields from '@/components/form/GroupedFormFields.vue'
 import TableCellValue from '@/components/table/TableCellValue.vue'

@@ -21,8 +21,9 @@
     v-else-if="field.linkTable"
     v-model="model"
     :link-table="field.linkTable"
-    :placeholder="'请选择' + field.label"
+    :placeholder="field.placeholder || '请选择' + field.label"
     :disabled="field.readonly"
+    :exclude-values="linkExcludeValues"
   />
   <el-switch
     v-else-if="field.type === 'boolean'"
@@ -67,6 +68,13 @@ const options = ref<{ label: string; value: string }[]>([])
 const model = computed({
   get: () => props.modelValue,
   set: (v) => emit('update:modelValue', v)
+})
+
+/** 自引用上级字段编辑时排除自身，避免选成自己的上级 */
+const linkExcludeValues = computed(() => {
+  if (!props.field.linkTable || props.field.prop !== 'parent_id') return []
+  const id = props.model?.id
+  return id != null && id !== '' ? [String(id)] : []
 })
 
 function onPickerModel(v: Record<string, unknown>) {

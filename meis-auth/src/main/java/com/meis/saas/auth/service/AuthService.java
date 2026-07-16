@@ -5,8 +5,11 @@ import com.meis.saas.api.dto.LoginResponse;
 import com.meis.saas.common.cache.LoginRateLimitService;
 import com.meis.saas.common.cache.TokenBlacklistService;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.rbac.PermissionService;
 import com.meis.saas.common.security.JwtUtil;
+import com.meis.saas.common.tenant.TenantContext;
+import com.meis.saas.common.tenant.TenantInfo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -49,39 +52,61 @@ public class AuthService {
         if (!"active".equals(tenant.get("status"))) throw new BizException(403, "tenant disabled");
 
         String schema = tenant.get("schema_name").toString();
+        if (!schema.matches("^[a-zA-Z_][a-zA-Z0-9_]*$")) {
+            throw new BizException(400, "invalid tenant schema");
+        }
         String tenantId = tenant.get("id").toString();
-        List<Map<String, Object>> users = jdbc.queryForList(
-                "SELECT id, username, password_hash, real_name, is_active, role_ids, dept_id, permissions FROM " + schema + ".sys_user WHERE username = ?",
-                req.getUsername());
-        if (users.isEmpty()) throw new BizException(401, "invalid credentials");
-        Map<String, Object> user = users.get(0);
-        if (!Boolean.TRUE.equals(user.get("is_active"))) throw new BizException(403, "user disabled");
 
-        String hash = user.get("password_hash").toString();
-        if (!encoder.matches(req.getPassword(), hash)) throw new BizException(401, "invalid credentials");
+        // SoftDeleteSupport / TableColumnCache 依赖 current_schema()；登录无 JWT 时需先切入租户 schema
+        TenantInfo previous = TenantContext.get();
+        try {
+            TenantContext.set(TenantInfo.builder()
+                    .tenantId(tenantId)
+                    .tenantCode(req.getTenantCode())
+                    .schemaName(schema)
+                    .build());
 
-        loginRateLimit.onSuccess(req.getTenantCode(), req.getUsername());
+            List<Map<String, Object>> users = jdbc.queryForList(
+                    "SELECT id, username, password_hash, real_name, is_active, role_ids, dept_id, permissions FROM "
+                            + schema + ".sys_user WHERE username = ?"
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", null),
+                    req.getUsername());
+            if (users.isEmpty()) throw new BizException(401, "invalid credentials");
+            Map<String, Object> user = users.get(0);
+            if (!Boolean.TRUE.equals(user.get("is_active"))) throw new BizException(403, "user disabled");
 
-        String userId = user.get("id").toString();
-        UUID[] roleIds = toRoleIds(user.get("role_ids"));
-        Map<String, Object> permissions = permissionService.resolveUserEffectivePermissions(
-                tenantId, schema, userId, user.get("permissions"), roleIds);
-        List<String> roles = loadRoleCodes(schema, roleIds);
+            String hash = user.get("password_hash").toString();
+            if (!encoder.matches(req.getPassword(), hash)) throw new BizException(401, "invalid credentials");
 
-        String token = jwtUtil.generate(userId, req.getUsername(), tenantId, req.getTenantCode(), schema, roles, permissions, "tenant");
+            loginRateLimit.onSuccess(req.getTenantCode(), req.getUsername());
 
-        return LoginResponse.builder()
-                .token(token)
-                .userId(userId)
-                .username(req.getUsername())
-                .realName(user.get("real_name") != null ? user.get("real_name").toString() : req.getUsername())
-                .tenantId(tenantId)
-                .tenantCode(req.getTenantCode())
-                .schemaName(schema)
-                .roles(roles)
-                .permissions(permissions)
-                .userType("tenant")
-                .build();
+            String userId = user.get("id").toString();
+            UUID[] roleIds = toRoleIds(user.get("role_ids"));
+            Map<String, Object> permissions = permissionService.resolveUserEffectivePermissions(
+                    tenantId, schema, userId, user.get("permissions"), roleIds);
+            List<String> roles = loadRoleCodes(schema, roleIds);
+
+            String token = jwtUtil.generate(userId, req.getUsername(), tenantId, req.getTenantCode(), schema, roles, permissions, "tenant");
+
+            return LoginResponse.builder()
+                    .token(token)
+                    .userId(userId)
+                    .username(req.getUsername())
+                    .realName(user.get("real_name") != null ? user.get("real_name").toString() : req.getUsername())
+                    .tenantId(tenantId)
+                    .tenantCode(req.getTenantCode())
+                    .schemaName(schema)
+                    .roles(roles)
+                    .permissions(permissions)
+                    .userType("tenant")
+                    .build();
+        } finally {
+            if (previous != null) {
+                TenantContext.set(previous);
+            } else {
+                TenantContext.clear();
+            }
+        }
     }
 
     /** 平台管理员登录（public schema，仅系统管理） */
@@ -153,7 +178,10 @@ public class AuthService {
     private List<String> loadRoleCodes(String schema, UUID[] roleIds) {
         if (roleIds == null || roleIds.length == 0) return List.of();
         String in = Arrays.stream(roleIds).map(id -> "'" + id + "'").reduce((a, b) -> a + "," + b).orElse("");
-        return jdbc.queryForList("SELECT role_code FROM " + schema + ".sys_role WHERE id IN (" + in + ")", String.class);
+        return jdbc.queryForList(
+                "SELECT role_code FROM " + schema + ".sys_role WHERE id IN (" + in + ")"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "sys_role", null),
+                String.class);
     }
 
     private UUID[] toRoleIds(Object raw) {

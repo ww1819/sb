@@ -9,6 +9,7 @@ public final class ImportFieldRegistry {
     public static final String DEPARTMENT = "department";
     public static final String SUPPLIER = "supplier";
     public static final String MANUFACTURER = "manufacturer";
+    public static final String DEVICE_CATEGORY = "medical_device_category";
 
     private static final Map<String, List<ImportFieldDef>> DEFAULTS = buildDefaults();
 
@@ -69,8 +70,8 @@ public final class ImportFieldRegistry {
         ));
 
         map.put(MEDICAL_DEVICE, List.of(
-                f("device_code", "设备编码", "string", "device_code", true, 10),
-                f("device_name", "设备名称", "string", "device_name", true, 20),
+                f("device_code", "资产编码", "string", "device_code", true, 10),
+                f("device_name", "资产名称", "string", "device_name", true, 20),
                 f("brand", "品牌", "string", "brand", false, 30),
                 f("model", "型号", "string", "model", false, 40),
                 f("specification", "规格", "string", "specification", false, 45),
@@ -101,6 +102,13 @@ public final class ImportFieldRegistry {
                 f("is_inspection_device", "巡检设备", "boolean", "is_inspection_device", false, 186),
                 f("remark", "备注", "string", "remark", false, 190),
                 f("is_active", "启用", "boolean", "is_active", false, 200)
+        ));
+
+        map.put(DEVICE_CATEGORY, List.of(
+                f("category_code", "分类编码", "string", "category_code", true, 10),
+                f("category_name", "分类名称", "string", "category_name", true, 20),
+                f("parent_code", "上级编码", "string", "parent_code", false, 30),
+                f("sort_order", "排序", "number", "sort_order", false, 40)
         ));
 
         return Map.copyOf(map);

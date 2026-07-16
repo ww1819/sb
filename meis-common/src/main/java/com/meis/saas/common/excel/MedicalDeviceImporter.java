@@ -40,9 +40,9 @@ public final class MedicalDeviceImporter {
                 ImportFieldDef codeDef = fieldByKey.get("device_code");
                 ImportFieldDef nameDef = fieldByKey.get("device_name");
                 String code = ImportValueParser.require(raw.get("device_code"),
-                        codeDef != null ? codeDef.getFieldLabel() : "设备编码");
+                        codeDef != null ? codeDef.getFieldLabel() : "资产编码");
                 String name = ImportValueParser.require(raw.get("device_name"),
-                        nameDef != null ? nameDef.getFieldLabel() : "设备名称");
+                        nameDef != null ? nameDef.getFieldLabel() : "资产名称");
 
                 UUID id = UUID.randomUUID();
                 Map<String, Object> extension = new LinkedHashMap<>();
@@ -177,7 +177,7 @@ public final class MedicalDeviceImporter {
                 }
                 result.addSuccess();
             } catch (DataIntegrityViolationException e) {
-                result.addError(rowNum, "设备编码重复或数据约束冲突");
+                result.addError(rowNum, "资产编码重复或数据约束冲突");
             } catch (Exception e) {
                 result.addError(rowNum, friendlyError(e));
             }
@@ -221,7 +221,7 @@ public final class MedicalDeviceImporter {
             sets.add(k + " = " + placeholder(k));
             args.add(v);
         });
-        SoftDeleteSupport.appendUpdateAuditSets(dbColumns, sets, args);
+        SoftDeleteSupport.appendUpdateAuditSets(jdbc, dbColumns, sets, args);
         if (sets.isEmpty()) return;
         args.add(UUID.fromString(id));
         jdbc.update("UPDATE medical_device SET " + String.join(",", sets) + " WHERE id = ?::uuid", args.toArray());

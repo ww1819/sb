@@ -1,7 +1,8 @@
 <template>
   <AppModal v-model="visible" title="选择盘点设备" size="xl" @close="onClose">
-    <PageFilterBar v-model:keyword="keyword" placeholder="设备编码/名称" @search="load" @reset="onReset" />
+    <PageFilterBar v-model:keyword="keyword" placeholder="资产编码/名称" @search="load" @reset="onReset" />
     <el-table
+      ref="tableRef"
       v-loading="loading"
       :data="rows"
       row-key="id"
@@ -9,8 +10,8 @@
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" reserve-selection />
-      <el-table-column prop="device_code" label="设备编码" min-width="120" />
-      <el-table-column prop="device_name" label="设备名称" min-width="140" show-overflow-tooltip />
+      <el-table-column prop="device_code" label="资产编码" min-width="120" />
+      <el-table-column prop="device_name" label="资产名称" min-width="140" show-overflow-tooltip />
       <el-table-column prop="brand" label="品牌" min-width="100" />
       <el-table-column prop="specification" label="规格" min-width="100" />
       <el-table-column prop="model" label="型号" min-width="100" />
@@ -32,6 +33,7 @@ import { ElMessage } from 'element-plus'
 import http from '@/api/http'
 import AppModal from '@/components/AppModal.vue'
 import PageFilterBar from '@/components/system/PageFilterBar.vue'
+import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
 
 const props = defineProps<{
   modelValue: boolean
@@ -55,6 +57,8 @@ const loading = ref(false)
 const keyword = ref('')
 const rows = ref<Record<string, unknown>[]>([])
 const selected = ref<Record<string, unknown>[]>([])
+const tableRef = ref()
+const { syncFromTable, clearAll } = useCrossPageSelection()
 
 async function load() {
   if (!props.deptId) {
@@ -92,6 +96,12 @@ function onReset() {
 
 function onSelectionChange(selection: Record<string, unknown>[]) {
   selected.value = selection
+  syncFromTable(selection)
+}
+
+function onClearSelection() {
+  clearAll(tableRef.value)
+  selected.value = []
 }
 
 function confirm() {
@@ -101,7 +111,7 @@ function confirm() {
 }
 
 function onClose() {
-  selected.value = []
+  onClearSelection()
   keyword.value = ''
 }
 
@@ -114,7 +124,7 @@ watch(
       visible.value = false
       return
     }
-    selected.value = []
+    onClearSelection()
     load()
   }
 )

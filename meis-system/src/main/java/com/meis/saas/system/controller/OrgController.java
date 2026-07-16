@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.meis.saas.common.cache.CacheKeys;
 import com.meis.saas.common.cache.MeisCacheProperties;
 import com.meis.saas.common.cache.RedisJsonCache;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +24,9 @@ public class OrgController {
     @GetMapping("/tree")
     public Result<List<Map<String, Object>>> tree() {
         List<Map<String, Object>> depts = jdbc.queryForList(
-                "SELECT id, dept_code, dept_name, parent_id, campus_id, is_clinical FROM department WHERE is_active = true ORDER BY sort_order, dept_code");
+                "SELECT id, dept_code, dept_name, parent_id, campus_id, is_clinical FROM department WHERE is_active = true "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "department", null)
+                        + " ORDER BY sort_order, dept_code");
         Map<String, Object> root = new LinkedHashMap<>();
         root.put("id", "root");
         root.put("campus_name", "组织架构");
@@ -43,7 +46,9 @@ public class OrgController {
 
     private List<Map<String, Object>> loadPermDeptTree() {
         List<Map<String, Object>> all = jdbc.queryForList(
-                "SELECT id, dept_code, dept_name, parent_id, is_clinical FROM department WHERE is_active = true ORDER BY sort_order, dept_code");
+                "SELECT id, dept_code, dept_name, parent_id, is_clinical FROM department WHERE is_active = true "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "department", null)
+                        + " ORDER BY sort_order, dept_code");
         return buildTree(all, null);
     }
 

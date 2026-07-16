@@ -2,6 +2,7 @@ package com.meis.saas.qc.controller;
 
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -23,11 +24,13 @@ public class InspectionTemplateController {
                 FROM inspection_template t
                 LEFT JOIN inspection_type it ON it.id = t.inspection_type_id
                 WHERE t.id = ?::uuid
-                """, id);
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "inspection_template", "t"), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> result = new LinkedHashMap<>(rows.get(0));
         result.put("items", jdbc.queryForList(
-                "SELECT * FROM inspection_template_item WHERE template_id = ?::uuid ORDER BY sort_order, created_at", id));
+                "SELECT * FROM inspection_template_item WHERE template_id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "inspection_template_item", null)
+                        + " ORDER BY sort_order, created_at", id));
         return Result.ok(result);
     }
 
@@ -36,7 +39,9 @@ public class InspectionTemplateController {
     @OperationLog(module = "inspect", description = "保存巡检模板")
     public Result<Map<String, Object>> save(@RequestBody Map<String, Object> body) {
         UUID id = body.containsKey("id") ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
-        boolean exists = !jdbc.queryForList("SELECT 1 FROM inspection_template WHERE id = ?::uuid", id).isEmpty();
+        boolean exists = !jdbc.queryForList(
+                "SELECT 1 FROM inspection_template WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "inspection_template", null), id).isEmpty();
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> items = (List<Map<String, Object>>) body.getOrDefault("items", List.of());
         if (!exists) {

@@ -23,7 +23,7 @@ public class EnsureTenantV1Tables {
         statements.addAll(load(repo.resolve(
                 "meis-tenant/src/main/resources/db/migrations/tenant/V1__tables.sql")));
         statements.addAll(load(repo.resolve(
-                "meis-tenant/src/main/resources/db/migrations/tenant/V2__extensions.sql")));
+                "meis-tenant/src/main/resources/db/migrations/tenant/V2__indexes.sql")));
 
         try (Connection c = DriverManager.getConnection(
                 "jdbc:postgresql://localhost:5432/meis", "med", "med123456")) {

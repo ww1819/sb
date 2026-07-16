@@ -89,7 +89,11 @@ async function onTenantSubmit() {
     ElMessage.success('登录成功')
     router.push(getHomePath())
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.message || e.message || '登录失败')
+    if (!e?.isBizError) {
+      ElMessage.error(e?.response?.data?.message || e.message || '登录失败')
+    } else {
+      ElMessage.error(e.message || '登录失败')
+    }
   } finally {
     loading.value = false
   }

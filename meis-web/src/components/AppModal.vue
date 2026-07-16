@@ -3,7 +3,7 @@
     :model-value="modelValue"
     :title="title"
     :width="dialogWidth"
-    align-center
+    :align-center="placement === 'center'"
     destroy-on-close
     :show-close="false"
     :close-on-click-modal="closeOnClickModal"
@@ -11,7 +11,7 @@
     :z-index="layoutModalZIndex"
     modal-class="layout-content-modal"
     class="app-modal"
-    :class="`app-modal--${size}`"
+    :class="[`app-modal--${size}`, placement === 'right' ? 'app-modal--right' : '']"
     @update:model-value="$emit('update:modelValue', $event)"
   >
     <template #header="{ close, titleId, titleClass }">
@@ -47,9 +47,11 @@ const props = withDefaults(
     modelValue: boolean
     title: string
     size?: 'sm' | 'md' | 'lg' | 'xl'
+    /** center：内容区居中；right：贴内容区右侧（不遮挡顶栏/侧栏） */
+    placement?: 'center' | 'right'
     closeOnClickModal?: boolean
   }>(),
-  { size: 'md', closeOnClickModal: false }
+  { size: 'md', placement: 'center', closeOnClickModal: false }
 )
 
 defineEmits<{ 'update:modelValue': [value: boolean] }>()

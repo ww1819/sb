@@ -7,4 +7,5 @@
 
 **约定**：只维护 Flyway `V1__tables.sql`，再生成本目录文件；不要在本文件手改后忘记回写 V1。
 
-执行顺序（新库）：`00_extensions.sql` → `tenant_tables.sql` →（可选）`../patches/tenant_column_patches.sql`
+执行顺序（新库）：`00_extensions.sql` → `tenant_tables.sql` →（可选，已废弃）按需对照 `../patches/` 历史文件；正式环境请用 Flyway 槽位。
+

@@ -150,6 +150,18 @@ function Set-PanelHotReloadResult {
     }
 }
 
+function Clear-PanelHotReloadResult {
+    param([Parameter(Mandatory = $true)][string]$ServiceName)
+    if ([string]::IsNullOrWhiteSpace($ServiceName)) { return }
+    if ($script:PanelHotReloadResults.ContainsKey($ServiceName)) {
+        $script:PanelHotReloadResults.Remove($ServiceName) | Out-Null
+    }
+}
+
+function Clear-PanelAllHotReloadResults {
+    $script:PanelHotReloadResults = @{}
+}
+
 function Convert-PanelDateTime {
     param([string]$Text)
     if ([string]::IsNullOrWhiteSpace($Text)) { return $null }
@@ -167,26 +179,42 @@ function Resolve-PanelHotReloadDisplay {
     )
     if (-not $script:PanelHotReloadResults.ContainsKey($ServiceName)) { return $null }
     $hr = $script:PanelHotReloadResults[$ServiceName]
-    if ($hr.ok) { return $hr }
 
     $httpUp = $false
+    $debugUp = $false
     $jarHealthy = $false
     $jarMtime = ''
     if ($ServiceItem -is [System.Collections.IDictionary]) {
         $httpUp = [bool]$ServiceItem['httpUp']
+        $debugUp = [bool]$ServiceItem['debugUp']
         $jarHealthy = [bool]$ServiceItem['jarHealthy']
         $jarMtime = [string]$ServiceItem['jarMtime']
     } else {
         $httpUp = [bool]$ServiceItem.httpUp
+        $debugUp = [bool]$ServiceItem.debugUp
         $jarHealthy = [bool]$ServiceItem.jarHealthy
         $jarMtime = [string]$ServiceItem.jarMtime
     }
+
+    # 服务已停止：清空热加载时间（热加载进行中短暂 stop 除外）
+    $hrInProgress = $false
+    $hrLabel = "hotreload-$ServiceName"
+    if ($script:PanelBackgroundJobs.ContainsKey($hrLabel)) {
+        $hrJob = $script:PanelBackgroundJobs[$hrLabel]
+        if ($null -ne $hrJob -and $hrJob.State -eq 'Running') { $hrInProgress = $true }
+    }
+    if (-not $httpUp -and -not $debugUp -and -not $hrInProgress) {
+        Clear-PanelHotReloadResult -ServiceName $ServiceName
+        return $null
+    }
+
+    if ($hr.ok) { return $hr }
 
     if ($httpUp -and $jarHealthy) {
         $hrAt = Convert-PanelDateTime ([string]$hr.at)
         $jarAt = Convert-PanelDateTime $jarMtime
         if ($jarAt -and $hrAt -and $jarAt -gt $hrAt) {
-            $script:PanelHotReloadResults.Remove($ServiceName) | Out-Null
+            Clear-PanelHotReloadResult -ServiceName $ServiceName
             return $null
         }
         return [ordered]@{
@@ -196,7 +224,7 @@ function Resolve-PanelHotReloadDisplay {
             message   = '上次热加载失败，当前服务与 JAR 已恢复'
             steps     = @($hr.steps)
             httpUp    = $httpUp
-            debugUp   = [bool]$hr.debugUp
+            debugUp   = $debugUp
             fileCount = if ($null -ne $hr.fileCount) { [int]$hr.fileCount } else { 0 }
         }
     }
@@ -746,6 +774,7 @@ function Handle-PanelRequest {
     if ($method -eq 'POST') {
         if ($path -eq '/api/backend/stop-all') {
             Add-MeisPanelEvent 'STOP all backend (background)'
+            Clear-PanelAllHotReloadResults
             $r = Start-PanelBackgroundJob -Label 'stop-all-backend' -Action 'stop-all'
             Write-JsonResponse -Response $res -Data $r
             return
@@ -893,7 +922,13 @@ function Handle-PanelRequest {
             $action = $Matches[2]
             $eventLabel = ($action.ToUpper() + ' ' + $name)
             $r = switch ($action) {
-                'stop' { Invoke-PanelAction { Stop-MeisServiceByName $name; @{ message = ($name + ' stopped') } } -EventMessage $eventLabel }
+                'stop' {
+                    Invoke-PanelAction {
+                        Stop-MeisServiceByName $name
+                        Clear-PanelHotReloadResult -ServiceName $name
+                        @{ message = ($name + ' stopped') }
+                    } -EventMessage $eventLabel
+                }
                 'start' {
                     Add-MeisPanelEvent ($eventLabel + ' (background)')
                     Start-PanelServiceBackgroundJob -ServiceName $name -Action 'start'

@@ -70,7 +70,7 @@ $header = @'
 '@
 
 Set-Content -Path (Join-Path $TargetDir 'V1__tables.sql') -Value ($header + "`r`n" + ($tables -join "`r`n")) -Encoding UTF8 -NoNewline
-Set-Content -Path (Join-Path $TargetDir 'V2__extensions.sql') -Value ($header + "`r`n" + ($extensions -join "`r`n")) -Encoding UTF8 -NoNewline
+Set-Content -Path (Join-Path $TargetDir 'V2__indexes.sql') -Value ($header + "`r`n" + ($extensions -join "`r`n")) -Encoding UTF8 -NoNewline
 Set-Content -Path (Join-Path $TargetDir 'V3__seed_data.sql') -Value ($header + "`r`n" + ($data -join "`r`n")) -Encoding UTF8 -NoNewline
 
 Write-Host "Consolidated $($files.Count) files -> V1($($tables.Count)) V2($($extensions.Count)) V3($($data.Count)) statements in $TargetDir"

@@ -1,4 +1,4 @@
-﻿-- MEIS tenant: CREATE TABLE + COMMENT ON (visible in database catalog)
+-- MEIS tenant: CREATE TABLE + COMMENT ON (visible in database catalog)
 
 -- MEIS tenant business schema (per-tenant Flyway)
 -- ================================================================================
@@ -16,8 +16,10 @@
 --   is_deleted  SMALLINT NOT NULL DEFAULT 0            -- 删除标志：0未删除 / 1已删除
 --   deleted_at  TIMESTAMPTZ                            -- 删除时间
 --   deleted_by  UUID                                   -- 删除者
--- 老租户缺列由 R__audit_columns.sql / R__is_deleted_columns.sql 幂等补全。
--- 详见 docs/meis-requirements.md 附录 G.0。
+-- 配套姓名快照（有对应 *_by 时必有，附录 W.5）：
+--   created_by_name / updated_by_name / deleted_by_name  VARCHAR(100)
+-- 老租户缺列由 R__columns_audit.sql 幂等补全。
+-- 详见 docs/meis-requirements.md 附录 G.0 / W.5。
 -- ================================================================================
 -- 启用扩展
 -- UUID 生成扩展
@@ -206,15 +208,44 @@ COMMENT ON COLUMN sys_operation_log.status IS '状态';
 COMMENT ON COLUMN sys_operation_log.error_msg IS '错误信息';
 COMMENT ON COLUMN sys_operation_log.created_at IS '创建时间';
 
+-- 1.7 实体变更记录（附录 T）
+CREATE TABLE sys_entity_change_log (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    entity_type VARCHAR(64) NOT NULL,
+    entity_id UUID NOT NULL,
+    action VARCHAR(32) NOT NULL,
+    changed_fields JSONB,
+    snapshot_json JSONB,
+    operator_id UUID,
+    operator_name VARCHAR(100),
+    remark TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMPTZ,
+    deleted_by UUID
+);
+COMMENT ON TABLE sys_entity_change_log IS '主数据实体变更记录';
+COMMENT ON COLUMN sys_entity_change_log.entity_type IS '实体类型';
+COMMENT ON COLUMN sys_entity_change_log.entity_id IS '实体主键';
+COMMENT ON COLUMN sys_entity_change_log.action IS '动作（CREATE/UPDATE/DELETE 等）';
+COMMENT ON COLUMN sys_entity_change_log.changed_fields IS '变更字段 JSON';
+COMMENT ON COLUMN sys_entity_change_log.snapshot_json IS '精简快照 JSON';
+COMMENT ON COLUMN sys_entity_change_log.operator_id IS '操作人ID';
+COMMENT ON COLUMN sys_entity_change_log.operator_name IS '操作人姓名';
+COMMENT ON COLUMN sys_entity_change_log.remark IS '备注';
+
 -- ================================================================================
 -- 2. 医疗器械分类与供应商
 -- ================================================================================
 -- 2.1 医疗器械分类目录
 CREATE TABLE medical_device_category (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    category_code VARCHAR(6) UNIQUE NOT NULL,
+    category_code VARCHAR(16) UNIQUE NOT NULL,
     category_name VARCHAR(200) NOT NULL,
-    parent_code VARCHAR(6),
+    parent_code VARCHAR(16),
     level INTEGER NOT NULL,
     full_path VARCHAR(500),
     sort_order INTEGER DEFAULT 0,
@@ -630,6 +661,7 @@ CREATE TABLE medical_device (
     brand VARCHAR(100),
     model VARCHAR(100),
     serial_number VARCHAR(100),
+    unit_id UUID REFERENCES unit_dict(id),
     category_id UUID REFERENCES medical_device_category(id),
     asset_category_id UUID REFERENCES asset_category(id),
     finance_category_id UUID REFERENCES finance_category(id),
@@ -704,7 +736,8 @@ COMMENT ON COLUMN medical_device.device_name IS '设备名称';
 COMMENT ON COLUMN medical_device.brand IS '品牌';
 COMMENT ON COLUMN medical_device.model IS '型号';
 COMMENT ON COLUMN medical_device.serial_number IS '出厂序列号';
-COMMENT ON COLUMN medical_device.category_id IS '设备分类';
+COMMENT ON COLUMN medical_device.unit_id IS '计量单位（unit_dict）';
+COMMENT ON COLUMN medical_device.category_id IS '设备分类(68)';
 COMMENT ON COLUMN medical_device.manufacturer_id IS '生产厂商';
 COMMENT ON COLUMN medical_device.supplier_id IS '供应商';
 COMMENT ON COLUMN medical_device.country_of_origin IS '原产国';
@@ -1056,7 +1089,14 @@ CREATE TABLE device_label_print_log (
     printed_by UUID REFERENCES sys_user(id),
     printed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     template_code VARCHAR(50) DEFAULT 'default',
-    remark TEXT
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID
 );
 COMMENT ON TABLE device_label_print_log IS '资产标签打印记录';
 COMMENT ON COLUMN device_label_print_log.device_code IS '打印时设备编码快照（二维码载荷）';
@@ -1222,6 +1262,9 @@ CREATE TABLE repair_workorder_event (
     to_user_id UUID,
     remark TEXT,
     extra_json JSONB,
+    device_id UUID,
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 COMMENT ON TABLE repair_workorder_event IS '维修工单事件流水（时间轴）';
@@ -1264,6 +1307,9 @@ CREATE TABLE repair_workorder_process (
     skip_verify BOOLEAN,
     remark TEXT,
     extra_json JSONB,
+    device_id UUID,
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by UUID,
@@ -1284,6 +1330,9 @@ COMMENT ON COLUMN repair_workorder_process.user_id IS '相关维修负责人';
 COMMENT ON COLUMN repair_workorder_process.from_user_id IS '转派前负责人';
 COMMENT ON COLUMN repair_workorder_process.to_user_id IS '转派后负责人';
 COMMENT ON COLUMN repair_workorder_process.operator_id IS '操作人';
+COMMENT ON COLUMN repair_workorder_process.device_id IS '设备冗余（附录 W）';
+COMMENT ON COLUMN repair_workorder_process.device_code IS '设备编码快照';
+COMMENT ON COLUMN repair_workorder_process.device_name IS '设备名称快照';
 COMMENT ON COLUMN repair_workorder_process.solution_description IS '处理方案（完工）';
 COMMENT ON COLUMN repair_workorder_process.labor_cost IS '人工费';
 COMMENT ON COLUMN repair_workorder_process.parts_cost IS '配件费';
@@ -1339,6 +1388,11 @@ CREATE TABLE repair_workorder_segment (
     remark TEXT,
     verify_comment TEXT,
     auto_created BOOLEAN NOT NULL DEFAULT FALSE,
+    confirmed_at TIMESTAMP WITH TIME ZONE,
+    confirmed_by UUID REFERENCES sys_user(id),
+    device_id UUID,
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by UUID,
@@ -1353,6 +1407,35 @@ COMMENT ON COLUMN repair_workorder_segment.process_type_id IS '进程类型';
 COMMENT ON COLUMN repair_workorder_segment.user_id IS '负责人';
 COMMENT ON COLUMN repair_workorder_segment.started_at IS '开始时间';
 COMMENT ON COLUMN repair_workorder_segment.ended_at IS '结束时间';
+COMMENT ON COLUMN repair_workorder_segment.confirmed_at IS '段确认固化时间';
+COMMENT ON COLUMN repair_workorder_segment.confirmed_by IS '段确认人';
+COMMENT ON COLUMN repair_workorder_segment.device_id IS '设备冗余（附录 W）';
+COMMENT ON COLUMN repair_workorder_segment.device_code IS '设备编码快照';
+COMMENT ON COLUMN repair_workorder_segment.device_name IS '设备名称快照';
+
+-- 5.3.4b 维修工单进程段参与工程师（一段可多人）
+CREATE TABLE repair_workorder_segment_user (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    segment_id UUID NOT NULL REFERENCES repair_workorder_segment(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES sys_user(id),
+    is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+    work_content TEXT,
+    labor_cost DECIMAL(10,2),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID,
+    UNIQUE (segment_id, user_id)
+);
+COMMENT ON TABLE repair_workorder_segment_user IS '维修进程段参与工程师';
+COMMENT ON COLUMN repair_workorder_segment_user.segment_id IS '进程段';
+COMMENT ON COLUMN repair_workorder_segment_user.user_id IS '参与工程师';
+COMMENT ON COLUMN repair_workorder_segment_user.is_primary IS '是否主责（同步段 user_id）';
+COMMENT ON COLUMN repair_workorder_segment_user.work_content IS '工程师工作内容（选填）';
+COMMENT ON COLUMN repair_workorder_segment_user.labor_cost IS '工程师人工费（选填）';
 
 -- 5.4 备件库表
 CREATE TABLE spare_part (
@@ -1372,6 +1455,7 @@ CREATE TABLE spare_part (
     min_stock INTEGER,
     max_stock INTEGER,
     storage_location VARCHAR(200),
+    pinyin_code VARCHAR(50),
     remark TEXT,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -1390,6 +1474,7 @@ COMMENT ON COLUMN spare_part.stock_quantity IS 'stock quantity';
 COMMENT ON COLUMN spare_part.min_stock IS 'min stock';
 COMMENT ON COLUMN spare_part.max_stock IS 'max stock';
 COMMENT ON COLUMN spare_part.storage_location IS 'storage location';
+COMMENT ON COLUMN spare_part.pinyin_code IS '拼音简码（检索）';
 COMMENT ON COLUMN spare_part.remark IS '备注';
 COMMENT ON COLUMN spare_part.is_active IS '是否启用';
 COMMENT ON COLUMN spare_part.created_at IS '创建时间';
@@ -1404,7 +1489,10 @@ CREATE TABLE spare_part_usage (
     unit_price DECIMAL(10,2),
     total_price DECIMAL(10,2),
     used_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    operator_id UUID REFERENCES sys_user(id)
+    operator_id UUID REFERENCES sys_user(id),
+    device_id UUID,
+    device_code VARCHAR(50),
+    device_name VARCHAR(200)
 );
 COMMENT ON TABLE spare_part_usage IS '备件使用记录表';
 COMMENT ON COLUMN spare_part_usage.id IS '主键';
@@ -1415,6 +1503,7 @@ COMMENT ON COLUMN spare_part_usage.unit_price IS 'unit price';
 COMMENT ON COLUMN spare_part_usage.total_price IS '合计金额';
 COMMENT ON COLUMN spare_part_usage.used_at IS 'used时间';
 COMMENT ON COLUMN spare_part_usage.operator_id IS '关联操作人';
+COMMENT ON COLUMN spare_part_usage.device_id IS '设备冗余（附录 W）';
 
 -- 5.5.1 进程段配件明细
 CREATE TABLE repair_workorder_segment_part (
@@ -1424,6 +1513,10 @@ CREATE TABLE repair_workorder_segment_part (
     quantity INTEGER NOT NULL DEFAULT 1,
     unit_price DECIMAL(10,2),
     total_price DECIMAL(10,2),
+    supplier_id UUID REFERENCES supplier(id),
+    device_id UUID,
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -1434,6 +1527,8 @@ CREATE TABLE repair_workorder_segment_part (
     deleted_by UUID
 );
 COMMENT ON TABLE repair_workorder_segment_part IS '维修进程段配件明细';
+COMMENT ON COLUMN repair_workorder_segment_part.supplier_id IS '配件行供应商';
+COMMENT ON COLUMN repair_workorder_segment_part.device_id IS '设备冗余（附录 W）';
 
 -- ================================================================================
 -- 6. 保养管理模块
@@ -3215,6 +3310,9 @@ CREATE TABLE IF NOT EXISTS spare_part_transaction (
     operator_id UUID REFERENCES sys_user(id),
     ref_no VARCHAR(50),
     remark TEXT,
+    device_id UUID,
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 COMMENT ON TABLE spare_part_transaction IS 'spare part transaction';
@@ -3225,6 +3323,7 @@ COMMENT ON COLUMN spare_part_transaction.quantity IS '数量';
 COMMENT ON COLUMN spare_part_transaction.unit_price IS 'unit price';
 COMMENT ON COLUMN spare_part_transaction.workorder_id IS '关联workorder';
 COMMENT ON COLUMN spare_part_transaction.operator_id IS '关联操作人';
+COMMENT ON COLUMN spare_part_transaction.device_id IS '设备冗余（附录 W）';
 COMMENT ON COLUMN spare_part_transaction.created_at IS '创建时间';
 
 -- integration sync task

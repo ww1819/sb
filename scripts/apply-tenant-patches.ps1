@@ -1,8 +1,8 @@
-# Apply tenant column patches to a schema (idempotent)
+# Apply tenant business column patches to a schema (idempotent).
+# Prefer restarting meis-tenant (Flyway R__). This applies R__columns_biz offline only.
 param(
     [Parameter(Mandatory = $true)]
     [string]$Schema,
-    [string]$PgBinDir = "",
     [string]$DbHost = "localhost",
     [int]$Port = 5432,
     [string]$DbName = "meis",
@@ -12,7 +12,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path $PSScriptRoot -Parent
-$patchFile = Join-Path $repoRoot "db\source\patches\tenant_column_patches.sql"
+$patchFile = Join-Path $repoRoot "meis-tenant\src\main\resources\db\migrations\tenant\R__columns_biz.sql"
 
 if (-not (Test-Path $patchFile)) { throw "Patch file not found: $patchFile" }
 
@@ -35,6 +35,6 @@ function Invoke-WithJdbc {
 }
 
 $sql = Get-Content $patchFile -Raw -Encoding UTF8
-Write-Host "Applying patches to schema [$Schema] ..."
+Write-Host "Applying R__columns_biz to schema [$Schema] ..."
 Invoke-WithJdbc -Sql $sql
-Write-Host "Done."
+Write-Host "Done. For R__columns_audit / R__data_fix, restart meis-tenant."

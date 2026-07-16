@@ -49,7 +49,6 @@
     <div class="add-toolbar">
       <el-input v-model="candidateKeyword" placeholder="搜索姓名/工号/账号" clearable style="max-width: 280px" @keyup.enter="loadCandidates" />
       <el-button @click="loadCandidates">搜索</el-button>
-      <span class="muted">已选 {{ selectedCount }} 人（跨页保留）</span>
     </div>
     <el-table
       ref="candidateTableRef"
@@ -106,7 +105,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
 import AppModal from '@/components/AppModal.vue'
-import TableCellValue from '@/components/TableCellValue.vue'
+import TableCellValue from '@/components/table/TableCellValue.vue'
 import RefSelect from '@/components/form/RefSelect.vue'
 import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
 
@@ -126,7 +125,12 @@ const candidatePage = ref(1)
 const candidateSize = ref(10)
 const candidateTotal = ref(0)
 const candidateTableRef = ref()
-const { selectedCount, syncFromTable, selectedIds, clear: clearSelection } = useCrossPageSelection()
+const {
+  selectedCount,
+  syncFromTable,
+  selectedIds,
+  clearAll
+} = useCrossPageSelection()
 
 const recordsVisible = ref(false)
 const recordsTitle = ref('维修记录')
@@ -168,7 +172,7 @@ function onFilterChange() {
 }
 
 function openAdd() {
-  clearSelection()
+  onClearCandidateSelection()
   candidateKeyword.value = ''
   candidatePage.value = 1
   addVisible.value = true
@@ -177,6 +181,10 @@ function openAdd() {
 
 function onCandidateSelect(selection: Record<string, unknown>[]) {
   syncFromTable(selection)
+}
+
+function onClearCandidateSelection() {
+  clearAll(candidateTableRef.value)
 }
 
 async function loadCandidates() {
@@ -202,7 +210,7 @@ async function confirmAdd() {
   }
   ElMessage.success(`已添加 ${data.data?.updated ?? ids.length} 名维修工程师`)
   addVisible.value = false
-  clearSelection()
+  onClearCandidateSelection()
   await load()
 }
 

@@ -14,10 +14,22 @@ export const refSelectConfig: Record<string, RefSelectMeta> = {
   sys_user: { url: '/system/users', labelKey: 'real_name', codeKey: 'username' },
   supplier: { url: '/system/supplier/list', labelKey: 'supplier_name', codeKey: 'supplier_code', lookupUrl: '/system/supplier/lookup' },
   manufacturer: { url: '/system/manufacturer/list', labelKey: 'manufacturer_name', codeKey: 'manufacturer_code', lookupUrl: '/system/manufacturer/lookup' },
-  medical_device_category: { url: '/system/medical_device_category/list', labelKey: 'category_name' },
-  asset_category: { url: '/system/asset_category/list', labelKey: 'category_name' },
-  finance_category: { url: '/system/finance_category/list', labelKey: 'finance_name' },
-  unit_dict: { url: '/system/unit_dict/list', labelKey: 'unit_name' },
+  medical_device_category: {
+    url: '/system/medical_device_category/list',
+    labelKey: 'category_name',
+    codeKey: 'category_code'
+  },
+  asset_category: {
+    url: '/system/asset_category/list',
+    labelKey: 'category_name',
+    codeKey: 'category_code'
+  },
+  finance_category: {
+    url: '/system/finance_category/list',
+    labelKey: 'finance_name',
+    codeKey: 'finance_code'
+  },
+  unit_dict: { url: '/system/unit_dict/list', labelKey: 'unit_name', codeKey: 'unit_code' },
   medical_device: { url: '/asset/medical_device/list', labelKey: 'device_name', codeKey: 'device_code' },
   device_outbound: { url: '/asset/device_outbound/list', labelKey: 'outbound_no', codeKey: 'outbound_no' },
   inspection_plan: { url: '/inspect/inspection_plan/list', labelKey: 'plan_name', codeKey: 'plan_code' },
@@ -32,8 +44,8 @@ export const refSelectConfig: Record<string, RefSelectMeta> = {
   purchase_plan: { url: '/purchase/purchase_plan/list', labelKey: 'plan_code' },
   purchase_project: { url: '/purchase/purchase_project/list', labelKey: 'project_name' },
   purchase_contract: { url: '/purchase/purchase_contract/list', labelKey: 'contract_code' },
-  repair_engineer: { url: '/repair/engineer/list', labelKey: 'real_name', codeKey: 'employee_no' },
-  engineer: { url: '/repair/engineer/list', labelKey: 'real_name', codeKey: 'employee_no' },
+  repair_engineer: { url: '/repair/engineer/options', labelKey: 'real_name', codeKey: 'employee_no' },
+  engineer: { url: '/repair/engineer/options', labelKey: 'real_name', codeKey: 'employee_no' },
   fault_type_dict: { url: '/repair/fault_type_dict/list', labelKey: 'fault_name' },
   spare_part: { url: '/repair/spare_part/list', labelKey: 'part_name', codeKey: 'part_code' },
   warehouse: { url: '/system/warehouses', labelKey: 'warehouse_name' },

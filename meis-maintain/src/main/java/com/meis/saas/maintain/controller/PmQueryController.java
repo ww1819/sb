@@ -2,6 +2,7 @@ package com.meis.saas.maintain.controller;
 
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -21,6 +22,8 @@ public class PmQueryController {
             @RequestParam(required = false) String deviceCode,
             @RequestParam(required = false) String resultStatus) {
         StringBuilder where = new StringBuilder(" WHERE ei.status = 'completed' ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "pm_execution_item", "ei"));
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "pm_execution", "e"));
         List<Object> args = new ArrayList<>();
         if (deviceCode != null && !deviceCode.isBlank()) {
             where.append(" AND ei.device_code ILIKE ? ");
@@ -65,11 +68,14 @@ public class PmQueryController {
                 LEFT JOIN pm_template t ON t.id = e.template_id
                 LEFT JOIN pm_type l ON l.id = e.pm_type_id
                 WHERE ei.id = ?::uuid
-                """, itemId);
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "pm_execution_item", "ei")
+                + SoftDeleteSupport.notDeletedClause(jdbc, "pm_execution", "e"), itemId);
         if (rows.isEmpty()) return Result.ok(Map.of());
         Map<String, Object> result = new LinkedHashMap<>(rows.get(0));
         result.put("results", jdbc.queryForList(
-                "SELECT * FROM pm_execution_result WHERE execution_item_id = ?::uuid ORDER BY created_at", itemId));
+                "SELECT * FROM pm_execution_result WHERE execution_item_id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "pm_execution_result", null)
+                        + " ORDER BY created_at", itemId));
         return Result.ok(result);
     }
 }

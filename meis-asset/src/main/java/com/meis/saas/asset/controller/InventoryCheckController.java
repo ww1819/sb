@@ -38,6 +38,7 @@ public class InventoryCheckController {
             where.append(" AND audit_status = ? ");
             args.add(audit_status);
         }
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check", null));
         Long total = jdbc.queryForObject("SELECT COUNT(*) FROM inventory_check" + where, Long.class, args.toArray());
         List<Object> pageArgs = new ArrayList<>(args);
         pageArgs.add(query.limit());
@@ -60,6 +61,7 @@ public class InventoryCheckController {
                 FROM medical_device
                 WHERE is_active = true
                 """);
+        sql.append(SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", null));
         List<Object> args = new ArrayList<>();
         if (deptId != null && !deptId.toString().isBlank()) {
             sql.append(" AND dept_id = ?::uuid ");
@@ -74,8 +76,9 @@ public class InventoryCheckController {
                      AND id NOT IN (
                          SELECT device_id FROM inventory_check_item
                          WHERE check_id = ?::uuid AND device_id IS NOT NULL
-                     )
                     """);
+            sql.append(SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check_item", null));
+            sql.append(")");
             args.add(checkId);
         }
         List<String> excludes = excludeIds == null ? List.of()
@@ -92,10 +95,15 @@ public class InventoryCheckController {
 
     @GetMapping("/{id:" + UUID_PATH + "}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
-        var rows = jdbc.queryForList("SELECT * FROM inventory_check WHERE id = ?::uuid", id);
+        var rows = jdbc.queryForList(
+                "SELECT * FROM inventory_check WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check", null), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> t = rows.get(0);
-        t.put("items", jdbc.queryForList("SELECT * FROM inventory_check_item WHERE check_id = ?::uuid ORDER BY device_code", id));
+        t.put("items", jdbc.queryForList(
+                "SELECT * FROM inventory_check_item WHERE check_id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check_item", null)
+                        + " ORDER BY device_code", id));
         return Result.ok(t);
     }
 
@@ -161,7 +169,9 @@ public class InventoryCheckController {
     @Transactional
     @OperationLog(module = "asset", description = "审核盘点任务")
     public Result<Map<String, Object>> approve(@PathVariable UUID id) {
-        var rows = jdbc.queryForList("SELECT audit_status FROM inventory_check WHERE id = ?::uuid", id);
+        var rows = jdbc.queryForList(
+                "SELECT audit_status FROM inventory_check WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check", null), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         if ("approved".equals(String.valueOf(rows.get(0).get("audit_status")))) {
             throw new BizException(400, "盘点单已审核");
@@ -188,7 +198,8 @@ public class InventoryCheckController {
     public Result<Map<String, Object>> scan(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
         Object deviceId = body.get("device_id");
         var existing = jdbc.queryForList(
-                "SELECT id FROM inventory_check_item WHERE check_id = ?::uuid AND device_id = ?::uuid", id, deviceId);
+                "SELECT id FROM inventory_check_item WHERE check_id = ?::uuid AND device_id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check_item", null), id, deviceId);
         if (!existing.isEmpty()) {
             jdbc.update("""
                 UPDATE inventory_check_item SET is_found = true, is_matched = ?,
@@ -206,6 +217,7 @@ public class InventoryCheckController {
         jdbc.update("""
             UPDATE inventory_check SET checked_count = (
                 SELECT COUNT(*) FROM inventory_check_item WHERE check_id = ?::uuid AND is_found = true
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check_item", null) + """
             ), updated_at = NOW() WHERE id = ?::uuid
             """, id, id);
         return get(id);
@@ -223,7 +235,9 @@ public class InventoryCheckController {
     }
 
     private void assertMutable(UUID id) {
-        var rows = jdbc.queryForList("SELECT audit_status FROM inventory_check WHERE id = ?::uuid", id);
+        var rows = jdbc.queryForList(
+                "SELECT audit_status FROM inventory_check WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check", null), id);
         if (!rows.isEmpty() && "approved".equals(String.valueOf(rows.get(0).get("audit_status")))) {
             throw new BizException(400, "已审核的盘点单不可修改或删除");
         }

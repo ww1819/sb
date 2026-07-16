@@ -2,6 +2,7 @@ package com.meis.saas.asset.controller;
 
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.workflow.ApprovalInstanceService;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +21,9 @@ public class AssetTransferController {
 
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
-        var rows = jdbc.queryForList("SELECT * FROM asset_transfer WHERE id = ?::uuid", id);
+        var rows = jdbc.queryForList(
+                "SELECT * FROM asset_transfer WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "asset_transfer", null), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         return Result.ok(rows.get(0));
     }
@@ -58,7 +61,9 @@ public class AssetTransferController {
     @PostMapping("/{id}/submit")
     @OperationLog(module = "asset", description = "提交流转审批")
     public Result<Map<String, Object>> submit(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
-        var row = jdbc.queryForList("SELECT * FROM asset_transfer WHERE id = ?::uuid", id);
+        var row = jdbc.queryForList(
+                "SELECT * FROM asset_transfer WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "asset_transfer", null), id);
         if (row.isEmpty()) throw new BizException(404, "not found");
         approvalService.submit("asset_transfer", id, row.get(0).get("transfer_no").toString(),
                 "资产流转 " + row.get(0).get("transfer_no"), UUID.fromString(body.get("applicantId").toString()), 0);
@@ -68,7 +73,9 @@ public class AssetTransferController {
     @PostMapping("/{id}/execute")
     @OperationLog(module = "asset", description = "执行流转")
     public Result<Map<String, Object>> execute(@PathVariable UUID id) {
-        var row = jdbc.queryForList("SELECT * FROM asset_transfer WHERE id = ?::uuid", id);
+        var row = jdbc.queryForList(
+                "SELECT * FROM asset_transfer WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "asset_transfer", null), id);
         if (row.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> t = row.get(0);
         if (t.get("to_dept_id") != null && t.get("device_id") != null) {

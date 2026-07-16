@@ -1,18 +1,31 @@
 <template>
-  <SystemPageCard title="科室管理" subtitle="维护科室树与临床属性" :loading="loading" show-search @search="applyFilter" @reset="resetFilter" v-model:keyword="keyword">
-    <template #actions>
-      <el-button type="primary" @click="openForm()">新增科室</el-button>
-      <el-button @click="importVisible = true">导入</el-button>
-      <el-button @click="exportCsv">导出</el-button>
-      <el-button @click="openPinyinDialog">生成简码</el-button>
+  <SystemPageCard
+    title="科室维护"
+    subtitle="维护科室与临床属性"
+    :loading="loading"
+    show-pager
+    v-model:page="page"
+    v-model:size="size"
+    :total="filteredTotal"
+    @page-change="onPageChange"
+  >
+    <template #filterBar>
+      <PageFilterBar v-model:keyword="keyword" placeholder="关键词搜索" @search="applyFilter" @reset="resetFilter">
+        <template #actions>
+          <el-button type="primary" @click="openForm()">新增科室</el-button>
+          <el-button @click="importVisible = true">导入</el-button>
+          <el-button @click="exportCsv">导出</el-button>
+          <el-button @click="openPinyinDialog">生成简码</el-button>
+        </template>
+      </PageFilterBar>
     </template>
+
     <el-table
       ref="tableRef"
-      :data="filteredList"
+      :data="pagedList"
       border
       stripe
       row-key="id"
-      default-expand-all
       class="system-table dept-tree-table"
       :height="tableHeight"
       @selection-change="onSelectionChange"
@@ -40,7 +53,13 @@
         </template>
       </el-table-column>
     </el-table>
-    <el-dialog v-model="visible" :title="form.id ? '编辑科室' : '新增科室'" width="520px">
+
+    <AppModal
+      v-model="visible"
+      :title="form.id ? '编辑科室' : '新增科室'"
+      size="sm"
+      placement="right"
+    >
       <el-form :model="form" label-width="100px">
         <el-form-item label="科室编码" required><el-input v-model="form.dept_code" maxlength="3" /></el-form-item>
         <el-form-item label="科室名称" required><el-input v-model="form.dept_name" /></el-form-item>
@@ -63,7 +82,8 @@
         <el-button @click="visible = false">取消</el-button>
         <el-button type="primary" @click="save">保存</el-button>
       </template>
-    </el-dialog>
+    </AppModal>
+
     <EntityChangeHistoryDrawer v-model="changeLogVisible" entity-type="department" :entity-id="changeLogId" />
     <ImportDialog
       v-model="importVisible"
@@ -77,15 +97,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
+import PageFilterBar from '@/components/system/PageFilterBar.vue'
+import AppModal from '@/components/AppModal.vue'
 import ImportDialog from '@/components/ImportDialog.vue'
 import EntityChangeHistoryDrawer from '@/components/EntityChangeHistoryDrawer.vue'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
 import { downloadApiFile } from '@/utils/fileDownload'
 import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
+import { promptListActionScope, assertScopeSelection } from '@/composables/useListActionScope'
 import { executePinyinGenerate, promptPinyinScope } from '@/composables/usePinyinGenerate'
 
 const tableHeight = useSystemTableHeight()
@@ -100,7 +123,15 @@ const changeLogVisible = ref(false)
 const changeLogId = ref('')
 const form = ref<any>({ is_active: true, is_clinical: false, sort_order: 0 })
 const tableRef = ref()
-const { selectedCount, syncFromTable, selectedIds, clear: clearSelection } = useCrossPageSelection()
+const page = ref(1)
+const size = ref(20)
+
+const {
+  selectedCount,
+  syncFromTable,
+  selectedIds,
+  clearAll
+} = useCrossPageSelection()
 
 function openChangeLog(row: any) {
   changeLogId.value = String(row.id)
@@ -113,6 +144,18 @@ const filteredList = computed(() => {
   return list.value.filter((r) =>
     [r.dept_code, r.dept_name, r.pinyin_code, r.campus_name].some((v) => String(v || '').toLowerCase().includes(kw))
   )
+})
+
+const filteredTotal = computed(() => filteredList.value.length)
+
+const pagedList = computed(() => {
+  const start = (page.value - 1) * size.value
+  return filteredList.value.slice(start, start + size.value)
+})
+
+watch(filteredTotal, (total) => {
+  const maxPage = Math.max(1, Math.ceil(total / size.value) || 1)
+  if (page.value > maxPage) page.value = maxPage
 })
 
 onMounted(async () => {
@@ -135,14 +178,19 @@ function onSelectionChange(rows: any[]) {
   syncFromTable(rows)
 }
 
-function applyFilter() {
-  clearSelection()
-  tableRef.value?.clearSelection()
+function onPageChange() {
+  // 分页切换后表格勾选由 reserve-selection 维持
 }
+
+function applyFilter() {
+  page.value = 1
+  clearAll(tableRef.value)
+}
+
 function resetFilter() {
   keyword.value = ''
-  clearSelection()
-  tableRef.value?.clearSelection()
+  page.value = 1
+  clearAll(tableRef.value)
 }
 
 function openForm(row?: any) {
@@ -165,8 +213,17 @@ async function remove(row: any) {
 }
 
 async function exportCsv() {
+  const scope = await promptListActionScope(selectedCount.value, '导出')
+  if (!scope || !assertScopeSelection(scope, selectedCount.value)) return
   try {
-    await downloadApiFile('/system/departments/export', 'department_export.csv')
+    const params = new URLSearchParams()
+    if (scope === 'selected') params.set('ids', selectedIds().join(','))
+    else if (keyword.value) params.set('keyword', keyword.value)
+    const qs = params.toString()
+    await downloadApiFile(
+      qs ? `/system/departments/export?${qs}` : '/system/departments/export',
+      'department_export.csv'
+    )
   } catch {
     ElMessage.error('导出失败')
   }
@@ -174,15 +231,14 @@ async function exportCsv() {
 
 async function openPinyinDialog() {
   const scope = await promptPinyinScope(selectedCount.value)
-  if (!scope) return
+  if (!scope || !assertScopeSelection(scope, selectedCount.value)) return
   try {
     const ok = await executePinyinGenerate('/system/departments/generate-pinyin', scope, {
       selectedIds: selectedIds(),
       keyword: keyword.value || undefined
     })
     if (ok) {
-      clearSelection()
-      tableRef.value?.clearSelection()
+      clearAll(tableRef.value)
       load()
     }
   } catch {

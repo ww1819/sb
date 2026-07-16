@@ -20,7 +20,7 @@ import java.util.Map;
  * <p>老租户启动顺序（每个 {@code tenant_*} schema）：
  * <ol>
  *   <li>{@link SchemaTableEnsuring}：幂等执行 V1/V2 建表与索引（先扩展，再 {@code CREATE TABLE IF NOT EXISTS}）</li>
- *   <li>Flyway {@code migrate}：新租户跑 V1–V4；老租户主要跑 {@code R__tenant_schema_sync.sql} 逐列 {@code ADD COLUMN}</li>
+ *   <li>Flyway {@code migrate}：新租户跑 V1–V4；老租户主要跑 {@code R__columns_audit.sql} / {@code R__columns_biz.sql} / {@code R__data_fix.sql}</li>
  *   <li>{@link SchemaCommentFiller}：仅补空注释</li>
  *   <li>{@link TenantSchemaShadowGuard}：V1 缺表串写检测，仍缺表则启动失败</li>
  * </ol>
@@ -70,9 +70,9 @@ public class TenantSchemaMigrator {
             log.info("dev profile: Flyway repair + migrate (tenant schema {})", schemaName);
             flyway.repair();
         }
-        // 1) 幂等建表：V1/V2 + R__ 建表段（老租户缺表时创建；已有表跳过）
+        // 1) 幂等建表与索引：V1/V2（老租户缺表时创建；已有表跳过）
         schemaTableEnsuring.ensureFromMigrations(schemaName);
-        // 2) Flyway 补列与数据修正：R__ 中 ALTER / INSERT / UPDATE
+        // 2) Flyway 补列与数据修正：R__columns_audit / R__columns_biz / R__data_fix
         flyway.migrate();
         // 3) 仅补空注释
         schemaCommentFiller.fillEmptyComments(schemaName);

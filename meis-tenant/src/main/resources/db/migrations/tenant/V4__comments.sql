@@ -1,4 +1,4 @@
-﻿-- MEIS tenant: backfill COMMENT ON for objects created before V1 carried metadata comments
+-- MEIS tenant: backfill COMMENT ON for objects created before V1 carried metadata comments
 -- Safe to re-run: COMMENT ON overwrites existing descriptions
 
 COMMENT ON TABLE campus IS '院区表';
@@ -243,7 +243,8 @@ COMMENT ON COLUMN medical_device.device_name IS '设备名称';
 COMMENT ON COLUMN medical_device.brand IS '品牌';
 COMMENT ON COLUMN medical_device.model IS '型号';
 COMMENT ON COLUMN medical_device.serial_number IS '出厂序列号';
-COMMENT ON COLUMN medical_device.category_id IS '设备分类';
+COMMENT ON COLUMN medical_device.category_id IS '设备分类(68)';
+COMMENT ON COLUMN medical_device.unit_id IS '计量单位（unit_dict）';
 COMMENT ON COLUMN medical_device.manufacturer_id IS '生产厂商';
 COMMENT ON COLUMN medical_device.supplier_id IS '供应商';
 COMMENT ON COLUMN medical_device.country_of_origin IS '原产国';

@@ -12,7 +12,7 @@
       <PageFilterBar
         v-model:keyword="keyword"
         placeholder="关键词搜索"
-        :show-search-buttons="false"
+        :show-search-buttons="useActionsRowToolbar"
         @search="onSearch"
         @reset="onReset"
       >
@@ -47,27 +47,43 @@
             @change="onSearch"
           />
         </template>
-        <template #trailing>
+        <template v-if="!useActionsRowToolbar" #trailing>
           <el-button v-if="showImport" @click="importVisible = true">导入</el-button>
-          <template v-if="showPinyinCode">
-            <el-button @click="openPinyinDialog">生成简码</el-button>
-          </template>
+          <el-button v-if="showPinyinCode" @click="openPinyinDialog">生成简码</el-button>
           <slot name="toolbar-extra" />
         </template>
         <template #actions>
-          <CrudListFilterField
-            v-for="f in actionBarFilters"
-            :key="f.key"
-            :filter="f"
-            v-model="filterValues[f.key]"
-            :options="filterOptions[f.key] ?? []"
-            @change="onSearch"
-          />
-          <el-button type="primary" :icon="Search" @click="onSearch">查询</el-button>
-          <el-button :icon="RefreshLeft" @click="onReset">重置</el-button>
-          <el-button v-if="!hideAdd" v-permission="'add'" type="primary" @click="onAdd">新增</el-button>
-          <el-button @click="exportCsv">导出</el-button>
-          <slot name="actions-after" />
+          <template v-if="useActionsRowToolbar">
+            <CrudListFilterField
+              v-for="f in actionBarFilters"
+              :key="f.key"
+              :filter="f"
+              v-model="filterValues[f.key]"
+              :options="filterOptions[f.key] ?? []"
+              @change="onSearch"
+            />
+            <el-button v-if="!hideAdd" v-permission="'add'" type="primary" @click="onAdd">新增</el-button>
+            <el-button @click="exportCsv">导出</el-button>
+            <el-button v-if="showImport" @click="importVisible = true">导入</el-button>
+            <el-button v-if="showPinyinCode" @click="openPinyinDialog">生成简码</el-button>
+            <slot name="toolbar-extra" />
+            <slot name="actions-after" />
+          </template>
+          <template v-else>
+            <CrudListFilterField
+              v-for="f in actionBarFilters"
+              :key="f.key"
+              :filter="f"
+              v-model="filterValues[f.key]"
+              :options="filterOptions[f.key] ?? []"
+              @change="onSearch"
+            />
+            <el-button type="primary" :icon="Search" @click="onSearch">查询</el-button>
+            <el-button :icon="RefreshLeft" @click="onReset">重置</el-button>
+            <el-button v-if="!hideAdd" v-permission="'add'" type="primary" @click="onAdd">新增</el-button>
+            <el-button @click="exportCsv">导出</el-button>
+            <slot name="actions-after" />
+          </template>
         </template>
       </PageFilterBar>
     </template>
@@ -83,8 +99,7 @@
       @row-dblclick="onRowDblClick"
       @selection-change="onSelectionChange"
     >
-      <el-table-column v-if="showRowSelection" type="selection" width="48" fixed="left" reserve-selection />
-      <el-table-column v-else-if="showPinyinCode" type="selection" width="48" fixed="left" reserve-selection />
+      <el-table-column v-if="hasSelectionColumn" type="selection" width="48" fixed="left" reserve-selection />
       <el-table-column
         v-if="showRowIndex"
         label="序号"
@@ -110,14 +125,23 @@
             :field="f.prop"
             :sort-field="sortField"
             :sort-order="sortOrder"
-            @sort="setSort"
+            @sort="(field, order) => setSort(field, order)"
           />
         </template>
         <template #default="{ row }">
           <TableCellValue :field="f" :value="row[f.prop]" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" header-align="center" align="center" :width="operationWidth" fixed="right" class-name="col-operations">
+      <slot name="extra-columns" />
+      <el-table-column
+        v-if="!hideOperationColumn"
+        label="操作"
+        header-align="center"
+        align="center"
+        :width="operationWidth"
+        fixed="right"
+        class-name="col-operations"
+      >
         <template #default="{ row }">
           <div class="table-actions">
             <el-button
@@ -159,6 +183,7 @@
       v-model="formVisible"
       :title="formTitle"
       size="lg"
+      :placement="formPlacement"
       :show-save="formMode !== 'view'"
       @save="save"
     >
@@ -185,7 +210,7 @@
       :import-url="importUrl"
       :template-url="importTemplateUrl"
       :template-filename="`${config.table}_import_template.xlsx`"
-      @success="load"
+      @success="onImportSuccess"
     />
   </SystemPageCard>
 </template>
@@ -214,6 +239,7 @@ import { columnAlign } from '@/utils/tableCell'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
 import { useDict } from '@/composables/useDict'
 import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
+import { promptListActionScope, assertScopeSelection } from '@/composables/useListActionScope'
 import { executePinyinGenerate, promptPinyinScope } from '@/composables/usePinyinGenerate'
 import { preloadRefLabelMaps } from '@/composables/useRefLabelMap'
 
@@ -229,8 +255,20 @@ const props = defineProps<{
   canView?: (row: Record<string, unknown>) => boolean
   /** 操作列宽度（含自定义 row-actions 时可加大） */
   operationColumnWidth?: number
+  /** 隐藏默认「操作」列（由 extra-columns 自行挂功能列，见附录 U.14） */
+  hideOperationColumn?: boolean
+  /** 追加到列表查询的参数（如左侧树选中节点） */
+  extraQuery?: Record<string, string | number | boolean | undefined | null>
+  /** 新增表单默认值 */
+  defaultFormValues?: Record<string, unknown>
 }>()
-const emit = defineEmits<{ detail: [row: Record<string, unknown>]; add: []; deleted: [row: Record<string, unknown>] }>()
+const emit = defineEmits<{
+  detail: [row: Record<string, unknown>]
+  add: []
+  deleted: [row: Record<string, unknown>]
+  saved: [payload: Record<string, unknown>]
+  imported: []
+}>()
 const slots = useSlots()
 const { loadDict, preloadDictTypes } = useDict()
 
@@ -256,7 +294,13 @@ const changeLogEntityId = ref<string>('')
 const sortField = ref<string | null>(null)
 const sortOrder = ref<'asc' | 'desc' | null>(null)
 const selectedRows = ref<Record<string, unknown>[]>([])
-const { selectedCount, syncFromTable, selectedIds, clear: clearSelection } = useCrossPageSelection()
+const {
+  selectedCount,
+  syncFromTable,
+  selectedIds,
+  clear: clearSelection,
+  clearAll
+} = useCrossPageSelection()
 
 const tableHeight = useSystemTableHeight()
 
@@ -265,6 +309,7 @@ watch(tableHeight, () => {
 })
 
 const viewEnabled = computed(() => props.enableView === true || props.config.enableView === true)
+const hideOperationColumn = computed(() => props.hideOperationColumn === true)
 const operationWidth = computed(() => {
   if (props.operationColumnWidth) return props.operationColumnWidth
   const hasRowPrint = !!slots['row-actions']
@@ -274,6 +319,9 @@ const operationWidth = computed(() => {
 const changeLogEnabled = computed(() => props.config.enableChangeLog !== false && viewEnabled.value)
 const showRowIndex = computed(() => props.config.showRowIndex === true)
 const showRowSelection = computed(() => props.config.showRowSelection === true)
+const hasSelectionColumn = computed(() => showRowSelection.value || showPinyinCode.value)
+const useActionsRowToolbar = computed(() => props.config.toolbarLayout === 'actions-row')
+const formPlacement = computed(() => props.config.formPlacement === 'right' ? 'right' : 'center')
 
 const prependFilters = computed(() => props.config.listFilters?.filter((f) => f.prepend) ?? [])
 const actionBarFilters = computed(() => props.config.listFilters?.filter((f) => f.actionBar) ?? [])
@@ -397,6 +445,9 @@ async function load() {
     for (const [k, v] of Object.entries(props.config.listParams ?? {})) {
       if (v !== undefined && v !== null && v !== '') params[k] = v
     }
+    for (const [k, v] of Object.entries(props.extraQuery ?? {})) {
+      if (v !== undefined && v !== null && v !== '') params[k] = v as string | number | boolean
+    }
     if (sortField.value && sortOrder.value) {
       params.sortBy = sortField.value
       params.sortOrder = sortOrder.value
@@ -412,8 +463,7 @@ async function load() {
 function onSearch() {
   void nextTick().then(() => {
     page.value = 1
-    clearSelection()
-    tableRef.value?.clearSelection()
+    onClearSelection()
     load()
   })
 }
@@ -431,16 +481,32 @@ function onReset() {
   sortField.value = null
   sortOrder.value = null
   page.value = 1
-  clearSelection()
-  tableRef.value?.clearSelection()
+  onClearSelection()
   load()
 }
 
 function openForm(row?: Record<string, unknown>, mode: 'create' | 'edit' | 'view' = 'create') {
-  form.value = row ? { ...row } : {}
+  form.value = row ? { ...row } : { ...(props.defaultFormValues ?? {}) }
   formMode.value = mode
   formTitle.value = mode === 'view' ? '查看' : mode === 'edit' ? '编辑' : '新增'
   formVisible.value = true
+}
+
+/** 空串 UUID 外键转为 null（如上级分类清空 = 一级） */
+function normalizeSaveBody(src: Record<string, unknown>) {
+  const body: Record<string, unknown> = { ...src }
+  for (const [k, v] of Object.entries(body)) {
+    if (!(k === 'id' || k.endsWith('_id') || k.endsWith('_by'))) continue
+    if (v === undefined || v === '') body[k] = null
+  }
+  return body
+}
+
+function isApiOk(data: { code?: number; success?: boolean } | undefined) {
+  if (!data) return false
+  if (typeof data.code === 'number') return data.code === 0
+  if (typeof data.success === 'boolean') return data.success
+  return true
 }
 
 async function save() {
@@ -453,20 +519,34 @@ async function save() {
     return
   }
   try {
-    const id = form.value.id
+    const payload = normalizeSaveBody(form.value)
+    const id = payload.id
+    let data: { code?: number; success?: boolean; message?: string } | undefined
     if (props.config.saveUrl) {
-      await http.post(props.config.saveUrl, form.value)
+      data = (await http.post(props.config.saveUrl, payload)).data
     } else if (id) {
-      await http.put(`${props.config.apiBase}/${props.config.table}/${id}`, form.value)
+      data = (await http.put(`${props.config.apiBase}/${props.config.table}/${id}`, payload)).data
     } else {
-      await http.post(`${props.config.apiBase}/${props.config.table}`, form.value)
+      data = (await http.post(`${props.config.apiBase}/${props.config.table}`, payload)).data
+    }
+    // 后端业务失败常仍返回 HTTP 200 + code!=0，必须校验，否则会出现“成功但库中无数据”
+    if (!isApiOk(data)) {
+      ElMessage.error(data?.message || '保存失败')
+      return
     }
     formVisible.value = false
     ElMessage.success('保存成功')
+    emit('saved', { ...form.value })
     load()
-  } catch {
-    ElMessage.error('保存失败')
+  } catch (e: unknown) {
+    const err = e as { isBizError?: boolean; message?: string; response?: { data?: { message?: string } } }
+    ElMessage.error(err?.response?.data?.message || err?.message || '保存失败')
   }
+}
+
+function onImportSuccess() {
+  emit('imported')
+  load()
 }
 
 function onAdd() {
@@ -511,17 +591,49 @@ function onSelectionChange(selection: Record<string, unknown>[]) {
   syncFromTable(selection)
 }
 
+function onClearSelection() {
+  clearAll(tableRef.value)
+}
+
+function buildFilterQueryParams(): Record<string, string> {
+  const params: Record<string, string> = {}
+  if (!moreSearchFields.value.length && keyword.value) params.keyword = keyword.value
+  for (const f of moreSearchFields.value) {
+    const v = moreSearchValues.value[f.key]?.trim()
+    if (!v) continue
+    params[f.key] = v
+  }
+  if (props.config.listMode) params.mode = props.config.listMode
+  for (const f of props.config.listFilters ?? []) {
+    const v = filterValues[f.key]
+    if (f.type === 'daterange') {
+      const range = v as string[] | undefined
+      if (Array.isArray(range) && range[0]) params[`${f.key}From`] = range[0]
+      if (Array.isArray(range) && range[1]) params[`${f.key}To`] = range[1]
+      continue
+    }
+    if (f.multiple && Array.isArray(v) && v.length) {
+      params[f.key] = v.join(',')
+      continue
+    }
+    if (v !== undefined && v !== null && v !== '') params[f.key] = String(v)
+  }
+  for (const [k, v] of Object.entries(props.config.listParams ?? {})) {
+    if (v !== undefined && v !== null && v !== '') params[k] = String(v)
+  }
+  return params
+}
+
 async function openPinyinDialog() {
   const scope = await promptPinyinScope(selectedCount.value)
-  if (!scope) return
+  if (!scope || !assertScopeSelection(scope, selectedCount.value)) return
   try {
     const ok = await executePinyinGenerate(pinyinCodeUrl.value, scope, {
       selectedIds: selectedIds(),
       keyword: keyword.value || undefined
     })
     if (ok) {
-      clearSelection()
-      tableRef.value?.clearSelection()
+      onClearSelection()
       load()
     }
   } catch {
@@ -530,8 +642,20 @@ async function openPinyinDialog() {
 }
 
 async function exportCsv() {
+  const scope = await promptListActionScope(selectedCount.value, '导出')
+  if (!scope || !assertScopeSelection(scope, selectedCount.value)) return
   try {
-    await downloadApiFile(exportUrl.value, `${props.config.table}_export.csv`)
+    const params = new URLSearchParams()
+    if (scope === 'selected') {
+      params.set('ids', selectedIds().join(','))
+    } else {
+      for (const [k, v] of Object.entries(buildFilterQueryParams())) {
+        params.set(k, v)
+      }
+    }
+    const qs = params.toString()
+    const url = qs ? `${exportUrl.value}?${qs}` : exportUrl.value
+    await downloadApiFile(url, `${props.config.table}_export.csv`)
   } catch {
     ElMessage.error('导出失败')
   }
@@ -566,6 +690,17 @@ onMounted(async () => {
 onActivated(() => {
   if (initialized) load()
 })
+
+watch(
+  () => props.extraQuery,
+  () => {
+    if (!initialized) return
+    page.value = 1
+    onClearSelection()
+    void load()
+  },
+  { deep: true }
+)
 
 function getSelectedRows() {
   return selectedRows.value

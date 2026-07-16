@@ -47,7 +47,6 @@
           class="system-table"
           :height="tableHeight"
         >
-          <el-table-column type="selection" width="48" />
           <el-table-column label="操作" width="160" fixed="left">
             <template #default="{ row }">
               <div class="table-actions">

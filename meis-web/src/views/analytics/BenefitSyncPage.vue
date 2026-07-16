@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="benefit-sync-page">
     <SystemPageCard title="效益数据抓取" :loading="loading" show-pager v-model:page="page" v-model:size="size" :total="total" @page-change="load">
       <template #filterBar>
@@ -34,7 +34,7 @@
 import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/api/http'
-import SystemPageCard from '@/components/SystemPageCard.vue'
+import SystemPageCard from '@/components/system/SystemPageCard.vue'
 import PageFilterBar from '@/components/PageFilterBar.vue'
 
 const loading = ref(false)

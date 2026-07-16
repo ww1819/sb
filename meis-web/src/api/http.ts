@@ -28,7 +28,25 @@ http.interceptors.request.use((config) => {
 })
 
 http.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const rt = response.config.responseType
+    if (rt === 'blob' || rt === 'arraybuffer') return response
+    const data = response.data as { code?: number; message?: string; success?: boolean } | undefined
+    // 后端 Result 失败多为 HTTP 200 + code!=0；统一拒绝，避免误判为成功
+    if (
+      data &&
+      typeof data === 'object' &&
+      typeof data.code === 'number' &&
+      data.code !== 0
+    ) {
+      const err = Object.assign(new Error(data.message || '操作失败'), {
+        isBizError: true,
+        response
+      })
+      return Promise.reject(err)
+    }
+    return response
+  },
   (error) => {
     const status = error.response?.status as number | undefined
     const message = error.response?.data?.message as string | undefined

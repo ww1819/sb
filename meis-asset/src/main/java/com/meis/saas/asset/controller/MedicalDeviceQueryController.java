@@ -2,6 +2,7 @@ package com.meis.saas.asset.controller;
 
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -15,18 +16,6 @@ import java.util.Map;
 @RequestMapping("/api/asset/medical_device")
 @RequiredArgsConstructor
 public class MedicalDeviceQueryController {
-
-    private static final String FROM = """
-            FROM medical_device d
-            LEFT JOIN medical_device_category cat ON cat.id = d.category_id
-            LEFT JOIN asset_category ac ON ac.id = d.asset_category_id
-            LEFT JOIN finance_category fc ON fc.id = d.finance_category_id
-            LEFT JOIN manufacturer m ON m.id = d.manufacturer_id
-            LEFT JOIN supplier s ON s.id = d.supplier_id
-            LEFT JOIN department dept ON dept.id = d.dept_id
-            LEFT JOIN campus camp ON camp.id = d.campus_id
-            LEFT JOIN warehouse w ON w.id = d.warehouse_id
-            """;
 
     private final JdbcTemplate jdbc;
 
@@ -50,6 +39,7 @@ public class MedicalDeviceQueryController {
             @RequestParam(required = false) Boolean isEmergency) {
 
         StringBuilder where = new StringBuilder(" WHERE d.is_active IS NOT FALSE ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d"));
         List<Object> args = new ArrayList<>();
 
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
@@ -80,7 +70,8 @@ public class MedicalDeviceQueryController {
         appendBool(where, args, "d.is_life_support", isLifeSupport);
         appendBool(where, args, "d.is_emergency", isEmergency);
 
-        Long total = jdbc.queryForObject("SELECT COUNT(*) " + FROM + where, Long.class, args.toArray());
+        String from = buildFrom();
+        Long total = jdbc.queryForObject("SELECT COUNT(*) " + from + where, Long.class, args.toArray());
 
         List<Object> pageArgs = new ArrayList<>(args);
         pageArgs.add(query.limit());
@@ -99,10 +90,30 @@ public class MedicalDeviceQueryController {
                 """;
 
         List<Map<String, Object>> rows = jdbc.queryForList(
-                select + FROM + where + " ORDER BY d.created_at DESC NULLS LAST LIMIT ? OFFSET ?",
+                select + from + where + " ORDER BY d.created_at DESC NULLS LAST LIMIT ? OFFSET ?",
                 pageArgs.toArray());
 
         return Result.ok(PageResult.of(rows, total != null ? total : 0, query.getPage(), query.getSize()));
+    }
+
+    private String buildFrom() {
+        return " FROM medical_device d "
+                + " LEFT JOIN medical_device_category cat ON cat.id = d.category_id"
+                + SoftDeleteSupport.notDeletedClause(jdbc, "medical_device_category", "cat")
+                + " LEFT JOIN asset_category ac ON ac.id = d.asset_category_id"
+                + SoftDeleteSupport.notDeletedClause(jdbc, "asset_category", "ac")
+                + " LEFT JOIN finance_category fc ON fc.id = d.finance_category_id"
+                + SoftDeleteSupport.notDeletedClause(jdbc, "finance_category", "fc")
+                + " LEFT JOIN manufacturer m ON m.id = d.manufacturer_id"
+                + SoftDeleteSupport.notDeletedClause(jdbc, "manufacturer", "m")
+                + " LEFT JOIN supplier s ON s.id = d.supplier_id"
+                + SoftDeleteSupport.notDeletedClause(jdbc, "supplier", "s")
+                + " LEFT JOIN department dept ON dept.id = d.dept_id"
+                + SoftDeleteSupport.notDeletedClause(jdbc, "department", "dept")
+                + " LEFT JOIN campus camp ON camp.id = d.campus_id"
+                + SoftDeleteSupport.notDeletedClause(jdbc, "campus", "camp")
+                + " LEFT JOIN warehouse w ON w.id = d.warehouse_id"
+                + SoftDeleteSupport.notDeletedClause(jdbc, "warehouse", "w");
     }
 
     private static void appendEqUuid(StringBuilder where, List<Object> args, String column, String value) {

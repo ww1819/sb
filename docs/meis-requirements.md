@@ -72,7 +72,7 @@
 | 租户模型 | `public` 存租户元数据；`tenant_{code}` 存业务表 |
 | 前端 | `meis-web`（Vue3 + Element Plus） |
 | 后端 | 微服务（网关 8080，各业务服务 8081–8094） |
-| 数据库迁移 | `meis-tenant` Flyway + `R__tenant_schema_sync.sql` 租户补表 |
+| 数据库迁移 | `meis-tenant` Flyway + `R__columns_biz.sql / R__data_fix.sql` 租户补表 |
 | 移动端 | `meis-mobile`（Flutter 骨架） |
 
 ### 1.4 模块地图
@@ -157,13 +157,14 @@
 
 | 子模块 | 路径 | 核心表/实体 | 状态 |
 |--------|------|-------------|------|
-| 院区管理 | `/system/campus` | `campus` | 待编写 |
-| 科室管理 | `/system/dept` | `department` | 待编写 |
-| 用户管理 | `/system/user` | `sys_user` | 待编写 |
+| ~~院区管理~~ | `/system/campus` | `campus` | **菜单已迁至基础字典** `/dict/campus` |
+| ~~科室管理~~ | `/system/dept` | `department` | **菜单已停用**；入口在基础字典 `/dict/dept` |
+| 用户管理 | `/system/user` | `sys_user` | 已增强（见 SYS-F-04） |
 | 角色管理 | `/system/role` | `sys_role` | 待编写 |
 | 数据字典 | `/system/dict` | `sys_dict` | 待编写 |
 | 操作日志 | `/system/log` | `sys_operation_log` | 待编写 |
 | 审批配置 | `/system/approval` | `sys_approval_flow` | 待编写 |
+| 系统配置 | `/system/config` | `sys_config` | |
 | 租户管理 | 平台 | `sys_tenant` | 待编写 |
 
 **需求摘要（待补充）**：
@@ -171,6 +172,11 @@
 - [ ] SYS-F-01 登录：医院编码 + 账号 + 密码，JWT 含 schemaName
 - [ ] SYS-F-02 角色权限控制菜单与按钮（`v-permission`）
 - [ ] SYS-F-03 租户开户自动执行 Schema 迁移
+- [x] **SYS-F-04 用户管理增强（2026-07-14）**
+  - 编辑/新建表单增加 **是否维修工程师**（`is_repair_engineer`），与维修工程师管理页同源字段
+  - 列表筛选：关键词 + 启用状态 + **科室** + **是否维修工程师** + **角色** + **权限模式**
+  - **批量修改**：勾选用户后可批量设置科室 / 启用状态 / 是否维修工程师（只更新勾选的字段；不含密码与权限）
+  - 列表展示「维修工程师」列
 - [ ] SYS-B-01 科室与院区层级关系规则
 - [ ] SYS-B-02 用户与科室归属、数据权限范围
 
@@ -183,17 +189,27 @@
 
 | 子模块 | 路径 | 说明 |
 |--------|------|------|
-| 供应商 | `/dict/supplier` | 支持导入、拼音简码 |
-| 生产厂家 | `/dict/manufacturer` | 支持导入、拼音简码 |
-| 设备 68 分类 | `/dict/category` | 医疗器械分类 |
-| 资产分类 | `/dict/asset-category` | |
-| 财务分类 | `/dict/finance-category` | |
+| 院区管理 | `/dict/campus` | 由系统管理迁入（`system_campus`） |
+| 仓库维护 | `/dict/warehouse` | **唯一菜单入口**（`dict_warehouse`）；库房管理/系统管理侧重复菜单已停用 |
 | 科室维护 | `/dict/dept` | |
-| 仓库维护 | `/dict/warehouse` | |
+| 供应商管理 | `/dict/supplier` | 支持导入、拼音简码 |
+| 生产厂商 | `/dict/manufacturer` | 支持导入、拼音简码 |
+| 设备分类 | `/dict/category` | 左侧多级树（按 `parent_code`）；点节点筛本级+直接下级；新增默认上级为当前选中 |
+| 资产分类 | `/dict/asset-category` | 左侧多级树（按 `parent_id`）；点节点筛本级+直接下级；新增默认上级为当前选中 |
+| 财务分类 | `/dict/finance-category` | 左侧多级树（按 `parent_id`）；点节点筛下级；新增默认上级为当前选中 |
 | 单位维护 | `/dict/unit` | |
 
 **需求摘要（待补充）**：
 
+- [x] DICT-M-01 院区/供应商/设备分类/生产厂商菜单归入基础字典（自系统管理迁出）
+- [x] DICT-UI-01 科室维护：操作按钮下行排列；新增右侧抽屉；隐藏 ListSelectionBar；列表底部分页
+- [x] DICT-UI-02 供应商：查询贴搜索框；导入/生成简码在导出后；新增右侧抽屉；隐藏 ListSelectionBar（**仅 supplier 路径启用 `toolbarLayout`/`formPlacement`，不波及通用 CrudPage 默认页**）
+- [x] DICT-UI-03 财务分类：左侧多级树状分类 + 右侧列表按树节点联动（本级+直接下级，`tree_node_id`）；新增默认挂当前选中节点；列表含序号；列名为分类编码/分类名称，会计科目前展示上级分类；上级分类可改/可清空（清空=一级），不可选自身及子孙
+- [x] DICT-UI-04 通用保存：校验 `Result.code===0`（后端失败常 HTTP 200）；HTTP 拦截器拒绝业务失败，避免“提示成功但未入库”
+- [x] DICT-UI-05 设备分类：左侧多级树（`parent_code`）+ 右侧本级/直接下级联动；新增默认挂当前节点；上级可清空为一级；`level`/`full_path` 后端自动补齐
+- [x] DICT-UI-06 设备分类 Excel 导入：两列编码/名称即可；自动推导上级与层级（68 码 4/6/8 位）；支持无表头、编码补前导零；可重导更新；已种子入库国标 68 分类全文
+- [x] DICT-UI-07 设备分类树：默认仅展开「全部」（子级收起）；同级手风琴展开；列表分类编码/名称/上级编码可排序；上级编码后展示上级分类名称
+- [x] DICT-UI-08 资产分类：左侧多级树（`parent_id`）+ 右侧本级/直接下级联动；默认仅展开「全部」、同级手风琴；新增默认挂当前节点；上级可清空为一级
 - [ ] DICT-F-01 字典数据全院共享，变更需审计
 - [ ] DICT-F-02 拼音简码批量生成
 - [ ] DICT-B-01 已被业务引用的字典项不可物理删除
@@ -233,16 +249,32 @@
 
 | 子模块 | 路径 | 说明 |
 |--------|------|------|
-| 资产综合查询 | `/asset/query` | 多条件查询 |
-| 资产管理（台账） | `/asset/device` | 设备主档案 |
+| 资产登记（台账） | `/asset/device` | 设备主档案（菜单名「资产登记」；隐藏列表勾选条） |
+| 资产综合查询 | `/asset/query` | 多条件查询（菜单在「资产登记」之后，AST-UI-03） |
 | 资产导入 | `/asset/import` | Excel 导入 |
-| 设备入库 | `/asset/entry` | 主从单据 |
-| 设备出库 | `/asset/outbound` | 主从单据 |
-| 资产流转 | `/asset/transfer` | |
-| 资产盘点 | `/asset/inventory` | 主从 |
-| 设备报废 | `/asset/scrap` | |
+| ~~库存查询~~ | `/asset/stock` | **菜单已迁至库房管理**（挂在设备入库之后，见 AST-UI-04） |
+| ~~设备入库~~ | `/asset/entry` | **菜单已停用**（`asset_entry`）；功能入口在库房管理 `/warehouse/entry`，API/页面仍可直达 |
+| ~~设备出库~~ | `/asset/outbound` | **菜单已停用**；入口在库房管理 |
+| ~~资产流转~~ | `/asset/transfer` | **菜单已停用**；入口在库房调拨等 |
+| ~~资产盘点~~ | `/asset/inventory` | **菜单已停用**；入口在库房管理 |
+| ~~设备报废~~ | `/asset/scrap` | **菜单已停用**；入口在库房管理 |
 
 **需求摘要（待补充）**：
+
+- [x] AST-M-01 资产台账侧停用与库房重复菜单：`asset_entry` / `asset_outbound` / `asset_transfer` / `asset_inventory` / `asset_scrap`（入口统一库房管理，见 Q-04）
+- [x] AST-UI-01 菜单「资产管理」更名为「资产登记」；列表勾选条已随全局 PLT-UI-01 移除（保留勾选列供导出等）
+- [x] AST-UI-02 单位改 `unit_id` 下拉（`unit_dict`）；基本信息「单位」后展示「设备分类(68)」（`category_id`），去掉重复「医疗器械分类」标签
+- [x] AST-UI-03 资产台账菜单顺序：资产登记 → 资产综合查询 → 资产导入
+- [x] AST-UI-04 库存查询菜单从资产台账迁至库房管理（设备入库之后）；模块「公用设备借调」更名为「借调中心」（SHR-UI-01）
+- [x] PLT-UI-01 全局列表：移除「已选 N 条（跨页保留）/ 全选当页 / 取消全选」提示条；勾选列与跨页缓存、导出/批量作用域仍保留（附录 V）
+
+**AST-UI-02 定稿（2026-07-15 22:54:49）**
+
+| 项 | 定稿 |
+|----|------|
+| **单位** | `medical_device.unit_id` → `unit_dict`；表单 `linkTable: 'unit_dict'` 可搜索下拉；旧列 `device_unit` 保留不展示 |
+| **存量** | `R__data_fix` 按 `device_unit` 匹配 `unit_name`/`unit_code`（忽略大小写）回填 `unit_id`；匹配不上留空 |
+| **设备分类(68)** | 仍用 `category_id` → `medical_device_category`；移至单位后一格；标签统一「设备分类(68)」 |
 
 - [ ] AST-F-01 设备台账字段分组：基本信息 / 财务 / 位置 / 合规
 - [x] AST-01 计量检定类型字段（`metrology_type_code`，见附录 N / M）
@@ -263,8 +295,9 @@
 
 | 子模块 | 路径 | 说明 |
 |--------|------|------|
-| 库房维护 | `/warehouse/setting` | |
-| 设备入库 | `/warehouse/entry` | 同资产入库 |
+| ~~库房维护~~ | `/warehouse/setting` | **菜单已停用**（`warehouse_setting`）；仓库主数据入口在基础字典 `/dict/warehouse` |
+| 设备入库 | `/warehouse/entry` | 同资产入库（用户口语「备货入库」） |
+| 库存查询 | `/asset/stock` | 由资产台账迁入，排在设备入库之后（AST-UI-04） |
 | 设备出库 | `/warehouse/outbound` | |
 | 设备退货 | `/warehouse/return` | 主从 |
 | 库房调拨 | `/warehouse/transfer` | |
@@ -273,6 +306,8 @@
 
 **需求摘要（待补充）**：
 
+- [x] WH-M-01 停用重复仓库维护菜单：`warehouse_setting`、`system_warehouse`（入口统一 `dict_warehouse`）
+- [x] WH-M-02 / AST-UI-04 库存查询菜单归属库房管理（入库之后）
 - [ ] WH-B-01 库房与科室/院区关系
 - [ ] WH-B-02 入库来源：采购验收 / 调拨 / 其他
 - [ ] WH-F-01 退货流程与台账状态回滚
@@ -292,7 +327,7 @@
 | 维修验收 | `/repair/verify` | listMode=verify |
 | 维修工单 | `/repair/workorder` | 全量 |
 | 工程师 | `/repair/engineer` | 将改为「维修工程师管理」，见附录 U |
-| 配件档案 | `/repair/spare-archive` | |
+| 配件档案 | `/repair/spare-archive` | 见 **U.15.2**（去进销存 UI；拼音简码；复制/删除） |
 | 故障库 | `/repair/fault` | |
 
 **需求摘要**：
@@ -300,10 +335,13 @@
 - [x] REP-F-01 设备弹窗选择（`RepairDevicePicker`）
 - [x] REP-B-01 双层状态：主状态 + 维修子状态
 - [x] REP-B-02 设备台账 `pending_verify` 状态
-- [ ] REP-F-02 备件领用与库存扣减（**长期搁置**，待真实用户后再做）
+- [ ] REP-F-02 备件领用与库存扣减（**长期搁置**，待真实用户后再做；与 U.15.2 隐藏进销存 UI 一致）
 - [ ] REP-F-03 外协维修独立单据（**长期搁置**，待真实用户后再做）
-- [ ] REP-B-03 维修调度（派单/抢单/接单）、维修进程段、配件明细（附录 U）
+- [ ] REP-B-03 维修调度（派单/抢单/接单）、维修进程段、配件明细（附录 U / **U.15**）
 - [ ] REP-F-04 移动端扫码报修
+- [x] REP-F-05 配件档案：拼音简码、复制、有业务引用禁止删（U.15.2）
+- [x] REP-B-04 业务子表冗余 `device_id` 等（附录 **W**；维修 P0）
+- [x] REP-B-05 进程段编辑/删除、确认补 ended_at、待验自动确认（U.15.1–U.15.2）
 
 ---
 
@@ -435,10 +473,11 @@
 
 ---
 
-### 3.13 公用设备（SHR）
+### 3.13 公用设备 / 借调中心（SHR）
 
 **服务**：meis-special（`meis-shared` 路由别名）  
-**状态**：部分骨架已实现，业务待按附录 N 重构
+**状态**：部分骨架已实现，业务待按附录 N 重构  
+**菜单模块名**：借调中心（`mod_shared`，原「公用设备借调」，SHR-UI-01）
 
 | 子模块 | 路径 |
 |--------|------|
@@ -452,6 +491,7 @@
 
 **需求摘要**（详见 **附录 N**）：
 
+- [x] SHR-UI-01 模块菜单「公用设备借调」更名为「借调中心」
 - [x] SHR-01 公用设备列表改查资产台账（`is_shared_device`）；**废弃 `shared_device` 表**
 - [x] SHR-02 从非公用设备中新增为公用设备
 - [x] SHR-03 取消公用设备 / 查看借用记录
@@ -889,7 +929,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | Q-09 | 电流监测 | 待机电流上下限维护在标签页是回写台账还是标签独立覆盖 | 回写 `medical_device` | **已确认** |
 | Q-10 | 电流监测 | 上下限未配置或部分配置时运行状态如何判定 | 见 §3.16.1 情形 A–D | **已确认** |
 | Q-11 | 电流监测 | 原始读数保留多久 | 影响存储与归档策略 | 待确认 |
-| Q-04 | 库房 | 资产模块与库房模块菜单重复，如何分工 | 按角色/场景拆分或合并 | 待确认 |
+| Q-04 | 库房 | 资产模块与库房模块菜单重复，如何分工 | 入库/出库/调拨/盘点/报废入口统一「库房管理」；仓库主数据统一「基础字典→仓库维护」；停用 `asset_entry` 等及 `warehouse_setting`/`system_warehouse` | **已确认**（2026-07-15） |
 | Q-05 | 保养/巡检/PM | 三模块边界与是否合并展示 | 需业务方定义 | 待确认 |
 | Q-06 | 权限 | 科室用户数据权限：本科室 vs 本院 | 需院方确认 | 待确认 |
 | Q-07 | 移动端 | 一期移动端范围 | 报修 + 盘点？ | 待确认 |
@@ -901,6 +941,31 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+| 1.63 | 2026-07-16 00:02:47 | — | 全局移除列表「已选 N 条 / 全选当页 / 取消全选」提示条；保留勾选列+跨页缓存与导出作用域（附录 V 修订；约定包 v1.7 §5.4） |
+| 1.62 | 2026-07-15 23:36:51 | — | AST-UI-04/SHR-UI-01：借调中心更名；库存查询迁库房管理（设备入库后） |
+| 1.61 | 2026-07-15 23:29:58 | — | AST-UI-03：资产台账菜单顺序调整为登记→综合查询→导入→库存 |
+| 1.60 | 2026-07-15 22:54:49 | — | AST-UI-02：台账单位改 unit_dict 下拉；设备分类(68) 挪至单位后并去重标签 |
+| 1.59 | 2026-07-15 22:33:00 | — | 附录 U.17：进程工程师人工费；主单备件费/工时费/总费用自动汇总 |
+| 1.58 | 2026-07-15 22:29:58 | — | 资产台账菜单「资产管理」→「资产登记」；列表隐藏勾选条 AST-UI-01 |
+| 1.57 | 2026-07-15 22:24:00 | — | 附录 U.16：到场时间自动填、验收工时/子状态、时间轴跟随进程段 |
+| 1.56 | 2026-07-15 22:10:00 | — | U.14.2：维修验收列表功能分列（验收/拒绝验收分列）+ 横向滚动 |
+| 1.55 | 2026-07-15 21:51:15 | — | U.15.1：添加/编辑进程弹窗配件行统一含单价、数量、金额、供应商 |
+| 1.54 | 2026-07-15 21:20:52 | — | W.5/Q.12：审计与操作人姓名冗余升为强制约定；约定包 v1.6；交付自检纳入 |
+| 1.53 | 2026-07-15 21:08:35 | — | 附录 W.5：工作人员姓名冗余（审计 *_by_name + 业务责任人）；约定包 v1.5 |
+| 1.52 | 2026-07-15 20:42:27 | — | 附录 U.15 进程编辑/删除与确认补全；配件档案去进销存+简码；附录 W 业务冗余字段 |
+| 1.52 | 2026-07-15 | — | 资产分类左侧多级树（参考财务分类 parent_id 联动） |
+| 1.51 | 2026-07-15 | — | 设备分类导入国标 68 码全文（1388 条）；category_code 扩至 VARCHAR(16) |
+| 1.50 | 2026-07-15 | — | 设备分类支持 Excel 导入（自动 parent_code/level）；页面开放导入按钮 |
+| 1.49 | 2026-07-15 | — | 设备分类左侧多级树（parent_code）；tree_node_id 支持编码层级表 |
+| 1.48 | 2026-07-15 | — | 财务分类左侧多级树；通用分页支持扁平筛选参数（parent_id 等） |
+| 1.47 | 2026-07-15 | — | 供应商列表：序号列；编码/名称表头升序降序（通用分页支持 sortBy） |
+| 1.47 | 2026-07-15 17:36:00 | — | 附录 Q.9 文档时间颗粒度；附录 U.14 维修列表功能分列/进程展示与段确认固化 |
+| 1.46 | 2026-07-15 | — | 科室维护 UI：操作按钮第二行、右侧抽屉、隐藏勾选条、底部分页 |
+| 1.45 | 2026-07-15 | — | 基础字典菜单顺序：院区→仓库→科室→供应商→生产厂商→设备/资产/财务分类→单位 |
+| 1.45 | 2026-07-15 | — | 附录 L.5：后端停止后清空开发面板「热加载」时间列 |
+| 1.44 | 2026-07-15 | — | 院区/供应商/设备分类/生产厂商菜单迁入基础字典；取消前端强制归并到系统管理 |
+| 1.43 | 2026-07-15 | — | Q-04 补充：停用库房管理「库房维护」、系统管理「仓库维护」；仓库入口统一基础字典 |
+| 1.42 | 2026-07-15 | — | Q-04：资产台账隐藏与库房重复的设备入库等菜单；修正 R__ 误把 `asset_entry` 重新启用 |
 | 0.1 | 2026-07-11 | — | 初稿：仅电流监测 |
 | 1.0 | 2026-07-11 | — | 扩展为全系统需求与问题跟踪 |
 | 1.1 | 2026-07-11 | — | 补充电流监测：待机电流上下限、基站/标签监测记录、绑定追溯 |
@@ -908,7 +973,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | 1.3 | 2026-07-11 | — | 明确仅下限时读数等于下限归入待机 |
 | 1.4 | 2026-07-11 | — | 附录 D：数据库迁移双轨规范；V1 补全电流监测相关字段与表 |
 | 1.5 | 2026-07-11 | — | 附录 D.4：明确老租户启动先建表后补列；`SchemaTableEnsuring` 执行 V1/V2 |
-| 1.6 | 2026-07-11 | — | 清理 `R__tenant_schema_sync.sql` 建表语句；R__ 仅保留补列与种子数据 |
+| 1.6 | 2026-07-11 | — | 清理 `R__columns_biz.sql / R__data_fix.sql` 建表语句；R__ 仅保留补列与种子数据 |
 | 1.7 | 2026-07-11 | — | 附录 E：开发完成验收清单；开发面板热加载改为同步执行并分步反馈 |
 | 1.8 | 2026-07-11 | — | 标签：修复换绑设备；待机电流独立行操作；列表展示上下限 |
 | 1.9 | 2026-07-11 | — | 标签：修复换绑与绑定记录；标签名称不得与编码相同 |
@@ -928,6 +993,17 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | 1.23 | 2026-07-13 | — | 后端列表：双横向滚动条、筛选/表头浮动、列显示开关 |
 | 1.24 | 2026-07-13 | — | 附录 U：维修调度/工程师/进程/验收定稿（含拒绝验收状态） |
 | 1.25 | 2026-07-13 | — | 附录 U 补充：废弃 engineer 表、`verify_rejected`、列表范围与完整性评估 |
+| 1.42 | 2026-07-15 | — | U.13.4：进程工程师默认锁定+勾选多选；成员表 segment_user；修多处 JDBC ?/参数不匹配 |
+| 1.41 | 2026-07-15 | — | 附录 U.13：列表抢单；添加进程工程师/起止时间（补录勾选结束）；进程类型空与抢单缺列修复 |
+| 1.40 | 2026-07-15 | — | 附录 V / Q.8：列表勾选跨页缓存、全选当页、取消全选；导出/批量作用域（选中 vs 全部查询结果）；双写约定包 v1.3 §5.4 |
+| 1.39 | 2026-07-14 | — | Q.7：从文档沉淀约定增量双写约定包 v1.2（槽位/串库/软删读过滤/主从保存/新表通检等） |
+| 1.38 | 2026-07-14 | — | 附录 D.6：public/tenant 固定脚本槽位整合（建表/索引/补列/数据）；废止零散 V20+/patch |
+| 1.37 | 2026-07-14 | — | 附录 G.10：物理删除盘点；库结构 SQL 为主+代码扫描为辅；SoftDelete 无列时禁止静默物理删 |
+| 1.36 | 2026-07-14 | — | 附录 I.5：动态补齐缺 `is_deleted` 的租户表（标签打印日志/实体变更记录等） |
+| 1.35 | 2026-07-14 | — | 附录 I.4：自定义读 SQL 统一补 SoftDelete 过滤（system/auth/repair/asset/purchase/maintain/qc） |
+| 1.34 | 2026-07-14 | — | 租户库补齐 `sys_user.is_repair_engineer`；全表未删行 `is_deleted=0` + DEFAULT 0（见附录 I.3） |
+| 1.33 | 2026-07-14 | — | 维修处理：派工/取消进操作列；工程师下拉 `/engineer/options`；添加进程可见性说明 |
+| 1.32 | 2026-07-14 | — | 用户管理：维修工程师开关、列表筛选、批量改科室/启用/工程师 |
 | 1.31 | 2026-07-13 | — | 附录 U.11：四列表查询/状态多选；REP-F-02/03 长期搁置 |
 | 1.30 | 2026-07-13 | — | 落地 REP-05：维修进程类型、工单进程段、段上配件明细 |
 | 1.29 | 2026-07-13 | — | 落地 REP-04：抢单 API、负责人互斥、抢单并发锁 |
@@ -955,6 +1031,8 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | BACKLOG-REP-07 | 维修 | 报修申请列表展示全部未删工单；维修处理列表范围与进程可编规则 | 附录 U.8 | P1 | — | 已完成 |
 | BACKLOG-REP-F-02 | 维修 | 配件库存扣减与费用汇总 | 附录 U.7 / REP-F-02 | P2 | 待真实用户、降低交付难度 | **长期搁置** |
 | BACKLOG-REP-F-03 | 维修 | 外协维修独立单据 | 附录 U.7 / REP-F-03 | P2 | 待真实用户、降低交付难度 | **长期搁置** |
+| BACKLOG-AST-W01 | 跨模块 | 保养/计量/巡检/PM 执行表与公用设备费用表等补齐 device_id/code/name 冗余 | 附录 W.3.2 | P1 | 维修 P0 先落地；其余分批 | 可排期 |
+| BACKLOG-PLT-W02 | 跨模块 | 非维修业务责任人姓名快照（出入库 operator、不良事件 reporter/handler、验收成员等） | 附录 W.5.3 | P1 | 审计三列与维修责任人先落地 | 可排期 |
 
 **状态取值**：`暂缓` / `可排期` / `开发中` / `已完成` / **`长期搁置`**。完成后可移入版本记录说明，或将状态改为已完成并保留一行备查。
 
@@ -1009,7 +1087,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | 设备弹窗（报修） | `meis-web/src/components/repair/RepairDevicePicker.vue` |
 | 基站弹窗 | `meis-web/src/components/form/PowerStationPicker.vue` |
 | 租户迁库 | `meis-tenant/src/main/resources/db/migrations/` |
-| 租户补表脚本 | `meis-tenant/.../R__tenant_schema_sync.sql` |
+| 租户补表脚本 | `meis-tenant/.../R__columns_biz.sql / R__data_fix.sql` |
 | 数据库备份还原 | `scripts/backup-db.ps1`、`scripts/restore-db.ps1` |
 
 ---
@@ -1036,21 +1114,21 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 新增或修改租户表字段时，**必须同时维护两处**，保证新开户与老租户升级结果一致：
 
-| 场景 | `V1__tables.sql`（全量建表） | `R__tenant_schema_sync.sql`（老租户补列） |
-|------|------------------------------|------------------------------------------|
+| 场景 | `V1__tables.sql`（全量建表） | `R__columns_biz.sql`（老租户业务补列） / `R__data_fix.sql`（数据） |
+|------|------------------------------|------------------------------------------------------|
 | **新建表** | 写入完整 `CREATE TABLE` + 字段 + 默认 `COMMENT` | **不写**（建表由 `SchemaTableEnsuring` 执行 V1） |
-| **已有表加列** | 在对应 `CREATE TABLE` 中补上该列 | **单独一行** `ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...`（禁止一条 ALTER 多列） |
-| **索引** | `V2__extensions.sql` | **不写**（索引由 `SchemaTableEnsuring` 执行 V2） |
-| **手工镜像** | `db/source/create/tenant_tables.sql` | `db/source/patches/tenant_column_patches.sql`（与 R__ 补列段同步） |
+| **已有表加列** | 在对应 `CREATE TABLE` 中补上该列 | **单独一行** `ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...`（禁止一条 ALTER 多列；标准七列走 `R__columns_audit.sql`） |
+| **索引** | `V2__indexes.sql` | **不写**（索引由 `SchemaTableEnsuring` 执行 V2） |
+| **手工镜像** | `db/source/create/tenant_tables.sql` | `db/source/patches/` 已废弃新补丁；只改 Flyway 槽位 |
 
 ### D.2 开发检查清单（提交前）
 
 - [ ] `V1__tables.sql` 中 `CREATE TABLE` 已包含全部字段（新租户开箱即用）
 - [ ] **标准七列**已写入新建表：`created_at` / `updated_at` / `created_by` / `updated_by` / `is_deleted` / `deleted_at` / `deleted_by`（见附录 G.0）
-- [ ] `R__tenant_schema_sync.sql` 中每条**业务**新增列有对应 `ADD COLUMN IF NOT EXISTS`（标准七列走 `R__audit_columns.sql`）
+- [ ] `R__columns_biz.sql` 中每条**业务**新增列有对应 `ADD COLUMN IF NOT EXISTS`（标准七列走 `R__columns_audit.sql`；字典/回填写 `R__data_fix.sql`）
 - [ ] R__ 中**无** `CREATE TABLE` / `CREATE INDEX`（建表与索引仅维护 V1/V2）
-- [ ] `V2__extensions.sql` 已补充必要索引
-- [ ] `tenant_column_patches.sql` 已镜像 R__ 业务补列语句
+- [ ] `V2__indexes.sql` 已补充必要索引
+- [ ] 未在 `db/source/patches` 新增功能补丁（该目录已废弃）
 - [ ] 未在 R__ 中写 `COMMENT ON`（空注释由 `SchemaCommentFiller` 补全）
 - [ ] 前后端 CRUD 与交互走通（清单见附录 M.7）
 
@@ -1078,8 +1156,8 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 步骤 | 组件 | 作用 |
 |------|------|------|
-| 1 | `SchemaTableEnsuring` | 幂等建表与索引：`V1__tables.sql` + `V2__extensions.sql`（**先** `CREATE EXTENSION`，再 `SET search_path TO tenant, public`） |
-| 2 | Flyway `migrate` | 补列与修正：`R__tenant_schema_sync.sql` 中的 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` 及字典/数据 UPDATE |
+| 1 | `SchemaTableEnsuring` | 幂等建表与索引：`V1__tables.sql` + `V2__indexes.sql`（**先** `CREATE EXTENSION`，再 `SET search_path TO tenant, public`） |
+| 2 | Flyway `migrate` | 补列与修正：`R__columns_audit.sql` → `R__columns_biz.sql` → `R__data_fix.sql` |
 | 3 | `SchemaCommentFiller` | 仅对空注释列/表补 `COMMENT ON` |
 | 4 | `TenantSchemaShadowGuard` | 校验 V1 表是否齐全；缺表则重跑建表；仍缺则**启动失败**（避免串写 public） |
 
@@ -1119,6 +1197,21 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 **注意**：`public` 中误建的租户业务表（如 `power_tag_bind_log`）不会自动删除；修复后以租户 schema 内表为准。新环境勿向 public 写入租户业务 DDL。
 
+### D.6 固定脚本槽位（2026-07-14 整合）
+
+**目标**：public / 租户各一套固定文件；**禁止**「每加一张表/一个字段就新建一个迁移文件」。
+
+| 职责 | public | tenant |
+|------|--------|--------|
+| **建表** | `V1__tables.sql` | `V1__tables.sql` |
+| **索引** | `V2__indexes.sql` | `V2__indexes.sql` |
+| **一次性种子** | `V3__seed_data.sql`（冻结） | `V3__seed_data.sql` |
+| **历史注释** | `V4__comments.sql`（冻结） | `V4__comments.sql` |
+| **补全字段** | 平台列：写入 `R__data_fix.sql` 的 ALTER 段 | `R__columns_audit.sql`（七列）+ `R__columns_biz.sql`（业务列） |
+| **更正数据** | `R__data_fix.sql`（菜单等） | `R__data_fix.sql`（字典/回填） |
+
+本次整合：合并 `R__audit`+`R__is_deleted` → `R__columns_audit`；拆分原 `R__tenant_schema_sync` → `R__columns_biz` + `R__data_fix`；`V2__extensions` 更名为 `V2__indexes`；删除 `V20`/`V21`；`db/source/patches` 标记废弃。
+
 ---
 
 ## 附录 E：开发完成验收清单（必读）
@@ -1150,6 +1243,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 - [ ] 浏览器 **硬刷新**（`Ctrl+Shift+R`）或重新进入页面
 - [ ] 打开开发者工具 Network，确认列表请求 200 且 `data.records` 非空
 - [ ] 核对 `businessSchemas.ts` 列表列 `prop` 与 API 返回字段名一致（勿用旧别名如 `linked_device_name`）
+- [ ] 有勾选列：跨页缓存（表头/行勾选）；导出/批量变更先选作用域（附录 V）；**不再**展示「已选 N 条 / 全选当页 / 取消全选」提示条
 
 ### E.4 数据库变更后
 
@@ -1182,17 +1276,17 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 文件 | 职责 |
 |------|------|
 | `public/V1__tables.sql` | 平台表全量 `CREATE TABLE` + `COMMENT ON`（含全部字段） |
-| `public/V2__extensions.sql` | 索引 |
+| `public/V2__indexes.sql` | 索引 |
 | `public/V3__seed_data.sql` | 一次性：演示租户、套餐、平台管理员 |
 | `public/V4__comments.sql` | 历史注释回填 |
-| `public/R__public_schema_sync.sql` | **菜单目录**幂等同步；**已有表**逐列 `ADD COLUMN` |
+| `public/R__data_fix.sql` | **菜单目录**幂等同步；**已有表**逐列 `ADD COLUMN` |
 
 ### F.2 操作规则
 
 1. **新平台表** → 写入 `V1__tables.sql`
 2. **平台表加列** → V1 补 `CREATE TABLE` 字段 + R__ 补一行 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
-3. **新菜单 / 改菜单** → 只改 `R__public_schema_sync.sql`（`ON CONFLICT DO UPDATE`）
-4. **禁止**新建 `V5__xxx.sql` 等版本化菜单脚本（原 V5–V19 已删除并并入 R__）
+3. **新菜单 / 改菜单** → 只改 `R__data_fix.sql`（`ON CONFLICT DO UPDATE`）
+4. **禁止**新建 `V5__xxx.sql` / `V20+` 等版本化脚本（原 V5–V21 已删除并并入 R__）
 5. `spring.flyway.ignore-migration-patterns: "*:missing"` + dev 环境 `repair`，兼容已执行过旧版本的库
 
 ### F.3 本次整合记录
@@ -1200,7 +1294,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 变更 | 说明 |
 |------|------|
 | 删除 | `V5`–`V19`（15 个模块菜单脚本） |
-| 新增 | `R__public_schema_sync.sql`（基础菜单 + 各模块调整 + 套餐/租户授权） |
+| 新增 | `R__data_fix.sql`（基础菜单 + 各模块调整 + 套餐/租户授权） |
 | 精简 | `V3__seed_data.sql` 仅保留平台级一次性种子 |
 | 配置 | `application.yml` 增加 `ignore-migration-patterns` |
 
@@ -1226,15 +1320,23 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | `deleted_at` | `TIMESTAMPTZ` | NULL | 删除时间 |
 | `deleted_by` | `UUID` | NULL | 删除者（用户 id） |
 
+**配套姓名快照（附录 W.5，有对应 `*_by` 时必有）**：
+
+| 字段 | 类型 | 含义 |
+|------|------|------|
+| `created_by_name` | `VARCHAR(100)` | 创建者姓名快照 |
+| `updated_by_name` | `VARCHAR(100)` | 更新者姓名快照 |
+| `deleted_by_name` | `VARCHAR(100)` | 删除者姓名快照 |
+
 **落地规则**：
 
 | 场景 | 做法 |
 |------|------|
-| **以后新建表** | 在 `tenant/V1__tables.sql` 的 `CREATE TABLE` 中**直接写出上述七列**（文件头已有模板注释） |
-| **以前已有表** | 由 `R__audit_columns.sql`（含七列）+ `R__is_deleted_columns.sql` 幂等 `ADD COLUMN IF NOT EXISTS` 补全；重启 **meis-tenant** 生效 |
-| **禁止** | 在 `R__tenant_schema_sync.sql` 业务补列段零散追加标准七列；勿再拆 `V5+` 脚本 |
+| **以后新建表** | 在 `tenant/V1__tables.sql` 的 `CREATE TABLE` 中**直接写出上述七列**（文件头已有模板注释）；有 `*_by` 时同步写 `*_by_name` |
+| **以前已有表** | 由 `R__columns_audit.sql` 幂等 `ADD COLUMN IF NOT EXISTS` 补全（含标准七列、动态 `is_deleted`、审计姓名三列）；重启 **meis-tenant** 生效 |
+| **禁止** | 在 `R__columns_biz.sql` 业务补列段零散追加标准七列/审计姓名列；勿再拆 `V5+` 脚本 |
 
-应用层读写约定见 G.1；工具类为 `SoftDeleteSupport`。
+应用层读写约定见 G.1；工具类为 `SoftDeleteSupport`（写入 `*_by` 时同写 `*_by_name`）。
 
 ### G.1 原则
 
@@ -1254,7 +1356,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 通用 CRUD | `GenericTableController`（删/建/改/查） |
 | 分页 | `PageableJdbc`、`ExcelExportHelper` |
 | 导入 | `SimpleTableImporter` |
-| 库表补列 | `tenant/R__audit_columns.sql`（标准七列）、`tenant/R__is_deleted_columns.sql`（`is_deleted` 兼容补全） |
+| 库表补列 | `tenant/R__columns_audit.sql`（标准七列 + `is_deleted` 兼容补全） |
 
 ### G.3 明细表例外
 
@@ -1333,9 +1435,9 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 ### G.7 迁库锁表（2026-07-12 修复）
 
-`R__tenant_schema_sync.sql` 中 **DO 块批量 ALTER 114 表**会在单事务内长时间持锁，导致所有业务查询（含资产管理列表）超时失败。
+`R__columns_biz.sql / R__data_fix.sql` 中 **DO 块批量 ALTER 114 表**会在单事务内长时间持锁，导致所有业务查询（含资产管理列表）超时失败。
 
-已拆分为独立脚本 `tenant/R__audit_columns.sql`，并设置 `flyway:executeInTransaction=false`，逐条 `ALTER` 提交释放锁。若再次遇到全站查询挂起，检查 `pg_stat_activity` 是否有未结束的迁库会话。
+已拆分为独立脚本 `tenant/R__columns_audit.sql`，并设置 `flyway:executeInTransaction=false`，逐条 `ALTER` 提交释放锁。若再次遇到全站查询挂起，检查 `pg_stat_activity` 是否有未结束的迁库会话。
 
 修改 `meis-common`（如软删除工具类）后，在面板对 `meis-common` 点 **热加载依赖**，或手动对具体微服务点「热加载」。
 
@@ -1385,14 +1487,17 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 ### I.3 迁库
 
-脚本 `tenant/R__audit_columns.sql` / `R__is_deleted_columns.sql`（`flyway:executeInTransaction=false`）：
+脚本 `tenant/R__columns_audit.sql`（`flyway:executeInTransaction=false`）：
 
 1. 全租户业务表补齐标准七列（含 `is_deleted`）
 2. 将已有 `deleted_at IS NOT NULL` 的行回填为 `is_deleted=1`
+3. **存量修补（2026-07-14）**：凡含 `is_deleted` 的基表，对未删除行统一 `is_deleted=0`（含原 `NULL`），并 `ALTER … SET DEFAULT 0` / 尽量 `NOT NULL`（`R__columns_audit.sql` 末尾 DO 块；手工补丁见 `db/source/patches/sys_user_repair_engineer_and_is_deleted_defaults.sql`）
 
 部署后重启 **meis-tenant**，并对业务服务热加载 **meis-common**。
 
 新建表请直接在 `V1__tables.sql` 写入七列，见 **附录 G.0**。
+
+> **运维提示**：若租户库长期未跑 R__，`sys_user.is_repair_engineer` 缺失会导致派工工程师下拉无数据、`/repair/engineer/me` 失败、「添加进程」不显示。缺列时用户管理中开关可能看似已保存但无法落库；补列后需在用户管理 / 维修工程师管理中 **重新勾选**。
 
 ## 附录 J：开发面板整体 Clean 与打包（2026-07-12）
 
@@ -1477,7 +1582,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | **状态刷新** | 编译/JAR/源码比对结果随 `/api/status` **每 5 秒** 自动刷新（与运行状态同一轮询） |
 | **列表排序** | 默认按源码变更倒序；可点击 **服务 / 源码变更 / JAR** 表头切换正序/逆序 |
 | **列表筛选** | 服务类型（全部/核心/非核心）+ 名称或功能模糊搜索（附录 L.6） |
-| **热加载时间** | 独立列展示上次热加载完成时间；若源码变更晚于热加载则标「待同步」；**失败但服务/JAR 已恢复**时不再标红（显示灰色「已恢复」，或 JAR 重建后清除） |
+| **热加载时间** | 独立列展示上次热加载完成时间；若源码变更晚于热加载则标「待同步」；**失败但服务/JAR 已恢复**时不再标红（显示灰色「已恢复」，或 JAR 重建后清除）；**服务停止后清空**该时间（单服务停止 / 停止全部 / 状态检测到 HTTP+JDWP 均未监听） |
 | **自动热加载** | 仅 **HTTP + JDWP 均就绪** 的调试服务会触发；非调试模式显示「待调试热加载」；热加载进行中显示「同步中…」并抑制「JAR 落后」误报 |
 | **mtime 缓存** | 热加载成功后清除该模块 mtime 缓存，避免 5s 内误报待编译/JAR 落后 |
 | **后端热加载** | 默认需手动「热加载」；可勾选 **保存即热加载**（附录 L.6，仅调试中服务） |
@@ -1565,7 +1670,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 ### M.3 种子数据
 
-`R__tenant_schema_sync.sql` 预置：法规（`MANDATORY`、`MANDATORY_ONCE`、`MANDATORY_PERIODIC`、`VOLUNTARY` 及设备范围）、时机、地点、A/B/C 分级等条目。
+`R__columns_biz.sql / R__data_fix.sql` 预置：法规（`MANDATORY`、`MANDATORY_ONCE`、`MANDATORY_PERIODIC`、`VOLUNTARY` 及设备范围）、时机、地点、A/B/C 分级等条目。
 
 ### M.4 接口与前端
 
@@ -1598,15 +1703,17 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 **数据库**
 
-- [ ] `V1__tables.sql` 全量建表（含标准七列）；索引写 `V2__extensions.sql`
-- [ ] 业务补列写 `R__tenant_schema_sync.sql`；种子数据（字典/主数据）同步
+- [ ] `V1__tables.sql` 全量建表（含标准七列 + 有 `*_by` 时配套 `*_by_name`，见附录 W.5 / G.0）；索引写 `V2__indexes.sql`
+- [ ] 业务补列写 `R__columns_biz.sql / R__data_fix.sql`；种子数据（字典/主数据）同步
+- [ ] 业务责任人 UUID（`operator_id` / `reporter_id` / `approved_by` 等）同步建 `{field}_name` 或 `{role}_name`
 - [ ] `MetrologyDomainController`（或对应域 `TABLES`）注册表名
 
 **后端**
 
 - [ ] 分页 `GET .../page`（返回 `PageResult`：`records` + `total`）
-- [ ] 保存 `POST`（新增/更新合一；软删恢复；审计字段）
-- [ ] 删除 `DELETE`（软删，非物理删）
+- [ ] 保存 `POST`（新增/更新合一；软删恢复；审计字段；**优先** `SoftDeleteSupport`，保证 `*_by_name`）
+- [ ] 删除 `DELETE`（软删，非物理删；写 `deleted_by` 时写 `deleted_by_name`）
+- [ ] 手写 SQL 写 `*_by` / 责任人 UUID 时**必须**同事务写姓名快照（`resolveUserDisplayName`）
 - [ ] 可选：`GET /list`（下拉）、`GET /{id}`（详情）
 - [ ] 关键词/筛选参数与前端 `listFilters` 对齐
 
@@ -1615,13 +1722,12 @@ powershell -File scripts/ensure-tenant-tables.ps1
 - [ ] `businessSchemas.ts` 字段定义（`list`/`required`/`dictType`/`linkTable`）
 - [ ] `refSelectConfig.ts` 外键下拉（`valueKey`：`*_id` 用 `id`，编码列另建 `*_code` 键）
 - [ ] 页面 `PageConfig`：`saveUrl`、`listPageUrl`、`deleteUrl`（自定义 Controller 时必配）
-- [ ] 路由/菜单可访问；列表筛选、新增、编辑、删除走通
+- [ ] 路由/菜单可访问；列表筛选、新增、编辑、删除走通；责任人展示优先读姓名快照列
 
 **验证**
 
 - [ ] `mvn compile` 通过；重启相关服务后手工点一遍 CRUD
-
----
+- [ ] 抽查新建/更新/软删行：`*_by` 与 `*_by_name`（及业务责任人姓名）均非空（有登录用户时）
 
 ## 附录 N：资产台账 × 公用设备需求梳理（2026-07-12）
 
@@ -1784,7 +1890,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 | 类别 | 处理 |
 |------|------|
-| `shared_device` 表 | **删除**（V1 去除建表；`R__tenant_schema_sync` 迁移后 `DROP`） |
+| `shared_device` 表 | **删除**（V1 去除建表；`R__columns_biz / R__data_fix` 迁移后 `DROP`） |
 | `*DeviceController`（保养/巡检/计量/PM） | **删除**；执行单生成迁入 `*ExecutionGenerator` + `*PlanController` |
 | 前端 `*DevicePage.vue` 及菜单 `*_device` | **停用并移除**；设备标记与属性在台账表单维护 |
 | 独立设备表（保养/巡检/计量/PM） | **不存在**；无需删表 |
@@ -1798,7 +1904,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 ### O.4 实施清单
 
 - [x] 删除 `shared_device` 建表及审计脚本引用
-- [x] `R__tenant_schema_sync`：存量迁移 + `DROP TABLE shared_device`
+- [x] `R__columns_biz / R__data_fix`：存量迁移 + `DROP TABLE shared_device`
 - [x] 删除 4 个 `*DeviceController`，执行生成逻辑迁入 Generator
 - [x] 删除 4 个 `*DevicePage.vue`，移除 `ModulePage` / `pageRegistry` 路由
 - [x] 停用菜单：`maintain_device`、`inspect_device`、`metrology_device`、`pm_device`
@@ -1874,7 +1980,8 @@ powershell -File scripts/ensure-tenant-tables.ps1
 3. **交付前自检与修补**
    - 修改完成后，检查并补全/修正：
      - **后端 CRUD**：列表/详情、创建、更新、删除、校验、权限、软删、关联约束、错误返回等；
-     - **前端交互**：入口操作、表单/抽屉、只读与可编辑边界、按钮显隐、成功失败提示、与后端契约一致等。
+     - **前端交互**：入口操作、表单/抽屉、只读与可编辑边界、按钮显隐、成功失败提示、与后端契约一致等；
+     - **姓名冗余（附录 W.5）**：审计 `*_by_name` 与业务责任人姓名快照（约定包 §6.3）。
    - 发现缺口则当场修补，再视为完成。
 
 ### Q.2 执行说明
@@ -1902,17 +2009,68 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 | 主题 | 位置 |
 |------|------|
-| **跨项目可复用约定全集** | [reusable-engineering-conventions.md](reusable-engineering-conventions.md) |
-| 数据库迁移双轨（V1/V2 建表，R__ 补列） | [附录 D](#附录-d数据库迁移规范必读) |
+| **跨项目可复用约定全集** | [reusable-engineering-conventions.md](reusable-engineering-conventions.md)（**v1.7**） |
+| 数据库迁移双轨 / **固定槽位** / 串库防护 | [附录 D](#附录-d数据库迁移规范必读)（含 D.5 / D.6） |
 | 开发完成验收清单 | [附录 E](#附录-e开发完成验收清单必读) |
 | public schema 迁移 | [附录 F](#附录-fpublic-schema-迁移规范2026-07-11) |
-| 标准七列 / 软删与审计 | [附录 G](#附录-g软删除与审计字段规范2026-07-12)、[附录 I](#附录-i删除状态字段-is_deleted2026-07-12)、[附录 K](#附录-k审计字段与软删唯一键修补2026-07-12) |
+| 标准七列 / 软删与审计 / 读过滤 / 物理删盘点 | [附录 G](#附录-g软删除与审计字段规范2026-07-12)、[附录 I](#附录-i删除状态字段-is_deleted2026-07-12)、[附录 K](#附录-k审计字段与软删唯一键修补2026-07-12)、G.10、I.4–I.5 |
 | 外键显示名称 | [附录 H](#附录-h外键字段显示名称2026-07-12) |
+| 新增表/字段 CRUD 通检 | [附录 M.7](#m7-新增表字段通用检查清单每次必做) |
 | 开发面板 Clean/打包与状态 | [附录 J](#附录-j开发面板整体-clean-与打包2026-07-12)、[附录 L](#附录-l开发面板状态显示滞后2026-07-12) |
 | 主数据变更记录与精简快照 | [附录 T](#附录-t主数据查看与变更记录)（含 T.5 / T.6） |
 | 列表字典中文 | [附录 R](#附录-r列表状态与字典值中文显示) |
 | 报修草稿/提交/撤回 | [附录 S](#附录-s设备报修草稿--提交--撤回) |
-| 维修调度/进程/工程师/验收 | [附录 U](#附录-u维修调度工程师进程与验收2026-07-13) |
+| 维修调度/进程/工程师/验收 | [附录 U](#附录-u维修调度工程师进程与验收2026-07-13)（含 U.13 / U.14 / U.15 / U.16 / **U.17**） |
+| 列表勾选 / 批量作用域 | [附录 V](#附录-v列表勾选跨页缓存与批量作用域2026-07-15) |
+| 业务冗余字段（device / 人员姓名） | [附录 W](#附录-w业务冗余字段约定2026-07-15)（含 **W.5**） |
+| 需求文档时间颗粒度 | [附录 Q.9](#q9-需求文档时间颗粒度2026-07-15) |
+
+### Q.7 2026-07-14 从需求文档沉淀的约定增量
+
+已写入 [约定包 v1.2](reusable-engineering-conventions.md)，摘要：
+
+| 增量 | 来源附录 | 约定包章节 |
+|------|----------|------------|
+| 迁库固定槽位、禁止碎片脚本 | D.6 / F | §2.1 |
+| search_path 缺表串库防护 | D.5 | §2.2 |
+| 读接口全覆盖软删过滤；softDelete 禁静默物理删 | I.4 / G.10 | §3.1 / §3.4 |
+| 主从单据禁止只存主表 | PLT-X-05 | §6.1 |
+| UUID 字符串化、options 路径勿与 `/{id}` 冲突 | 工程实践 / H | §5.3 |
+| 新表 CRUD + 变更记录通检 | M.7 / T | §7.4 |
+| 业务编码创建后只读；有关联禁止删主数据 | O / 资产标签等 | §8 NF-06/07 |
+
+### Q.8 2026-07-15 列表勾选与批量作用域
+
+已写入 [约定包 §5.4](reusable-engineering-conventions.md) 与 [附录 V](#附录-v列表勾选跨页缓存与批量作用域2026-07-15)。
+
+**2026-07-16 修订（PLT-UI-01）**：全系统去掉 `ListSelectionBar`（「已选 N 条 / 全选当页 / 取消全选」）；跨页缓存与作用域弹窗仍强制。约定包升至 **v1.7**。
+
+### Q.9 需求文档时间颗粒度（2026-07-15）
+
+> 指同事在本需求文档中登记需求/问题/版本的时间，**不是**业务单据字段。
+
+| 项 | 定稿 |
+|----|------|
+| **适用范围** | [第 4 章 已知问题](#4-已知问题与技术债)、[第 5 章 待确认问题](#5-待确认问题)、[第 6 章 版本记录](#6-版本记录)；附录内「已确认（日期）」类标注同理 |
+| **新记录** | 使用 **`YYYY-MM-DD HH:mm:ss`**（本地时区，到秒） |
+| **历史记录** | **保持原日期**（仅 `YYYY-MM-DD`），不强制回填时分秒 |
+| **决策列示例** | `**已确认**（2026-07-15 17:36:00）` |
+
+### Q.10 2026-07-15 业务冗余字段约定
+
+已写入 [约定包 v1.4 §6.2](reusable-engineering-conventions.md) 与 [附录 W](#附录-w业务冗余字段约定2026-07-15)。
+
+### Q.11 2026-07-15 21:08:35 工作人员姓名冗余
+
+已写入 [约定包 v1.5 §6.3](reusable-engineering-conventions.md) 与 [附录 W.5](#w5-工作人员姓名冗余2026-07-15)。
+
+定稿：范围含 **标准审计三列姓名** + **业务操作责任人**；取值 `COALESCE(NULLIF(TRIM(real_name),''), username)`；写入时拷贝，**不**因事后改名级联。
+
+### Q.12 2026-07-15 21:20:52 姓名冗余升为强制约定
+
+用户确认：审计字段与操作人姓名冗余策略作为**开发约定**，**后续系统功能一律遵守**（含新表、新手写 SQL、新业务责任人字段）。
+
+已强化 [附录 W.5](#w5-工作人员姓名冗余2026-07-15)、[M.7](#m7-新增表字段通用检查清单每次必做)、交付规则与 [约定包 v1.6 §3 / §6.3 / §7.4](reusable-engineering-conventions.md)。
 
 ---
 
@@ -1966,7 +2124,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 | 页面 | 表单展示 | 列表/详情操作 |
 |------|----------|----------------|
-| **报修申请** `/repair/apply` | 仅 **基本信息** + **备注**（设备、故障描述、紧急程度等）；**不展示**财务信息、流程信息（工程师/派工/费用/验收等） | **提交**、**撤回**、**删除**（草稿）、**变更记录**；**禁止「取消」**（取消属后续维修流程） |
+| **报修申请** `/repair/apply` | 仅 **基本信息** + **备注**（设备、故障描述、紧急程度等）；**不展示**财务信息、派工/费用/验收操作区；**可只读展示**维修进程段与配件更换（见 U.14） | **提交**、**撤回**、**删除**（草稿）、**变更记录**；**禁止「取消」**（取消属后续维修流程） |
 | **维修处理** `/repair/handle` | 展示流程/财务等处理字段 | 派工、接单、转派、完工、挂起、**取消** 等 |
 | **维修验收** `/repair/verify` | 展示验收相关字段 | 验收通过/不通过 |
 
@@ -2178,9 +2336,9 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 | 字段名 | 类型 | 中文注释 |
 |---|---|---|
-| `category_code` | `VARCHAR(6)` | 分类编码（68码） |
+| `category_code` | `VARCHAR(16)` | 分类编码（68码，支持 4/6/8 位） |
 | `category_name` | `VARCHAR(200)` | 分类名称 |
-| `parent_code` | `VARCHAR(6)` | 上级编码 |
+| `parent_code` | `VARCHAR(16)` | 上级分类编码 |
 | `level` | `INTEGER` | 层级 |
 | `sort_order` | `INTEGER` | 排序号 |
 | `is_active` | `BOOLEAN` | 是否启用 |
@@ -2209,9 +2367,9 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 | 字段名 | 类型 | 中文注释 |
 |---|---|---|
-| `finance_code` | `VARCHAR(50)` | 财务编码 |
-| `finance_name` | `VARCHAR(200)` | 财务名称 |
-| `parent_id` | `UUID` | 上级分类 |
+| `finance_code` | `VARCHAR(50)` | 分类编码（列表展示名） |
+| `finance_name` | `VARCHAR(200)` | 分类名称（列表展示名） |
+| `parent_id` | `UUID` | 上级分类（列表展示于会计科目前） |
 | `account_subject` | `VARCHAR(50)` | 会计科目 |
 | `fund_source` | `VARCHAR(50)` | 资金来源 |
 | `sort_order` | `INTEGER` | 排序号 |
@@ -2447,6 +2605,160 @@ API：`GET /repair/workorder/page` 增加 `statuses`（逗号分隔）、`urgenc
 
 **主流程结论**：报修 → 派单/抢单 → 维修进程 → 验收/拒绝/返修 **已闭环**；上述缺口不影响首期上线。
 
+### U.13 列表抢单与进程段补录字段（2026-07-15）
+
+> 来源：用户需求 + 现场问题（抢单 bad SQL、进程类型下拉空）。
+
+#### U.13.1 合理性
+
+| 项 | 结论 |
+|----|------|
+| 列表操作「派工」后增加「抢单」 | **合理**；与详情 footer 抢单同规则 |
+| 添加进程可选工程师 | **合理**；默认工单负责人（无则当前登录工程师），可改选 |
+| 开始/结束时间 | **合理**；开始默认此刻可改；结束默认空，勾选后才可填（补录） |
+| 进程类型为空 | **缺陷**：须修种子/过滤/`addable` 静默空列表 |
+
+#### U.13.2 行为定稿
+
+| 能力 | 规则 |
+|------|------|
+| **列表抢单** | `#row-actions` 在派工之后；规则同详情 `can('grab')` |
+| **进程工程师** | 默认接单人（`assigned_user_id`）**只读**；勾选「修改工程师」后可改且 **支持多选**；第一个为主责写入段 `user_id`，全部写入 `repair_workorder_segment_user` |
+| **开始时间** | 必填，默认当前时刻 |
+| **结束时间** | 默认不启用；勾选「填写结束时间（补录）」后可填；有值则段入库即已结束；须 ≥ 开始 |
+| **上一段** | 新段前自动结束开放段；上一段 `ended_at` 取本段 `started_at` |
+| **进程类型** | `/addable` 不因 segment 表短暂缺失静默空返回；布尔稳健解析；种子按 `type_code` 幂等补齐 |
+
+#### U.13.3 抢单 bad grammar
+
+多因租户缺 `assigned_user_id`。处置：`R__columns_biz` + 重启 meis-tenant；缺列时接口返回明确提示。
+
+#### U.13.4 进程工程师多选与 JDBC 占位符排查（2026-07-15）
+
+| 项 | 定稿 |
+|----|------|
+| 默认 | 工程师=工单接单人，禁止编辑 |
+| 修改 | 勾选后可多选维修工程师；一段可多人同时参与 |
+| 存储 | 段表 `user_id`=主责（列表第一人）；成员表 `repair_workorder_segment_user` |
+| JDBC 扫描 | 已修 `?`/参数不匹配：进程段 INSERT、入库生成设备、报废、保养记录/执行单、巡检/计量执行、公用借调 |
+
+**状态**：按 U.13（含 U.13.4）实施。
+
+### U.14 列表功能分列、进程展示与段确认固化（2026-07-15 17:36:00）
+
+> 来源：用户需求（文末草稿已并入本节后删除）。
+
+#### U.14.1 合理性
+
+| 项 | 结论 |
+|----|------|
+| 维修列表横向滚动（仅维修相关页） | **合理**；字段与功能只会增多 |
+| 取消单一「操作列」，每功能独立列 | **合理**；便于后续调列序；操作列仅保留查看/编辑/删除/变更记录等通用项（或按页精简） |
+| 申请+处理可见进程与配件 | **合理**；修订附录 S.4：申请页 **只读**展示进程/配件，仍不展示财务与派工操作 |
+| 工程师行列表 + 工作内容选填 | **合理**；`segment_user.work_content` |
+| 段确认固化（非完整审批流） | **合理**；与科室验收区分，避免双重审批 |
+
+#### U.14.2 维修列表交互（方案 A）
+
+| 项 | 定稿 |
+|----|------|
+| **范围** | 仅维修：`/repair/apply`、`/repair/handle`、`/repair/verify`、`/repair/workorder`（不做全局 CrudPage 约定） |
+| **横向滚动** | 表格区域可左右滑动（`el-table` 宽溢出即出现横向滚动条）；页面骨架不动 |
+| **功能列** | **维修处理**：取消把派工/接单/转派等塞进同一操作列；**每个功能单独一列**（派工、抢单、接单、转派、添加进程、开始维修、完工、挂起、恢复、取消…）；后续新功能继续追加列，列序可后调 |
+| **维修验收** | 同方案 A：**取消单一操作列**；列表分列展示全部能力——**查看**、**验收**、**拒绝验收**（两列拆分，勿合并）、**变更记录**；仅 `pending_verify` 显示验收/拒绝按钮；权限与详情 footer 一致，**不必进详情才能操作** |
+| **通用操作** | 「查看 / 编辑 / 删除 / 变更记录」可保留窄操作列或并入功能列；权限规则与详情 footer 一致，**不必进详情才能操作** |
+| **详情 footer** | 保留同等能力（双入口）；验收页 footer 同步提供「验收」「拒绝验收」 |
+
+#### U.14.3 进程与配件展示
+
+| 页面 | 规则 |
+|------|------|
+| **报修申请** | 详情内 **只读**展示「维修进程段」及每段 **配件更换记录**；不可添加进程/配件/确认 |
+| **维修处理** | 详情内展示进程段 + 配件；未确认段可维护；已确认段只读 |
+| **列表** | 本轮不强制加「进程摘要」列（可后续追加） |
+
+#### U.14.4 进程段工程师与工作内容
+
+| 项 | 定稿 |
+|----|------|
+| UI | 添加/编辑进程时为 **工程师行列表**（选人 + 工作内容 + 主责标记），非仅多选下拉 |
+| `work_content` | **选填**；存 `repair_workorder_segment_user.work_content` |
+| 主责 | 仍同步段表 `user_id`；成员表 `is_primary` |
+| 展示 | 进程段下列出各工程师姓名与工作内容 |
+
+#### U.14.5 段确认固化
+
+| 项 | 定稿 |
+|----|------|
+| **模型** | 轻量「确认固化」，**不做**通过/驳回审批流 |
+| **必记字段** | 段确认操作须写入并展示：**确认状态**、**确认时间**（`confirmed_at`）、**确认人**（`confirmed_by` → 姓名） |
+| **确认状态** | `未确认` / `已确认`；系统自动段展示为 `已确认（系统）`（`auto_created`，可不写 `confirmed_by`） |
+| **落库** | `POST .../segments/{id}/confirm` 时 `confirmed_at = NOW()`、`confirmed_by = 当前登录用户`；事件流水 `confirm_segment` |
+| **未确认** | 可改：进程备注/起止（若已开放编辑接口）、工程师列表与工作内容、配件明细；可删除未确认段（若实现删除） |
+| **已确认** | **禁止**删改进程、工程师、配件；只读展示 |
+| **系统段** | `auto_created = true` → **视为已固化**（接单开段、拒绝验收、待验收等） |
+| **谁确认** | 具备 **维修处理** 操作权限的用户（调度/设备科；与派工同级）；工程师维护未确认段，确认由调度执行 |
+| **提交验收** | 除当前仍开放且即将关闭的段外，**历史段须均已确认**；否则拦截并提示 |
+| **API** | `POST /repair/workorder/{id}/segments/{segmentId}/confirm` |
+
+#### U.14.6 库表变更（固定槽位）
+
+| 表 | 变更 |
+|----|------|
+| `repair_workorder_segment` | `confirmed_at TIMESTAMPTZ`、`confirmed_by UUID`（→ sys_user） |
+| `repair_workorder_segment_user` | `work_content TEXT` |
+| 脚本 | `V1__tables.sql` 同步建表；`R__columns_biz.sql` 补列 |
+
+**状态**：按 U.14 实施。
+
+### U.15 进程段编辑删除、确认补全与配件档案（2026-07-15 20:42:27）
+
+> 来源：用户需求（文末草稿已并入本节与附录 W 后删除）。  
+> 待确认已定稿：删段不重开上一段；工程师至少保留 1 人；进行中可改 `ended_at`；确认时空 `ended_at` 回填；开待验段时自动确认未确认段；冗余选方案 B 并推广（附录 W）。
+
+#### U.15.1 进程段编辑 / 删除 / 配件行
+
+| 项 | 定稿 |
+|----|------|
+| **可编辑** | 仅 **未确认** 段（含进行中开放段）：备注、`started_at` / `ended_at`、工程师行（含工作内容/主责）、配件行 |
+| **配件行可改** | 单价、数量、**供应商**（`repair_workorder_segment_part.supplier_id`）；**金额 = 数量 × 单价**（写 `total_price`，界面只读展示）；可删行 |
+| **添加工序弹窗** | 「添加维修进程」与「编辑维修进程」配件区一致：每行配件 + 数量 + 单价 + 金额(自动) + 供应商；选配件时可带出档案默认单价/供应商（可改） |
+| **工程师** | 可删人；**至少保留 1 人**；删主责则按剩余顺序第一人升主责并同步段 `user_id` |
+| **删除段** | 仅未确认；**软删**；**不**清空/重开上一段 `ended_at` |
+| **已确认 / 系统段** | 仍只读（U.14.5） |
+| **API** | `PUT .../segments/{segmentId}`；`DELETE .../segments/{segmentId}`；`PUT .../segments/{segmentId}/parts/{partId}`；`DELETE .../parts/{partId}`；工程师随段 PUT 全量覆盖或提供删人接口 |
+| **页面** | 维修处理详情可操作；报修申请仍只读（U.14.3） |
+
+#### U.15.2 段确认与待验自动确认
+
+| 项 | 定稿 |
+|----|------|
+| **确认时空 `ended_at`** | `POST .../confirm` 时若 `ended_at IS NULL`，则 **`ended_at = NOW()`**（与 `confirmed_at` 同次写入） |
+| **开「已维修待验」段** | 创建 `pending_verify` 系统段时：**自动确认**本工单全部仍未确认的段（含刚结束的开放段）；对每段执行与手工确认同等落库（`confirmed_at`/`confirmed_by`；空则补 `ended_at`）；系统段自身仍按 U.14 视为已固化 |
+| **提交验收拦截** | 保留 U.14.5：历史段须已确认；因待验开段已自动确认，正常完工路径应已满足 |
+
+#### U.15.3 配件档案（去进销存 UI）
+
+| 项 | 定稿 |
+|----|------|
+| **隐藏字段** | 表单/列表不展示：库房、库位、库存数量、最低库存；**经验默认一并隐藏**最高库存（`max_stock`） |
+| **隐藏 Tab** | 「库存预警」「流水记录」整页隐藏（库表可保留，接口可不挂菜单） |
+| **进销存** | 与 REP-F-02 一致，**本期不做**；禁止从档案页维护库存数量 |
+| **拼音简码** | `spare_part.pinyin_code`（双轨补列）；列表支持「生成简码」（对齐供应商/科室） |
+| **复制** | 支持；打开新增并带出名称/规格等；**编码须重填**（不自动生成，避免撞码） |
+| **删除** | 软删；若存在进程配件明细 / 使用记录 / 流水等业务引用则 **禁止删除** 并提示 |
+
+#### U.15.4 库表变更（固定槽位）
+
+| 表 | 变更 |
+|----|------|
+| `repair_workorder_segment_part` | `supplier_id UUID`（→ supplier） |
+| `spare_part` | `pinyin_code VARCHAR(50)` |
+| 冗余列 | 见 [附录 W](#附录-w业务冗余字段约定2026-07-15)（维修 P0） |
+| 脚本 | `V1__tables.sql` + `R__columns_biz.sql` |
+
+**状态**：U.15 / W.3.1（维修 P0）已实施；跨模块见 W.3.2 / `BACKLOG-AST-W01`。
+
 **开发面板热加载自检（2026-07-13）**：截图中 `meis-tenant`「JAR 落后 + 待同步」而 `meis-repair` 已热加载，属 **机制 + 状态刷新** 叠加（见附录 L.6 机制修补），非业务缺陷。请 **重启开发面板** 使脚本生效；若 tenant 仅 HTTP 无 JDWP，须手动热加载或「调试启动」。
 
 #### 拉取同事代码与 mtime 早晚（2026-07-13 确认）
@@ -2461,4 +2773,278 @@ API：`GET /repair/workorder/page` 增加 `statuses`（逗号分隔）、`urgenc
 
 **建议**：`git pull` 后若涉及 Java，对改过的服务点一次「热加载」最稳妥；依赖 `meis-common` 时用「热加载依赖」。
 
+### I.4 查询默认排除已软删（2026-07-14）
+
+| 项 | 约定 |
+|----|------|
+| 适用范围 | 所有读接口：列表、详情、下拉/options、统计 COUNT/SUM、登录与权限解析、业务校验用的存在性查询 |
+| 实现 | 拼接 `SoftDeleteSupport.notDeletedClause(jdbc, table, alias)`（无 `is_deleted`/`deleted_at` 列时返回空串，安全兼容） |
+| 例外 | 变更记录快照加载、按唯一键**查找已软删行以便恢复**、明确「含已删」的管理排查接口（须标注） |
+| 联表 | **每张有软删列的业务表别名**各自加过滤；勿只滤主表而忽略子表/候选设备等 |
+
+> 手工 SQL / 业务重写的 page/get（尤其 `meis-purchase`、`meis-maintain`、`meis-qc`、`meis-asset` 出入库类）历史上易漏；`GenericTableController` 路径已默认过滤。
+
+### I.5 缺 `is_deleted` 表的动态补齐（2026-07-14）
+
+| 项 | 约定 |
+|----|------|
+| 范围 | 各租户 schema 内全部 `BASE TABLE`（排除 `flyway_%`） |
+| 动作 | 缺列则 `ADD is_deleted SMALLINT NOT NULL DEFAULT 0`；同步补 `deleted_at`/`deleted_by`；存量因 DEFAULT 为 `0`；有 `deleted_at` 时已删行回填 `is_deleted=1` |
+| 脚本 | `R__columns_audit.sql` 动态 DO（权威）；勿再新增零散 patch |
+| 扫描结果 | `tenant_*` 仅缺：`device_label_print_log`、`sys_entity_change_log`（日志类亦补标志；读过滤仍按 I.4 例外） |
+| public | 平台/遗留副本不在本轮租户补齐范围 |
+
+
+### G.10 物理删除盘点与结构补齐策略（2026-07-14）
+
+#### G.10.1 代码中 `DELETE FROM` 盘点
+
+| 类别 | 表 / 位置 | 结论 |
+|------|-----------|------|
+| **明细先清空再写入（保留物理删）** | `*_item` / `*_member` / `contract_payment`（随主单保存重写）：采购计划/合同付款/验收、出入库退货盘点明细、保养/巡检/计量/PM 模板项 | **符合 G.3**，不改为软删（否则每次保存堆积软删行） |
+| **主表删除 API** | 走 `SoftDeleteSupport.softDelete` / `GenericTableController` | **已是软删** |
+| **工具兜底** | `SoftDeleteSupport`：表无软删列时曾物理 `DELETE` | **改为报错**，禁止静默物理删主数据 |
+| **平台租户注销** | `TenantService`：`sys_tenant` + `sys_tenant_menu` | **例外**：平台配置/关联重绑；租户行现状物理删 |
+| **租户菜单重绑** | `TenantMenuService`：先删后插绑定 | **等同明细例外**，保留物理删 |
+
+> 结论：租户**业务主表**侧未发现「删除接口仍物理删」的缺口；现存物理删几乎全是 G.3 明细重写或平台绑定。
+
+#### G.10.2 新增表必须含标准七列（重申并加强）
+
+| 要求 | 说明 |
+|------|------|
+| **强制** | 新建租户业务表 `CREATE TABLE` **必须**含附录 G.0 七列 |
+| `is_deleted` | `SMALLINT NOT NULL DEFAULT 0`（未删默认 0） |
+| **禁止** | 建表后再靠业务代码「碰巧」补列；禁止无七列的新表进入 `V1__tables.sql` |
+| **存量** | 继续靠 `R__columns_audit.sql`（含动态补 `is_deleted`） |
+
+#### G.10.3 库结构补齐：SQL 脚本为主，代码扫描为辅（定稿）
+
+| 方式 | 擅长 | 不擅长 |
+|------|------|--------|
+| **SQL / Flyway R__（结构真理来源）** | 幂等加列、默认值、存量回填、多租户一致、可审计 | 发现代码误写物理 `DELETE` |
+| **代码扫描（行为门禁）** | 找 `DELETE FROM`、漏 `notDeletedClause`、主表未走 `softDelete` | 不能代替迁库给各租户加列 |
+
+**定稿组合**：
+
+1. **库结构** → **只认 SQL**：`V1`（新表）+ `R__`（老表幂等）；必要时手工 patch；启动 `meis-tenant` 落到各租户。
+2. **运行行为** → **代码约定 + 扫描**：主表禁止裸 `DELETE`；明细 G.3 例外须可识别；可用巡检扫 `DELETE FROM`。
+3. **不要**用应用启动时 Java 扫库再 `ALTER` 作主方案；动态 DO 放在 **R__ SQL** 内（已采用）。
+
 ---
+
+## 附录 V：列表勾选跨页缓存与批量作用域（2026-07-15）
+
+> 来源：用户需求；通用原则双写 [约定包 §5.4](reusable-engineering-conventions.md)。  
+> **2026-07-16 修订**：按 PLT-UI-01 取消「已选 / 全选当页 / 取消全选」提示条 UI；其余约定不变。
+
+### V.1 合理性结论
+
+- **合理**：分页列表仅「当页勾选」易导致误操作；导出/批量变更若不区分「勾选行 / 当前查询全部」容易伤数或漏数。
+- **无批量/导出**的列表不应挂空勾选列。
+- **提示条**：用户反馈全系统列表上方的「已选 N 条（跨页保留）/ 全选当页 / 取消全选」占用视线且与表头勾选重复 → **全局移除**；跨页能力改由表头/行勾选 + `reserve-selection` 承担。
+
+### V.2 行为约定
+
+| 能力 | 说明 |
+|------|------|
+| 跨页缓存 | `row-key` + `reserve-selection` + `useCrossPageSelection`；翻页保留已选 |
+| ~~全选当页 / 取消全选提示条~~ | **已废止**（不再渲染 `ListSelectionBar`）；可用表头勾选选当页 |
+| 筛选/重置 | 清空勾选 |
+| 导出 / 批量写 | `promptListActionScope`：仅勾选行 vs 全部查询结果；后端收 `ids` 或筛选条件（`keyword`/`filters`/`all`） |
+| 候选池确认添加 | 只需已选 id（如维修工程师批量添加） |
+
+### V.3 MEIS 落地
+
+| 组件/页面 | 说明 |
+|-----------|------|
+| `CrudPage` | 有勾选列时**不**再展示提示条；导出/生成简码仍走作用域 |
+| 用户 / 科室 / 供应商等 | 同上；用户批量修改支持 `all` + 筛选 |
+| 工程师候选弹窗 / 盘点设备选择 | 跨页勾选；确认添加仅已选（无提示条） |
+| 系统配置 / 电流读数 | 去掉无用勾选列 |
+| 采购计划/合同 | 统一走 `CrudPage` 导出 |
+
+**状态**：按修订后 V.2 / V.3 实施；新列表默认遵守约定包 §5.4（无提示条）。
+
+---
+
+## 附录 W：业务冗余字段约定（2026-07-15）
+
+> 来源：用户确认方案 B，并要求不限于 `device_id`、按经验推广关键字段冗余，便于台账追溯与直查。  
+> 可复用原则双写 [约定包 v1.4 §6.2](reusable-engineering-conventions.md)。
+
+### W.1 原则
+
+| 项 | 定稿 |
+|----|------|
+| **目的** | 子表/流水可按设备（及关键展示字段）直查，少跨多层 join；保留写入时点快照 |
+| **写入** | 插入子行时从 **主单 / 台账** 拷贝冗余列；同事务 |
+| **变更** | 子行 **不随** 台账事后改名自动级联（快照语义）；主单若允许改 `device_id`（罕见），须同事务刷新未关闭子行或禁止改设备 |
+| **勿冗余** | 纯字典/模板主数据、无设备上下文的配置表 |
+| **索引** | 对高频按设备查询的表建 `device_id` 索引（`V2__indexes.sql`） |
+| **回填** | 老数据一次性 `UPDATE … FROM` 主单回填；可空列允许历史 NULL，新写入必填（主单有设备时） |
+
+### W.2 推荐冗余列（设备业务子表）
+
+| 列 | 说明 |
+|----|------|
+| `device_id` | **必冗余**（主单有设备时） |
+| `device_code` | 编码快照，列表/导出免 join |
+| `device_name` | 名称快照 |
+| 单据号快照（可选） | 如 `wo_no`，便于流水独立展示 |
+| 组织快照（可选） | 如报修科室 `report_dept_id` 仅主单需要时不必向下铺 |
+
+配件明细行另可冗余：`supplier_id`（业务可改，以行为准）+ 展示用供应商名称可由 join 或快照二选一（本期 **只存 supplier_id**，名称走字典/外键显示）。
+
+### W.3 落地范围
+
+#### W.3.1 维修（P0，与 U.15 同轮）
+
+| 表 | 补列 |
+|----|------|
+| `repair_workorder_event` | `device_id`、`device_code`、`device_name` |
+| `repair_workorder_process` | 同上 |
+| `repair_workorder_segment` | 同上 |
+| `repair_workorder_segment_part` | 同上 + `supplier_id` |
+| `spare_part_usage` | `device_id`、`device_code`、`device_name`（有工单时从工单带入） |
+| `spare_part_transaction` | 同上（若本期仍保留表结构） |
+
+`repair_workorder_segment_user`：**不强制**铺设备冗余（人维度，台账少直查）；需要时经 segment → device。
+
+主单 `repair_workorder` 已有 `device_id/code/name`，保持写入校验（创单/改单设备必填）。
+
+#### W.3.2 其他模块（P1，同约定分批补）
+
+| 模块 | 现状缺口（经验） | 补齐 |
+|------|------------------|------|
+| 保养 | `maintenance_execution` / `maintenance_execution_result` 缺 `device_id` | 从计划/记录带入 + code/name |
+| 计量 | `metrology_execution` 缺 | 同上 |
+| 巡检 | `inspection_execution` 缺 | 同上 |
+| 预防性维护 PM | `pm_execution` 缺 | 同上 |
+| 公用设备 | `shared_device_fee` 缺 `device_id` | 从借调/归还单带入 + code/name |
+
+已有 `device_id` 的主单/明细（如 `maintenance_record`、`inspection_record`、借调单等）**补齐 code/name 快照**（若尚无），写入时从 `medical_device` 拷贝。
+
+P1 记入第 7 章：`BACKLOG-AST-W01`（跨模块执行表/费用表冗余补齐），实施时仍走固定迁库槽位。
+
+### W.4 台账查询
+
+设备台账子页（维修/保养/巡检/计量/借调等）优先：
+
+1. 有冗余 `device_id` 的子表/流水 → `WHERE device_id = ?`  
+2. 否则 → 经主单 `device_id` 关联  
+
+**状态**：W.3.1 与 U.15 同轮实施；W.3.2 进待开发池后分批。
+
+### W.5 工作人员姓名冗余（2026-07-15）**【强制约定】**
+
+> 来源：用户确认——审计列 + 业务责任人均冗余姓名；优先 `real_name`，空则 `username`；写入快照、不级联改名。  
+> **效力（Q.12）**：后续所有新功能 / 新表 / 新手写 SQL **一律遵守**；存量缺口分批修补（见 W.5.5 / `BACKLOG-PLT-W02`）。  
+> 可复用原则双写 [约定包 v1.6 §3 / §6.3](reusable-engineering-conventions.md)。
+
+#### W.5.1 原则
+
+| 项 | 定稿 |
+|----|------|
+| **目的** | 操作记录背书、责任落实到人；避免用户改名后 join 导致追溯展示漂移 |
+| **取值** | `COALESCE(NULLIF(TRIM(real_name), ''), username)`（与变更记录 `operator_name` 一致） |
+| **写入** | 写 `*_by` / 业务责任人 UUID 的**同一事务**拷贝姓名列 |
+| **变更** | **不**因事后改名级联更新历史行（快照语义，同 W.1） |
+| **列命名** | 审计：`created_by_name` / `updated_by_name` / `deleted_by_name`；业务：`{role}_name` 或 `{field}_name`（如 `reporter_name`、`operator_name`、`confirmed_by_name`） |
+| **勿冗余** | 纯关联配置表、无责任语义的中间表（如仅存 `role_id` 的关系表） |
+| **实现偏好** | 优先 `SoftDeleteSupport.applyInsertAudit` / `appendUpdateAuditSets(jdbc,…)`；手写 SQL 须显式绑姓名 |
+
+#### W.5.2 标准审计姓名（全表，强制）
+
+凡含 `created_by` / `updated_by` / `deleted_by` 的租户业务表，配套同名 `*_by_name VARCHAR(100)`：
+
+| 触发 | 动作 |
+|------|------|
+| INSERT | 写 `created_by` 时写 `created_by_name` |
+| UPDATE | `appendUpdateAuditSets` 写 `updated_by` 时写 `updated_by_name` |
+| 软删 | 写 `deleted_by` 时写 `deleted_by_name` |
+| 恢复 | `deleted_by` / `deleted_by_name` 置空 |
+
+落地：`R__columns_audit.sql` 动态补列；`R__data_fix.sql` 按 UUID 回填；`SoftDeleteSupport` 统一写入。客户端禁止伪造 `*_by_name`（列入 `CLIENT_UPDATE_STRIP`）。
+
+#### W.5.3 业务操作责任人（强制策略，落地分批）
+
+**策略强制**：凡新增或改写带操作语义的用户 UUID 字段，**必须**同步姓名列与写入逻辑。存量按优先级补齐。
+
+| 优先级 | 范围 | 示例列 |
+|--------|------|--------|
+| **P0** | 维修 | `repair_workorder.reporter_name` / `assigned_user_name`；`repair_workorder_event|process` 的 `operator_name`、`user_name`、`from_user_name`、`to_user_name`；`repair_workorder_segment.user_name` / `confirmed_by_name`；`repair_workorder_segment_user.user_name`；`spare_part_usage.operator_name` |
+| **P1** | 其他模块 | 出入库/归还 `operator_name`；不良事件 `reporter_name`/`handler_name`；验收成员等 → `BACKLOG-PLT-W02` |
+
+已有姓名列（如 `sys_entity_change_log.operator_name`）保持，写入规则与 W.5.1 对齐。
+
+#### W.5.4 展示
+
+列表/详情优先读快照列；快照为空时（历史数据）可临时 join `sys_user` 回退，回填完成后应以快照为准。
+
+**状态**：**约定已强制生效**（Q.12）；W.5.2 列已就绪、通用 CRUD 已写；维修 W.5.3 P0 已落地；手写 SQL 审计姓名与非维修责任人分批修补（W.5.5 / `BACKLOG-PLT-W02`）。
+
+#### W.5.5 代码自检（2026-07-15 21:18:41）
+
+| 类别 | 结论 |
+|------|------|
+| **库列** | `R__columns_audit` 动态补 `*_by_name`；维修责任人列在 `R__columns_biz`；老数据 `R__data_fix` 可回填 |
+| **通用 CRUD** | 走 `SoftDeleteSupport` / `GenericTableController` 的路径：**已写** `created/updated/deleted_by_name` |
+| **变更记录** | `sys_entity_change_log.operator_name`：**已写** |
+| **维修 P0 责任人** | 报修/派工/事件/流程/段确认/段成员/配件领用：**主路径已写** |
+| **审计姓名写点遗漏（存量）** | 大量**手写 SQL** 只写 `*_by`、不写 `*_by_name`（院区/科室/字典/角色/仓库、导入主数据、计量/巡检/保养/PM、电流标签/基站、特种设备、审批流配置等）→ 后续改写这些入口时**必须**补姓名，禁止只写 UUID |
+| **业务责任人（非维修）** | 出入库/归还 `operator_id`、不良事件 `reporter_id`/`handler_id`、各计划 `approved_by`、标签绑定 `operator_id`、验收成员 `user_id` 等 → `BACKLOG-PLT-W02` |
+
+**强制写法**：新建/改业务写点优先复用 `SoftDeleteSupport.applyInsertAudit` / `appendUpdateAuditSets(jdbc,…)`；手写 SQL 须同时绑 `*_by_name = SoftDeleteSupport.resolveUserDisplayName(...)`。
+
+### U.16 到场时间、验收工时/子状态与时间轴（2026-07-15 22:24:00）
+
+> 来源：用户需求（文末草稿已并入本节后删除）。截图：验收关闭后到场时间/维修工时为空、子状态未选；时间轴缺「已维修待验收 / 拒绝验收」节点且与进程段时段不一致。
+
+#### U.16.1 合理性
+
+| 项 | 结论 |
+|----|------|
+| 到场时间空则添加进程时自动填 | **合理**；减少漏填 |
+| 验收后计算维修工时 | **合理**；默认「开始维修 → 最后一次已维修待验收」时段 |
+| 验收后子状态=已验收 | **合理**；需字典项 `repair_sub_status.verified` |
+| 时间轴跟随进程段 | **合理**；避免固定里程碑与真实进程分支脱节 |
+
+#### U.16.2 定稿
+
+| 项 | 定稿 |
+|----|------|
+| **到场时间** | 添加维修进程（工程师段）时：若主单 `arrival_time` 为空，则写入本次段 `started_at`（持久化列） |
+| **维修工时** | 科室**验收通过**时计算并写入 `repair_duration_hours`（小时，2 位小数）：**默认** = 最后一次进程类型 `pending_verify`（已维修待验收）的 `started_at` − `repair_start_time`；若无待验段则退回 `repair_end_time − repair_start_time`；缺任一侧则不写 |
+| **子状态** | 验收通过并结案时：`repair_sub_status = verified`（字典「已验收」）；拒绝验收不强制改子状态（主状态 `verify_rejected`） |
+| **结案时间** | 关闭时持久化 `closed_at`；详情 schema 只读展示 |
+| **时间轴 milestones** | 以事件+进程段驱动：在原有报修/派单/开始/结束/验收/关闭基础上，**插入**「已维修待验收」「拒绝验收」节点（有则显示，时间取对应事件或段 `started_at`）；可多次出现时取各次时间 |
+| **时间轴「维修中明细」** | **改为**来自 `repair_workorder_segment`（类型名 + started_at~ended_at + 时长），不再仅从子状态事件推演，与上方「维修进程段」一致 |
+
+**状态**：按 U.16 实施。
+
+### U.17 进程工程师人工费与财务汇总（2026-07-15 22:33:00）
+
+> 来源：用户需求（文末草稿已并入本节后删除）。草稿「工时费」误写成备件合计，定稿更正。
+
+#### U.17.1 合理性
+
+| 项 | 结论 |
+|----|------|
+| 工程师行填人工费 | **合理**；费用落在参与人维度，可多人分摊 |
+| 备件费=各进程配件金额合计 | **合理**；与配件行 `total_price` 一致 |
+| 工时费=各工程师人工费合计 | **合理**（修正草稿笔误） |
+| 总费用=备件费+工时费 | **合理**；主单财务区只读展示 |
+
+#### U.17.2 定稿
+
+| 项 | 定稿 |
+|----|------|
+| **工程师人工费** | `repair_workorder_segment_user.labor_cost DECIMAL(10,2)`（选填，默认空/0）；添加/编辑进程工程师行可填「人工费」 |
+| **备件费** `parts_cost` | Σ 本工单全部未删进程配件行的 `total_price`（无则按 数量×单价） |
+| **工时费** `labor_cost` | Σ 本工单全部未删进程工程师行的 `labor_cost`（界面标签「工时费」） |
+| **总费用** `total_cost` | `parts_cost + labor_cost` |
+| **回写时机** | 进程段增删改、工程师保存、配件增删改后 **重算并写主单**；详情财务区只读 |
+| **报修申请** | 仍不展示财务区（S.4 / U.14.3） |
+
+**状态**：按 U.17 实施。

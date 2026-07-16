@@ -50,6 +50,18 @@ public final class ImportHeaderMapper {
         for (ImportFieldDef f : ImportFieldRegistry.get(ImportFieldRegistry.MEDICAL_DEVICE)) {
             alias.put(normalize(f.getFieldLabel()), f.getFieldKey());
         }
+        for (ImportFieldDef f : ImportFieldRegistry.get(ImportFieldRegistry.DEVICE_CATEGORY)) {
+            alias.put(normalize(f.getFieldLabel()), f.getFieldKey());
+        }
+        // 兼容旧模板列名
+        alias.put(normalize("设备编码"), "device_code");
+        alias.put(normalize("设备名称"), "device_name");
+        alias.put(normalize("分类编码(68码)"), "category_code");
+        alias.put(normalize("标准分类代码"), "category_code");
+        alias.put(normalize("编码"), "category_code");
+        alias.put(normalize("代码"), "category_code");
+        alias.put(normalize("名称"), "category_name");
+        alias.put(normalize("行号"), "sort_order");
         return alias;
     }
 }

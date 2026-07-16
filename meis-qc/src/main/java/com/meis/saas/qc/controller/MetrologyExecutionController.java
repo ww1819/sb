@@ -4,6 +4,7 @@ import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -22,6 +23,7 @@ public class MetrologyExecutionController {
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(PageQuery query, @RequestParam(required = false) String status) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "metrology_execution", "e"));
         List<Object> args = new ArrayList<>();
         if (status != null && !status.isBlank()) {
             where.append(" AND e.status = ? ");
@@ -57,19 +59,22 @@ public class MetrologyExecutionController {
                 LEFT JOIN metrology_category c ON c.id = e.category_id
                 LEFT JOIN metrology_org o ON o.id = e.org_id
                 WHERE e.id = ?::uuid
-                """, id);
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_execution", "e"), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> result = new LinkedHashMap<>(rows.get(0));
         var items = jdbc.queryForList("""
                 SELECT ei.*, d.dept_name
                 FROM metrology_execution_item ei
                 LEFT JOIN department d ON d.id = ei.dept_id
-                WHERE ei.execution_id = ?::uuid ORDER BY ei.created_at
-                """, id);
+                WHERE ei.execution_id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_execution_item", "ei")
+                + " ORDER BY ei.created_at", id);
         for (Map<String, Object> item : items) {
             UUID itemId = (UUID) item.get("id");
             item.put("results", jdbc.queryForList(
-                    "SELECT * FROM metrology_execution_result WHERE execution_item_id = ?::uuid ORDER BY created_at", itemId));
+                    "SELECT * FROM metrology_execution_result WHERE execution_item_id = ?::uuid "
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_execution_result", null)
+                            + " ORDER BY created_at", itemId));
         }
         result.put("items", items);
         return Result.ok(result);
@@ -108,11 +113,14 @@ public class MetrologyExecutionController {
                 WHERE id=?::uuid
                 """, body.getOrDefault("overall_result", "pass"), body.get("certificate_no"),
                 body.get("certificate_url"), body.get("cost"), body.get("remark"), itemId);
-        var execRows = jdbc.queryForList("SELECT execution_id FROM metrology_execution_item WHERE id = ?::uuid", itemId);
+        var execRows = jdbc.queryForList(
+                "SELECT execution_id FROM metrology_execution_item WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_execution_item", null), itemId);
         if (!execRows.isEmpty()) {
             UUID execId = (UUID) execRows.get(0).get("execution_id");
             long pending = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM metrology_execution_item WHERE execution_id=?::uuid AND status <> 'completed'",
+                    "SELECT COUNT(*) FROM metrology_execution_item WHERE execution_id=?::uuid AND status <> 'completed'"
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_execution_item", null),
                     Long.class, execId);
             if (pending == 0) {
                 jdbc.update("UPDATE metrology_execution SET status='completed', execute_end_time=NOW(), updated_at=NOW() WHERE id=?::uuid", execId);
@@ -128,10 +136,12 @@ public class MetrologyExecutionController {
         var planIds = jdbc.queryForList("""
                 SELECT DISTINCT plan_id FROM metrology_execution_item
                 WHERE execution_id=?::uuid AND plan_id IS NOT NULL
-                """, execId);
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_execution_item", null), execId);
         for (Map<String, Object> row : planIds) {
             UUID planId = (UUID) row.get("plan_id");
-            var plan = jdbc.queryForList("SELECT cycle_days FROM metrology_plan WHERE id=?::uuid", planId);
+            var plan = jdbc.queryForList(
+                    "SELECT cycle_days FROM metrology_plan WHERE id=?::uuid "
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_plan", null), planId);
             if (plan.isEmpty()) continue;
             Integer cycleDays = (Integer) plan.get(0).get("cycle_days");
             LocalDate next = cycleDays != null && cycleDays > 0
@@ -143,8 +153,9 @@ public class MetrologyExecutionController {
                     """, next, planId);
             jdbc.update("""
                     UPDATE medical_device SET last_calibration_date=CURRENT_DATE, next_calibration_date=?, updated_at=NOW()
-                    WHERE id=(SELECT device_id FROM metrology_plan WHERE id=?::uuid)
-                    """, next, planId);
+                    WHERE id=(SELECT device_id FROM metrology_plan WHERE id=?::uuid
+                    """ + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_plan", null) + ")",
+                    next, planId);
         }
     }
 
@@ -154,12 +165,17 @@ public class MetrologyExecutionController {
                 FROM metrology_execution_item ei
                 JOIN metrology_execution e ON e.id = ei.execution_id
                 WHERE ei.id=?::uuid
-                """, itemId);
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_execution_item", "ei")
+                + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_execution", "e"), itemId);
         if (item.isEmpty()) return;
         Map<String, Object> row = item.get(0);
-        var org = jdbc.queryForList("SELECT org_name FROM metrology_org WHERE id=?::uuid", row.get("org_id"));
+        var org = jdbc.queryForList(
+                "SELECT org_name FROM metrology_org WHERE id=?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_org", null), row.get("org_id"));
         String orgName = org.isEmpty() ? null : (String) org.get(0).get("org_name");
-        var plan = jdbc.queryForList("SELECT next_due_date FROM metrology_plan WHERE id=?::uuid", row.get("plan_id"));
+        var plan = jdbc.queryForList(
+                "SELECT next_due_date FROM metrology_plan WHERE id=?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_plan", null), row.get("plan_id"));
         Object nextDue = plan.isEmpty() ? null : plan.get(0).get("next_due_date");
         jdbc.update("""
                 INSERT INTO metrology_record (id, metrology_no, device_id, device_code, device_name, metrology_org,

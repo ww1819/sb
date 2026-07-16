@@ -5,7 +5,6 @@
         <el-button v-if="contract?.id" type="warning" @click="save">保存合同</el-button>
         <el-button v-if="contract?.id" type="primary" @click="submit">提交审批</el-button>
         <el-button v-if="contract?.id" @click="printContract">打印合同</el-button>
-        <el-button @click="exportContract">导出列表</el-button>
       </template>
     </CrudPage>
 
@@ -127,10 +126,6 @@ async function reload() {
 function printContract() {
   if (!contract.value) return
   printContractDoc({ ...contract.value, payments: payments.value })
-}
-
-function exportContract() {
-  window.open('/api/purchase/purchase_contract/export', '_blank')
 }
 </script>
 

@@ -1,39 +1,12 @@
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import http from '@/api/http'
+import { promptListActionScope, type ListActionScope } from '@/composables/useListActionScope'
 
-export type PinyinGenerateScope = 'all' | 'selected'
+export type PinyinGenerateScope = ListActionScope
 
-/** 弹窗选择生成范围后调用后端接口 */
+/** 弹窗选择生成范围后调用后端接口（与列表导出/批量作用域约定一致） */
 export async function promptPinyinScope(selectedCount: number): Promise<PinyinGenerateScope | null> {
-  if (selectedCount === 0) {
-    try {
-      await ElMessageBox.confirm(
-        '当前未勾选任何行，将按当前查询条件更新全部结果。是否继续？',
-        '生成拼音简码',
-        { confirmButtonText: '更新全部结果', cancelButtonText: '取消', type: 'info' }
-      )
-      return 'all'
-    } catch {
-      return null
-    }
-  }
-
-  try {
-    await ElMessageBox.confirm(
-      `已勾选 ${selectedCount} 条记录。请选择拼音简码的更新范围。`,
-      '生成拼音简码',
-      {
-        confirmButtonText: '全部查询结果',
-        cancelButtonText: '仅勾选行',
-        distinguishCancelAndClose: true,
-        type: 'info'
-      }
-    )
-    return 'all'
-  } catch (action) {
-    if (action === 'cancel') return 'selected'
-    return null
-  }
+  return promptListActionScope(selectedCount, '生成拼音简码')
 }
 
 export async function executePinyinGenerate(

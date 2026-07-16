@@ -2,6 +2,7 @@ package com.meis.saas.purchase.support;
 
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.ArrayList;
@@ -14,6 +15,7 @@ public final class PurchasePageQueries {
     public static PageResult<Map<String, Object>> planPage(JdbcTemplate jdbc, PageQuery q,
             String approvalStatus, Integer planYear) {
         StringBuilder where = new StringBuilder(" WHERE p.is_active IS NOT FALSE ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", "p"));
         List<Object> args = new ArrayList<>();
         appendKeyword(where, args, q.getKeyword(), "p.plan_code", "d.dept_name", "u.real_name");
         if (approvalStatus != null && !approvalStatus.isBlank()) {
@@ -24,12 +26,13 @@ public final class PurchasePageQueries {
             where.append(" AND p.plan_year = ? ");
             args.add(planYear);
         }
-        PurchaseDataScope.applyPlanFilter(where, args);
+        PurchaseDataScope.applyPlanFilter(where, args, jdbc);
         String from = """
             FROM purchase_plan p
             LEFT JOIN department d ON d.id = p.dept_id
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "department", "d") + """
             LEFT JOIN sys_user u ON u.id = p.applicant_id
-            """;
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "u");
         return page(jdbc, from, where, args, q, "p.created_at DESC NULLS LAST",
                 "p.*, d.dept_name, u.real_name AS applicant_name");
     }
@@ -37,6 +40,7 @@ public final class PurchasePageQueries {
     public static PageResult<Map<String, Object>> projectPage(JdbcTemplate jdbc, PageQuery q,
             String status, String planId) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "purchase_project", "pj"));
         List<Object> args = new ArrayList<>();
         appendKeyword(where, args, q.getKeyword(), "pj.project_code", "pj.project_name", "pl.plan_code", "s.supplier_name");
         if (status != null && !status.isBlank()) {
@@ -47,12 +51,13 @@ public final class PurchasePageQueries {
             where.append(" AND pj.plan_id = ?::uuid ");
             args.add(planId);
         }
-        PurchaseDataScope.applyProjectFilter(where, args);
+        PurchaseDataScope.applyProjectFilter(where, args, jdbc);
         String from = """
             FROM purchase_project pj
             LEFT JOIN purchase_plan pl ON pl.id = pj.plan_id
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", "pl") + """
             LEFT JOIN supplier s ON s.id = pj.supplier_id
-            """;
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "supplier", "s");
         return page(jdbc, from, where, args, q, "pj.created_at DESC NULLS LAST",
                 "pj.*, pl.plan_code, s.supplier_name");
     }
@@ -60,6 +65,7 @@ public final class PurchasePageQueries {
     public static PageResult<Map<String, Object>> contractPage(JdbcTemplate jdbc, PageQuery q,
             String approvalStatus, String acceptanceStatus) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "purchase_contract", "c"));
         List<Object> args = new ArrayList<>();
         appendKeyword(where, args, q.getKeyword(), "c.contract_code", "c.contract_name", "pj.project_name", "s.supplier_name");
         if (approvalStatus != null && !approvalStatus.isBlank()) {
@@ -73,9 +79,11 @@ public final class PurchasePageQueries {
         String from = """
             FROM purchase_contract c
             LEFT JOIN purchase_project pj ON pj.id = c.project_id
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_project", "pj") + """
             LEFT JOIN supplier s ON s.id = c.supplier_id
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "supplier", "s") + """
             LEFT JOIN purchase_acceptance pa ON pa.contract_id = c.id
-            """;
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_acceptance", "pa");
         return page(jdbc, from, where, args, q, "c.created_at DESC NULLS LAST",
                 "c.*, pj.project_name, s.supplier_name, pa.acceptance_no, pa.acceptance_status AS acc_status, pa.entry_id");
     }
@@ -83,6 +91,7 @@ public final class PurchasePageQueries {
     public static PageResult<Map<String, Object>> acceptancePage(JdbcTemplate jdbc, PageQuery q,
             String acceptanceStatus) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "purchase_acceptance", "a"));
         List<Object> args = new ArrayList<>();
         appendKeyword(where, args, q.getKeyword(), "a.acceptance_no", "c.contract_code", "s.supplier_name");
         if (acceptanceStatus != null && !acceptanceStatus.isBlank()) {
@@ -92,9 +101,11 @@ public final class PurchasePageQueries {
         String from = """
             FROM purchase_acceptance a
             LEFT JOIN purchase_contract c ON c.id = a.contract_id
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_contract", "c") + """
             LEFT JOIN supplier s ON s.id = a.supplier_id
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "supplier", "s") + """
             LEFT JOIN device_entry de ON de.id = a.entry_id
-            """;
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "device_entry", "de");
         return page(jdbc, from, where, args, q, "a.created_at DESC NULLS LAST",
                 "a.*, c.contract_code, c.contract_name, s.supplier_name, de.entry_no, de.status AS entry_status");
     }

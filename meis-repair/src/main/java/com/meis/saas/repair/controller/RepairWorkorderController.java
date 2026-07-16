@@ -6,6 +6,7 @@ import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
+import com.meis.saas.common.persistence.TableColumnCache;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
 import com.meis.saas.repair.service.RepairWorkorderProcessService;
@@ -65,15 +66,19 @@ public class RepairWorkorderController {
                 SELECT d.id, d.device_code, d.device_name, d.specification, d.serial_number,
                        d.financial_code, d.dept_id, d.device_status, dept.dept_name
                 FROM medical_device d
-                LEFT JOIN department dept ON dept.id = d.dept_id
+                LEFT JOIN department dept ON dept.id = d.dept_id""");
+        sql.append(SoftDeleteSupport.notDeletedClause(jdbc, "department", "dept"));
+        sql.append("""
                 WHERE d.is_active = true
                   AND COALESCE(d.device_status, '') NOT IN ('maintenance', 'pending_verify', 'scrap')
                   AND d.id NOT IN (
                       SELECT device_id FROM repair_workorder
                       WHERE device_id IS NOT NULL
                         AND status IN ('reported','dispatching','pending_accept','accepted','repairing','pending_verify','suspended','verify_rejected')
-                  )
                 """);
+        sql.append(SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null));
+        sql.append(")");
+        sql.append(SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d"));
         List<Object> args = new ArrayList<>();
         appendIlike(sql, args, "dept.dept_name", deptName);
         appendIlike(sql, args, "d.device_name", deviceName);
@@ -181,10 +186,81 @@ public class RepairWorkorderController {
         UUID typeId = UUID.fromString(String.valueOf(rawTypeId));
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> parts = (List<Map<String, Object>>) body.getOrDefault("parts", List.of());
-        Map<String, Object> seg = segmentService.addEngineerSegment(id, wo, typeId, str(body.get("remark")), parts);
+        List<Map<String, Object>> engineers = resolveEngineers(body);
+        OffsetDateTime startedAt = RepairWorkorderSegmentService.parseDateTime(
+                body.get("startedAt") != null ? body.get("startedAt") : body.get("started_at"));
+        OffsetDateTime endedAt = null;
+        Object enableEnd = body.get("enableEndedAt") != null ? body.get("enableEndedAt") : body.get("enable_ended_at");
+        Object rawEnded = body.get("endedAt") != null ? body.get("endedAt") : body.get("ended_at");
+        if (Boolean.TRUE.equals(enableEnd) || "true".equalsIgnoreCase(String.valueOf(enableEnd))
+                || (rawEnded != null && !String.valueOf(rawEnded).isBlank())) {
+            endedAt = RepairWorkorderSegmentService.parseDateTime(rawEnded);
+            if (endedAt == null) {
+                throw new BizException(400, "请填写结束时间");
+            }
+        }
+        Map<String, Object> seg = segmentService.addEngineerSegment(
+                id, wo, typeId, str(body.get("remark")), parts, engineers, startedAt, endedAt);
         addEvent(id, "add_segment", str(wo.get("status")), str(loadWorkorder(id).get("status")),
-                null, null, wo.get("assigned_user_id"), null, null,
+                null, null, seg.get("user_id"), null, null,
                 "添加进程段: " + seg.get("type_name"), null);
+        return Result.ok(seg);
+    }
+
+    @PutMapping("/{id:" + UUID_PATH + "}/segments/{segmentId:" + UUID_PATH + "}")
+    @Transactional
+    @OperationLog(module = "repair", description = "编辑维修进程段")
+    public Result<Map<String, Object>> updateSegment(@PathVariable UUID id,
+                                                     @PathVariable UUID segmentId,
+                                                     @RequestBody Map<String, Object> body) {
+        Map<String, Object> wo = requireWo(id);
+        if ("draft".equals(str(wo.get("status")))) {
+            throw new BizException(400, "草稿工单不可编辑进程段");
+        }
+        assertRepairEngineer();
+        List<Map<String, Object>> engineers = resolveEngineers(body);
+        Map<String, Object> seg = segmentService.updateSegment(id, segmentId, body, engineers);
+        addEvent(id, "update_segment", str(wo.get("status")), str(wo.get("status")),
+                null, null, seg.get("user_id"), null, null,
+                "编辑进程段: " + seg.get("type_name"), null);
+        return Result.ok(seg);
+    }
+
+    @DeleteMapping("/{id:" + UUID_PATH + "}/segments/{segmentId:" + UUID_PATH + "}")
+    @Transactional
+    @OperationLog(module = "repair", description = "删除维修进程段")
+    public Result<Void> deleteSegment(@PathVariable UUID id, @PathVariable UUID segmentId) {
+        Map<String, Object> wo = requireWo(id);
+        if ("draft".equals(str(wo.get("status")))) {
+            throw new BizException(400, "草稿工单不可删除进程段");
+        }
+        assertRepairEngineer();
+        Map<String, Object> before = segmentService.listSegments(id).stream()
+                .filter(s -> segmentId.toString().equals(String.valueOf(s.get("id"))))
+                .findFirst().orElse(null);
+        segmentService.deleteSegment(id, segmentId);
+        addEvent(id, "delete_segment", str(wo.get("status")), str(wo.get("status")),
+                null, null, before != null ? before.get("user_id") : null, null, null,
+                "删除进程段" + (before != null && before.get("type_name") != null ? ": " + before.get("type_name") : ""), null);
+        return Result.ok();
+    }
+
+    @PostMapping("/{id:" + UUID_PATH + "}/segments/{segmentId:" + UUID_PATH + "}/confirm")
+    @Transactional
+    @OperationLog(module = "repair", description = "确认维修进程段")
+    public Result<Map<String, Object>> confirmSegment(@PathVariable UUID id, @PathVariable UUID segmentId) {
+        Map<String, Object> wo = requireWo(id);
+        if ("draft".equals(str(wo.get("status")))) {
+            throw new BizException(400, "草稿工单不可确认进程段");
+        }
+        String uid = operatorId();
+        if (uid == null || uid.isBlank()) {
+            throw new BizException(401, "未登录");
+        }
+        Map<String, Object> seg = segmentService.confirmSegment(id, segmentId);
+        addEvent(id, "confirm_segment", str(wo.get("status")), str(wo.get("status")),
+                null, null, seg.get("user_id"), null, null,
+                "确认进程段: " + seg.get("type_name"), null);
         return Result.ok(seg);
     }
 
@@ -200,14 +276,43 @@ public class RepairWorkorderController {
         return Result.ok(segmentService.addPart(segmentId, body));
     }
 
+    @PutMapping("/{id:" + UUID_PATH + "}/segments/{segmentId:" + UUID_PATH + "}/parts/{partId:" + UUID_PATH + "}")
+    @Transactional
+    @OperationLog(module = "repair", description = "编辑进程段配件")
+    public Result<Map<String, Object>> updateSegmentPart(@PathVariable UUID id,
+                                                         @PathVariable UUID segmentId,
+                                                         @PathVariable UUID partId,
+                                                         @RequestBody Map<String, Object> body) {
+        requireWo(id);
+        assertRepairEngineer();
+        assertAssignedOwner(requireWo(id));
+        return Result.ok(segmentService.updatePart(segmentId, partId, body));
+    }
+
+    @DeleteMapping("/{id:" + UUID_PATH + "}/segments/{segmentId:" + UUID_PATH + "}/parts/{partId:" + UUID_PATH + "}")
+    @Transactional
+    @OperationLog(module = "repair", description = "删除进程段配件")
+    public Result<Void> deleteSegmentPart(@PathVariable UUID id,
+                                          @PathVariable UUID segmentId,
+                                          @PathVariable UUID partId) {
+        requireWo(id);
+        assertRepairEngineer();
+        assertAssignedOwner(requireWo(id));
+        segmentService.deletePart(segmentId, partId);
+        return Result.ok();
+    }
+
     @GetMapping("/{id:" + UUID_PATH + "}/timeline")
     public Result<Map<String, Object>> timeline(@PathVariable UUID id) {
         Map<String, Object> wo = loadWorkorder(id);
         List<Map<String, Object>> events = jdbc.queryForList(
-                "SELECT * FROM repair_workorder_event WHERE workorder_id = ?::uuid ORDER BY created_at ASC, id ASC", id);
+                "SELECT * FROM repair_workorder_event WHERE workorder_id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_event", null)
+                        + " ORDER BY created_at ASC, id ASC", id);
 
-        List<Map<String, Object>> milestones = buildMilestones(wo, events);
-        List<Map<String, Object>> segments = buildSubStatusSegments(events);
+        List<Map<String, Object>> processSegments = segmentService.listSegments(id);
+        List<Map<String, Object>> milestones = buildMilestones(wo, events, processSegments);
+        List<Map<String, Object>> segments = buildTimelineSegmentsFromProcess(processSegments);
         Map<String, Object> summary = buildSummary(wo, events);
 
         Map<String, Object> data = new LinkedHashMap<>();
@@ -231,16 +336,31 @@ public class RepairWorkorderController {
         assertDeviceAvailable(body.get("device_id"), null);
         UUID id = UUID.randomUUID();
         String woNo = "WO" + System.currentTimeMillis();
-        jdbc.update("""
-            INSERT INTO repair_workorder (id, wo_no, device_id, device_code, device_name, reporter_id, report_dept_id,
-                report_method, report_time, fault_description, urgency_level, fault_type_id, remark, status)
-            VALUES (?::uuid,?,?::uuid,?,?,?::uuid,?::uuid,?,?::timestamptz,?,?,?::uuid,?,?)
-            """,
-                id, woNo, body.get("device_id"), body.get("device_code"), body.get("device_name"),
-                blankToNull(body.get("reporter_id")), blankToNull(body.get("report_dept_id")),
-                body.getOrDefault("report_method", "web"), body.get("report_time"),
-                body.get("fault_description"), body.getOrDefault("urgency_level", "normal"),
-                blankToNull(body.get("fault_type_id")), blankToNull(body.get("remark")), "draft");
+        Object reporterId = blankToNull(body.get("reporter_id"));
+        String reporterName = SoftDeleteSupport.resolveUserDisplayName(jdbc, reporterId);
+        if (TableColumnCache.hasColumn(jdbc, "repair_workorder", "reporter_name")) {
+            jdbc.update("""
+                INSERT INTO repair_workorder (id, wo_no, device_id, device_code, device_name, reporter_id, reporter_name, report_dept_id,
+                    report_method, report_time, fault_description, urgency_level, fault_type_id, remark, status)
+                VALUES (?::uuid,?,?::uuid,?,?,?::uuid,?,?::uuid,?,?::timestamptz,?,?,?::uuid,?,?)
+                """,
+                    id, woNo, body.get("device_id"), body.get("device_code"), body.get("device_name"),
+                    reporterId, reporterName, blankToNull(body.get("report_dept_id")),
+                    body.getOrDefault("report_method", "web"), body.get("report_time"),
+                    body.get("fault_description"), body.getOrDefault("urgency_level", "normal"),
+                    blankToNull(body.get("fault_type_id")), blankToNull(body.get("remark")), "draft");
+        } else {
+            jdbc.update("""
+                INSERT INTO repair_workorder (id, wo_no, device_id, device_code, device_name, reporter_id, report_dept_id,
+                    report_method, report_time, fault_description, urgency_level, fault_type_id, remark, status)
+                VALUES (?::uuid,?,?::uuid,?,?,?::uuid,?::uuid,?,?::timestamptz,?,?,?::uuid,?,?)
+                """,
+                    id, woNo, body.get("device_id"), body.get("device_code"), body.get("device_name"),
+                    reporterId, blankToNull(body.get("report_dept_id")),
+                    body.getOrDefault("report_method", "web"), body.get("report_time"),
+                    body.get("fault_description"), body.getOrDefault("urgency_level", "normal"),
+                    blankToNull(body.get("fault_type_id")), blankToNull(body.get("remark")), "draft");
+        }
         Map<String, Object> row = requireWo(id);
         addEvent(id, "created", null, "draft", null, null, null, null, null, "保存草稿", null);
         changeLog.recordCreate("repair_workorder", id, row);
@@ -272,6 +392,10 @@ public class RepairWorkorderController {
             if ("device_id".equals(col) || col.endsWith("_id")) {
                 sets.add(col + " = ?::uuid");
                 args.add(blankToNull(v));
+                if ("reporter_id".equals(col) && TableColumnCache.hasColumn(jdbc, "repair_workorder", "reporter_name")) {
+                    sets.add("reporter_name = ?");
+                    args.add(SoftDeleteSupport.resolveUserDisplayName(jdbc, v));
+                }
             } else if ("report_time".equals(col)) {
                 sets.add(col + " = ?::timestamptz");
                 args.add(v);
@@ -484,11 +608,21 @@ public class RepairWorkorderController {
         String remark = body != null ? str(body.get("remark")) : "工程师抢单";
         if (remark.isBlank()) remark = "工程师抢单";
 
-        int updated = jdbc.update("""
-                UPDATE repair_workorder
-                SET status = 'repairing', assigned_user_id = ?::uuid, repair_sub_status = 'internal', updated_at = NOW()
-                WHERE id = ?::uuid AND status IN ('reported','dispatching') AND assigned_user_id IS NULL
-                """, userId, id);
+        int updated;
+        if (TableColumnCache.hasColumn(jdbc, "repair_workorder", "assigned_user_name")) {
+            updated = jdbc.update("""
+                    UPDATE repair_workorder
+                    SET status = 'repairing', assigned_user_id = ?::uuid, assigned_user_name = ?,
+                        repair_sub_status = 'internal', updated_at = NOW()
+                    WHERE id = ?::uuid AND status IN ('reported','dispatching') AND assigned_user_id IS NULL
+                    """, userId, SoftDeleteSupport.resolveUserDisplayName(jdbc, userId), id);
+        } else {
+            updated = jdbc.update("""
+                    UPDATE repair_workorder
+                    SET status = 'repairing', assigned_user_id = ?::uuid, repair_sub_status = 'internal', updated_at = NOW()
+                    WHERE id = ?::uuid AND status IN ('reported','dispatching') AND assigned_user_id IS NULL
+                    """, userId, id);
+        }
         if (updated == 0) {
             throw new BizException(409, "工单已被他人抢单或已派单，请刷新后重试");
         }
@@ -580,6 +714,8 @@ public class RepairWorkorderController {
         if (skipVerify && "verify_rejected".equals(current)) {
             throw new BizException(400, "拒绝验收返修后不可跳过验收直接结案");
         }
+        // U.15.2：提交验收时由 openSystemSegment(pending_verify) 自动确认未确认段；
+        // 不可在开待验段之前 assert，否则会误拦正常完工。
         String target = skipVerify ? "closed" : "pending_verify";
         processService.insertProcess(id, ProcessRecord.builder("complete")
                 .fromStatus(current).toStatus(target)
@@ -594,12 +730,26 @@ public class RepairWorkorderController {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> parts = (List<Map<String, Object>>) body.getOrDefault("spareParts", List.of());
         for (Map<String, Object> p : parts) {
-            jdbc.update("INSERT INTO spare_part_usage (id, workorder_id, part_id, quantity, unit_price) VALUES (?::uuid,?::uuid,?::uuid,?,?)",
-                    UUID.randomUUID(), id, p.get("part_id"), p.get("quantity"), p.get("unit_price"));
+            Object opId = operatorId();
+            if (TableColumnCache.hasColumn(jdbc, "spare_part_usage", "operator_name")) {
+                jdbc.update("""
+                        INSERT INTO spare_part_usage
+                        (id, workorder_id, part_id, quantity, unit_price, operator_id, operator_name,
+                         device_id, device_code, device_name)
+                        VALUES (?::uuid,?::uuid,?::uuid,?,?,?::uuid,?,?::uuid,?,?)
+                        """,
+                        UUID.randomUUID(), id, p.get("part_id"), p.get("quantity"), p.get("unit_price"),
+                        blankToNull(opId), SoftDeleteSupport.resolveUserDisplayName(jdbc, opId),
+                        blankToNull(wo.get("device_id")), blankToNull(wo.get("device_code")), blankToNull(wo.get("device_name")));
+            } else {
+                jdbc.update("INSERT INTO spare_part_usage (id, workorder_id, part_id, quantity, unit_price) VALUES (?::uuid,?::uuid,?::uuid,?,?)",
+                        UUID.randomUUID(), id, p.get("part_id"), p.get("quantity"), p.get("unit_price"));
+            }
             jdbc.update("INSERT INTO spare_part_transaction (spare_part_id, txn_type, quantity, workorder_id) VALUES (?::uuid,'out',?,?::uuid)",
                     p.get("spare_part_id") != null ? p.get("spare_part_id") : p.get("part_id"), p.get("quantity"), id);
         }
         processService.syncWorkorderState(id, target, null, null);
+        segmentService.recalculateWorkorderCosts(id);
         addEvent(id, "complete", current, target, str(wo.get("repair_sub_status")), null,
                 wo.get("assigned_user_id"), null, null,
                 skipVerify ? "完工直接结案" : "完工提交验收", null);
@@ -628,6 +778,7 @@ public class RepairWorkorderController {
         boolean pass = !"fail".equalsIgnoreCase(result);
         Object verifierId = blankToNull(body.get("verifier_id"));
         if (pass) {
+            OffsetDateTime lastPendingVerifyAt = segmentService.lastSegmentStartedAt(id, "pending_verify");
             processService.insertProcess(id, ProcessRecord.builder("verify_pass")
                     .fromStatus("pending_verify").toStatus("verified")
                     .operatorId(verifierId != null ? verifierId : operatorId())
@@ -637,9 +788,11 @@ public class RepairWorkorderController {
                     .remark(str(body.get("verify_comment"))).build());
             processService.insertProcess(id, ProcessRecord.builder("close")
                     .fromStatus("verified").toStatus("closed").operatorId(operatorId()).remark("验收后关闭").build());
-            processService.syncWorkorderState(id, "closed", null, null);
-            addEvent(id, "verify_pass", "pending_verify", "verified", null, null, null, null, null, str(body.get("verify_comment")), null);
-            addEvent(id, "close", "verified", "closed", null, null, null, null, null, "验收后关闭", null);
+            processService.syncWorkorderState(id, "closed", "verified", null);
+            processService.writeRepairDurationHours(id, wo,
+                    toOffset(wo.get("repair_start_time")), lastPendingVerifyAt, toOffset(wo.get("repair_end_time")));
+            addEvent(id, "verify_pass", "pending_verify", "verified", null, "verified", null, null, null, str(body.get("verify_comment")), null);
+            addEvent(id, "close", "verified", "closed", null, "verified", null, null, null, "验收后关闭", null);
             syncDeviceStatus(wo.get("device_id"), "normal");
             segmentService.openSystemSegment(id, "verified", verifierId, "验收通过", null);
         } else {
@@ -761,7 +914,8 @@ public class RepairWorkorderController {
     private void assertDeviceAvailable(Object deviceId, UUID excludeWoId) {
         if (deviceId == null || String.valueOf(deviceId).isBlank()) return;
         List<Map<String, Object>> device = jdbc.queryForList(
-                "SELECT device_status FROM medical_device WHERE id = ?::uuid", deviceId);
+                "SELECT device_status FROM medical_device WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", null), deviceId);
         if (device.isEmpty()) throw new BizException(400, "设备不存在");
         String ds = str(device.get(0).get("device_status"));
         if (Set.of("maintenance", "pending_verify", "scrap").contains(ds)) {
@@ -795,17 +949,73 @@ public class RepairWorkorderController {
     private void addEvent(UUID woId, String type, String fromStatus, String toStatus,
                           String fromSub, String toSub, Object userId,
                           Object fromUser, Object toUser, String remark, String extraJson) {
-        jdbc.update("""
-            INSERT INTO repair_workorder_event
-            (id, workorder_id, event_type, from_status, to_status, from_sub_status, to_sub_status,
-             operator_id, user_id, from_user_id, to_user_id, remark, extra_json)
-            VALUES (?::uuid,?::uuid,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?::uuid,?,CAST(? AS jsonb))
-            """,
-                UUID.randomUUID(), woId, type, blankToNull(fromStatus), blankToNull(toStatus),
-                blankToNull(fromSub), blankToNull(toSub),
-                blankToNull(operatorId()), blankToNull(userId),
-                blankToNull(fromUser), blankToNull(toUser),
-                blankToNull(remark), extraJson);
+        Map<String, Object> wo = loadWorkorder(woId);
+        boolean hasDevice = TableColumnCache.hasColumn(jdbc, "repair_workorder_event", "device_id");
+        boolean hasNames = TableColumnCache.hasColumn(jdbc, "repair_workorder_event", "operator_name");
+        Object opId = blankToNull(operatorId());
+        String opName = SoftDeleteSupport.resolveUserDisplayName(jdbc, opId);
+        String userName = SoftDeleteSupport.resolveUserDisplayName(jdbc, userId);
+        String fromUserName = SoftDeleteSupport.resolveUserDisplayName(jdbc, fromUser);
+        String toUserName = SoftDeleteSupport.resolveUserDisplayName(jdbc, toUser);
+        if (hasDevice && hasNames) {
+            jdbc.update("""
+                INSERT INTO repair_workorder_event
+                (id, workorder_id, event_type, from_status, to_status, from_sub_status, to_sub_status,
+                 operator_id, user_id, from_user_id, to_user_id,
+                 operator_name, user_name, from_user_name, to_user_name,
+                 remark, extra_json, device_id, device_code, device_name)
+                VALUES (?::uuid,?::uuid,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?::uuid,
+                        ?,?,?,?,
+                        ?,CAST(? AS jsonb),?::uuid,?,?)
+                """,
+                    UUID.randomUUID(), woId, type, blankToNull(fromStatus), blankToNull(toStatus),
+                    blankToNull(fromSub), blankToNull(toSub),
+                    opId, blankToNull(userId), blankToNull(fromUser), blankToNull(toUser),
+                    opName, userName, fromUserName, toUserName,
+                    blankToNull(remark), extraJson,
+                    blankToNull(wo.get("device_id")), blankToNull(wo.get("device_code")), blankToNull(wo.get("device_name")));
+        } else if (hasDevice) {
+            jdbc.update("""
+                INSERT INTO repair_workorder_event
+                (id, workorder_id, event_type, from_status, to_status, from_sub_status, to_sub_status,
+                 operator_id, user_id, from_user_id, to_user_id, remark, extra_json,
+                 device_id, device_code, device_name)
+                VALUES (?::uuid,?::uuid,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?::uuid,?,CAST(? AS jsonb),
+                        ?::uuid,?,?)
+                """,
+                    UUID.randomUUID(), woId, type, blankToNull(fromStatus), blankToNull(toStatus),
+                    blankToNull(fromSub), blankToNull(toSub),
+                    opId, blankToNull(userId), blankToNull(fromUser), blankToNull(toUser),
+                    blankToNull(remark), extraJson,
+                    blankToNull(wo.get("device_id")), blankToNull(wo.get("device_code")), blankToNull(wo.get("device_name")));
+        } else if (hasNames) {
+            jdbc.update("""
+                INSERT INTO repair_workorder_event
+                (id, workorder_id, event_type, from_status, to_status, from_sub_status, to_sub_status,
+                 operator_id, user_id, from_user_id, to_user_id,
+                 operator_name, user_name, from_user_name, to_user_name,
+                 remark, extra_json)
+                VALUES (?::uuid,?::uuid,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?::uuid,
+                        ?,?,?,?,
+                        ?,CAST(? AS jsonb))
+                """,
+                    UUID.randomUUID(), woId, type, blankToNull(fromStatus), blankToNull(toStatus),
+                    blankToNull(fromSub), blankToNull(toSub),
+                    opId, blankToNull(userId), blankToNull(fromUser), blankToNull(toUser),
+                    opName, userName, fromUserName, toUserName,
+                    blankToNull(remark), extraJson);
+        } else {
+            jdbc.update("""
+                INSERT INTO repair_workorder_event
+                (id, workorder_id, event_type, from_status, to_status, from_sub_status, to_sub_status,
+                 operator_id, user_id, from_user_id, to_user_id, remark, extra_json)
+                VALUES (?::uuid,?::uuid,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?::uuid,?,CAST(? AS jsonb))
+                """,
+                    UUID.randomUUID(), woId, type, blankToNull(fromStatus), blankToNull(toStatus),
+                    blankToNull(fromSub), blankToNull(toSub),
+                    opId, blankToNull(userId), blankToNull(fromUser), blankToNull(toUser),
+                    blankToNull(remark), extraJson);
+        }
     }
 
     private static Object resolveUserId(Map<String, Object> body) {
@@ -815,6 +1025,59 @@ public class RepairWorkorderController {
             if (v != null && !String.valueOf(v).isBlank()) return v;
         }
         return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<String> resolveUserIds(Map<String, Object> body) {
+        if (body == null) return List.of();
+        Object raw = body.get("userIds") != null ? body.get("userIds") : body.get("user_ids");
+        if (raw instanceof List<?> list) {
+            List<String> out = new ArrayList<>();
+            for (Object o : list) {
+                if (o != null && !String.valueOf(o).isBlank()) out.add(String.valueOf(o));
+            }
+            return out;
+        }
+        if (raw instanceof String s && !s.isBlank()) {
+            return Arrays.stream(s.split(",")).map(String::trim).filter(x -> !x.isEmpty()).toList();
+        }
+        return List.of();
+    }
+
+    /**
+     * 解析工程师行：优先 body.engineers[{userId, workContent, isPrimary}]，否则回退 userIds / userId。
+     */
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> resolveEngineers(Map<String, Object> body) {
+        if (body == null) return List.of();
+        Object raw = body.get("engineers");
+        if (raw instanceof List<?> list && !list.isEmpty()) {
+            List<Map<String, Object>> out = new ArrayList<>();
+            for (Object o : list) {
+                if (o instanceof Map<?, ?> m) {
+                    Object uid = m.get("userId") != null ? m.get("userId") : m.get("user_id");
+                    if (uid == null || String.valueOf(uid).isBlank()) continue;
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("user_id", String.valueOf(uid));
+                    Object wc = m.get("workContent") != null ? m.get("workContent") : m.get("work_content");
+                    if (wc != null) row.put("work_content", String.valueOf(wc));
+                    Object primary = m.get("isPrimary") != null ? m.get("isPrimary") : m.get("is_primary");
+                    if (primary != null) row.put("is_primary", primary);
+                    out.add(row);
+                } else if (o != null && !String.valueOf(o).isBlank()) {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("user_id", String.valueOf(o));
+                    out.add(row);
+                }
+            }
+            if (!out.isEmpty()) return out;
+        }
+        Object userId = resolveUserId(body);
+        List<String> userIds = resolveUserIds(body);
+        if (userIds.isEmpty() && userId != null) {
+            userIds = List.of(String.valueOf(userId));
+        }
+        return RepairWorkorderSegmentService.engineersFromUserIds(userIds);
     }
 
     private static boolean isUnassigned(Map<String, Object> wo) {
@@ -828,7 +1091,8 @@ public class RepairWorkorderController {
             throw new BizException(401, "未登录");
         }
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT COALESCE(is_repair_engineer, false) AS is_repair_engineer FROM sys_user WHERE id = ?::uuid AND is_active = true",
+                "SELECT COALESCE(is_repair_engineer, false) AS is_repair_engineer FROM sys_user WHERE id = ?::uuid AND is_active = true"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", null),
                 uid);
         if (rows.isEmpty() || !Boolean.TRUE.equals(rows.get(0).get("is_repair_engineer"))) {
             throw new BizException(403, "仅维修工程师可执行此操作");
@@ -893,6 +1157,9 @@ public class RepairWorkorderController {
             case "dispatch" -> "派工";
             case "grab" -> "抢单";
             case "add_segment" -> "添加进程段";
+            case "update_segment" -> "编辑进程段";
+            case "delete_segment" -> "删除进程段";
+            case "confirm_segment" -> "确认进程段";
             case "transfer" -> "转派";
             case "accept" -> "接单";
             case "reject" -> "退单";
@@ -910,7 +1177,8 @@ public class RepairWorkorderController {
         };
     }
 
-    private List<Map<String, Object>> buildMilestones(Map<String, Object> wo, List<Map<String, Object>> events) {
+    private List<Map<String, Object>> buildMilestones(Map<String, Object> wo, List<Map<String, Object>> events,
+                                                      List<Map<String, Object>> processSegments) {
         String status = str(wo.get("status"));
         boolean skippedDispatch = events.stream().anyMatch(e -> "start_repair".equals(str(e.get("event_type"))))
                 && events.stream().noneMatch(e -> "dispatch".equals(str(e.get("event_type"))));
@@ -925,13 +1193,69 @@ public class RepairWorkorderController {
                 skippedDispatch, skippedDispatch ? "工程师直修，已跳过派单" : null));
         list.add(milestone("repairing", "开始维修", wo.get("repair_start_time"), false, null));
         list.add(milestone("complete", "维修结束", wo.get("repair_end_time"), false, null));
+
+        // U.16：插入已维修待验收 / 拒绝验收（跟随实际进程与事件，可多次）
+        int pvIdx = 0;
+        int rejectIdx = 0;
+        for (Map<String, Object> seg : processSegments) {
+            String code = str(seg.get("type_code"));
+            String name = str(seg.get("type_name"));
+            if ("pending_verify".equals(code)) {
+                list.add(milestone("pending_verify_" + (++pvIdx),
+                        name.isBlank() ? "已维修待验收" : name,
+                        seg.get("started_at"), false, null));
+            } else if ("verify_rejected".equals(code)) {
+                list.add(milestone("verify_rejected_" + (++rejectIdx),
+                        name.isBlank() ? "拒绝验收" : name,
+                        seg.get("started_at"), false, null));
+            }
+        }
+        for (Map<String, Object> e : events) {
+            String type = str(e.get("event_type"));
+            if ("submit_verify".equals(type) && pvIdx == 0) {
+                list.add(milestone("pending_verify_event", "已维修待验收", e.get("created_at"), false, null));
+            } else if ("verify_fail".equals(type) && rejectIdx == 0) {
+                list.add(milestone("verify_fail_" + e.get("id"), "拒绝验收", e.get("created_at"), false, null));
+            }
+        }
+
         list.add(milestone("verify", "科室验收", wo.get("verify_time"),
                 skippedVerify || ("closed".equals(status) && wo.get("verify_time") == null && wo.get("repair_end_time") != null),
                 skippedVerify ? "已跳过验收直接结案" : null));
         list.add(milestone("closed", "工单关闭",
                 firstNonNull(wo.get("closed_at"), "closed".equals(status) || "cancelled".equals(status) ? wo.get("updated_at") : null),
                 false, null));
+
+        list.sort((a, b) -> {
+            OffsetDateTime ta = toOffset(a.get("at"));
+            OffsetDateTime tb = toOffset(b.get("at"));
+            if (ta == null && tb == null) return 0;
+            if (ta == null) return 1;
+            if (tb == null) return -1;
+            return ta.compareTo(tb);
+        });
         return list;
+    }
+
+    /** U.16：时间轴明细跟随进程段，与详情「维修进程段」一致。 */
+    private List<Map<String, Object>> buildTimelineSegmentsFromProcess(List<Map<String, Object>> processSegments) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> seg : processSegments) {
+            OffsetDateTime start = toOffset(seg.get("started_at"));
+            OffsetDateTime end = toOffset(seg.get("ended_at"));
+            Map<String, Object> row = new LinkedHashMap<>();
+            String code = str(seg.get("type_code"));
+            String name = str(seg.get("type_name"));
+            row.put("type", code);
+            row.put("subStatus", code);
+            row.put("subStatusLabel", name.isBlank() ? code : name);
+            row.put("start", start);
+            row.put("end", end);
+            row.put("minutes", start != null && end != null ? Duration.between(start, end).toMinutes() : 0);
+            row.put("remark", seg.get("remark"));
+            out.add(row);
+        }
+        return out;
     }
 
     private Map<String, Object> milestone(String key, String label, Object at, boolean skipped, String skipReason) {
