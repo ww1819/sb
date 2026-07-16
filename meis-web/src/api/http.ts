@@ -39,7 +39,10 @@ http.interceptors.response.use(
       typeof data.code === 'number' &&
       data.code !== 0
     ) {
-      const err = Object.assign(new Error(data.message || '操作失败'), {
+      const msg = data.message || '操作失败'
+      if (data.code === 409) ElMessage.warning(msg)
+      else ElMessage.error(msg)
+      const err = Object.assign(new Error(msg), {
         isBizError: true,
         response
       })

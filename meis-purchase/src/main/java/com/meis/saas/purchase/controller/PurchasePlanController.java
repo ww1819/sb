@@ -68,17 +68,18 @@ public class PurchasePlanController {
                 prefer_import=?, approval_status=?, version=COALESCE(version,1)+1, updated_at=NOW()
                 WHERE id=?::uuid
                 """,
-                    planCode, body.get("plan_year"), body.get("campus_id"), body.get("dept_id"), body.get("applicant_id"),
+                    planCode, body.get("plan_year"), uuidOrNull(body.get("campus_id")), uuidOrNull(body.get("dept_id")),
+                    uuidOrNull(body.get("applicant_id")),
                     body.get("total_budget"), body.get("justification"), body.get("remark"),
                     body.getOrDefault("plan_type", "annual"), body.get("fund_source"),
                     body.getOrDefault("is_large_equipment", false), body.get("large_equipment_class"),
                     body.get("benefit_analysis_url"), body.get("dept_argument_url"),
-                    body.get("device_name"), body.get("unit"), body.get("model"), body.get("fill_date"),
+                    body.get("device_name"), body.get("unit"), body.get("model"), blankToNull(body.get("fill_date")),
                     body.get("existing_device_status"), body.get("existing_device_usage_freq"),
                     body.get("reference_manufacturer"), body.get("specification"), body.get("brand"),
                     body.get("quantity"), body.get("similar_device_count"), body.get("demand_level"),
                     body.get("product_attribute_req"), body.get("other_condition_confirm"),
-                    body.get("unit_budget_price"), body.get("category_id"), body.get("demand_nature"),
+                    body.get("unit_budget_price"), uuidOrNull(body.get("category_id")), body.get("demand_nature"),
                     body.getOrDefault("prefer_import", false),
                     body.getOrDefault("approval_status", "draft"), id);
         } else {
@@ -92,26 +93,27 @@ public class PurchasePlanController {
                 prefer_import)
                 VALUES (?::uuid,?,?,?::uuid,?::uuid,?::uuid,?,?,?,?,?,?,?,?,?,?,?,?,?,?::date,?,?,?,?,?,?,?,?,?,?,?,?::uuid,?,?)
                 """,
-                    id, planCode, body.get("plan_year"), body.get("campus_id"), body.get("dept_id"), body.get("applicant_id"),
+                    id, planCode, body.get("plan_year"), uuidOrNull(body.get("campus_id")), uuidOrNull(body.get("dept_id")),
+                    uuidOrNull(body.get("applicant_id")),
                     body.get("total_budget"), body.get("justification"), body.get("remark"),
                     body.getOrDefault("plan_type", "annual"), body.get("fund_source"), "draft",
                     body.getOrDefault("is_large_equipment", false), body.get("large_equipment_class"),
                     body.get("benefit_analysis_url"), body.get("dept_argument_url"),
                     PurchaseChainService.newChainNo(planCode),
-                    body.get("device_name"), body.get("unit"), body.get("model"), body.get("fill_date"),
+                    body.get("device_name"), body.get("unit"), body.get("model"), blankToNull(body.get("fill_date")),
                     body.get("existing_device_status"), body.get("existing_device_usage_freq"),
                     body.get("reference_manufacturer"), body.get("specification"), body.get("brand"),
                     body.get("quantity"), body.get("similar_device_count"), body.get("demand_level"),
                     body.get("product_attribute_req"), body.get("other_condition_confirm"),
-                    body.get("unit_budget_price"), body.get("category_id"), body.get("demand_nature"),
+                    body.get("unit_budget_price"), uuidOrNull(body.get("category_id")), body.get("demand_nature"),
                     body.getOrDefault("prefer_import", false));
         }
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> items = new ArrayList<>(
                 (List<Map<String, Object>>) body.getOrDefault("items", List.of()));
         double totalBudget = resolveTotalBudget(body, items);
-        if (body.get("plan_year") != null) {
-            int year = ((Number) body.get("plan_year")).intValue();
+        if (body.get("plan_year") != null && !body.get("plan_year").toString().isBlank()) {
+            int year = parseInt(body.get("plan_year"));
             var dup = jdbc.queryForList(
                     "SELECT id FROM purchase_plan WHERE plan_year = ? AND id != ?::uuid AND is_active = true"
                             + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", null) + " LIMIT 1",
@@ -122,6 +124,7 @@ public class PurchasePlanController {
         }
         jdbc.update("DELETE FROM purchase_plan_item WHERE plan_id = ?::uuid", id);
         for (Map<String, Object> item : items) {
+            if (isBlank(item.get("device_name"))) continue;
             jdbc.update("""
                 INSERT INTO purchase_plan_item (id, plan_id, device_name, category_id, quantity, estimated_price,
                 total_price, specification, priority, justification, use_dept_id, is_imported, registration_no,
@@ -131,9 +134,10 @@ public class PurchasePlanController {
                 is_large_equipment, large_equipment_class)
                 VALUES (?::uuid,?::uuid,?,?::uuid,?,?,?,?,?,?,?::uuid,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
-                    UUID.randomUUID(), id, item.get("device_name"), item.get("category_id"), item.get("quantity"),
+                    UUID.randomUUID(), id, item.get("device_name"), uuidOrNull(item.get("category_id")),
+                    item.get("quantity") != null ? item.get("quantity") : 0,
                     item.get("estimated_price"), item.get("total_price"), item.get("specification"),
-                    item.getOrDefault("priority", 1), item.get("justification"), item.get("use_dept_id"),
+                    item.getOrDefault("priority", 1), item.get("justification"), uuidOrNull(item.get("use_dept_id")),
                     item.getOrDefault("is_imported", false), item.get("registration_no"),
                     item.get("unit"), item.get("brand_intent"), item.getOrDefault("is_metrology", false),
                     item.get("udi_code"),
@@ -215,11 +219,20 @@ public class PurchasePlanController {
     }
 
     private static double resolveTotalBudget(Map<String, Object> plan, List<Map<String, Object>> items) {
-        if (plan.get("total_budget") instanceof Number n) {
+        Object budget = plan.get("total_budget");
+        if (budget instanceof Number n) {
             return n.doubleValue();
+        }
+        if (budget != null && !budget.toString().isBlank()) {
+            try {
+                return Double.parseDouble(budget.toString());
+            } catch (NumberFormatException ignored) {
+                // fall through to item sum
+            }
         }
         double total = 0;
         for (Map<String, Object> item : items) {
+            if (isBlank(item.get("device_name"))) continue;
             Number qty = item.get("quantity") instanceof Number n ? n : 1;
             Number price = item.get("estimated_price") instanceof Number n ? n : 0;
             double lineTotal = qty.doubleValue() * price.doubleValue();
@@ -240,5 +253,19 @@ public class PurchasePlanController {
 
     private static boolean isBlank(Object value) {
         return value == null || (value instanceof String s && s.isBlank());
+    }
+
+    private static Object blankToNull(Object value) {
+        return isBlank(value) ? null : value;
+    }
+
+    private static Object uuidOrNull(Object value) {
+        if (isBlank(value)) return null;
+        return value.toString();
+    }
+
+    private static int parseInt(Object value) {
+        if (value instanceof Number n) return n.intValue();
+        return Integer.parseInt(value.toString().trim());
     }
 }

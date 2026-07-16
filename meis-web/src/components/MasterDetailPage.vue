@@ -186,9 +186,38 @@ async function saveMaster() {
     ElMessage.warning(`请填写：${missing.map((f) => f.label).join('、')}`)
     return
   }
-  await http.post(props.saveUrl, { ...master.value, items: items.value })
-  detailVisible.value = false
-  crudRef.value?.load()
+  const payloadItems = items.value.filter((it) => {
+    const name = it.device_name
+    return name != null && String(name).trim() !== ''
+  })
+  const blankRows = items.value.length - payloadItems.length
+  if (blankRows > 0 && payloadItems.length === 0 && items.value.length > 0) {
+    ElMessage.warning('请填写明细设备名称，或删除空白明细行')
+    return
+  }
+  const planYear = master.value.plan_year
+  const yearNum =
+    typeof planYear === 'number'
+      ? planYear
+      : planYear != null && String(planYear).trim() !== ''
+        ? Number(planYear)
+        : undefined
+  if (yearNum == null || Number.isNaN(yearNum)) {
+    ElMessage.warning('请填写计划年度')
+    return
+  }
+  try {
+    await http.post(props.saveUrl, {
+      ...master.value,
+      plan_year: yearNum,
+      items: payloadItems
+    })
+    ElMessage.success('保存成功')
+    detailVisible.value = false
+    crudRef.value?.load()
+  } catch {
+    // 错误提示由 http 拦截器统一处理
+  }
 }
 
 async function submitApproval() {
