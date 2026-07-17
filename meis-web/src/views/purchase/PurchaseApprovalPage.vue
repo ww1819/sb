@@ -140,58 +140,44 @@
       </template>
     </AppModal>
 
-    <AppModal v-model="visible" title="审批详情" size="xl">
-      <template v-if="current">
-        <el-descriptions :column="2" border size="small" class="approval-desc">
-          <el-descriptions-item label="计划单号">{{ current.plan_code || current.business_no }}</el-descriptions-item>
-          <el-descriptions-item label="类型">{{ typeLabel(current.business_type) }}</el-descriptions-item>
-          <el-descriptions-item label="院区">{{ current.campus_name || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="科室">{{ current.dept_name || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="申请人">{{ current.applicant_name }}</el-descriptions-item>
-          <el-descriptions-item label="状态">
-            <StatusTag :value="current.approval_status ?? current.status" dict-type="approval_status" />
-          </el-descriptions-item>
-        </el-descriptions>
-
-        <div v-if="isPurchasePlan" class="plan-detail-block">
-          <div class="plan-detail-title">明细信息</div>
-          <el-table
-            v-loading="planLoading"
-            :data="planItems"
-            border
-            size="small"
-            max-height="360"
-            class="plan-detail-table"
+    <AppModal v-model="visible" title="采购申请 编辑" size="xl">
+      <div v-loading="planLoading">
+        <template v-if="planMaster">
+          <GroupedFormFields
+            table="purchase_plan"
+            :model="planMaster"
+            :fields="viewBasicFields"
+            :group-columns="{ basic: 6 }"
+            :highlight-labels="['plan_type', 'campus_id', 'dept_id', 'total_budget']"
+          />
+          <MasterDetailForm
+            :items="planItems"
+            :show-add-button="false"
+            :show-operations="false"
           >
-            <el-table-column type="index" label="序号" width="56" align="center" />
-            <el-table-column
-              v-for="f in detailFields"
-              :key="f.prop"
-              :prop="f.prop"
-              :label="f.label"
-              :width="f.width"
-              :min-width="f.width ?? Math.max(120, f.label.length * 14 + 24)"
-              show-overflow-tooltip
-            >
-              <template #default="{ row }">
-                <TableCellValue :field="f" :value="row[f.prop]" />
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-empty v-if="!planLoading && !planItems.length" description="暂无明细" :image-size="56" />
-        </div>
-
-        <ApprovalPanel
-          v-if="current.business_type && current.business_id"
-          :business-type="String(current.business_type)"
-          :business-id="String(current.business_id)"
-          @changed="onApprovalChanged"
-        />
-      </template>
-      <template #footer>
-        <el-button @click="visible = false">关闭</el-button>
-        <el-button v-if="current?.business_type && current?.business_id" type="primary" @click="goBusiness">打开业务单据</el-button>
-      </template>
+            <template #detail-columns>
+              <el-table-column
+                v-for="f in viewDetailFields"
+                :key="f.prop"
+                :prop="f.prop"
+                :label="f.label"
+                :width="f.width"
+                :min-width="f.width ?? Math.max(120, f.label.length * 14 + 24)"
+                :sortable="f.detailSortable || false"
+                show-overflow-tooltip
+              >
+                <template #header>
+                  <span :class="{ 'detail-col-required': f.required }">{{ f.label }}</span>
+                </template>
+                <template #default="{ row }">
+                  <TableCellValue :field="f" :value="row[f.prop]" />
+                </template>
+              </el-table-column>
+            </template>
+          </MasterDetailForm>
+        </template>
+        <el-empty v-else-if="!planLoading" description="暂无单据数据" :image-size="64" />
+      </div>
     </AppModal>
   </div>
 </template>
@@ -199,24 +185,22 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { useRouter } from 'vue-router'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
 import PageFilterBar from '@/components/system/PageFilterBar.vue'
 import AppModal from '@/components/AppModal.vue'
-import ApprovalPanel from '@/components/ApprovalPanel.vue'
 import ApprovalProgressDrawer from '@/components/ApprovalProgressDrawer.vue'
+import MasterDetailForm from '@/components/MasterDetailForm.vue'
+import GroupedFormFields from '@/components/form/GroupedFormFields.vue'
 import StatusTag from '@/components/table/StatusTag.vue'
 import TableCellValue from '@/components/table/TableCellValue.vue'
 import TableFileCell from '@/components/table/TableFileCell.vue'
-import { getDetailFields, collectLinkTables, type FieldSchema } from '@/config/pageSchemas'
-import { preloadRefLabelMaps } from '@/composables/useRefLabelMap'
+import { getDetailFields, getSchema, type FieldSchema } from '@/config/pageSchemas'
 import { useDict } from '@/composables/useDict'
 import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
 import { promptListActionScope, assertScopeSelection } from '@/composables/useListActionScope'
 import { useAuthStore } from '@/stores/auth'
 
-const router = useRouter()
 const auth = useAuthStore()
 const { loadDict, resolveDictLabel } = useDict()
 const loading = ref(false)
@@ -228,7 +212,6 @@ const keyword = ref('')
 const businessType = ref('purchase_plan')
 const status = ref('')
 const visible = ref(false)
-const current = ref<Record<string, unknown> | null>(null)
 const tableRef = ref()
 
 const {
@@ -241,9 +224,24 @@ const {
 const selectedRowMap = ref(new Map<string, Record<string, unknown>>())
 
 const planLoading = ref(false)
+const planMaster = ref<Record<string, unknown> | null>(null)
 const planItems = ref<Record<string, unknown>[]>([])
-const detailFields = computed(() => getDetailFields('purchase_plan_item'))
-const isPurchasePlan = computed(() => String(current.value?.business_type ?? '') === 'purchase_plan')
+
+const masterFormFields = computed(() =>
+  getSchema('purchase_plan').filter((f) => {
+    if (f.form === false) return false
+    if (f.readonly && f.form !== true) return false
+    return true
+  })
+)
+const viewBasicFields = computed(() =>
+  masterFormFields.value
+    .filter((f) => (f.group ?? 'other') === 'basic')
+    .map((f) => ({ ...f, readonly: true }))
+)
+const viewDetailFields = computed(() =>
+  getDetailFields('purchase_plan_item').map((f) => ({ ...f, readonly: true }))
+)
 
 const progressVisible = ref(false)
 const progressBusinessType = ref('purchase_plan')
@@ -274,18 +272,6 @@ function formatDay(v: unknown) {
   if (Number.isNaN(d.getTime())) return s
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
-const typeMap: Record<string, string> = {
-  purchase_plan: '采购计划',
-  purchase_project: '采购项目',
-  purchase_contract: '采购合同',
-  purchase_acceptance: '安装验收',
-  contract_payment: '合同付款'
-}
-
-function typeLabel(t: unknown) {
-  return typeMap[String(t)] ?? String(t)
 }
 
 function rowSerial(index: number) {
@@ -496,28 +482,30 @@ async function exportCsv() {
   }
 }
 
-async function loadPlanItems(businessId: string) {
+async function openDetail(row: Record<string, unknown>) {
+  if (String(row.business_type) !== 'purchase_plan' || !row.business_id) {
+    ElMessage.warning('当前仅支持查看采购计划类单据')
+    return
+  }
+  visible.value = true
   planLoading.value = true
+  planMaster.value = null
   planItems.value = []
   try {
-    const tables = collectLinkTables('purchase_plan_item')
-    if (tables.length) await preloadRefLabelMaps(tables)
-    const { data } = await http.get(`/purchase/plan/${businessId}`)
+    const { data } = await http.get(`/purchase/plan/${row.business_id}`)
     if (data.code === 0 && data.data) {
-      planItems.value = (data.data.items as Record<string, unknown>[]) ?? []
+      const { items, ...master } = data.data as Record<string, unknown> & { items?: Record<string, unknown>[] }
+      planMaster.value = master
+      planItems.value = items ?? []
+    } else {
+      ElMessage.error(data.message || '加载单据失败')
+      visible.value = false
     }
+  } catch {
+    ElMessage.error('加载单据失败')
+    visible.value = false
   } finally {
     planLoading.value = false
-  }
-}
-
-async function openDetail(row: Record<string, unknown>) {
-  current.value = row
-  visible.value = true
-  if (String(row.business_type) === 'purchase_plan' && row.business_id) {
-    await loadPlanItems(String(row.business_id))
-  } else {
-    planItems.value = []
   }
 }
 
@@ -531,28 +519,10 @@ function openProgress(row: Record<string, unknown>) {
 
 watch(visible, (v) => {
   if (!v) {
+    planMaster.value = null
     planItems.value = []
-    current.value = null
   }
 })
-
-function onApprovalChanged() {
-  load()
-}
-
-function goBusiness() {
-  if (!current.value) return
-  const type = String(current.value.business_type)
-  const pathMap: Record<string, string> = {
-    purchase_plan: '/purchase/apply',
-    purchase_project: '/purchase/project',
-    purchase_contract: '/purchase/contract',
-    purchase_acceptance: '/purchase/acceptance'
-  }
-  const path = pathMap[type]
-  if (path) router.push(path)
-  visible.value = false
-}
 
 onMounted(async () => {
   await loadDict('approval_status')
@@ -563,15 +533,6 @@ onMounted(async () => {
 
 <style scoped>
 .filter-item { width: 160px; }
-.approval-desc { margin-bottom: 16px; }
-.plan-detail-block { margin-bottom: 16px; }
-.plan-detail-title {
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 8px;
-  color: var(--meis-text-primary, #303133);
-}
-.plan-detail-table { width: 100%; }
 .act-hint {
   margin-left: 88px;
   color: var(--el-text-color-secondary);
@@ -586,5 +547,10 @@ onMounted(async () => {
 }
 :deep(.col-operations) {
   background: var(--el-bg-color);
+}
+.detail-col-required::before {
+  content: '*';
+  color: var(--el-color-danger);
+  margin-right: 2px;
 }
 </style>
