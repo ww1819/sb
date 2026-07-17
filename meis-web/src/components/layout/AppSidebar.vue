@@ -44,6 +44,19 @@
                 <el-menu-item v-for="item in group.items" :key="item.path" :index="item.path">
                   {{ item.title }}
                 </el-menu-item>
+                <template v-for="(sub, si) in group.groups ?? []" :key="`${group.id || gi}-sub-${sub.id || sub.title || si}`">
+                  <el-sub-menu v-if="sub.title" :index="groupSubIndex(groupSubIndex(mod.id, group, gi), sub, si)">
+                    <template #title>
+                      <span>{{ sub.title }}</span>
+                    </template>
+                    <el-menu-item v-for="item in sub.items" :key="item.path" :index="item.path">
+                      {{ item.title }}
+                    </el-menu-item>
+                  </el-sub-menu>
+                  <el-menu-item v-for="item in sub.items" v-else :key="item.path" :index="item.path">
+                    {{ item.title }}
+                  </el-menu-item>
+                </template>
               </el-sub-menu>
               <el-menu-item v-for="item in group.items" v-else :key="item.path" :index="item.path">
                 {{ item.title }}
@@ -83,6 +96,7 @@ interface MenuGroup {
   id?: string
   title: string
   items: MenuItem[]
+  groups?: MenuGroup[]
 }
 
 interface TopModule {
@@ -113,7 +127,7 @@ function groupSubIndex(modId: string, group: MenuGroup, gi: number) {
   return `${modId}/${group.id || group.title || `g${gi}`}`
 }
 
-/** 当前路径对应需展开的一级模块 + 二级分组 index */
+/** 当前路径对应需展开的一级模块 + 二级/三级分组 index */
 function findOpenIndexes(path: string): string[] {
   for (const mod of props.modules) {
     if (mod.path === path) return []
@@ -122,6 +136,14 @@ function findOpenIndexes(path: string): string[] {
         const idxs = [mod.id]
         if (group.title) idxs.push(groupSubIndex(mod.id, group, gi))
         return idxs
+      }
+      for (const [si, sub] of (group.groups ?? []).entries()) {
+        if (sub.items.some((item) => item.path === path)) {
+          const idxs = [mod.id]
+          if (group.title) idxs.push(groupSubIndex(mod.id, group, gi))
+          if (sub.title) idxs.push(groupSubIndex(groupSubIndex(mod.id, group, gi), sub, si))
+          return idxs
+        }
       }
     }
   }
