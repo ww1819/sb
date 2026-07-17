@@ -163,6 +163,15 @@ ALTER TABLE device_outbound ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20)
 ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS from_warehouse_id UUID;
 ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS to_warehouse_id UUID;
 ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS warehouse_id UUID;
+-- ---------- 盘点补打标签 / 统一打印流水（附录 AST.INV） ----------
+ALTER TABLE inventory_check_item ADD COLUMN IF NOT EXISTS need_reprint_label BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE inventory_check_item ADD COLUMN IF NOT EXISTS label_printed BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE inventory_check_item ADD COLUMN IF NOT EXISTS label_print_count INT NOT NULL DEFAULT 0;
+ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS printed_by_name VARCHAR(100);
+ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS biz_type VARCHAR(50);
+ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS biz_id UUID;
+ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS biz_no VARCHAR(50);
+ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS biz_item_id UUID;
 -- ---------- 公用设备借调模块（附录 N） ----------
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_shared_device BOOLEAN DEFAULT FALSE;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS metrology_type_code VARCHAR(50);

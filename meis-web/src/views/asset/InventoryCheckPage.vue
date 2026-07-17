@@ -41,6 +41,14 @@
         >
           完成盘点
         </el-button>
+        <el-button
+          v-if="row.id"
+          link
+          type="primary"
+          @click="openReprint(row)"
+        >
+          补打条码
+        </el-button>
       </template>
     </CrudPage>
 
@@ -57,8 +65,13 @@
               :min-width="f.width ?? 120"
             >
               <template #default="{ row }">
+                <el-switch
+                  v-if="f.prop === 'need_reprint_label' && row.id"
+                  :model-value="!!row.need_reprint_label"
+                  @change="(v: string | number | boolean) => onNeedReprintChange(row, !!v)"
+                />
                 <FieldRenderer
-                  v-if="editable && !f.readonly && (f.linkTable || f.dictType || f.type === 'boolean')"
+                  v-else-if="editable && !f.readonly && (f.linkTable || f.dictType || f.type === 'boolean')"
                   v-model="row[f.prop]"
                   :field="f"
                 />
@@ -68,7 +81,7 @@
                   type="textarea"
                   :rows="2"
                 />
-                <span v-else>{{ row[f.prop] ?? '-' }}</span>
+                <span v-else>{{ formatCell(row[f.prop]) }}</span>
               </template>
             </el-table-column>
             <el-table-column v-if="editable" label="操作" width="80" fixed="right">
@@ -88,6 +101,28 @@
       </template>
     </AppModal>
 
+    <AppModal v-model="reprintVisible" title="补打条码" size="lg">
+      <el-table
+        ref="reprintTableRef"
+        :data="reprintItems"
+        border
+        max-height="420"
+        row-key="id"
+        @selection-change="onReprintSelectionChange"
+      >
+        <el-table-column type="selection" width="48" reserve-selection />
+        <el-table-column prop="device_code" label="设备编码" min-width="120" />
+        <el-table-column prop="device_name" label="设备名称" min-width="140" />
+        <el-table-column prop="label_print_count" label="已打次数" width="90" />
+      </el-table>
+      <template #footer>
+        <el-button @click="reprintVisible = false">关闭</el-button>
+        <el-button type="primary" :disabled="!reprintSelected.length" @click="doReprint">
+          打印所选（{{ reprintSelected.length }}）
+        </el-button>
+      </template>
+    </AppModal>
+
     <DeviceLedgerPicker
       v-model="pickerVisible"
       :dept-id="deptId"
@@ -100,9 +135,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, type ElTable } from 'element-plus'
 import http from '@/api/http'
 import CrudPage from '@/components/CrudPage.vue'
 import AppModal from '@/components/AppModal.vue'
@@ -111,6 +146,7 @@ import FieldRenderer from '@/components/FieldRenderer.vue'
 import DeviceLedgerPicker from '@/components/asset/DeviceLedgerPicker.vue'
 import { getPageConfig } from '@/config/pageRegistry'
 import { getDetailFields, getSchema } from '@/config/pageSchemas'
+import { printInventoryReprintLabels } from '@/utils/printAssetLabel'
 
 const route = useRoute()
 const path = computed(() => '/' + String(route.params.module) + '/' + String(route.params.page))
@@ -127,6 +163,12 @@ const formFields = computed(() => {
   return fields.map((f) => ({ ...f, readonly: true }))
 })
 
+const reprintVisible = ref(false)
+const reprintCheckId = ref('')
+const reprintItems = ref<Record<string, unknown>[]>([])
+const reprintSelected = ref<Record<string, unknown>[]>([])
+const reprintTableRef = ref<InstanceType<typeof ElTable> | null>(null)
+
 const modalTitle = computed(() => {
   if (!master.value?.id) return '资产盘点 新增'
   return isApproved(master.value) ? '资产盘点 查看' : '资产盘点 编辑'
@@ -138,6 +180,12 @@ const checkId = computed(() => (master.value?.id ? String(master.value.id) : '')
 const excludeDeviceIds = computed(() =>
   items.value.map((item) => String(item.device_id ?? '')).filter((id) => id && id !== 'undefined')
 )
+
+function formatCell(v: unknown) {
+  if (v === true) return '是'
+  if (v === false) return '否'
+  return v ?? '-'
+}
 
 function isApproved(row: Record<string, unknown>) {
   return row.audit_status === 'approved'
@@ -187,6 +235,9 @@ function onDevicesPicked(devices: Record<string, unknown>[]) {
       actual_location: '',
       is_found: false,
       is_matched: false,
+      need_reprint_label: false,
+      label_printed: false,
+      label_print_count: 0,
       condition_status: '',
       remark: ''
     })
@@ -236,6 +287,54 @@ async function completeRow(row: Record<string, unknown>) {
     if (e !== 'cancel' && e !== 'close') {
       ElMessage.error('操作失败')
     }
+  }
+}
+
+async function onNeedReprintChange(row: Record<string, unknown>, value: boolean) {
+  if (!master.value?.id || !row.id) {
+    row.need_reprint_label = value
+    return
+  }
+  try {
+    await http.patch(`/asset/inventory/${master.value.id}/items/${row.id}`, {
+      need_reprint_label: value
+    })
+    row.need_reprint_label = value
+  } catch {
+    ElMessage.error('更新补打标志失败')
+  }
+}
+
+async function openReprint(row: Record<string, unknown>) {
+  reprintCheckId.value = String(row.id)
+  reprintSelected.value = []
+  const { data } = await http.get(`/asset/inventory/${row.id}/reprint-items`)
+  reprintItems.value = (data.data as Record<string, unknown>[]) ?? []
+  reprintVisible.value = true
+  await nextTick()
+  reprintTableRef.value?.clearSelection()
+  if (!reprintItems.value.length) {
+    ElMessage.info('当前没有标记为需补打的明细')
+  }
+}
+
+function onReprintSelectionChange(rows: Record<string, unknown>[]) {
+  reprintSelected.value = rows
+}
+
+async function doReprint() {
+  if (!reprintCheckId.value || !reprintSelected.value.length) return
+  try {
+    await printInventoryReprintLabels(reprintCheckId.value, reprintSelected.value)
+    ElMessage.success('已打开打印预览，并记录打印流水')
+    const { data } = await http.get(`/asset/inventory/${reprintCheckId.value}/reprint-items`)
+    reprintItems.value = (data.data as Record<string, unknown>[]) ?? []
+    reprintSelected.value = []
+    await nextTick()
+    reprintTableRef.value?.clearSelection()
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : '打印失败'
+    ElMessage.error(msg)
   }
 }
 </script>

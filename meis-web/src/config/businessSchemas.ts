@@ -426,7 +426,6 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'audit_status', label: '审核状态', dictType: 'audit_status', list: true, readonly: true },
     { prop: 'total_count', label: '应盘数量', type: 'number', list: true, readonly: true },
     { prop: 'checked_count', label: '已盘数量', type: 'number', list: true, readonly: true },
-    { prop: 'matched_count', label: '账实相符', type: 'number', list: true, readonly: true },
     { prop: 'mismatch_count', label: '差异数量', type: 'number', list: true, readonly: true },
     { prop: 'status', label: '状态', dictType: 'check_status', list: true },
     { prop: 'remark', label: '备注', type: 'textarea' }
@@ -437,7 +436,9 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'expected_location', label: '账面位置', detail: true, readonly: true },
     { prop: 'actual_location', label: '实盘位置', detail: true },
     { prop: 'is_found', label: '是否找到', type: 'boolean', detail: true },
-    { prop: 'is_matched', label: '账实相符', type: 'boolean', detail: true },
+    { prop: 'need_reprint_label', label: '补打标签', type: 'boolean', detail: true },
+    { prop: 'label_printed', label: '已打印', type: 'boolean', detail: true, readonly: true },
+    { prop: 'label_print_count', label: '打印次数', type: 'number', detail: true, readonly: true },
     { prop: 'condition_status', label: '设备状况', dictType: 'condition_status', detail: true },
     { prop: 'remark', label: '备注', type: 'textarea', detail: true }
   ],

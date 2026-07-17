@@ -199,25 +199,13 @@ function buildPrintDocument(labelFragments: string[]) {
 </html>`
 }
 
-async function recordPrintLog(deviceId: unknown) {
-  if (!deviceId) return
-  try {
-    await http.post(`/asset/device/${deviceId}/label/print`, { template_code: 'asset_sticker' })
-  } catch {
-    // 打印预览已打开，记录失败不阻断
-  }
+export type LabelPrintBizContext = {
+  biz_type: 'device' | 'inventory_check'
+  biz_id?: string
+  biz_no?: string
 }
 
-export async function printAssetLabelsBatch(rows: Record<string, unknown>[]) {
-  if (!rows.length) {
-    throw new Error('请先选择要打印的设备')
-  }
-
-  const invalid = rows.filter((row) => !String(row.device_code ?? '').trim())
-  if (invalid.length) {
-    throw new Error('所选设备中存在无资产编码的记录，无法打印')
-  }
-
+async function openLabelPreview(rows: Record<string, unknown>[]) {
   await ensureRefLabelMap('department')
   const hospitalName = await resolveHospitalName()
 
@@ -241,9 +229,57 @@ export async function printAssetLabelsBatch(rows: Record<string, unknown>[]) {
   win.document.write(html)
   win.document.close()
   win.focus()
+}
+
+async function recordDevicePrintLog(deviceId: unknown) {
+  if (!deviceId) return
+  try {
+    await http.post(`/asset/device/${deviceId}/label/print`, { template_code: 'asset_sticker' })
+  } catch {
+    // 打印预览已打开，记录失败不阻断
+  }
+}
+
+export async function printAssetLabelsBatch(rows: Record<string, unknown>[]) {
+  if (!rows.length) {
+    throw new Error('请先选择要打印的设备')
+  }
+
+  const invalid = rows.filter((row) => !String(row.device_code ?? '').trim())
+  if (invalid.length) {
+    throw new Error('所选设备中存在无资产编码的记录，无法打印')
+  }
+
+  await openLabelPreview(rows)
 
   for (const row of rows) {
-    await recordPrintLog(row.id)
+    await recordDevicePrintLog(row.id)
+  }
+}
+
+/** 盘点补打：预览复用台账模板，流水走盘点专用接口（回写明细补打标志）。 */
+export async function printInventoryReprintLabels(
+  checkId: string,
+  rows: Record<string, unknown>[]
+) {
+  if (!checkId) throw new Error('缺少盘点单')
+  if (!rows.length) throw new Error('请先选择要补打的设备')
+
+  const invalid = rows.filter((row) => !String(row.device_code ?? '').trim())
+  if (invalid.length) {
+    throw new Error('所选设备中存在无资产编码的记录，无法打印')
+  }
+
+  await openLabelPreview(rows)
+
+  const itemIds = rows.map((r) => r.id).filter(Boolean)
+  try {
+    await http.post(`/asset/inventory/${checkId}/label/print`, {
+      item_ids: itemIds,
+      template_code: 'asset_sticker'
+    })
+  } catch {
+    // 预览已打开，记录失败不阻断
   }
 }
 

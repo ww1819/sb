@@ -200,6 +200,7 @@ public class RepairWorkorderController {
         for (Map<String, Object> row : rows) {
             normalizeFaultPhotosField(row);
         }
+        attachDeviceLedgerFields(rows);
         processService.enrichWorkorders(rows);
         return Result.ok(PageResult.of(rows, total != null ? total : 0, query.getPage(), query.getSize()));
     }
@@ -1032,6 +1033,32 @@ public class RepairWorkorderController {
     private void normalizeFaultPhotosField(Map<String, Object> row) {
         if (row == null || !row.containsKey("fault_photos")) return;
         row.put("fault_photos", parseFaultPhotos(row.get("fault_photos")));
+    }
+
+    /** 列表补充台账规格/序列号（主单未冗余这些列）。 */
+    private void attachDeviceLedgerFields(List<Map<String, Object>> rows) {
+        if (rows == null || rows.isEmpty()) return;
+        Set<String> ids = new LinkedHashSet<>();
+        for (Map<String, Object> row : rows) {
+            Object id = row.get("device_id");
+            if (id != null && !String.valueOf(id).isBlank()) ids.add(String.valueOf(id));
+        }
+        if (ids.isEmpty()) return;
+        String placeholders = String.join(",", Collections.nCopies(ids.size(), "?::uuid"));
+        List<Map<String, Object>> devices = jdbc.queryForList(
+                "SELECT id, specification, serial_number FROM medical_device WHERE id IN (" + placeholders + ")"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", null),
+                ids.toArray());
+        Map<String, Map<String, Object>> byId = new HashMap<>();
+        for (Map<String, Object> d : devices) {
+            byId.put(String.valueOf(d.get("id")), d);
+        }
+        for (Map<String, Object> row : rows) {
+            Map<String, Object> d = byId.get(String.valueOf(row.get("device_id")));
+            if (d == null) continue;
+            row.put("specification", d.get("specification"));
+            row.put("serial_number", d.get("serial_number"));
+        }
     }
 
     private void assertWithdrawable(Map<String, Object> wo) {
