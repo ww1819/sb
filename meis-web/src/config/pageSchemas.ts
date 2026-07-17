@@ -22,15 +22,27 @@ export interface FieldSchema {
   type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'textarea' | 'boolean' | 'json' | 'file'
   dictType?: string
   linkTable?: string
+  /** 覆盖 RefSelect 的 valueKey（如 unit 存 unit_name） */
+  linkValueKey?: string
+  /** 外键下拉标签不拼编码，只显示名称（如申报人只显示姓名） */
+  linkHideCode?: boolean
   widget?: 'repairDevicePicker' | 'devicePicker' | 'stationPicker'
   group?: FieldGroup
   required?: boolean
   readonly?: boolean
   list?: boolean
   detail?: boolean
+  /** 明细表是否可本地升/降序 */
+  detailSortable?: boolean
+  /** 数量等：保存时须严格大于该值（如 0） */
+  minExclusive?: number
   width?: number
   span?: number
   placeholder?: string
+  /** 是否出现在表单，默认 true；false 仅列表等展示 */
+  form?: boolean
+  /** textarea 行数，默认 3 */
+  rows?: number
 }
 
 export const tableSchemas: Record<string, FieldSchema[]> = {

@@ -11,6 +11,7 @@
               v-for="(row, rowIdx) in panelOuterFieldRows(g)"
               :key="rowIdx"
               class="form-grid"
+              :class="formGridClass(g.group)"
               :style="panelOuterGridStyle(g.group)"
             >
               <el-form-item
@@ -30,6 +31,7 @@
           <div
             v-else-if="panelOuterFields(g).length"
             class="form-grid"
+            :class="formGridClass(g.group)"
             :style="panelOuterGridStyle(g.group)"
           >
             <el-form-item
@@ -67,6 +69,7 @@
             v-for="(row, rowIdx) in groupFieldRows(g)"
             :key="rowIdx"
             class="form-grid"
+            :class="formGridClass(g.group)"
             :style="{ gridTemplateColumns: `repeat(${groupColumns(g.group)}, minmax(0, 1fr))` }"
           >
           <el-form-item
@@ -86,6 +89,7 @@
         <div
           v-else-if="groupColumns(g.group)"
           class="form-grid"
+          :class="formGridClass(g.group)"
           :style="{ gridTemplateColumns: `repeat(${groupColumns(g.group)}, minmax(0, 1fr))` }"
         >
           <el-form-item
@@ -213,11 +217,22 @@ function groupColumns(group: FieldGroup) {
   return props.groupColumns?.[group]
 }
 
+function formGridClass(group: FieldGroup) {
+  const cols = groupColumns(group)
+  return cols && cols >= 4 ? 'form-grid--dense' : undefined
+}
+
 function gridItemStyle(field: FieldSchema, group: FieldGroup) {
   const cols = groupColumns(group)
   if (!cols) return undefined
   if (field.span && field.span >= 24) return { gridColumn: '1 / -1' }
-  if (field.type === 'textarea') return { gridColumn: '1 / -1' }
+  if (field.type === 'textarea') {
+    if (field.span && field.span < 24) {
+      const spanCols = Math.max(1, Math.floor((cols * field.span) / 24))
+      return { gridColumn: `span ${spanCols}` }
+    }
+    return { gridColumn: '1 / -1' }
+  }
   return undefined
 }
 
@@ -256,6 +271,32 @@ const flatFields = computed(() => props.fields ?? getSchema(props.table).filter(
   padding-right: 6px;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+.form-grid--dense :deep(.el-form-item) {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.form-grid--dense :deep(.el-form-item__label) {
+  width: auto !important;
+  max-width: none;
+  min-width: 72px;
+  padding: 0 6px 0 0;
+  line-height: 1.25;
+  white-space: nowrap;
+  text-align: right;
+  font-size: 12px;
+  height: auto !important;
+  flex-shrink: 0;
+}
+
+.form-grid--dense :deep(.el-form-item__content) {
+  margin-left: 0 !important;
+  flex: 1;
+  min-width: 0;
 }
 
 .form-grid :deep(.el-form-item__content) {

@@ -47,7 +47,7 @@ public class ScreenDashboardService {
         k.put("pendingApprovals", count("SELECT COUNT(*) FROM sys_approval_instance WHERE status = 'pending'"));
         k.put("lifeSupportCount", count("SELECT COUNT(*) FROM medical_device WHERE is_life_support = true AND is_active = true"));
         k.put("totalAssetValue", jdbc.queryForObject(
-                "SELECT COALESCE(SUM(purchase_price),0) FROM medical_device WHERE is_active = true", Number.class));
+                "SELECT COALESCE(SUM(original_value),0) FROM medical_device WHERE is_active = true", Number.class));
         return k;
     }
 

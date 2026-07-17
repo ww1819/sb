@@ -1,3 +1,5 @@
+import type { FieldGroup } from './pageSchemas'
+
 export interface ListFilterOption {
   value: string
   label: string
@@ -72,6 +74,8 @@ export interface PageConfig {
   formPlacement?: 'center' | 'right'
   /** 支持表头升序/降序的列 prop */
   sortableColumns?: string[]
+  /** 分组表单每行列数（如基本信息 5 列） */
+  formGroupColumns?: Partial<Record<FieldGroup, number>>
 }
 
 export const pageRegistry: Record<string, PageConfig> = {
@@ -86,10 +90,26 @@ export const pageRegistry: Record<string, PageConfig> = {
     saveUrl: '/purchase/plan',
     showRowIndex: true,
     showRowSelection: true,
+    columns: [
+      'plan_code',
+      'campus_name',
+      'dept_name',
+      'applicant_name',
+      'fill_date',
+      'total_budget',
+      'plan_year',
+      'plan_type',
+      'approved_by_name',
+      'approved_at',
+      'approval_status',
+      'benefit_analysis_url',
+      'dept_argument_url'
+    ],
     listFilters: [
       { key: 'approval_status', label: '审批状态', dictType: 'approval_status' },
-      { key: 'plan_year', label: '计划年度', type: 'number' }
-    ]
+      { key: 'plan_type', label: '计划类型', dictType: 'plan_type' }
+    ],
+    formGroupColumns: { basic: 6 }
   },
   '/purchase/apply': {
     title: '采购申请',
@@ -102,10 +122,26 @@ export const pageRegistry: Record<string, PageConfig> = {
     saveUrl: '/purchase/plan',
     showRowIndex: true,
     showRowSelection: true,
+    columns: [
+      'plan_code',
+      'campus_name',
+      'dept_name',
+      'applicant_name',
+      'fill_date',
+      'total_budget',
+      'plan_year',
+      'plan_type',
+      'approved_by_name',
+      'approved_at',
+      'approval_status',
+      'benefit_analysis_url',
+      'dept_argument_url'
+    ],
     listFilters: [
       { key: 'approval_status', label: '审批状态', dictType: 'approval_status' },
-      { key: 'plan_year', label: '计划年度', type: 'number' }
-    ]
+      { key: 'plan_type', label: '计划类型', dictType: 'plan_type' }
+    ],
+    formGroupColumns: { basic: 6 }
   },
   '/purchase/approval': {
     title: '采购审批',
@@ -114,7 +150,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/purchase/approval/page'
   },
   '/purchase/project': {
-    title: '采购项目',
+    title: '设备采购计划表',
     apiBase: '/purchase',
     table: 'purchase_project',
     listPageUrl: '/purchase/project/page',

@@ -15,7 +15,7 @@ INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_o
 ('dashboard', 'mod_dashboard', '工作台', 'menu', '/dashboard', 1),
 ('mod_purchase', NULL, '采购管理', 'module', NULL, 3),
 ('purchase_plan', 'mod_purchase', '采购计划', 'menu', '/purchase/plan', 1),
-('purchase_project', 'mod_purchase', '采购项目', 'menu', '/purchase/project', 2),
+('purchase_project', 'mod_purchase', '设备采购计划表', 'menu', '/purchase/project', 2),
 ('purchase_contract', 'mod_purchase', '采购合同', 'menu', '/purchase/contract', 3),
 ('mod_asset', NULL, '资产台账', 'module', NULL, 4),
 ('asset_device', 'mod_asset', '资产登记', 'menu', '/asset/device', 1),
@@ -302,7 +302,7 @@ ON CONFLICT (menu_code) DO UPDATE SET
 
 UPDATE sys_menu SET menu_name = '设备合同管理', sort_order = 4 WHERE menu_code = 'purchase_contract';
 UPDATE sys_menu SET menu_name = '安装验收', sort_order = 5 WHERE menu_code = 'purchase_acceptance';
-UPDATE sys_menu SET menu_name = '采购项目', sort_order = 3 WHERE menu_code = 'purchase_project';
+UPDATE sys_menu SET menu_name = '设备采购计划表', sort_order = 3 WHERE menu_code = 'purchase_project';
 UPDATE sys_menu SET is_active = FALSE WHERE menu_code = 'purchase_plan';
 
 INSERT INTO sys_package_menu (package_code, menu_code)

@@ -2,6 +2,7 @@
   <StatusTag v-if="showStatus" :value="value" :prop="field.prop" :dict-type="field.dictType" />
   <span v-else-if="showAmount" class="cell-number cell-amount">{{ formattedNumber }}</span>
   <span v-else-if="showNumeric" class="cell-number">{{ formattedNumber }}</span>
+  <el-link v-else-if="showFile" :href="fileUrl" target="_blank" type="primary" :underline="false">预览</el-link>
   <span v-else>{{ displayText }}</span>
 </template>
 
@@ -42,12 +43,21 @@ const showStatus = computed(
 )
 const showAmount = computed(() => isAmountField(props.field.prop, props.field.type))
 const showNumeric = computed(() => isNumericField(props.field.prop, props.field.type))
+const fileUrl = computed(() => {
+  if (props.field.type !== 'file') return ''
+  const v = props.value
+  if (v === null || v === undefined || v === '') return ''
+  const s = String(v)
+  return s.startsWith('http') || s.startsWith('/api') ? s : `/api${s}`
+})
+const showFile = computed(() => props.field.type === 'file' && !!fileUrl.value)
 
 const formattedNumber = computed(() => formatCellNumber(props.value, showAmount.value))
 const displayText = computed(() => {
   // 订阅外键标签缓存版本，预加载完成后触发重绘（避免一直显示 UUID）
   void labelCacheVersion.value
   if (props.value === null || props.value === undefined || props.value === '') return '-'
+  if (props.field.type === 'file') return '-'
   const fromDict = resolveDictLabel(props.field.dictType, props.value)
   if (fromDict) return fromDict
   if (props.field.linkTable) {
