@@ -81,19 +81,34 @@ public class MenuService {
 
     private boolean isModuleVisible(String modCode, Set<String> allowed, List<Map<String, Object>> allMenus) {
         if (allowed.contains(modCode)) return true;
+        Map<String, String> parentOf = parentMap(allMenus);
         return allMenus.stream().anyMatch(m -> {
             if (!"menu".equals(m.get("menu_type"))) return false;
             if (!allowed.contains(m.get("menu_code").toString())) return false;
             Object parent = m.get("parent_code");
             if (parent == null) return false;
-            String parentCode = parent.toString();
-            if (modCode.equals(parentCode)) return true;
-            // menu under a group under this module
-            return allMenus.stream().anyMatch(g ->
-                    "group".equals(g.get("menu_type"))
-                            && modCode.equals(String.valueOf(g.get("parent_code")))
-                            && parentCode.equals(g.get("menu_code").toString()));
+            return isUnderAncestor(parent.toString(), modCode, parentOf);
         });
+    }
+
+    private Map<String, String> parentMap(List<Map<String, Object>> allMenus) {
+        Map<String, String> parentOf = new HashMap<>();
+        for (Map<String, Object> m : allMenus) {
+            Object parent = m.get("parent_code");
+            if (parent != null) parentOf.put(m.get("menu_code").toString(), parent.toString());
+        }
+        return parentOf;
+    }
+
+    /** parentCode 或其任意上级是否等于 ancestorCode */
+    private boolean isUnderAncestor(String parentCode, String ancestorCode, Map<String, String> parentOf) {
+        String p = parentCode;
+        int guard = 0;
+        while (p != null && guard++ < 32) {
+            if (ancestorCode.equals(p)) return true;
+            p = parentOf.get(p);
+        }
+        return false;
     }
 
     public List<Map<String, Object>> platformMenuTree() {
@@ -182,13 +197,13 @@ public class MenuService {
     }
 
     /**
-     * 组装导航分组：模块下可直接挂 menu，也可挂 menu_type=group 的二级分组，
-     * 分组下再挂三级 menu。按直接子节点 sort_order 交错输出。
+     * 组装导航分组：模块下可直接挂 menu，也可挂 menu_type=group 的二级分组；
+     * 分组下可再挂 menu，也可再挂嵌套 group（如保养 → 巡检）。
      */
-    private List<Map<String, Object>> buildGroups(String modCode, List<Map<String, Object>> allMenus,
+    private List<Map<String, Object>> buildGroups(String parentCode, List<Map<String, Object>> allMenus,
                                                    Set<String> allowed) {
         List<Map<String, Object>> directChildren = allMenus.stream()
-                .filter(m -> modCode.equals(String.valueOf(m.get("parent_code"))))
+                .filter(m -> parentCode.equals(String.valueOf(m.get("parent_code"))))
                 .filter(m -> {
                     String type = String.valueOf(m.get("menu_type"));
                     String code = m.get("menu_code").toString();
@@ -212,24 +227,39 @@ public class MenuService {
             }
             flushUntitledGroup(groups, pendingDirect);
             pendingDirect.clear();
-            String groupCode = child.get("menu_code").toString();
-            List<Map<String, Object>> items = allMenus.stream()
-                    .filter(m -> groupCode.equals(String.valueOf(m.get("parent_code")))
-                            && "menu".equals(m.get("menu_type"))
-                            && allowed.contains(m.get("menu_code").toString()))
-                    .sorted(Comparator.comparingInt(m -> ((Number) m.getOrDefault("sort_order", 0)).intValue()))
-                    .map(this::toLeaf)
-                    .collect(Collectors.toCollection(ArrayList::new));
-            if (!items.isEmpty()) {
-                Map<String, Object> g = new LinkedHashMap<>();
-                g.put("id", groupCode.replace('_', '-'));
-                g.put("title", child.get("menu_name"));
-                g.put("items", items);
-                groups.add(g);
-            }
+            Map<String, Object> node = buildGroupNode(child, allMenus, allowed);
+            if (node != null) groups.add(node);
         }
         flushUntitledGroup(groups, pendingDirect);
         return groups;
+    }
+
+    private Map<String, Object> buildGroupNode(Map<String, Object> groupMenu, List<Map<String, Object>> allMenus,
+                                               Set<String> allowed) {
+        String groupCode = groupMenu.get("menu_code").toString();
+        List<Map<String, Object>> items = allMenus.stream()
+                .filter(m -> groupCode.equals(String.valueOf(m.get("parent_code")))
+                        && "menu".equals(m.get("menu_type"))
+                        && allowed.contains(m.get("menu_code").toString()))
+                .sorted(Comparator.comparingInt(m -> ((Number) m.getOrDefault("sort_order", 0)).intValue()))
+                .map(this::toLeaf)
+                .collect(Collectors.toCollection(ArrayList::new));
+        List<Map<String, Object>> nested = allMenus.stream()
+                .filter(m -> groupCode.equals(String.valueOf(m.get("parent_code")))
+                        && "group".equals(m.get("menu_type")))
+                .filter(m -> allowed.contains(m.get("menu_code").toString())
+                        || hasVisibleMenuUnder(m.get("menu_code").toString(), allMenus, allowed))
+                .sorted(Comparator.comparingInt(m -> ((Number) m.getOrDefault("sort_order", 0)).intValue()))
+                .map(m -> buildGroupNode(m, allMenus, allowed))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(ArrayList::new));
+        if (items.isEmpty() && nested.isEmpty()) return null;
+        Map<String, Object> g = new LinkedHashMap<>();
+        g.put("id", groupCode.replace('_', '-'));
+        g.put("title", groupMenu.get("menu_name"));
+        g.put("items", items);
+        if (!nested.isEmpty()) g.put("groups", nested);
+        return g;
     }
 
     private void flushUntitledGroup(List<Map<String, Object>> groups, List<Map<String, Object>> pendingDirect) {
@@ -241,10 +271,14 @@ public class MenuService {
     }
 
     private boolean hasVisibleMenuUnder(String groupCode, List<Map<String, Object>> allMenus, Set<String> allowed) {
-        return allMenus.stream().anyMatch(m ->
-                groupCode.equals(String.valueOf(m.get("parent_code")))
-                        && "menu".equals(m.get("menu_type"))
-                        && allowed.contains(m.get("menu_code").toString()));
+        for (Map<String, Object> m : allMenus) {
+            if (!groupCode.equals(String.valueOf(m.get("parent_code")))) continue;
+            String type = String.valueOf(m.get("menu_type"));
+            String code = m.get("menu_code").toString();
+            if ("menu".equals(type) && allowed.contains(code)) return true;
+            if ("group".equals(type) && hasVisibleMenuUnder(code, allMenus, allowed)) return true;
+        }
+        return false;
     }
 
     private Map<String, Object> singleModule(Map<String, Object> mod) {

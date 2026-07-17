@@ -664,11 +664,7 @@ function buildTitleMap(list: NavModule[]) {
 
     if (mod.path) map.set(mod.path, mod.title)
 
-    for (const g of mod.groups ?? []) {
-
-      for (const item of g.items) map.set(item.path, item.title)
-
-    }
+    fillTitleFromGroups(mod.groups ?? [], map)
 
   }
 
@@ -680,6 +676,13 @@ function buildTitleMap(list: NavModule[]) {
 
   return map
 
+}
+
+function fillTitleFromGroups(groups: { items?: { path: string; title: string }[]; groups?: unknown[] }[], map: Map<string, string>) {
+  for (const g of groups) {
+    for (const item of g.items ?? []) map.set(item.path, item.title)
+    if (g.groups?.length) fillTitleFromGroups(g.groups as typeof groups, map)
+  }
 }
 
 

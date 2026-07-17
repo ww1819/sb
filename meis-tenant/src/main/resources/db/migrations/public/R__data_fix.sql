@@ -635,18 +635,27 @@ ON CONFLICT (menu_code) DO UPDATE SET
     sort_order = EXCLUDED.sort_order,
     is_active = TRUE;
 
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('screen_warehouse_twin', 'mod_screen', '数字孪生大屏', 'menu', '/screen/warehouse-twin', 2)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
 INSERT INTO sys_package_menu (package_code, menu_code)
 SELECT pkg, m.menu_code
 FROM (VALUES ('standard'), ('flagship'), ('professional')) AS p(pkg)
 CROSS JOIN sys_menu m
-WHERE m.menu_code IN ('mod_screen', 'screen_equipment')
+WHERE m.menu_code IN ('mod_screen', 'screen_equipment', 'screen_warehouse_twin')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO sys_tenant_menu (tenant_id, menu_code)
 SELECT t.id, m.menu_code
 FROM sys_tenant t
 CROSS JOIN sys_menu m
-WHERE m.menu_code IN ('mod_screen', 'screen_equipment')
+WHERE m.menu_code IN ('mod_screen', 'screen_equipment', 'screen_warehouse_twin')
 ON CONFLICT DO NOTHING;
 
 -- ---------- 套餐 / 租户菜单授权（标准版、旗舰版、专业版） ----------
@@ -672,7 +681,7 @@ WHERE menu_type IN ('module','menu')
   AND is_active = TRUE
   AND menu_code IN (
     'mod_analytics', 'analytics_mapping', 'analytics_sync', 'analytics_summary',
-    'analytics_cost', 'analytics_device', 'mod_screen', 'screen_equipment',
+    'analytics_cost', 'analytics_device', 'mod_screen', 'screen_equipment', 'screen_warehouse_twin',
     'mod_power', 'power_station', 'power_tag', 'power_status', 'power_stats', 'power_record'
   )
 ON CONFLICT DO NOTHING;
@@ -876,10 +885,11 @@ CROSS JOIN sys_menu m
 WHERE m.menu_code = 'ops_maintain'
 ON CONFLICT DO NOTHING;
 
--- ---------- INS-UI-01 / MET-UI-01：运维下巡检管理、计量管理二级分组（与保养管理同级） ----------
+-- ---------- INS-UI-01 / MET-UI-01：巡检挂保养下（四级）；计量管理仍为运维二级 ----------
+-- 终态：运维 → 保养管理 → 巡检管理 → 巡检*；运维 → 计量管理 → 计量*
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
-('ops_inspect', 'mod_ops', '巡检管理', 'group', NULL, 3),
-('ops_metrology', 'mod_ops', '计量管理', 'group', NULL, 4)
+('ops_inspect', 'ops_maintain', '巡检管理', 'group', NULL, 5),
+('ops_metrology', 'mod_ops', '计量管理', 'group', NULL, 3)
 ON CONFLICT (menu_code) DO UPDATE SET
     parent_code = EXCLUDED.parent_code,
     menu_name = EXCLUDED.menu_name,
@@ -963,12 +973,14 @@ WHERE menu_code = 'repair_engineer';
 
 -- 电流监测：由一级模块改为运维下二级分组（仍用 menu_code=mod_power，子菜单不变）
 UPDATE sys_menu SET parent_code = 'mod_ops', menu_name = '电流监测', menu_type = 'group',
-    path = NULL, sort_order = 5, is_active = TRUE
+    path = NULL, sort_order = 4, is_active = TRUE
 WHERE menu_code = 'mod_power';
 
+-- 运维二级分组顺序：维修 → 保养（含巡检） → 计量 → 电流监测
+UPDATE sys_menu SET sort_order = 1, is_active = TRUE WHERE menu_code = 'ops_repair';
 UPDATE sys_menu SET sort_order = 2, is_active = TRUE WHERE menu_code = 'ops_maintain';
-UPDATE sys_menu SET sort_order = 3, is_active = TRUE WHERE menu_code = 'ops_inspect';
-UPDATE sys_menu SET sort_order = 4, is_active = TRUE WHERE menu_code = 'ops_metrology';
+UPDATE sys_menu SET parent_code = 'ops_maintain', sort_order = 5, is_active = TRUE WHERE menu_code = 'ops_inspect';
+UPDATE sys_menu SET sort_order = 3, is_active = TRUE WHERE menu_code = 'ops_metrology';
 
 INSERT INTO sys_package_menu (package_code, menu_code)
 SELECT pkg, m.menu_code

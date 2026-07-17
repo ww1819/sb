@@ -17,4 +17,9 @@ public class ScreenEquipmentController {
     public Result<Map<String, Object>> dashboard() {
         return Result.ok(dashboardService.equipmentDashboard());
     }
+
+    @GetMapping("/warehouse-twin")
+    public Result<Map<String, Object>> warehouseTwin() {
+        return Result.ok(dashboardService.warehouseTwinDashboard());
+    }
 }

@@ -687,6 +687,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/power/record/page'
   },
   '/screen/equipment': { title: '设备运营大屏', apiBase: '/screen', table: 'medical_device' },
+  '/screen/warehouse-twin': { title: '数字孪生大屏', apiBase: '/screen', table: 'warehouse' },
   '/system/campus': { title: '院区管理', apiBase: '/system', table: 'campus',
   enableView: true
 },

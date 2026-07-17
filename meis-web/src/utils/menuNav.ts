@@ -11,6 +11,8 @@ export interface NavMenuGroup {
   id?: string
   title: string
   items: NavMenuItem[]
+  /** 嵌套分组（如保养管理 → 巡检管理） */
+  groups?: NavMenuGroup[]
 }
 
 export interface NavModule {
@@ -34,7 +36,7 @@ export interface BreadcrumbItem {
 
 export function normalizeNavModules(modules: NavModule[]): NavModule[] {
   return ensureExtraMenus(ensureSystemConfigMenu(modules.map((mod) => {
-    const items = (mod.groups ?? []).flatMap((group) => group.items)
+    const items = collectGroupItems(mod.groups ?? [])
     if (items.length !== 1) return mod
 
     const only = items[0]
@@ -53,6 +55,15 @@ export function normalizeNavModules(modules: NavModule[]): NavModule[] {
 
     return mod
   })))
+}
+
+function collectGroupItems(groups: NavMenuGroup[]): NavMenuItem[] {
+  const out: NavMenuItem[] = []
+  for (const g of groups) {
+    out.push(...(g.items ?? []))
+    if (g.groups?.length) out.push(...collectGroupItems(g.groups))
+  }
+  return out
 }
 
 const SYSTEM_CONFIG_MENU: NavMenuItem = {
@@ -138,19 +149,32 @@ export function flattenMenus(modules: NavModule[]): FlatMenuItem[] {
         keywords: mod.title.toLowerCase()
       })
     }
-    for (const group of mod.groups ?? []) {
-      for (const item of group.items) {
-        list.push({
-          path: item.path,
-          title: item.title,
-          moduleTitle: mod.title,
-          groupTitle: group.title || undefined,
-          keywords: [mod.title, group.title, item.title].filter(Boolean).join(' ').toLowerCase()
-        })
-      }
-    }
+    walkGroups(mod.groups ?? [], mod.title, undefined, list)
   }
   return list
+}
+
+function walkGroups(
+  groups: NavMenuGroup[],
+  moduleTitle: string,
+  parentGroupTitle: string | undefined,
+  list: FlatMenuItem[]
+) {
+  for (const group of groups) {
+    const groupTitle = group.title || parentGroupTitle
+    for (const item of group.items ?? []) {
+      list.push({
+        path: item.path,
+        title: item.title,
+        moduleTitle,
+        groupTitle: groupTitle || undefined,
+        keywords: [moduleTitle, groupTitle, item.title].filter(Boolean).join(' ').toLowerCase()
+      })
+    }
+    if (group.groups?.length) {
+      walkGroups(group.groups, moduleTitle, group.title || parentGroupTitle, list)
+    }
+  }
 }
 
 export function resolveBreadcrumb(
@@ -162,21 +186,34 @@ export function resolveBreadcrumb(
     if (mod.path === activePath) {
       return [{ label: mod.title }]
     }
-    for (const group of mod.groups ?? []) {
-      for (const item of group.items) {
-        if (item.path === activePath) {
-          const crumbs: BreadcrumbItem[] = [{ label: mod.title }]
-          if (group.title) crumbs.push({ label: group.title })
-          crumbs.push({ label: titleMap.get(activePath) ?? item.title })
-          return crumbs
-        }
-      }
-    }
+    const crumbs = findBreadcrumbInGroups(mod.groups ?? [], activePath, titleMap, [{ label: mod.title }])
+    if (crumbs) return crumbs
   }
   const fallback = titleMap.get(activePath) ?? getPageConfig(activePath)?.title
   if (fallback) return [{ label: fallback }]
   const seg = activePath.split('/').filter(Boolean).pop()
   return [{ label: seg ?? '当前页面' }]
+}
+
+function findBreadcrumbInGroups(
+  groups: NavMenuGroup[],
+  activePath: string,
+  titleMap: Map<string, string>,
+  prefix: BreadcrumbItem[]
+): BreadcrumbItem[] | null {
+  for (const group of groups) {
+    const next = group.title ? [...prefix, { label: group.title }] : prefix
+    for (const item of group.items ?? []) {
+      if (item.path === activePath) {
+        return [...next, { label: titleMap.get(activePath) ?? item.title }]
+      }
+    }
+    if (group.groups?.length) {
+      const found = findBreadcrumbInGroups(group.groups, activePath, titleMap, next)
+      if (found) return found
+    }
+  }
+  return null
 }
 
 export function filterMenuItems(items: FlatMenuItem[], keyword: string) {

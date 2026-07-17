@@ -1,9 +1,11 @@
 package com.meis.saas.analytics.service;
 
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -11,6 +13,10 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class ScreenDashboardService {
+    /** 前端虚拟仓 ID：无 warehouse_id 的设备归入此节点 */
+    private static final String UNASSIGNED_WAREHOUSE_ID = "unassigned";
+    private static final int DEVICES_PER_WAREHOUSE_LIMIT = 80;
+
     private final JdbcTemplate jdbc;
 
     public Map<String, Object> equipmentDashboard() {
@@ -25,6 +31,11 @@ public class ScreenDashboardService {
         data.put("powerOverview", powerOverview());
         data.put("purchaseBrief", purchaseBrief());
         return data;
+    }
+
+    /** 库房数字孪生专用数据（独立大屏） */
+    public Map<String, Object> warehouseTwinDashboard() {
+        return warehouseTwin();
     }
 
     private Map<String, Object> buildKpis() {
@@ -137,8 +148,117 @@ public class ScreenDashboardService {
         return p;
     }
 
+    /**
+     * 演示级库房数字孪生数据：仓库列表 + 每仓状态聚合 + 每仓设备样本（上限 80）。
+     * 无 warehouse_id 的设备归入虚拟仓「未分配」。
+     */
+    private Map<String, Object> warehouseTwin() {
+        Map<String, Object> twin = new LinkedHashMap<>();
+        String whNotDel = SoftDeleteSupport.notDeletedClause(jdbc, "warehouse", "w");
+        String mdNotDel = SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d");
+
+        List<Map<String, Object>> warehouses = new ArrayList<>();
+        Map<String, List<Map<String, Object>>> devicesByWarehouse = new LinkedHashMap<>();
+
+        List<Map<String, Object>> whRows = jdbc.queryForList("""
+                SELECT w.id, w.warehouse_code, w.warehouse_name
+                FROM warehouse w
+                WHERE COALESCE(w.is_active, true) = true
+                """ + whNotDel + """
+                ORDER BY w.sort_order NULLS LAST, w.warehouse_code
+                """);
+
+        for (Map<String, Object> wh : whRows) {
+            String id = String.valueOf(wh.get("id"));
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", id);
+            item.put("warehouse_code", wh.get("warehouse_code"));
+            item.put("warehouse_name", wh.get("warehouse_name"));
+            item.put("virtual", false);
+            fillWarehouseDeviceStats(item, devicesByWarehouse, id, false, mdNotDel);
+            warehouses.add(item);
+        }
+
+        long unassignedCount = count("""
+                SELECT COUNT(*) FROM medical_device d
+                WHERE d.warehouse_id IS NULL AND COALESCE(d.is_active, true) = true
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d"));
+        if (unassignedCount > 0 || warehouses.isEmpty()) {
+            Map<String, Object> virtual = new LinkedHashMap<>();
+            virtual.put("id", UNASSIGNED_WAREHOUSE_ID);
+            virtual.put("warehouse_code", "UNASSIGNED");
+            virtual.put("warehouse_name", "未分配库房");
+            virtual.put("virtual", true);
+            fillWarehouseDeviceStats(virtual, devicesByWarehouse, UNASSIGNED_WAREHOUSE_ID, true, mdNotDel);
+            warehouses.add(virtual);
+        }
+
+        warehouses.sort((a, b) -> Long.compare(
+                ((Number) b.getOrDefault("deviceCount", 0L)).longValue(),
+                ((Number) a.getOrDefault("deviceCount", 0L)).longValue()));
+
+        twin.put("warehouses", warehouses);
+        twin.put("devicesByWarehouse", devicesByWarehouse);
+        return twin;
+    }
+
+    private void fillWarehouseDeviceStats(
+            Map<String, Object> item,
+            Map<String, List<Map<String, Object>>> devicesByWarehouse,
+            String warehouseId,
+            boolean unassigned,
+            String mdNotDel) {
+        String whFilter = unassigned
+                ? " AND d.warehouse_id IS NULL "
+                : " AND d.warehouse_id = ?::uuid ";
+
+        String countSql = """
+                SELECT COUNT(*) FROM medical_device d
+                WHERE COALESCE(d.is_active, true) = true
+                """ + whFilter + mdNotDel;
+        long deviceCount = unassigned
+                ? count(countSql)
+                : count(countSql, warehouseId);
+        item.put("deviceCount", deviceCount);
+
+        String statusSql = """
+                SELECT COALESCE(d.device_status, 'unknown') AS status, COUNT(*) AS cnt
+                FROM medical_device d
+                WHERE COALESCE(d.is_active, true) = true
+                """ + whFilter + mdNotDel + """
+                GROUP BY d.device_status
+                """;
+        List<Map<String, Object>> statusRows = unassigned
+                ? jdbc.queryForList(statusSql)
+                : jdbc.queryForList(statusSql, warehouseId);
+        Map<String, Long> statusCounts = new LinkedHashMap<>();
+        for (Map<String, Object> row : statusRows) {
+            statusCounts.put(String.valueOf(row.get("status")), ((Number) row.get("cnt")).longValue());
+        }
+        item.put("statusCounts", statusCounts);
+
+        String deviceSql = """
+                SELECT d.id, d.device_code, d.device_name, d.device_status, dept.dept_name
+                FROM medical_device d
+                LEFT JOIN department dept ON dept.id = d.dept_id
+                WHERE COALESCE(d.is_active, true) = true
+                """ + whFilter + mdNotDel + """
+                ORDER BY d.updated_at DESC NULLS LAST, d.device_code
+                LIMIT ?
+                """;
+        List<Map<String, Object>> devices = unassigned
+                ? jdbc.queryForList(deviceSql, DEVICES_PER_WAREHOUSE_LIMIT)
+                : jdbc.queryForList(deviceSql, warehouseId, DEVICES_PER_WAREHOUSE_LIMIT);
+        devicesByWarehouse.put(warehouseId, devices);
+    }
+
     private long count(String sql) {
         Long v = jdbc.queryForObject(sql, Long.class);
+        return v != null ? v : 0;
+    }
+
+    private long count(String sql, Object... args) {
+        Long v = jdbc.queryForObject(sql, Long.class, args);
         return v != null ? v : 0;
     }
 }

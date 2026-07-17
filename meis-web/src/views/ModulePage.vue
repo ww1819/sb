@@ -123,6 +123,7 @@ const pageMap: Record<string, ReturnType<typeof defineAsyncComponent>> = {
   '/power/stats': defineAsyncComponent(() => import('@/views/power/PowerStatsPage.vue')),
   '/power/record': defineAsyncComponent(() => import('@/views/power/PowerRecordPage.vue')),
   '/screen/equipment': defineAsyncComponent(() => import('@/views/screen/EquipmentScreenPage.vue')),
+  '/screen/warehouse-twin': defineAsyncComponent(() => import('@/views/screen/WarehouseTwinScreenPage.vue')),
 }
 
 const pageComponent = computed(() => {

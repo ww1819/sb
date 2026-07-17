@@ -45,6 +45,22 @@
               <el-menu-item v-for="item in group.items" :key="item.path" :index="item.path">
                 {{ item.title }}
               </el-menu-item>
+              <template v-for="(sub, si) in group.groups ?? []" :key="`${group.id || gi}-sub-${sub.id || sub.title || si}`">
+                <el-sub-menu
+                  v-if="sub.title"
+                  :index="`${mod.id}/${group.id || group.title || `g${gi}`}/${sub.id || sub.title || `s${si}`}`"
+                >
+                  <template #title>
+                    <span>{{ sub.title }}</span>
+                  </template>
+                  <el-menu-item v-for="item in sub.items" :key="item.path" :index="item.path">
+                    {{ item.title }}
+                  </el-menu-item>
+                </el-sub-menu>
+                <el-menu-item v-for="item in sub.items" v-else :key="item.path" :index="item.path">
+                  {{ item.title }}
+                </el-menu-item>
+              </template>
             </el-sub-menu>
             <el-menu-item v-for="item in group.items" v-else :key="item.path" :index="item.path">
               {{ item.title }}
