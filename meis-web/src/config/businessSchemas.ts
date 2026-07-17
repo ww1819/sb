@@ -652,6 +652,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'report_method', label: '报修渠道', dictType: 'report_method', group: 'basic' },
     { prop: 'report_time', label: '报修时间', type: 'datetime', list: true, group: 'basic' },
     { prop: 'fault_description', label: '故障描述', type: 'textarea', list: true, group: 'basic', required: true },
+    { prop: 'fault_photos', label: '故障图片', type: 'imageList', maxCount: 3, group: 'basic' },
     { prop: 'urgency_level', label: '紧急程度', dictType: 'urgency', list: true, group: 'basic' },
     { prop: 'fault_type_id', label: '故障类型', linkTable: 'fault_type_dict', group: 'basic' },
     { prop: 'assigned_user_id', label: '工程师', linkTable: 'repair_engineer', list: true, group: 'workflow' },

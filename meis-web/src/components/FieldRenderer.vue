@@ -38,6 +38,12 @@
     :placeholder="field.label"
     :disabled="field.readonly"
   />
+  <ImageListField
+    v-else-if="field.type === 'imageList'"
+    v-model="imageListModel"
+    :disabled="field.readonly"
+    :max="field.maxCount ?? 3"
+  />
   <component
     v-else
     :is="inputComponent"
@@ -58,6 +64,7 @@ import type { FieldSchema } from '@/config/pageSchemas'
 import { useDict } from '@/composables/useDict'
 import RefSelect from '@/components/form/RefSelect.vue'
 import FileUploadField from '@/components/form/FileUploadField.vue'
+import ImageListField from '@/components/form/ImageListField.vue'
 import RepairDevicePickerField from '@/components/repair/RepairDevicePickerField.vue'
 import AssetDevicePickerField from '@/components/form/AssetDevicePickerField.vue'
 import PowerStationPickerField from '@/components/form/PowerStationPickerField.vue'
@@ -87,6 +94,15 @@ function onPickerModel(v: Record<string, unknown>) {
 const fileModel = computed({
   get: () => (props.modelValue == null ? '' : String(props.modelValue)),
   set: (v) => emit('update:modelValue', v)
+})
+
+const imageListModel = computed({
+  get: () => {
+    const v = props.modelValue
+    if (Array.isArray(v)) return v.map(String)
+    return [] as string[]
+  },
+  set: (v: string[]) => emit('update:modelValue', v)
 })
 
 const useDictSelect = computed(() => !!props.field.dictType)

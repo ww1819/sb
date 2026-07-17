@@ -9,10 +9,13 @@ import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.persistence.TableColumnCache;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.meis.saas.repair.service.RepairWorkorderProcessService;
 import com.meis.saas.repair.service.RepairWorkorderProcessService.ProcessRecord;
 import com.meis.saas.repair.service.RepairWorkorderSegmentService;
 import lombok.RequiredArgsConstructor;
+import org.postgresql.util.PGobject;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -37,7 +40,17 @@ public class RepairWorkorderController {
     private static final Set<String> DRAFT_EDITABLE_FIELDS = Set.of(
             "device_id", "device_code", "device_name", "reporter_id", "report_dept_id",
             "report_method", "report_time", "fault_description", "urgency_level",
-            "fault_type_id", "remark"
+            "fault_type_id", "remark", "fault_photos"
+    );
+
+    private static final int FAULT_PHOTOS_MAX = 3;
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final Map<String, String> DEVICE_STATUS_LABEL = Map.of(
+            "normal", "正常",
+            "maintenance", "维修中",
+            "pending_verify", "待验收",
+            "scrap", "报废",
+            "idle", "闲置"
     );
 
     private static final Set<String> HANDLE_LIST_STATUSES = Set.of(
@@ -88,6 +101,41 @@ public class RepairWorkorderController {
         appendIlike(sql, args, "d.serial_number", serialNumber);
         sql.append(" ORDER BY d.device_code LIMIT 500");
         return Result.ok(jdbc.queryForList(sql.toString(), args.toArray()));
+    }
+
+    /**
+     * 扫码/编码锁定台账：优先精确 device_code，否则模糊；含不可报修设备（带 can_report）。
+     */
+    @GetMapping("/devices/lookup")
+    public Result<List<Map<String, Object>>> deviceLookup(@RequestParam String deviceCode) {
+        if (deviceCode == null || deviceCode.isBlank()) {
+            throw new BizException(400, "设备编码不能为空");
+        }
+        String code = deviceCode.trim();
+        String notDeleted = SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d");
+        List<Map<String, Object>> rows = jdbc.queryForList("""
+                SELECT d.id, d.device_code, d.device_name, d.specification, d.serial_number,
+                       d.financial_code, d.dept_id, d.device_status, d.is_active, dept.dept_name
+                FROM medical_device d
+                LEFT JOIN department dept ON dept.id = d.dept_id
+                WHERE d.device_code = ?
+                """ + notDeleted + SoftDeleteSupport.notDeletedClause(jdbc, "department", "dept")
+                + " ORDER BY d.device_code LIMIT 50", code);
+        if (rows.isEmpty()) {
+            rows = jdbc.queryForList("""
+                    SELECT d.id, d.device_code, d.device_name, d.specification, d.serial_number,
+                           d.financial_code, d.dept_id, d.device_status, d.is_active, dept.dept_name
+                    FROM medical_device d
+                    LEFT JOIN department dept ON dept.id = d.dept_id
+                    WHERE d.device_code ILIKE ?
+                    """ + notDeleted + SoftDeleteSupport.notDeletedClause(jdbc, "department", "dept")
+                    + " ORDER BY d.device_code LIMIT 50", "%" + code + "%");
+        }
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            out.add(enrichDeviceReportability(row));
+        }
+        return Result.ok(out);
     }
 
     @GetMapping("/page")
@@ -149,6 +197,9 @@ public class RepairWorkorderController {
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT * FROM repair_workorder" + where + " ORDER BY report_time DESC NULLS LAST, created_at DESC LIMIT ? OFFSET ?",
                 pageArgs.toArray());
+        for (Map<String, Object> row : rows) {
+            normalizeFaultPhotosField(row);
+        }
         processService.enrichWorkorders(rows);
         return Result.ok(PageResult.of(rows, total != null ? total : 0, query.getPage(), query.getSize()));
     }
@@ -334,31 +385,36 @@ public class RepairWorkorderController {
             throw new BizException(400, "请填写故障描述");
         }
         assertDeviceAvailable(body.get("device_id"), null);
+        String faultPhotosJson = toFaultPhotosJson(body.get("fault_photos"));
         UUID id = UUID.randomUUID();
         String woNo = "WO" + System.currentTimeMillis();
         Object reporterId = blankToNull(body.get("reporter_id"));
         String reporterName = SoftDeleteSupport.resolveUserDisplayName(jdbc, reporterId);
+        Object reportTime = body.get("report_time") != null && !String.valueOf(body.get("report_time")).isBlank()
+                ? body.get("report_time") : OffsetDateTime.now();
         if (TableColumnCache.hasColumn(jdbc, "repair_workorder", "reporter_name")) {
             jdbc.update("""
                 INSERT INTO repair_workorder (id, wo_no, device_id, device_code, device_name, reporter_id, reporter_name, report_dept_id,
-                    report_method, report_time, fault_description, urgency_level, fault_type_id, remark, status)
-                VALUES (?::uuid,?,?::uuid,?,?,?::uuid,?,?::uuid,?,?::timestamptz,?,?,?::uuid,?,?)
+                    report_method, report_time, fault_description, fault_photos, urgency_level, fault_type_id, remark, status)
+                VALUES (?::uuid,?,?::uuid,?,?,?::uuid,?,?::uuid,?,?::timestamptz,?,CAST(? AS jsonb),?,?::uuid,?,?)
                 """,
                     id, woNo, body.get("device_id"), body.get("device_code"), body.get("device_name"),
                     reporterId, reporterName, blankToNull(body.get("report_dept_id")),
-                    body.getOrDefault("report_method", "web"), body.get("report_time"),
-                    body.get("fault_description"), body.getOrDefault("urgency_level", "normal"),
+                    body.getOrDefault("report_method", "web"), reportTime,
+                    body.get("fault_description"), faultPhotosJson,
+                    body.getOrDefault("urgency_level", "normal"),
                     blankToNull(body.get("fault_type_id")), blankToNull(body.get("remark")), "draft");
         } else {
             jdbc.update("""
                 INSERT INTO repair_workorder (id, wo_no, device_id, device_code, device_name, reporter_id, report_dept_id,
-                    report_method, report_time, fault_description, urgency_level, fault_type_id, remark, status)
-                VALUES (?::uuid,?,?::uuid,?,?,?::uuid,?::uuid,?,?::timestamptz,?,?,?::uuid,?,?)
+                    report_method, report_time, fault_description, fault_photos, urgency_level, fault_type_id, remark, status)
+                VALUES (?::uuid,?,?::uuid,?,?,?::uuid,?::uuid,?,?::timestamptz,?,CAST(? AS jsonb),?,?::uuid,?,?)
                 """,
                     id, woNo, body.get("device_id"), body.get("device_code"), body.get("device_name"),
                     reporterId, blankToNull(body.get("report_dept_id")),
-                    body.getOrDefault("report_method", "web"), body.get("report_time"),
-                    body.get("fault_description"), body.getOrDefault("urgency_level", "normal"),
+                    body.getOrDefault("report_method", "web"), reportTime,
+                    body.get("fault_description"), faultPhotosJson,
+                    body.getOrDefault("urgency_level", "normal"),
                     blankToNull(body.get("fault_type_id")), blankToNull(body.get("remark")), "draft");
         }
         Map<String, Object> row = requireWo(id);
@@ -399,6 +455,9 @@ public class RepairWorkorderController {
             } else if ("report_time".equals(col)) {
                 sets.add(col + " = ?::timestamptz");
                 args.add(v);
+            } else if ("fault_photos".equals(col)) {
+                sets.add("fault_photos = CAST(? AS jsonb)");
+                args.add(toFaultPhotosJson(v));
             } else {
                 sets.add(col + " = ?");
                 args.add(v);
@@ -892,13 +951,87 @@ public class RepairWorkorderController {
                 "SELECT * FROM repair_workorder WHERE id = ?::uuid "
                         + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null), id);
         if (rows.isEmpty()) throw new BizException(404, "workorder not found");
-        return rows.get(0);
+        Map<String, Object> row = rows.get(0);
+        normalizeFaultPhotosField(row);
+        return row;
     }
 
     private Map<String, Object> loadWorkorder(UUID id) {
         Map<String, Object> wo = requireWo(id);
         processService.enrichWorkorder(wo);
         return wo;
+    }
+
+    private Map<String, Object> enrichDeviceReportability(Map<String, Object> device) {
+        Map<String, Object> d = new LinkedHashMap<>(device);
+        String status = str(d.get("device_status"));
+        String statusLabel = DEVICE_STATUS_LABEL.getOrDefault(status, status.isBlank() ? "未知" : status);
+        d.put("device_status_label", statusLabel);
+        boolean blockedByStatus = Set.of("maintenance", "pending_verify", "scrap").contains(status);
+        boolean inactive = Boolean.FALSE.equals(d.get("is_active"));
+        boolean busy = !jdbc.queryForList("""
+                SELECT id FROM repair_workorder
+                WHERE device_id = ?::uuid
+                  AND status IN ('reported','dispatching','pending_accept','accepted','repairing','pending_verify','suspended','verify_rejected')
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null) + " LIMIT 1",
+                d.get("id")).isEmpty();
+        boolean canReport = !blockedByStatus && !busy && !inactive;
+        d.put("can_report", canReport);
+        if (!canReport) {
+            if (blockedByStatus) {
+                d.put("cannot_report_reason", "设备当前状态为「" + statusLabel + "」，不可报修");
+            } else if (busy) {
+                d.put("cannot_report_reason", "该设备已有进行中的报修单");
+            } else {
+                d.put("cannot_report_reason", "设备未启用，不可报修");
+            }
+        }
+        return d;
+    }
+
+    /** 校验并序列化为 JSON 数组字符串；空则 null。最多 FAULT_PHOTOS_MAX 张。 */
+    private String toFaultPhotosJson(Object raw) {
+        List<String> urls = parseFaultPhotos(raw);
+        if (urls.size() > FAULT_PHOTOS_MAX) {
+            throw new BizException(400, "故障图片最多上传 " + FAULT_PHOTOS_MAX + " 张");
+        }
+        if (urls.isEmpty()) return null;
+        try {
+            return JSON.writeValueAsString(urls);
+        } catch (Exception e) {
+            throw new BizException(400, "故障图片格式无效");
+        }
+    }
+
+    private List<String> parseFaultPhotos(Object raw) {
+        if (raw == null) return List.of();
+        try {
+            if (raw instanceof List<?> list) {
+                List<String> out = new ArrayList<>();
+                for (Object o : list) {
+                    if (o == null) continue;
+                    String s = String.valueOf(o).trim();
+                    if (!s.isEmpty() && !"null".equalsIgnoreCase(s)) out.add(s);
+                }
+                return out;
+            }
+            if (raw instanceof PGobject pg && pg.getValue() != null) {
+                return JSON.readValue(pg.getValue(), new TypeReference<List<String>>() {});
+            }
+            String s = String.valueOf(raw).trim();
+            if (s.isEmpty() || "null".equalsIgnoreCase(s)) return List.of();
+            if (s.startsWith("[")) {
+                return JSON.readValue(s, new TypeReference<List<String>>() {});
+            }
+            return List.of(s);
+        } catch (Exception e) {
+            throw new BizException(400, "故障图片格式无效");
+        }
+    }
+
+    private void normalizeFaultPhotosField(Map<String, Object> row) {
+        if (row == null || !row.containsKey("fault_photos")) return;
+        row.put("fault_photos", parseFaultPhotos(row.get("fault_photos")));
     }
 
     private void assertWithdrawable(Map<String, Object> wo) {
@@ -919,7 +1052,8 @@ public class RepairWorkorderController {
         if (device.isEmpty()) throw new BizException(400, "设备不存在");
         String ds = str(device.get(0).get("device_status"));
         if (Set.of("maintenance", "pending_verify", "scrap").contains(ds)) {
-            throw new BizException(400, "设备当前不可报修: " + ds);
+            String label = DEVICE_STATUS_LABEL.getOrDefault(ds, ds);
+            throw new BizException(400, "设备当前状态为「" + label + "」，不可报修");
         }
         String sql = """
                 SELECT id FROM repair_workorder

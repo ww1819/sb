@@ -1392,6 +1392,11 @@ async function saveDraft() {
     ElMessage.warning('请填写故障描述')
     return
   }
+  const photos = wo.value.fault_photos
+  if (Array.isArray(photos) && photos.length > 3) {
+    ElMessage.warning('故障图片最多 3 张')
+    return
+  }
   const id = wo.value.id
   const { data } = id
     ? await http.put(`/repair/workorder/${id}`, wo.value)
@@ -1404,25 +1409,39 @@ async function saveDraft() {
   ElMessage.success(id ? '草稿已保存' : '草稿已创建')
   await loadTimeline()
   crudRef.value?.load()
+  if (pageMode.value === 'apply' && wo.value?.status === 'draft') {
+    try {
+      await ElMessageBox.confirm('草稿已保存，是否立即提交报修？', '是否提交', {
+        confirmButtonText: '是',
+        cancelButtonText: '否',
+        type: 'info',
+        distinguishCancelAndClose: true
+      })
+      await doSubmit(wo.value, { skipConfirm: true })
+    } catch {
+      /* 否 / 关闭：留草稿 */
+    }
+  }
 }
 
-async function doSubmit(row?: Record<string, unknown>) {
+async function doSubmit(row?: Record<string, unknown>, opts?: { skipConfirm?: boolean }) {
   const target = row ?? wo.value
   if (!target) return
   if (!target.id) {
     wo.value = { ...target }
     await saveDraft()
-    if (!wo.value?.id) return
-    return doSubmit(wo.value)
+    return
   }
-  await ElMessageBox.confirm('提交后将进入维修流程，提交前请确认信息无误。', '提交报修', { type: 'warning' })
+  if (!opts?.skipConfirm) {
+    await ElMessageBox.confirm('提交后将进入维修流程，提交前请确认信息无误。', '提交报修', { type: 'warning' })
+  }
   const { data } = await http.post(`/repair/workorder/${target.id}/submit`)
   if (data.code !== 0 && data.code !== 200) {
     ElMessage.error(data.message || '提交失败')
     return
   }
   ElMessage.success('已提交')
-  if (!row) visible.value = false
+  if (!row || opts?.skipConfirm) visible.value = false
   crudRef.value?.load()
 }
 

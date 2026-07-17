@@ -19,7 +19,9 @@ export type FieldGroup =
 export interface FieldSchema {
   prop: string
   label: string
-  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'textarea' | 'boolean' | 'json' | 'file'
+  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'textarea' | 'boolean' | 'json' | 'file' | 'imageList'
+  /** imageList 最大张数 */
+  maxCount?: number
   dictType?: string
   linkTable?: string
   /** 覆盖 RefSelect 的 valueKey（如 unit 存 unit_name） */
