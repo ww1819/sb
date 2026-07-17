@@ -27,7 +27,7 @@
 import { onMounted, ref } from 'vue'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
-import PageFilterBar from '@/components/PageFilterBar.vue'
+import PageFilterBar from '@/components/system/PageFilterBar.vue'
 
 const loading = ref(false)
 const rows = ref<Record<string, unknown>[]>([])

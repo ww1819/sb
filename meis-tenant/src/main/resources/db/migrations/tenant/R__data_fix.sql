@@ -9,6 +9,27 @@
 -- =============================================================================
 
 -- ---------- 数据修正与字典（非 DDL，可重复） ----------
+-- 审批状态 draft 展示为「未提交」
+UPDATE sys_dict SET dict_label = '未提交'
+WHERE dict_type = 'approval_status' AND dict_code = 'draft' AND dict_label IS DISTINCT FROM '未提交';
+
+-- 已通过采购计划若缺审核人，回填终审记录
+UPDATE purchase_plan p
+SET approved_by = r.approver_id,
+    approved_at = COALESCE(p.approved_at, r.acted_at, NOW())
+FROM (
+    SELECT DISTINCT ON (i.business_id)
+           i.business_id, rec.approver_id, rec.acted_at
+    FROM sys_approval_instance i
+    JOIN sys_approval_record rec ON rec.instance_id = i.id AND rec.action = 'approve'
+    WHERE i.business_type = 'purchase_plan' AND i.status = 'approved'
+    ORDER BY i.business_id, rec.acted_at DESC NULLS LAST
+) r
+WHERE p.id = r.business_id
+  AND p.approval_status = 'approved'
+  AND p.approved_by IS NULL
+  AND r.approver_id IS NOT NULL;
+
 UPDATE inventory_check
 SET audit_status = 'approved'
 WHERE approved_by IS NOT NULL AND COALESCE(audit_status, 'pending') = 'pending';

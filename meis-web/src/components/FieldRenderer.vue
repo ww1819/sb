@@ -21,6 +21,8 @@
     v-else-if="field.linkTable"
     v-model="model"
     :link-table="field.linkTable"
+    :value-key="field.linkValueKey"
+    :hide-code="field.linkHideCode"
     :placeholder="field.placeholder || '请选择' + field.label"
     :disabled="field.readonly"
     :exclude-values="linkExcludeValues"
@@ -35,6 +37,12 @@
     v-model="fileModel"
     :placeholder="field.label"
     :disabled="field.readonly"
+  />
+  <ImageListField
+    v-else-if="field.type === 'imageList'"
+    v-model="imageListModel"
+    :disabled="field.readonly"
+    :max="field.maxCount ?? 3"
   />
   <component
     v-else
@@ -56,6 +64,7 @@ import type { FieldSchema } from '@/config/pageSchemas'
 import { useDict } from '@/composables/useDict'
 import RefSelect from '@/components/form/RefSelect.vue'
 import FileUploadField from '@/components/form/FileUploadField.vue'
+import ImageListField from '@/components/form/ImageListField.vue'
 import RepairDevicePickerField from '@/components/repair/RepairDevicePickerField.vue'
 import AssetDevicePickerField from '@/components/form/AssetDevicePickerField.vue'
 import PowerStationPickerField from '@/components/form/PowerStationPickerField.vue'
@@ -87,6 +96,15 @@ const fileModel = computed({
   set: (v) => emit('update:modelValue', v)
 })
 
+const imageListModel = computed({
+  get: () => {
+    const v = props.modelValue
+    if (Array.isArray(v)) return v.map(String)
+    return [] as string[]
+  },
+  set: (v: string[]) => emit('update:modelValue', v)
+})
+
 const useDictSelect = computed(() => !!props.field.dictType)
 
 const useNativeReadonly = computed(() => {
@@ -108,10 +126,14 @@ const inputComponent = computed(() => {
 const attrs = computed(() => {
   const base: Record<string, unknown> = {}
   if (props.field.placeholder) base.placeholder = props.field.placeholder
-  if (props.field.type === 'textarea') return { ...base, type: 'textarea', rows: 3, style: 'width:100%' }
+  if (props.field.type === 'textarea') {
+    return { ...base, type: 'textarea', rows: props.field.rows ?? 3, style: 'width:100%' }
+  }
   if (props.field.type === 'date') return { ...base, type: 'date', valueFormat: 'YYYY-MM-DD', style: 'width:100%' }
   if (props.field.type === 'datetime') return { ...base, type: 'datetime', valueFormat: 'YYYY-MM-DD HH:mm:ss', style: 'width:100%' }
-  if (props.field.type === 'number') return { ...base, style: 'width:100%' }
+  if (props.field.type === 'number') {
+    return { ...base, controls: false, style: 'width:100%' }
+  }
   if (props.field.dictType) return { ...base, clearable: true, style: 'width:100%' }
   return { ...base, style: 'width:100%' }
 })

@@ -30,7 +30,7 @@ public class BenefitController {
         args.add(query.getSize());
         args.add(offset);
         var rows = jdbc.queryForList("""
-                SELECT d.id, d.device_code, d.device_name, d.purchase_price, d.net_value, d.purchase_date,
+                SELECT d.id, d.device_code, d.device_name, d.original_value, d.net_value, d.purchase_date,
                        dept.dept_name,
                        latest.benefit_level, latest.net_profit, latest.profit_rate, latest.summary_year, latest.summary_month
                 FROM medical_device d

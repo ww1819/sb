@@ -48,7 +48,7 @@ public class BenefitSummaryController {
         args.add(query.getSize());
         args.add(offset);
         var rows = jdbc.queryForList("""
-                SELECT s.*, dept.dept_name, d.purchase_price, d.net_value
+                SELECT s.*, dept.dept_name, d.original_value, d.net_value
                 FROM device_benefit_summary s
                 LEFT JOIN medical_device d ON d.id = s.device_id
                 LEFT JOIN department dept ON dept.id = d.dept_id

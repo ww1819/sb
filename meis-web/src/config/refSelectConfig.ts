@@ -5,6 +5,8 @@ export interface RefSelectMeta {
   codeKey?: string
   valueKey?: string
   lookupUrl?: string
+  /** 有 codeKey 时是否拼「编码 名称」；默认 true。单位等场景可关，只显示名称 */
+  showCode?: boolean
 }
 
 export const refSelectConfig: Record<string, RefSelectMeta> = {
@@ -29,7 +31,7 @@ export const refSelectConfig: Record<string, RefSelectMeta> = {
     labelKey: 'finance_name',
     codeKey: 'finance_code'
   },
-  unit_dict: { url: '/system/unit_dict/list', labelKey: 'unit_name', codeKey: 'unit_code' },
+  unit_dict: { url: '/system/unit_dict/list', labelKey: 'unit_name', codeKey: 'unit_code', showCode: false },
   medical_device: { url: '/asset/medical_device/list', labelKey: 'device_name', codeKey: 'device_code' },
   device_outbound: { url: '/asset/device_outbound/list', labelKey: 'outbound_no', codeKey: 'outbound_no' },
   inspection_plan: { url: '/inspect/inspection_plan/list', labelKey: 'plan_name', codeKey: 'plan_code' },

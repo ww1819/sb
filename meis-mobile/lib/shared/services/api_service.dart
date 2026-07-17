@@ -105,23 +105,92 @@ class ApiService {
   }
 
   Future<List<dynamic>> getList(String path, {Map<String, dynamic>? query}) async {
-    final res = await dio.get<Map<String, dynamic>>(path, queryParameters: query);
-    final body = res.data;
-    if (body == null || body['code'] != 0) {
-      throw ApiException(body?['message']?.toString() ?? '请求失败');
+    final data = await getData(path, query: query);
+    if (data is List) return data;
+    if (data is Map && data['records'] is List) return data['records'] as List<dynamic>;
+    if (data is Map && data['list'] is List) return data['list'] as List<dynamic>;
+    return [];
+  }
+
+  Future<Map<String, dynamic>> getPage(String path, {Map<String, dynamic>? query}) async {
+    final data = await getData(path, query: query);
+    if (data is Map<String, dynamic>) return data;
+    return {'records': data is List ? data : [], 'total': 0};
+  }
+
+  Future<dynamic> getData(String path, {Map<String, dynamic>? query}) async {
+    try {
+      final res = await dio.get<Map<String, dynamic>>(path, queryParameters: query);
+      return _unwrap(res.data);
+    } on DioException catch (e) {
+      throw ApiException(_dioMessage(e), statusCode: e.response?.statusCode);
     }
-    return (body['data'] as List<dynamic>?) ?? [];
+  }
+
+  Future<dynamic> postData(String path, [Map<String, dynamic>? data]) async {
+    try {
+      final res = await dio.post<Map<String, dynamic>>(path, data: data ?? {});
+      return _unwrap(res.data);
+    } on DioException catch (e) {
+      throw ApiException(_dioMessage(e), statusCode: e.response?.statusCode);
+    }
+  }
+
+  Future<dynamic> putData(String path, Map<String, dynamic> data) async {
+    try {
+      final res = await dio.put<Map<String, dynamic>>(path, data: data);
+      return _unwrap(res.data);
+    } on DioException catch (e) {
+      throw ApiException(_dioMessage(e), statusCode: e.response?.statusCode);
+    }
+  }
+
+  Future<void> deleteData(String path) async {
+    try {
+      final res = await dio.delete<Map<String, dynamic>>(path);
+      _unwrap(res.data);
+    } on DioException catch (e) {
+      throw ApiException(_dioMessage(e), statusCode: e.response?.statusCode);
+    }
   }
 
   Future<void> post(String path, Map<String, dynamic> data) async {
-    final res = await dio.post<Map<String, dynamic>>(path, data: data);
-    final body = res.data;
-    if (body == null || body['code'] != 0) {
-      throw ApiException(body?['message']?.toString() ?? '请求失败');
+    await postData(path, data);
+  }
+
+  Future<String> uploadFile(String filePath, {String filename = 'photo.jpg'}) async {
+    try {
+      final form = FormData.fromMap({
+        'file': await MultipartFile.fromFile(filePath, filename: filename),
+      });
+      final res = await dio.post<Map<String, dynamic>>(
+        '/file/upload',
+        data: form,
+        options: Options(contentType: 'multipart/form-data'),
+      );
+      final data = _unwrap(res.data);
+      if (data is Map && data['url'] != null) {
+        return data['url'].toString();
+      }
+      throw ApiException('上传失败');
+    } on DioException catch (e) {
+      throw ApiException(_dioMessage(e), statusCode: e.response?.statusCode);
     }
   }
 
+  dynamic _unwrap(Map<String, dynamic>? body) {
+    if (body == null) throw ApiException('空响应');
+    if (body['code'] != 0 && body['code'] != 200) {
+      throw ApiException(body['message']?.toString() ?? '请求失败');
+    }
+    return body['data'];
+  }
+
   String _dioMessage(DioException e) {
+    final data = e.response?.data;
+    if (data is Map && data['message'] != null) {
+      return data['message'].toString();
+    }
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:

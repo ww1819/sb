@@ -10,7 +10,7 @@
       </template>
     </CrudPage>
 
-    <AppModal v-model="visible" title="采购项目 详情" size="xl">
+    <AppModal v-model="visible" title="设备采购计划表 详情" size="xl">
       <template v-if="project">
         <el-steps :active="stepIndex" finish-status="success" simple class="project-steps">
           <el-step title="草稿" /><el-step title="审批" /><el-step title="招标" /><el-step title="定标" /><el-step title="关闭" />

@@ -59,7 +59,7 @@
 import { onMounted, ref } from 'vue'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
-import PageFilterBar from '@/components/PageFilterBar.vue'
+import PageFilterBar from '@/components/system/PageFilterBar.vue'
 import AppModal from '@/components/AppModal.vue'
 
 const loading = ref(false)

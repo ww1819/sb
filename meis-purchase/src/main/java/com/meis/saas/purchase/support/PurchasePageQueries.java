@@ -13,7 +13,7 @@ public final class PurchasePageQueries {
     private PurchasePageQueries() {}
 
     public static PageResult<Map<String, Object>> planPage(JdbcTemplate jdbc, PageQuery q,
-            String approvalStatus, Integer planYear) {
+            String approvalStatus, Integer planYear, String planType) {
         StringBuilder where = new StringBuilder(" WHERE p.is_active IS NOT FALSE ");
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", "p"));
         List<Object> args = new ArrayList<>();
@@ -26,15 +26,43 @@ public final class PurchasePageQueries {
             where.append(" AND p.plan_year = ? ");
             args.add(planYear);
         }
+        if (planType != null && !planType.isBlank()) {
+            where.append(" AND p.plan_type = ? ");
+            args.add(planType);
+        }
         PurchaseDataScope.applyPlanFilter(where, args, jdbc);
         String from = """
             FROM purchase_plan p
+            LEFT JOIN campus c ON c.id = p.campus_id
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "campus", "c") + """
             LEFT JOIN department d ON d.id = p.dept_id
             """ + SoftDeleteSupport.notDeletedClause(jdbc, "department", "d") + """
             LEFT JOIN sys_user u ON u.id = p.applicant_id
-            """ + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "u");
-        return page(jdbc, from, where, args, q, "p.created_at DESC NULLS LAST",
-                "p.*, d.dept_name, u.real_name AS applicant_name");
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "u") + """
+            LEFT JOIN sys_user au ON au.id = p.approved_by
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", "au");
+        PageResult<Map<String, Object>> result = page(jdbc, from, where, args, q, "p.created_at DESC NULLS LAST",
+                "p.*, c.campus_name, d.dept_name, u.real_name AS applicant_name, au.real_name AS approved_by_name");
+        for (Map<String, Object> row : result.getRecords()) {
+            fillDateFallback(row);
+        }
+        return result;
+    }
+
+    /** 申报日期为空时回退创建日期，避免列表空白 */
+    static void fillDateFallback(Map<String, Object> row) {
+        if (row.get("fill_date") != null) return;
+        Object created = row.get("created_at");
+        if (created == null) return;
+        if (created instanceof java.sql.Timestamp ts) {
+            row.put("fill_date", ts.toLocalDateTime().toLocalDate());
+        } else if (created instanceof java.time.OffsetDateTime odt) {
+            row.put("fill_date", odt.toLocalDate());
+        } else if (created instanceof java.time.LocalDateTime ldt) {
+            row.put("fill_date", ldt.toLocalDate());
+        } else if (created instanceof java.time.Instant instant) {
+            row.put("fill_date", java.time.LocalDate.ofInstant(instant, java.time.ZoneId.systemDefault()));
+        }
     }
 
     public static PageResult<Map<String, Object>> projectPage(JdbcTemplate jdbc, PageQuery q,

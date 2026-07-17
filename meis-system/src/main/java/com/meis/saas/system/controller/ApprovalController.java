@@ -71,4 +71,9 @@ public class ApprovalController {
     public Result<Map<String, Object>> byBusiness(@RequestParam String businessType, @RequestParam UUID businessId) {
         return Result.ok(instanceService.getByBusiness(businessType, businessId));
     }
+
+    @GetMapping("/business/progress")
+    public Result<Map<String, Object>> progress(@RequestParam String businessType, @RequestParam UUID businessId) {
+        return Result.ok(instanceService.progressByBusiness(businessType, businessId));
+    }
 }
