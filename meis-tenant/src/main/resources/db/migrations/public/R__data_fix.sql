@@ -639,18 +639,27 @@ ON CONFLICT (menu_code) DO UPDATE SET
     sort_order = EXCLUDED.sort_order,
     is_active = TRUE;
 
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('screen_warehouse_twin', 'mod_screen', '数字孪生大屏', 'menu', '/screen/warehouse-twin', 2)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
 INSERT INTO sys_package_menu (package_code, menu_code)
 SELECT pkg, m.menu_code
 FROM (VALUES ('standard'), ('flagship'), ('professional')) AS p(pkg)
 CROSS JOIN sys_menu m
-WHERE m.menu_code IN ('mod_screen', 'screen_equipment')
+WHERE m.menu_code IN ('mod_screen', 'screen_equipment', 'screen_warehouse_twin')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO sys_tenant_menu (tenant_id, menu_code)
 SELECT t.id, m.menu_code
 FROM sys_tenant t
 CROSS JOIN sys_menu m
-WHERE m.menu_code IN ('mod_screen', 'screen_equipment')
+WHERE m.menu_code IN ('mod_screen', 'screen_equipment', 'screen_warehouse_twin')
 ON CONFLICT DO NOTHING;
 
 -- ---------- 套餐 / 租户菜单授权（标准版、旗舰版、专业版） ----------
@@ -676,7 +685,7 @@ WHERE menu_type IN ('module','menu')
   AND is_active = TRUE
   AND menu_code IN (
     'mod_analytics', 'analytics_mapping', 'analytics_sync', 'analytics_summary',
-    'analytics_cost', 'analytics_device', 'mod_screen', 'screen_equipment',
+    'analytics_cost', 'analytics_device', 'mod_screen', 'screen_equipment', 'screen_warehouse_twin',
     'mod_power', 'power_station', 'power_tag', 'power_status', 'power_stats', 'power_record'
   )
 ON CONFLICT DO NOTHING;

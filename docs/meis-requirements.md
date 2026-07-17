@@ -850,14 +850,22 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 ### 3.17 运营大屏（SCR）
 
-**路径**：`/screen/equipment`  
-**状态**：未开始
+**路径**：
+- `/screen/equipment` — 设备运营大屏（KPI / 图表 / 动态）
+- `/screen/warehouse-twin` — 数字孪生大屏（独立菜单）
 
-**需求摘要（待补充）**：
+**菜单**：`mod_screen` 下
+- `screen_equipment` 设备运营大屏
+- `screen_warehouse_twin` 数字孪生大屏
 
-- [ ] SCR-F-01 设备总量、维修中、保养到期等指标卡
+**状态**：进行中
+
+**需求摘要**：
+
+- [x] SCR-F-01 设备总量、维修中、保养到期等指标卡
 - [ ] SCR-F-02 科室/院区维度钻取
-- [ ] SCR-N-01 大屏刷新频率与性能
+- [x] SCR-F-03 演示级库房数字孪生（独立菜单 `/screen/warehouse-twin`；按医药仓储「五区三色」布局：待验区/合格品区/发货区/退货区/不合格品区，黄绿红色标；货架对标医院库房银灰开孔立柱实拍；`GET /api/screen/equipment/warehouse-twin`；无库位主数据时按设备状态演示映射）
+- [x] SCR-N-01 大屏约 60s 自动刷新；3D 场景离页 dispose
 
 ---
 
