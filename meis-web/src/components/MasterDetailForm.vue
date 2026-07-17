@@ -11,9 +11,9 @@
             <template #default="{ $index }">{{ $index + 1 }}</template>
           </el-table-column>
           <slot name="detail-columns" />
-          <el-table-column label="操作" width="88" align="center" fixed="right">
+          <el-table-column v-if="showOperations" label="操作" width="88" align="center" fixed="right">
             <template #default="{ $index }">
-              <el-button link type="danger" @click="items.splice($index, 1)">删除</el-button>
+              <el-button link type="danger" :disabled="!allowDelete" @click="items.splice($index, 1)">删除</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -32,10 +32,19 @@ withDefaults(
     detailTitle?: string
     showRowIndex?: boolean
     showAddButton?: boolean
+    showOperations?: boolean
+    allowDelete?: boolean
     /** 明细表固定高度（含表头），超出后上下滚动；列过多时左右滚动 */
     tableHeight?: number
   }>(),
-  { detailTitle: '明细信息', showRowIndex: true, showAddButton: true, tableHeight: 420 }
+  {
+    detailTitle: '明细信息',
+    showRowIndex: true,
+    showAddButton: true,
+    showOperations: true,
+    allowDelete: true,
+    tableHeight: 420
+  }
 )
 defineEmits<{ 'add-item': [] }>()
 </script>
