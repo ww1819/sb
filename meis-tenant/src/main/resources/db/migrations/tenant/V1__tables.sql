@@ -1075,6 +1075,9 @@ CREATE TABLE inventory_check_item (
     actual_location VARCHAR(200),
     is_found BOOLEAN,
     is_matched BOOLEAN,
+    need_reprint_label BOOLEAN NOT NULL DEFAULT FALSE,
+    label_printed BOOLEAN NOT NULL DEFAULT FALSE,
+    label_print_count INT NOT NULL DEFAULT 0,
     condition_status VARCHAR(20),
     check_date TIMESTAMP WITH TIME ZONE,
     checker_id UUID REFERENCES sys_user(id),
@@ -1092,6 +1095,9 @@ COMMENT ON COLUMN inventory_check_item.expected_location IS '账面位置';
 COMMENT ON COLUMN inventory_check_item.actual_location IS '实际位置';
 COMMENT ON COLUMN inventory_check_item.is_found IS '是否找到设备';
 COMMENT ON COLUMN inventory_check_item.is_matched IS '是否盘实相符';
+COMMENT ON COLUMN inventory_check_item.need_reprint_label IS '是否需补打标签';
+COMMENT ON COLUMN inventory_check_item.label_printed IS '本明细是否已打印过标签';
+COMMENT ON COLUMN inventory_check_item.label_print_count IS '本明细标签打印次数';
 COMMENT ON COLUMN inventory_check_item.condition_status IS '设备状况';
 COMMENT ON COLUMN inventory_check_item.check_date IS '盘点/巡检日期';
 COMMENT ON COLUMN inventory_check_item.checker_id IS '盘点人';
@@ -1155,8 +1161,13 @@ CREATE TABLE device_label_print_log (
     device_code VARCHAR(20) NOT NULL,
     device_name VARCHAR(200),
     printed_by UUID REFERENCES sys_user(id),
+    printed_by_name VARCHAR(100),
     printed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     template_code VARCHAR(50) DEFAULT 'default',
+    biz_type VARCHAR(50),
+    biz_id UUID,
+    biz_no VARCHAR(50),
+    biz_item_id UUID,
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -1166,8 +1177,13 @@ CREATE TABLE device_label_print_log (
     deleted_at TIMESTAMP WITH TIME ZONE,
     deleted_by UUID
 );
-COMMENT ON TABLE device_label_print_log IS '资产标签打印记录';
+COMMENT ON TABLE device_label_print_log IS '资产标签打印记录（统一流水，可挂业务上下文）';
 COMMENT ON COLUMN device_label_print_log.device_code IS '打印时设备编码快照（二维码载荷）';
+COMMENT ON COLUMN device_label_print_log.printed_by_name IS '打印人姓名快照';
+COMMENT ON COLUMN device_label_print_log.biz_type IS '业务类型：device / inventory_check 等';
+COMMENT ON COLUMN device_label_print_log.biz_id IS '业务主单ID';
+COMMENT ON COLUMN device_label_print_log.biz_no IS '业务单号快照';
+COMMENT ON COLUMN device_label_print_log.biz_item_id IS '业务明细ID';
 
 -- ================================================================================
 -- 5. 维修管理模块

@@ -154,8 +154,15 @@ class _RepairPageState extends ConsumerState<RepairPage> {
     }
   }
 
+  String _text(Map<String, dynamic> row, String key) {
+    final v = row[key]?.toString().trim();
+    if (v == null || v.isEmpty || v == 'null') return '—';
+    return v;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: const Text('扫码报修'),
@@ -181,41 +188,86 @@ class _RepairPageState extends ConsumerState<RepairPage> {
                       final row = items[i];
                       final status = row['status']?.toString() ?? '';
                       final label = statusLabel[status] ?? status;
+                      final fault = _text(row, 'fault_description');
                       return Card(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          title: Text(row['wo_no']?.toString() ?? row['id']?.toString() ?? ''),
-                          subtitle: Text(
-                            '${row['device_name'] ?? row['device_code'] ?? '—'}\n'
-                            '$label · ${row['fault_description'] ?? ''}',
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          isThreeLine: true,
+                        margin: const EdgeInsets.only(bottom: 10),
+                        child: InkWell(
                           onTap: () => openForm(id: row['id']?.toString()),
-                          trailing: PopupMenuButton<String>(
-                            onSelected: (v) {
-                              if (v == 'edit') {
-                                openForm(id: row['id']?.toString());
-                              } else if (v == 'submit') {
-                                submit(row);
-                              } else if (v == 'withdraw') {
-                                withdraw(row);
-                              } else if (v == 'delete') {
-                                deleteDraft(row);
-                              }
-                            },
-                            itemBuilder: (_) => [
-                              if (status == 'draft') ...[
-                                const PopupMenuItem(value: 'edit', child: Text('编辑')),
-                                const PopupMenuItem(value: 'submit', child: Text('提交')),
-                                const PopupMenuItem(value: 'delete', child: Text('删除')),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        _text(row, 'wo_no'),
+                                        style: const TextStyle(fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: scheme.primaryContainer.withValues(alpha: 0.55),
+                                        borderRadius: BorderRadius.circular(999),
+                                      ),
+                                      child: Text(label, style: TextStyle(fontSize: 12, color: scheme.onPrimaryContainer)),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text('设备名称：${_text(row, 'device_name')}'),
+                                Text('设备编码：${_text(row, 'device_code')}'),
+                                Text('规格：${_text(row, 'specification')}'),
+                                Text('序列号：${_text(row, 'serial_number')}'),
+                                if (fault != '—') ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '故障：$fault',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
+                                  ),
+                                ],
+                                const SizedBox(height: 4),
+                                const Divider(height: 12),
+                                Wrap(
+                                  spacing: 4,
+                                  children: [
+                                    if (status == 'draft') ...[
+                                      TextButton(
+                                        onPressed: () => openForm(id: row['id']?.toString()),
+                                        child: const Text('编辑'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => submit(row),
+                                        child: const Text('提交'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => deleteDraft(row),
+                                        style: TextButton.styleFrom(foregroundColor: scheme.error),
+                                        child: const Text('删除'),
+                                      ),
+                                    ] else if (status == 'reported') ...[
+                                      TextButton(
+                                        onPressed: () => openForm(id: row['id']?.toString()),
+                                        child: const Text('查看'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => withdraw(row),
+                                        child: const Text('撤回'),
+                                      ),
+                                    ] else
+                                      TextButton(
+                                        onPressed: () => openForm(id: row['id']?.toString()),
+                                        child: const Text('查看'),
+                                      ),
+                                  ],
+                                ),
                               ],
-                              if (status == 'reported')
-                                const PopupMenuItem(value: 'withdraw', child: Text('撤回')),
-                              if (status != 'draft')
-                                const PopupMenuItem(value: 'edit', child: Text('查看')),
-                            ],
+                            ),
                           ),
                         ),
                       );

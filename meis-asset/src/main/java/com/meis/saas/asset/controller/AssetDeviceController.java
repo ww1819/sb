@@ -329,10 +329,20 @@ public class AssetDeviceController {
         String template = body != null && body.get("template_code") != null
                 ? body.get("template_code").toString() : "default";
         String remark = body != null && body.get("remark") != null ? body.get("remark").toString() : null;
+        String printedByName = null;
+        if (printedBy != null && !printedBy.toString().isBlank()) {
+            var nameRows = jdbc.queryForList(
+                    "SELECT COALESCE(NULLIF(TRIM(real_name), ''), username) AS name FROM sys_user WHERE id = ?::uuid",
+                    printedBy);
+            if (!nameRows.isEmpty() && nameRows.get(0).get("name") != null) {
+                printedByName = nameRows.get(0).get("name").toString();
+            }
+        }
         jdbc.update("""
-                INSERT INTO device_label_print_log (id, device_id, device_code, device_name, printed_by, template_code, remark)
-                VALUES (?::uuid, ?::uuid, ?, ?, ?::uuid, ?, ?)
-                """, logId, id, code, device.get("device_name"), printedBy, template, remark);
+                INSERT INTO device_label_print_log
+                (id, device_id, device_code, device_name, printed_by, printed_by_name, template_code, biz_type, biz_id, remark)
+                VALUES (?::uuid, ?::uuid, ?, ?, ?::uuid, ?, ?, 'device', ?::uuid, ?)
+                """, logId, id, code, device.get("device_name"), printedBy, printedByName, template, id, remark);
         jdbc.update("""
                 UPDATE medical_device SET label_printed = TRUE, qr_code_url = ?, updated_at = NOW() WHERE id = ?::uuid
                 """, code, id);
