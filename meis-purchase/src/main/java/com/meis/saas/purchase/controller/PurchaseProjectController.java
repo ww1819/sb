@@ -5,6 +5,8 @@ import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
+import com.meis.saas.common.rbac.PermissionContext;
+import com.meis.saas.common.rbac.PermissionInterceptor;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.workflow.ApprovalInstanceService;
 import com.meis.saas.purchase.support.PurchaseChainService;
@@ -30,7 +32,59 @@ public class PurchaseProjectController {
     public Result<PageResult<Map<String, Object>>> page(PageQuery query,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String plan_id) {
+        // PUR-UI-08：列表改为已审批计划明细；原项目分页仍可用 /page/legacy
+        return Result.ok(PurchasePageQueries.approvedPlanItemPage(jdbc, query));
+    }
+
+    @GetMapping("/page/legacy")
+    public Result<PageResult<Map<String, Object>>> pageLegacy(PageQuery query,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String plan_id) {
         return Result.ok(PurchasePageQueries.projectPage(jdbc, query, status, plan_id));
+    }
+
+    /** PUR-UI-09：订单审核意见 */
+    @PostMapping("/approved-items/{itemId}/order-review")
+    @Transactional
+    @OperationLog(module = "purchase", description = "订单审核意见")
+    public Result<Map<String, Object>> orderReview(@PathVariable UUID itemId, @RequestBody Map<String, Object> body) {
+        Object commentObj = body.get("comment");
+        if (commentObj == null || commentObj.toString().isBlank()) {
+            throw new BizException(400, "请填写订单审核意见");
+        }
+        String comment = commentObj.toString().trim();
+        var rows = jdbc.queryForList("""
+                SELECT i.id, i.order_no, p.approval_status
+                FROM purchase_plan_item i
+                JOIN purchase_plan p ON p.id = i.plan_id
+                WHERE i.id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan_item", "i")
+                + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", "p"), itemId);
+        if (rows.isEmpty()) throw new BizException(404, "明细不存在");
+        if (!"approved".equals(String.valueOf(rows.get(0).get("approval_status")))) {
+            throw new BizException(400, "仅已审批通过的明细可填写订单审核意见");
+        }
+        PermissionContext ctx = PermissionInterceptor.CTX.get();
+        UUID reviewerId = null;
+        String reviewerName = null;
+        if (ctx != null && ctx.getUserId() != null && !ctx.getUserId().isBlank()) {
+            reviewerId = UUID.fromString(ctx.getUserId());
+            reviewerName = SoftDeleteSupport.resolveUserDisplayName(jdbc, reviewerId);
+        }
+        jdbc.update("""
+                UPDATE purchase_plan_item
+                SET order_review_comment = ?,
+                    order_reviewed_at = NOW(),
+                    order_reviewed_by = ?::uuid,
+                    order_reviewed_by_name = ?,
+                    updated_at = NOW()
+                WHERE id = ?::uuid
+                """, comment, reviewerId, reviewerName, itemId);
+        var out = jdbc.queryForList("""
+                SELECT id, order_no, order_review_comment, order_reviewed_at, order_reviewed_by, order_reviewed_by_name
+                FROM purchase_plan_item WHERE id = ?::uuid
+                """, itemId);
+        return Result.ok(out.isEmpty() ? Map.of() : out.get(0));
     }
 
     @GetMapping("/{id}")

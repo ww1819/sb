@@ -152,10 +152,8 @@ export const pageRegistry: Record<string, PageConfig> = {
   '/purchase/project': {
     title: '设备采购计划表',
     apiBase: '/purchase',
-    table: 'purchase_project',
-    listPageUrl: '/purchase/project/page',
-    saveUrl: '/purchase/project',
-    listFilters: [{ key: 'status', label: '项目状态', dictType: 'project_status' }]
+    table: 'purchase_plan_item',
+    listPageUrl: '/purchase/project/page'
   },
   '/purchase/contract': {
     title: '设备合同管理',

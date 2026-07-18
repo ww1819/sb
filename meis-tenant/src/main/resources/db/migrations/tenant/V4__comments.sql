@@ -193,6 +193,11 @@ COMMENT ON COLUMN purchase_plan_item.existing_device_usage_freq IS '现有设备
 COMMENT ON COLUMN purchase_plan_item.other_condition_confirm IS '其他条件确认';
 COMMENT ON COLUMN purchase_plan_item.is_large_equipment IS '是否大型设备';
 COMMENT ON COLUMN purchase_plan_item.large_equipment_class IS '大型设备分类';
+COMMENT ON COLUMN purchase_plan_item.order_no IS '订单号（DD-yyyyMMdd+4位日流水）';
+COMMENT ON COLUMN purchase_plan_item.order_review_comment IS '订单审核意见';
+COMMENT ON COLUMN purchase_plan_item.order_reviewed_at IS '订单审核时间';
+COMMENT ON COLUMN purchase_plan_item.order_reviewed_by IS '订单审核人';
+COMMENT ON COLUMN purchase_plan_item.order_reviewed_by_name IS '订单审核人姓名快照';
 COMMENT ON TABLE purchase_project IS '采购项目表';
 COMMENT ON COLUMN purchase_project.id IS '主键';
 COMMENT ON COLUMN purchase_project.project_code IS '项目编码';

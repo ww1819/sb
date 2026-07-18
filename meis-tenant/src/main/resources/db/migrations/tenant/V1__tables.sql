@@ -521,7 +521,12 @@ CREATE TABLE purchase_plan_item (
     existing_device_usage_freq VARCHAR(50),
     other_condition_confirm TEXT,
     is_large_equipment BOOLEAN DEFAULT false,
-    large_equipment_class VARCHAR(20)
+    large_equipment_class VARCHAR(20),
+    order_no VARCHAR(20),
+    order_review_comment TEXT,
+    order_reviewed_at TIMESTAMPTZ,
+    order_reviewed_by UUID,
+    order_reviewed_by_name VARCHAR(100)
 );
 COMMENT ON TABLE purchase_plan_item IS '采购计划明细表';
 COMMENT ON COLUMN purchase_plan_item.id IS '主键';
@@ -552,6 +557,11 @@ COMMENT ON COLUMN purchase_plan_item.existing_device_usage_freq IS '现有设备
 COMMENT ON COLUMN purchase_plan_item.other_condition_confirm IS '其他条件确认';
 COMMENT ON COLUMN purchase_plan_item.is_large_equipment IS '是否大型设备';
 COMMENT ON COLUMN purchase_plan_item.large_equipment_class IS '大型设备分类';
+COMMENT ON COLUMN purchase_plan_item.order_no IS '订单号（DD-yyyyMMdd+4位日流水）';
+COMMENT ON COLUMN purchase_plan_item.order_review_comment IS '订单审核意见';
+COMMENT ON COLUMN purchase_plan_item.order_reviewed_at IS '订单审核时间';
+COMMENT ON COLUMN purchase_plan_item.order_reviewed_by IS '订单审核人';
+COMMENT ON COLUMN purchase_plan_item.order_reviewed_by_name IS '订单审核人姓名快照';
 
 -- 3.3 采购项目表
 CREATE TABLE purchase_project (

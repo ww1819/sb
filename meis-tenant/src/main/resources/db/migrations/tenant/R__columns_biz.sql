@@ -343,3 +343,9 @@ ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS existing_device_usage_fr
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS other_condition_confirm TEXT;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS is_large_equipment BOOLEAN DEFAULT false;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS large_equipment_class VARCHAR(20);
+-- ---------- purchase_plan_item（订单号 / 订单审核 PUR-UI-09） ----------
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS order_no VARCHAR(20);
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS order_review_comment TEXT;
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS order_reviewed_at TIMESTAMPTZ;
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS order_reviewed_by UUID;
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS order_reviewed_by_name VARCHAR(100);

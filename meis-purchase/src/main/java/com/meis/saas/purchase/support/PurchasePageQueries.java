@@ -3,6 +3,7 @@ package com.meis.saas.purchase.support;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
+import com.meis.saas.common.purchase.PurchasePlanItemOrderNos;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.ArrayList;
@@ -88,6 +89,77 @@ public final class PurchasePageQueries {
             """ + SoftDeleteSupport.notDeletedClause(jdbc, "supplier", "s");
         return page(jdbc, from, where, args, q, "pj.created_at DESC NULLS LAST",
                 "pj.*, pl.plan_code, s.supplier_name");
+    }
+
+    /**
+     * 设备采购计划表：仅展示审批已通过计划的明细行（PUR-UI-08）。
+     */
+    public static PageResult<Map<String, Object>> approvedPlanItemPage(JdbcTemplate jdbc, PageQuery q) {
+        // 历史已通过明细补齐订单号（PUR-UI-09）
+        List<Integer> missing = jdbc.query("""
+                SELECT 1
+                FROM purchase_plan_item i
+                JOIN purchase_plan p ON p.id = i.plan_id
+                WHERE p.approval_status = 'approved'
+                  AND (i.order_no IS NULL OR TRIM(i.order_no) = '')
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", "p")
+                + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan_item", "i") + """
+                LIMIT 1
+                """, (rs, rowNum) -> 1);
+        if (!missing.isEmpty()) {
+            PurchasePlanItemOrderNos.allocateMissingApproved(jdbc);
+        }
+        StringBuilder where = new StringBuilder(" WHERE p.approval_status = 'approved' ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", "p"));
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan_item", "i"));
+        List<Object> args = new ArrayList<>();
+        appendKeyword(where, args, q.getKeyword(),
+                "i.order_no", "p.plan_code", "d.dept_name", "i.device_name", "i.specification", "i.brand_intent");
+        PurchaseDataScope.applyPlanFilter(where, args, jdbc);
+        String from = """
+            FROM purchase_plan_item i
+            JOIN purchase_plan p ON p.id = i.plan_id
+            LEFT JOIN department d ON d.id = p.dept_id
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "department", "d") + """
+            LEFT JOIN LATERAL (
+                SELECT DISTINCT ON (i0.business_id)
+                       i0.id, i0.created_at
+                FROM sys_approval_instance i0
+                WHERE i0.business_type = 'purchase_plan'
+                  AND i0.business_id = p.id
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "sys_approval_instance", "i0") + """
+                ORDER BY i0.business_id, i0.created_at DESC NULLS LAST
+            ) inst ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT r.comment
+                FROM sys_approval_record r
+                WHERE r.instance_id = inst.id
+                ORDER BY r.acted_at DESC NULLS LAST
+                LIMIT 1
+            ) last_rec ON TRUE
+            """;
+        PageResult<Map<String, Object>> result = page(jdbc, from, where, args, q,
+                "p.approved_at DESC NULLS LAST, p.created_at DESC NULLS LAST, i.created_at ASC NULLS LAST",
+                """
+                i.id, i.plan_id, i.device_name, i.specification, i.estimated_price, i.quantity, i.total_price,
+                i.fund_source, i.justification AS purchase_purpose, i.brand_intent,
+                i.order_no, i.order_review_comment, i.order_reviewed_at, i.order_reviewed_by_name,
+                p.plan_code, p.plan_year, p.fill_date, p.created_at, p.remark AS plan_remark,
+                d.dept_name,
+                inst.created_at AS submitted_at,
+                last_rec.comment AS approval_comment
+                """);
+        for (Map<String, Object> row : result.getRecords()) {
+            fillDateFallback(row);
+            if (row.get("total_price") == null) {
+                Object qty = row.get("quantity");
+                Object price = row.get("estimated_price");
+                if (qty instanceof Number qn && price instanceof Number pn) {
+                    row.put("total_price", qn.doubleValue() * pn.doubleValue());
+                }
+            }
+        }
+        return result;
     }
 
     public static PageResult<Map<String, Object>> contractPage(JdbcTemplate jdbc, PageQuery q,

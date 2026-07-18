@@ -201,6 +201,9 @@ public class ApprovalInstanceService {
                 } else {
                     jdbc.update("UPDATE purchase_plan SET approval_status = ? WHERE id = ?::uuid", status, businessId);
                 }
+                if ("approved".equals(status)) {
+                    com.meis.saas.common.purchase.PurchasePlanItemOrderNos.allocateForPlan(jdbc, businessId);
+                }
             }
             case "purchase_contract" -> {
                 jdbc.update("UPDATE purchase_contract SET approval_status = ? WHERE id = ?::uuid", status, businessId);
