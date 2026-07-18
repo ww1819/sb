@@ -58,76 +58,80 @@
       <div class="bid-split">
         <div class="bid-left">
           <div class="bid-panel-title">产品明细</div>
-          <el-table :data="bidLeftRows" border size="small" class="bid-left-table">
-            <el-table-column type="index" label="序号" width="52" align="center" />
-            <el-table-column prop="device_name" label="设备名称" min-width="120" show-overflow-tooltip />
-            <el-table-column prop="dept_name" label="申请科室" min-width="100" show-overflow-tooltip />
-            <el-table-column prop="specification" label="规格型号" min-width="120" show-overflow-tooltip />
-            <el-table-column prop="quantity" label="数量" width="80" align="right">
-              <template #default="{ row }">
-                <TableCellValue :field="qtyField" :value="row.quantity" />
-              </template>
-            </el-table-column>
-            <el-table-column prop="total_price" label="总金额" width="110" align="right">
-              <template #default="{ row }">
-                <TableCellValue :field="totalField" :value="row.total_price" />
-              </template>
-            </el-table-column>
-          </el-table>
+          <div class="bid-panel-scroll">
+            <el-table :data="bidLeftRows" border size="small" class="bid-left-table" style="width: 720px">
+              <el-table-column type="index" label="序号" width="52" align="center" />
+              <el-table-column prop="device_name" label="设备名称" min-width="140" show-overflow-tooltip />
+              <el-table-column prop="dept_name" label="申请科室" min-width="120" show-overflow-tooltip />
+              <el-table-column prop="specification" label="规格型号" min-width="140" show-overflow-tooltip />
+              <el-table-column prop="quantity" label="数量" width="90" align="right">
+                <template #default="{ row }">
+                  <TableCellValue :field="qtyField" :value="row.quantity" />
+                </template>
+              </el-table-column>
+              <el-table-column prop="total_price" label="总金额" width="120" align="right">
+                <template #default="{ row }">
+                  <TableCellValue :field="totalField" :value="row.total_price" />
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
         </div>
         <div class="bid-right">
           <div class="bid-panel-head">
             <div class="bid-panel-title">供应商信息</div>
             <el-button type="primary" link @click="addSupplierRow">新增行</el-button>
           </div>
-          <el-table :data="supplierRows" border size="small" class="bid-supplier-table">
-            <el-table-column type="index" label="序号" width="52" align="center" />
-            <el-table-column label="供应商名称" min-width="140">
-              <template #default="{ row }">
-                <el-input v-model="row.supplier_name" placeholder="供应商名称" />
-              </template>
-            </el-table-column>
-            <el-table-column label="联系人" width="110">
-              <template #default="{ row }">
-                <el-input v-model="row.contact_person" placeholder="联系人" />
-              </template>
-            </el-table-column>
-            <el-table-column label="联系电话" width="130">
-              <template #default="{ row }">
-                <el-input v-model="row.contact_phone" placeholder="联系电话" />
-              </template>
-            </el-table-column>
-            <el-table-column label="品牌" width="110">
-              <template #default="{ row }">
-                <el-input v-model="row.brand" placeholder="品牌" />
-              </template>
-            </el-table-column>
-            <el-table-column label="规格型号" min-width="120">
-              <template #default="{ row }">
-                <el-input v-model="row.specification" placeholder="规格型号" />
-              </template>
-            </el-table-column>
-            <el-table-column label="最终金额" width="120">
-              <template #default="{ row }">
-                <el-input v-model="row.final_amount" placeholder="最终金额" />
-              </template>
-            </el-table-column>
-            <el-table-column label="质保期" width="100">
-              <template #default="{ row }">
-                <el-input v-model="row.warranty_period" placeholder="质保期" />
-              </template>
-            </el-table-column>
-            <el-table-column label="优惠条款" min-width="140">
-              <template #default="{ row }">
-                <el-input v-model="row.preferential_terms" placeholder="优惠条款" />
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="70" align="center" fixed="right">
-              <template #default="{ $index }">
-                <el-button link type="danger" @click="removeSupplierRow($index)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
+          <div class="bid-panel-scroll">
+            <el-table :data="supplierRows" border size="small" class="bid-supplier-table" style="width: 1180px">
+              <el-table-column type="index" label="序号" width="52" align="center" />
+              <el-table-column label="供应商名称" min-width="140">
+                <template #default="{ row }">
+                  <el-input v-model="row.supplier_name" placeholder="供应商名称" />
+                </template>
+              </el-table-column>
+              <el-table-column label="联系人" width="110">
+                <template #default="{ row }">
+                  <el-input v-model="row.contact_person" placeholder="联系人" />
+                </template>
+              </el-table-column>
+              <el-table-column label="联系电话" width="130">
+                <template #default="{ row }">
+                  <el-input v-model="row.contact_phone" placeholder="联系电话" />
+                </template>
+              </el-table-column>
+              <el-table-column label="品牌" width="110">
+                <template #default="{ row }">
+                  <el-input v-model="row.brand" placeholder="品牌" />
+                </template>
+              </el-table-column>
+              <el-table-column label="规格型号" min-width="120">
+                <template #default="{ row }">
+                  <el-input v-model="row.specification" placeholder="规格型号" />
+                </template>
+              </el-table-column>
+              <el-table-column label="最终金额" width="120">
+                <template #default="{ row }">
+                  <el-input v-model="row.final_amount" placeholder="最终金额" />
+                </template>
+              </el-table-column>
+              <el-table-column label="质保期" width="100">
+                <template #default="{ row }">
+                  <el-input v-model="row.warranty_period" placeholder="质保期" />
+                </template>
+              </el-table-column>
+              <el-table-column label="优惠条款" min-width="140">
+                <template #default="{ row }">
+                  <el-input v-model="row.preferential_terms" placeholder="优惠条款" />
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="70" align="center" fixed="right">
+                <template #default="{ $index }">
+                  <el-button link type="danger" @click="removeSupplierRow($index)">删除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
         </div>
       </div>
       <template #footer>
@@ -368,11 +372,16 @@ onMounted(() => {
   display: grid;
   grid-template-columns: minmax(280px, 38%) minmax(420px, 1fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+  min-height: 480px;
 }
 .bid-left,
 .bid-right {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: 480px;
+  max-height: 62vh;
   border: 1px solid var(--el-border-color);
   border-radius: 4px;
   padding: 12px;
@@ -381,22 +390,55 @@ onMounted(() => {
 .bid-panel-title {
   font-weight: 600;
   margin-bottom: 8px;
+  flex-shrink: 0;
 }
 .bid-panel-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
+  flex-shrink: 0;
 }
 .bid-panel-head .bid-panel-title {
   margin-bottom: 0;
 }
+.bid-panel-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-x: scroll;
+  overflow-y: auto;
+  /* 始终预留滚动条槽位，避免悬停才出现 */
+  scrollbar-gutter: stable both-edges;
+}
+.bid-panel-scroll::-webkit-scrollbar {
+  height: 12px;
+  width: 12px;
+}
+.bid-panel-scroll::-webkit-scrollbar-thumb {
+  background: #c0c4cc;
+  border-radius: 6px;
+  border: 2px solid #f0f2f5;
+}
+.bid-panel-scroll::-webkit-scrollbar-track {
+  background: #f0f2f5;
+  border-radius: 6px;
+}
+.bid-panel-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #c0c4cc #f0f2f5;
+}
+.bid-left-table,
 .bid-supplier-table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
 }
 @media (max-width: 1100px) {
   .bid-split {
     grid-template-columns: 1fr;
+  }
+  .bid-left,
+  .bid-right {
+    height: 360px;
   }
 }
 </style>
