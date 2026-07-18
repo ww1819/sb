@@ -73,7 +73,7 @@ public class PurchaseContractController {
                 UPDATE purchase_contract SET contract_name=?, project_id=?::uuid, supplier_id=?::uuid,
                 contract_amount=?, sign_date=?, start_date=?, end_date=?, delivery_deadline=?, warranty_period=?,
                 payment_terms=?, contract_file_url=?, acceptance_status=?, acceptance_report_url=?,
-                invoice_summary=?, contract_type=?, performance_bond=?, registration_cert_url=?,
+                invoice_summary=?, contract_type=?, performance_bond=?, registration_cert_url=?, fund_source=?,
                 approval_status=?, status=?, remark=?, version=COALESCE(version,1)+1, updated_at=NOW()
                 WHERE id=?::uuid
                 """, body.get("contract_name"), body.get("project_id"), body.get("supplier_id"),
@@ -81,22 +81,22 @@ public class PurchaseContractController {
                     body.get("delivery_deadline"), body.get("warranty_period"), body.get("payment_terms"),
                     body.get("contract_file_url"), body.get("acceptance_status"), body.get("acceptance_report_url"),
                     body.get("invoice_summary"), body.getOrDefault("contract_type", "purchase"),
-                    body.get("performance_bond"), body.get("registration_cert_url"),
+                    body.get("performance_bond"), body.get("registration_cert_url"), body.get("fund_source"),
                     body.getOrDefault("approval_status", "draft"),
                     body.getOrDefault("status", "active"), body.get("remark"), id);
         } else {
             jdbc.update("""
                 INSERT INTO purchase_contract (id, contract_code, contract_name, project_id, supplier_id, contract_amount,
                 sign_date, start_date, end_date, delivery_deadline, warranty_period, payment_terms, contract_file_url,
-                contract_type, performance_bond, registration_cert_url, approval_status, status, acceptance_status,
+                contract_type, performance_bond, registration_cert_url, fund_source, approval_status, status, acceptance_status,
                 invoice_summary, acceptance_report_url, remark, business_chain_no)
-                VALUES (?::uuid,?,?,?::uuid,?::uuid,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                VALUES (?::uuid,?,?,?::uuid,?::uuid,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """, id, body.getOrDefault("contract_code", "CT" + System.currentTimeMillis()),
                     body.get("contract_name"), body.get("project_id"), body.get("supplier_id"),
                     body.get("contract_amount"), body.get("sign_date"), body.get("start_date"), body.get("end_date"),
                     body.get("delivery_deadline"), body.get("warranty_period"), body.get("payment_terms"),
                     body.get("contract_file_url"), body.getOrDefault("contract_type", "purchase"),
-                    body.get("performance_bond"), body.get("registration_cert_url"),
+                    body.get("performance_bond"), body.get("registration_cert_url"), body.get("fund_source"),
                     "draft", "active", body.getOrDefault("acceptance_status", "pending"),
                     body.get("invoice_summary"), body.get("acceptance_report_url"), body.get("remark"), chainNo);
         }

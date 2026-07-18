@@ -197,6 +197,9 @@
       :show-save="formMode !== 'view'"
       @save="save"
     >
+      <template #header-actions>
+        <slot name="form-header-actions" :form="form" :mode="formMode" />
+      </template>
       <div v-if="formMode === 'view' && form.id && changeLogEnabled" class="change-log-bar">
         <el-button @click="openChangeLog">变更记录</el-button>
       </div>

@@ -456,3 +456,6 @@ ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS sort_order INTEGER D
 ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
 ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(100);
 ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS deleted_by_name VARCHAR(100);
+
+-- ---------- purchase_contract 资金来源（PUR-UI-19） ----------
+ALTER TABLE purchase_contract ADD COLUMN IF NOT EXISTS fund_source VARCHAR(30);

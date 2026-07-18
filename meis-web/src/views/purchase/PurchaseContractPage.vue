@@ -1,6 +1,11 @@
 <template>
   <div class="workflow-crud">
     <CrudPage ref="crudRef" :config="config" @detail="openDetail" @saved="onSaved">
+      <template #form-header-actions="{ form, mode }">
+        <el-button v-if="mode !== 'view'" type="primary" plain @click="openBiddingRef(form)">
+          引用招标计划
+        </el-button>
+      </template>
       <template #form="{ form, mode }">
         <el-form label-width="110px" :disabled="mode === 'view'">
           <FormSection title="基本信息">
@@ -105,6 +110,33 @@
         <el-button v-if="contract?.id" @click="printContract">打印合同</el-button>
       </template>
     </CrudPage>
+
+    <AppModal v-model="biddingRefVisible" title="引用招标计划" size="xl">
+      <el-table
+        v-loading="biddingLoading"
+        :data="biddingRows"
+        border
+        size="small"
+        max-height="420"
+        row-key="id"
+        @selection-change="onBiddingSelectionChange"
+      >
+        <el-table-column type="selection" width="48" align="center" />
+        <el-table-column prop="device_name" label="设备名称" min-width="140" show-overflow-tooltip />
+        <el-table-column prop="specification" label="设备规格型号" min-width="140" show-overflow-tooltip />
+        <el-table-column prop="quantity" label="数量" width="90" align="right" />
+        <el-table-column label="单价" width="110" align="right">
+          <template #default="{ row }">{{ formatAmount(row.estimated_price) }}</template>
+        </el-table-column>
+        <el-table-column label="总金额" width="120" align="right">
+          <template #default="{ row }">{{ formatAmount(row.total_price) }}</template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="biddingRefVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmBiddingRef">确认</el-button>
+      </template>
+    </AppModal>
 
     <AppModal v-model="visible" title="采购合同 详情" size="xl">
       <el-tabs v-if="contract">
@@ -231,6 +263,12 @@ const payments = ref<Record<string, unknown>[]>([])
 const paymentFields = getDetailFields('contract_payment')
 const manufacturerCache = ref<Map<string, string>>(new Map())
 
+const biddingRefVisible = ref(false)
+const biddingLoading = ref(false)
+const biddingRows = ref<Record<string, unknown>[]>([])
+const biddingSelected = ref<Record<string, unknown>[]>([])
+const biddingTargetForm = ref<Record<string, unknown> | null>(null)
+
 const contractSchemaFields = computed(() => getSchema(config.table).filter((f) => f.form !== false))
 const attachPropSet = new Set<string>(ATTACH_PROPS)
 const mainFormFields = computed(() => contractSchemaFields.value.filter((f) => !attachPropSet.has(f.prop)))
@@ -239,6 +277,61 @@ const attachFormFields = computed(() =>
     (f): f is NonNullable<typeof f> => !!f
   )
 )
+
+async function openBiddingRef(form: Record<string, unknown>) {
+  biddingTargetForm.value = form
+  biddingSelected.value = []
+  biddingRefVisible.value = true
+  biddingLoading.value = true
+  try {
+    const { data } = await http.get('/purchase/bidding/page', {
+      params: { page: 1, size: 500 }
+    })
+    biddingRows.value = data.data?.records ?? []
+  } catch {
+    biddingRows.value = []
+    ElMessage.error('加载招标计划失败')
+  } finally {
+    biddingLoading.value = false
+  }
+}
+
+function onBiddingSelectionChange(rows: Record<string, unknown>[]) {
+  biddingSelected.value = rows
+}
+
+function confirmBiddingRef() {
+  const form = biddingTargetForm.value
+  if (!form) return
+  if (!biddingSelected.value.length) {
+    ElMessage.warning('请至少选择一条招标明细')
+    return
+  }
+  form.items = biddingSelected.value.map((row) => {
+    const quantity = row.quantity ?? ''
+    const unitPrice = row.estimated_price ?? ''
+    let amount: string | number = row.total_price ?? ''
+    if ((amount === '' || amount == null) && quantity !== '' && unitPrice !== '') {
+      const q = Number(quantity)
+      const p = Number(unitPrice)
+      if (Number.isFinite(q) && Number.isFinite(p)) {
+        amount = Math.round(q * p * 100) / 100
+      }
+    }
+    return {
+      device_name: String(row.device_name ?? ''),
+      specification: String(row.specification ?? ''),
+      brand: '',
+      quantity,
+      unit_price: unitPrice,
+      amount,
+      manufacturer_id: '',
+      manufacturer_name: ''
+    } satisfies ItemRow
+  })
+  biddingRefVisible.value = false
+  ElMessage.success(`已引用 ${biddingSelected.value.length} 条招标明细`)
+}
 
 function emptyItem(): ItemRow {
   return {

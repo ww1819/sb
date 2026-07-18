@@ -724,6 +724,7 @@ CREATE TABLE purchase_contract (
     contract_type VARCHAR(30) DEFAULT 'purchase',
     performance_bond DECIMAL(15,2),
     registration_cert_url VARCHAR(500),
+    fund_source VARCHAR(30),
     version INTEGER DEFAULT 1
 );
 COMMENT ON TABLE purchase_contract IS '采购合同表';
@@ -733,7 +734,7 @@ COMMENT ON COLUMN purchase_contract.contract_name IS '合同名称';
 COMMENT ON COLUMN purchase_contract.project_id IS '采购项目';
 COMMENT ON COLUMN purchase_contract.supplier_id IS '供应商';
 COMMENT ON COLUMN purchase_contract.sign_date IS 'sign日期';
-COMMENT ON COLUMN purchase_contract.start_date IS '开始日期';
+COMMENT ON COLUMN purchase_contract.start_date IS '维保日期';
 COMMENT ON COLUMN purchase_contract.end_date IS '结束日期';
 COMMENT ON COLUMN purchase_contract.contract_amount IS 'contract金额';
 COMMENT ON COLUMN purchase_contract.warranty_period IS 'warranty period';
@@ -754,6 +755,7 @@ COMMENT ON COLUMN purchase_contract.business_chain_no IS '采购业务链编号�
 COMMENT ON COLUMN purchase_contract.contract_type IS '合同类型';
 COMMENT ON COLUMN purchase_contract.performance_bond IS '履约保证金';
 COMMENT ON COLUMN purchase_contract.registration_cert_url IS '注册证附件URL';
+COMMENT ON COLUMN purchase_contract.fund_source IS '资金来源';
 COMMENT ON COLUMN purchase_contract.version IS '乐观锁版本号';
 
 -- 3.4b 合同设备明细（PUR-UI-17）

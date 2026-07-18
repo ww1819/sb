@@ -6,6 +6,9 @@
     :placement="placement"
     @update:model-value="$emit('update:modelValue', $event)"
   >
+    <template #header-actions>
+      <slot name="header-actions" />
+    </template>
     <slot />
     <template #footer>
       <div class="form-drawer-footer">
