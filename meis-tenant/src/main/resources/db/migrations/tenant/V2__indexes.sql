@@ -108,6 +108,9 @@ COMMENT ON INDEX idx_acceptance_member_acc IS '索引：purchase acceptance memb
 CREATE INDEX IF NOT EXISTS idx_bidder_project ON purchase_bidder(project_id);
 COMMENT ON INDEX idx_bidder_project IS '索引：purchase bidder.采购项目';
 
+CREATE INDEX IF NOT EXISTS idx_plan_item_bid_supplier_item ON purchase_plan_item_bid_supplier(plan_item_id);
+COMMENT ON INDEX idx_plan_item_bid_supplier_item IS '索引：计划明细招标供应商.计划明细';
+
 CREATE INDEX IF NOT EXISTS idx_complaint_project ON purchase_complaint(project_id);
 COMMENT ON INDEX idx_complaint_project IS '索引：purchase complaint.采购项目';
 

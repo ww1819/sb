@@ -711,6 +711,14 @@ ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT 
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS deleted_by UUID;
 UPDATE purchase_plan_item SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS created_by UUID;
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS updated_by UUID;
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS deleted_by UUID;
+UPDATE purchase_plan_item_bid_supplier SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
 ALTER TABLE purchase_project ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE purchase_project ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE purchase_project ADD COLUMN IF NOT EXISTS created_by UUID;

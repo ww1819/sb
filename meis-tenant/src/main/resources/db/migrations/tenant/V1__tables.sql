@@ -593,6 +593,53 @@ COMMENT ON COLUMN purchase_plan_item.bargain_at IS '议价保存时间';
 COMMENT ON COLUMN purchase_plan_item.bargain_by IS '议价操作人';
 COMMENT ON COLUMN purchase_plan_item.bargain_by_name IS '议价操作人姓名快照';
 
+-- 3.2b 计划明细招标供应商（PUR-UI-15）
+CREATE TABLE purchase_plan_item_bid_supplier (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    plan_item_id UUID NOT NULL REFERENCES purchase_plan_item(id),
+    supplier_name VARCHAR(200) NOT NULL,
+    contact_person VARCHAR(100),
+    contact_phone VARCHAR(50),
+    brand VARCHAR(100),
+    specification VARCHAR(200),
+    final_amount DECIMAL(15,2),
+    warranty_period VARCHAR(100),
+    preferential_terms TEXT,
+    sort_order INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by UUID,
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMPTZ,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100)
+);
+COMMENT ON TABLE purchase_plan_item_bid_supplier IS '采购计划明细招标供应商';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.id IS '主键';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.plan_item_id IS '计划明细';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.supplier_name IS '供应商名称';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.contact_person IS '联系人';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.contact_phone IS '联系电话';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.brand IS '品牌';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.specification IS '规格型号';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.final_amount IS '最终金额';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.warranty_period IS '质保期';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.preferential_terms IS '优惠条款';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.sort_order IS '排序号';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.created_at IS '创建时间';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.updated_at IS '更新时间';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.created_by IS '创建人';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.created_by_name IS '创建人姓名快照';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.updated_by IS '更新人';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.updated_by_name IS '更新人姓名快照';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.is_deleted IS '软删标记';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.deleted_at IS '删除时间';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.deleted_by IS '删除人';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.deleted_by_name IS '删除人姓名快照';
+
 -- 3.3 采购项目表
 CREATE TABLE purchase_project (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

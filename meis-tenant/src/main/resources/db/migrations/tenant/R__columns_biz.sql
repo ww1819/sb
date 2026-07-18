@@ -374,3 +374,41 @@ ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_reviewed_by_name
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_at TIMESTAMPTZ;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_by UUID;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_by_name VARCHAR(100);
+
+-- ---------- purchase_plan_item_bid_supplier（招标供应商 PUR-UI-15） ----------
+CREATE TABLE IF NOT EXISTS purchase_plan_item_bid_supplier (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    plan_item_id UUID NOT NULL REFERENCES purchase_plan_item(id),
+    supplier_name VARCHAR(200) NOT NULL,
+    contact_person VARCHAR(100),
+    contact_phone VARCHAR(50),
+    brand VARCHAR(100),
+    specification VARCHAR(200),
+    final_amount DECIMAL(15,2),
+    warranty_period VARCHAR(100),
+    preferential_terms TEXT,
+    sort_order INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by UUID,
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMPTZ,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100)
+);
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS plan_item_id UUID;
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS supplier_name VARCHAR(200);
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS contact_person VARCHAR(100);
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS contact_phone VARCHAR(50);
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS brand VARCHAR(100);
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS specification VARCHAR(200);
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS final_amount DECIMAL(15,2);
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS warranty_period VARCHAR(100);
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS preferential_terms TEXT;
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(100);
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS deleted_by_name VARCHAR(100);
