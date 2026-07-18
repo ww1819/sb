@@ -76,6 +76,15 @@ export interface PageConfig {
   sortableColumns?: string[]
   /** 分组表单每行列数（如基本信息 5 列） */
   formGroupColumns?: Partial<Record<FieldGroup, number>>
+  /** 表单抽屉标题（create/edit/view） */
+  formTitles?: { create?: string; edit?: string; view?: string }
+  /** 表单抽屉尺寸（默认 lg） */
+  formDrawerSize?: 'sm' | 'md' | 'lg' | 'xl'
+  /**
+   * 编辑/查看时按 saveUrl/{id} 拉取完整详情（含主从 items 等），
+   * 避免列表行字段不全导致保存丢明细。
+   */
+  loadFormDetail?: boolean
 }
 
 export const pageRegistry: Record<string, PageConfig> = {
@@ -169,6 +178,14 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/purchase/contract/page',
     saveUrl: '/purchase/contract',
     showRowSelection: true,
+    formGroupColumns: { basic: 4 },
+    formDrawerSize: 'xl',
+    loadFormDetail: true,
+    formTitles: {
+      create: '新增(设备购置合同)',
+      edit: '编辑(设备购置合同)',
+      view: '查看(设备购置合同)'
+    },
     listFilters: [
       { key: 'approval_status', label: '审批状态', dictType: 'approval_status' },
       { key: 'acceptance_status', label: '验收状态', dictType: 'acceptance_status' }

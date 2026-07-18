@@ -40,6 +40,14 @@ public class PurchaseContractController {
         c.put("payments", jdbc.queryForList(
                 "SELECT * FROM contract_payment WHERE contract_id = ?::uuid"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "contract_payment", null), id));
+        c.put("items", jdbc.queryForList("""
+                SELECT id, contract_id, device_name, specification, brand, quantity, unit_price, amount,
+                       manufacturer_id, manufacturer_name, sort_order
+                FROM purchase_contract_item
+                WHERE contract_id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_contract_item", null) + """
+                ORDER BY sort_order ASC NULLS LAST, created_at ASC NULLS LAST
+                """, id));
         return Result.ok(c);
     }
 
@@ -80,15 +88,17 @@ public class PurchaseContractController {
             jdbc.update("""
                 INSERT INTO purchase_contract (id, contract_code, contract_name, project_id, supplier_id, contract_amount,
                 sign_date, start_date, end_date, delivery_deadline, warranty_period, payment_terms, contract_file_url,
-                contract_type, performance_bond, registration_cert_url, approval_status, status, acceptance_status, business_chain_no)
-                VALUES (?::uuid,?,?,?::uuid,?::uuid,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                contract_type, performance_bond, registration_cert_url, approval_status, status, acceptance_status,
+                invoice_summary, acceptance_report_url, remark, business_chain_no)
+                VALUES (?::uuid,?,?,?::uuid,?::uuid,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """, id, body.getOrDefault("contract_code", "CT" + System.currentTimeMillis()),
                     body.get("contract_name"), body.get("project_id"), body.get("supplier_id"),
                     body.get("contract_amount"), body.get("sign_date"), body.get("start_date"), body.get("end_date"),
                     body.get("delivery_deadline"), body.get("warranty_period"), body.get("payment_terms"),
                     body.get("contract_file_url"), body.getOrDefault("contract_type", "purchase"),
                     body.get("performance_bond"), body.get("registration_cert_url"),
-                    "draft", "active", body.getOrDefault("acceptance_status", "pending"), chainNo);
+                    "draft", "active", body.getOrDefault("acceptance_status", "pending"),
+                    body.get("invoice_summary"), body.get("acceptance_report_url"), body.get("remark"), chainNo);
         }
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> payments = (List<Map<String, Object>>) body.getOrDefault("payments", List.of());
@@ -109,8 +119,100 @@ public class PurchaseContractController {
                     p.get("finance_audit_date"), p.get("invoice_type"), p.get("tax_amount"),
                     p.get("voucher_no"), p.get("remark"));
         }
+        saveContractItems(id, body);
         PurchaseValidators.recalcContractPaymentProgress(jdbc, id);
         return get(id);
+    }
+
+    private void saveContractItems(UUID contractId, Map<String, Object> body) {
+        Object raw = body.get("items");
+        if (!(raw instanceof List<?> list)) {
+            return;
+        }
+        var ctx = com.meis.saas.common.rbac.PermissionInterceptor.CTX.get();
+        UUID actorId = null;
+        String actorName = null;
+        if (ctx != null && ctx.getUserId() != null && !ctx.getUserId().isBlank()) {
+            actorId = UUID.fromString(ctx.getUserId());
+            actorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, actorId);
+        }
+        jdbc.update("""
+                UPDATE purchase_contract_item
+                SET is_deleted = 1, deleted_at = NOW(), deleted_by = ?::uuid, deleted_by_name = ?,
+                    updated_at = NOW(), updated_by = ?::uuid, updated_by_name = ?
+                WHERE contract_id = ?::uuid AND is_deleted = 0
+                """, actorId, actorName, actorId, actorName, contractId);
+        int order = 1;
+        for (Object o : list) {
+            if (!(o instanceof Map<?, ?> m)) continue;
+            @SuppressWarnings("unchecked")
+            Map<String, Object> row = (Map<String, Object>) m;
+            String deviceName = blankToNull(row.get("device_name"));
+            if (deviceName == null) continue;
+            UUID manufacturerId = parseUuid(row.get("manufacturer_id"));
+            String manufacturerName = blankToNull(row.get("manufacturer_name"));
+            if (manufacturerId != null) {
+                var mf = jdbc.queryForList(
+                        "SELECT manufacturer_name FROM manufacturer WHERE id = ?::uuid"
+                                + SoftDeleteSupport.notDeletedClause(jdbc, "manufacturer", null),
+                        manufacturerId);
+                if (!mf.isEmpty()) {
+                    manufacturerName = blankToNull(mf.get(0).get("manufacturer_name"));
+                }
+            }
+            Object qty = row.get("quantity");
+            Object price = row.get("unit_price");
+            Object amount = row.get("amount");
+            if (amount == null) {
+                Double qn = toDouble(qty);
+                Double pn = toDouble(price);
+                if (qn != null && pn != null) {
+                    amount = Math.round(qn * pn * 100.0) / 100.0;
+                }
+            }
+            jdbc.update("""
+                    INSERT INTO purchase_contract_item (
+                        id, contract_id, device_name, specification, brand, quantity, unit_price, amount,
+                        manufacturer_id, manufacturer_name, sort_order,
+                        created_at, updated_at, created_by, created_by_name, updated_by, updated_by_name, is_deleted
+                    ) VALUES (
+                        ?::uuid, ?::uuid, ?, ?, ?, ?, ?, ?,
+                        ?::uuid, ?, ?,
+                        NOW(), NOW(), ?::uuid, ?, ?::uuid, ?, 0
+                    )
+                    """,
+                    UUID.randomUUID(), contractId, deviceName,
+                    blankToNull(row.get("specification")),
+                    blankToNull(row.get("brand")),
+                    qty, price, amount,
+                    manufacturerId, manufacturerName, order++,
+                    actorId, actorName, actorId, actorName);
+        }
+    }
+
+    private static String blankToNull(Object v) {
+        if (v == null) return null;
+        String s = v.toString().trim();
+        return s.isEmpty() ? null : s;
+    }
+
+    private static UUID parseUuid(Object v) {
+        if (v == null) return null;
+        String s = v.toString().trim();
+        if (s.isEmpty()) return null;
+        return UUID.fromString(s);
+    }
+
+    private static Double toDouble(Object v) {
+        if (v == null) return null;
+        if (v instanceof Number n) return n.doubleValue();
+        String s = v.toString().trim();
+        if (s.isEmpty()) return null;
+        try {
+            return Double.parseDouble(s);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     @PostMapping("/{id}/submit")

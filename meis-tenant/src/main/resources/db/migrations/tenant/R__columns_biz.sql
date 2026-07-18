@@ -418,3 +418,41 @@ ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS deleted_by_
 ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS supplier_id UUID;
 ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS bid_doc_url VARCHAR(500);
 ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS is_winner BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- ---------- purchase_contract_item（合同设备明细 PUR-UI-17） ----------
+CREATE TABLE IF NOT EXISTS purchase_contract_item (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    contract_id UUID NOT NULL REFERENCES purchase_contract(id),
+    device_name VARCHAR(200) NOT NULL,
+    specification VARCHAR(200),
+    brand VARCHAR(100),
+    quantity DECIMAL(15,2),
+    unit_price DECIMAL(15,2),
+    amount DECIMAL(15,2),
+    manufacturer_id UUID REFERENCES manufacturer(id),
+    manufacturer_name VARCHAR(200),
+    sort_order INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by UUID,
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMPTZ,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100)
+);
+ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS contract_id UUID;
+ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
+ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS specification VARCHAR(200);
+ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS brand VARCHAR(100);
+ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS quantity DECIMAL(15,2);
+ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS unit_price DECIMAL(15,2);
+ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS amount DECIMAL(15,2);
+ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS manufacturer_id UUID;
+ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS manufacturer_name VARCHAR(200);
+ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
+ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(100);
+ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS deleted_by_name VARCHAR(100);

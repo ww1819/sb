@@ -756,6 +756,53 @@ COMMENT ON COLUMN purchase_contract.performance_bond IS '履约保证金';
 COMMENT ON COLUMN purchase_contract.registration_cert_url IS '注册证附件URL';
 COMMENT ON COLUMN purchase_contract.version IS '乐观锁版本号';
 
+-- 3.4b 合同设备明细（PUR-UI-17）
+CREATE TABLE purchase_contract_item (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    contract_id UUID NOT NULL REFERENCES purchase_contract(id),
+    device_name VARCHAR(200) NOT NULL,
+    specification VARCHAR(200),
+    brand VARCHAR(100),
+    quantity DECIMAL(15,2),
+    unit_price DECIMAL(15,2),
+    amount DECIMAL(15,2),
+    manufacturer_id UUID REFERENCES manufacturer(id),
+    manufacturer_name VARCHAR(200),
+    sort_order INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by UUID,
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMPTZ,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100)
+);
+COMMENT ON TABLE purchase_contract_item IS '采购合同设备明细';
+COMMENT ON COLUMN purchase_contract_item.id IS '主键';
+COMMENT ON COLUMN purchase_contract_item.contract_id IS '采购合同';
+COMMENT ON COLUMN purchase_contract_item.device_name IS '设备名称';
+COMMENT ON COLUMN purchase_contract_item.specification IS '设备规格型号';
+COMMENT ON COLUMN purchase_contract_item.brand IS '品牌';
+COMMENT ON COLUMN purchase_contract_item.quantity IS '数量';
+COMMENT ON COLUMN purchase_contract_item.unit_price IS '单价';
+COMMENT ON COLUMN purchase_contract_item.amount IS '金额';
+COMMENT ON COLUMN purchase_contract_item.manufacturer_id IS '生产厂家';
+COMMENT ON COLUMN purchase_contract_item.manufacturer_name IS '生产厂家名称快照';
+COMMENT ON COLUMN purchase_contract_item.sort_order IS '排序号';
+COMMENT ON COLUMN purchase_contract_item.created_at IS '创建时间';
+COMMENT ON COLUMN purchase_contract_item.updated_at IS '更新时间';
+COMMENT ON COLUMN purchase_contract_item.created_by IS '创建人';
+COMMENT ON COLUMN purchase_contract_item.created_by_name IS '创建人姓名快照';
+COMMENT ON COLUMN purchase_contract_item.updated_by IS '更新人';
+COMMENT ON COLUMN purchase_contract_item.updated_by_name IS '更新人姓名快照';
+COMMENT ON COLUMN purchase_contract_item.is_deleted IS '软删标记';
+COMMENT ON COLUMN purchase_contract_item.deleted_at IS '删除时间';
+COMMENT ON COLUMN purchase_contract_item.deleted_by IS '删除人';
+COMMENT ON COLUMN purchase_contract_item.deleted_by_name IS '删除人姓名快照';
+
 -- 3.5 合同付款记录表
 CREATE TABLE contract_payment (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

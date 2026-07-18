@@ -192,7 +192,7 @@
       v-if="!detailMode"
       v-model="formVisible"
       :title="formTitle"
-      size="lg"
+      :size="config.formDrawerSize || 'lg'"
       :placement="formPlacement"
       :show-save="formMode !== 'view'"
       @save="save"
@@ -511,10 +511,22 @@ function onReset() {
   load()
 }
 
-function openForm(row?: Record<string, unknown>, mode: 'create' | 'edit' | 'view' = 'create') {
+async function openForm(row?: Record<string, unknown>, mode: 'create' | 'edit' | 'view' = 'create') {
   form.value = row ? { ...row } : { ...(props.defaultFormValues ?? {}) }
   formMode.value = mode
-  formTitle.value = mode === 'view' ? '查看' : mode === 'edit' ? '编辑' : '新增'
+  formTitle.value =
+    props.config.formTitles?.[mode] ??
+    (mode === 'view' ? '查看' : mode === 'edit' ? '编辑' : '新增')
+  if (row?.id && props.config.loadFormDetail && props.config.saveUrl) {
+    try {
+      const { data } = await http.get(`${props.config.saveUrl}/${row.id}`)
+      if (data?.data && typeof data.data === 'object') {
+        form.value = { ...data.data }
+      }
+    } catch {
+      /* 详情拉取失败时仍用列表行打开，避免阻断编辑 */
+    }
+  }
   formVisible.value = true
 }
 

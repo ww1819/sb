@@ -111,6 +111,9 @@ COMMENT ON INDEX idx_bidder_project IS '索引：purchase bidder.采购项目';
 CREATE INDEX IF NOT EXISTS idx_plan_item_bid_supplier_item ON purchase_plan_item_bid_supplier(plan_item_id);
 COMMENT ON INDEX idx_plan_item_bid_supplier_item IS '索引：计划明细招标供应商.计划明细';
 
+CREATE INDEX IF NOT EXISTS idx_contract_item_contract ON purchase_contract_item(contract_id);
+COMMENT ON INDEX idx_contract_item_contract IS '索引：采购合同设备明细.合同';
+
 CREATE INDEX IF NOT EXISTS idx_complaint_project ON purchase_complaint(project_id);
 COMMENT ON INDEX idx_complaint_project IS '索引：purchase complaint.采购项目';
 

@@ -695,6 +695,14 @@ ALTER TABLE purchase_contract ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT N
 ALTER TABLE purchase_contract ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 ALTER TABLE purchase_contract ADD COLUMN IF NOT EXISTS deleted_by UUID;
 UPDATE purchase_contract SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
+ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS created_by UUID;
+ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS updated_by UUID;
+ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS deleted_by UUID;
+UPDATE purchase_contract_item SET is_deleted = 1 WHERE deleted_at IS NOT NULL AND is_deleted = 0;
 ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS created_by UUID;
