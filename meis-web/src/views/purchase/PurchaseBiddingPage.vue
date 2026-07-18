@@ -83,22 +83,41 @@
             <el-button type="primary" link @click="addSupplierRow">新增行</el-button>
           </div>
           <div class="bid-panel-scroll">
-            <el-table :data="supplierRows" border size="small" class="bid-supplier-table" style="width: 1180px">
+            <el-table :data="supplierRows" border size="small" class="bid-supplier-table" style="width: 1380px">
+              <el-table-column label="中标" width="64" align="center" fixed="left">
+                <template #default="{ row }">
+                  <el-radio
+                    :model-value="winnerKey"
+                    :value="row._key"
+                    @change="() => setWinner(row._key)"
+                  />
+                </template>
+              </el-table-column>
               <el-table-column type="index" label="序号" width="52" align="center" />
-              <el-table-column label="供应商名称" min-width="140">
+              <el-table-column label="供应商名称" min-width="180">
                 <template #default="{ row }">
-                  <el-input v-model="row.supplier_name" placeholder="供应商名称" />
+                  <el-select
+                    v-model="row.supplier_id"
+                    filterable
+                    clearable
+                    placeholder="请选择供应商"
+                    style="width: 100%"
+                    @change="(v) => onSupplierChange(row, v ? String(v) : null)"
+                  >
+                    <el-option
+                      v-for="s in supplierOptions"
+                      :key="s.id"
+                      :label="s.label"
+                      :value="s.id"
+                    />
+                  </el-select>
                 </template>
               </el-table-column>
-              <el-table-column label="联系人" width="110">
-                <template #default="{ row }">
-                  <el-input v-model="row.contact_person" placeholder="联系人" />
-                </template>
+              <el-table-column label="联系人" width="110" show-overflow-tooltip>
+                <template #default="{ row }">{{ row.contact_person || '-' }}</template>
               </el-table-column>
-              <el-table-column label="联系电话" width="130">
-                <template #default="{ row }">
-                  <el-input v-model="row.contact_phone" placeholder="联系电话" />
-                </template>
+              <el-table-column label="联系电话" width="130" show-overflow-tooltip>
+                <template #default="{ row }">{{ row.contact_phone || '-' }}</template>
               </el-table-column>
               <el-table-column label="品牌" width="110">
                 <template #default="{ row }">
@@ -125,9 +144,27 @@
                   <el-input v-model="row.preferential_terms" placeholder="优惠条款" />
                 </template>
               </el-table-column>
+              <el-table-column label="投标信息" width="140" align="center">
+                <template #default="{ row }">
+                  <div class="bid-file-cell">
+                    <el-upload :show-file-list="false" :http-request="(opt) => onBidUpload(row, opt)">
+                      <el-button link type="primary" :loading="row._uploading">上传</el-button>
+                    </el-upload>
+                    <el-button
+                      v-if="row.bid_doc_url"
+                      link
+                      type="primary"
+                      :loading="row._downloading"
+                      @click="onBidDownload(row)"
+                    >
+                      下载
+                    </el-button>
+                  </div>
+                </template>
+              </el-table-column>
               <el-table-column label="操作" width="70" align="center" fixed="right">
-                <template #default="{ $index }">
-                  <el-button link type="danger" @click="removeSupplierRow($index)">删除</el-button>
+                <template #default="{ row, $index }">
+                  <el-button link type="danger" @click="removeSupplierRow(row, $index)">删除</el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -145,7 +182,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import type { TableInstance } from 'element-plus'
+import type { TableInstance, UploadRequestOptions } from 'element-plus'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
 import PageFilterBar from '@/components/system/PageFilterBar.vue'
@@ -154,9 +191,20 @@ import AppModal from '@/components/AppModal.vue'
 import type { FieldSchema } from '@/config/pageSchemas'
 import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
 import { promptListActionScope } from '@/composables/useListActionScope'
+import { downloadApiFile } from '@/utils/fileDownload'
+
+type SupplierOption = {
+  id: string
+  label: string
+  supplier_name: string
+  contact_person: string
+  contact_phone: string
+}
 
 type SupplierRow = {
+  _key: string
   id?: string
+  supplier_id: string
   supplier_name: string
   contact_person: string
   contact_phone: string
@@ -165,6 +213,10 @@ type SupplierRow = {
   final_amount: string
   warranty_period: string
   preferential_terms: string
+  bid_doc_url: string
+  is_winner: boolean
+  _uploading?: boolean
+  _downloading?: boolean
 }
 
 const { selectedCount, selectedIds, syncFromTable, clearAll } = useCrossPageSelection()
@@ -182,14 +234,24 @@ const bidVisible = ref(false)
 const bidSubmitting = ref(false)
 const bidRow = ref<Record<string, unknown> | null>(null)
 const supplierRows = ref<SupplierRow[]>([])
+const supplierOptions = ref<SupplierOption[]>([])
+const winnerKey = ref('')
 
 const qtyField: FieldSchema = { prop: 'quantity', label: '数量', type: 'number' }
 const totalField: FieldSchema = { prop: 'total_price', label: '总金额', type: 'number' }
 
 const bidLeftRows = computed(() => (bidRow.value ? [bidRow.value] : []))
 
+let supplierKeySeq = 0
+function nextSupplierKey() {
+  supplierKeySeq += 1
+  return `s-${supplierKeySeq}`
+}
+
 function emptySupplier(): SupplierRow {
   return {
+    _key: nextSupplierKey(),
+    supplier_id: '',
     supplier_name: '',
     contact_person: '',
     contact_phone: '',
@@ -197,7 +259,84 @@ function emptySupplier(): SupplierRow {
     specification: '',
     final_amount: '',
     warranty_period: '',
-    preferential_terms: ''
+    preferential_terms: '',
+    bid_doc_url: '',
+    is_winner: false
+  }
+}
+
+function setWinner(key: string) {
+  winnerKey.value = key
+  for (const r of supplierRows.value) {
+    r.is_winner = r._key === key
+  }
+}
+
+function onSupplierChange(row: SupplierRow, supplierId: string | null) {
+  const id = supplierId || ''
+  row.supplier_id = id
+  const found = supplierOptions.value.find((s) => s.id === id)
+  if (found) {
+    row.supplier_name = found.supplier_name
+    row.contact_person = found.contact_person
+    row.contact_phone = found.contact_phone
+  } else {
+    row.supplier_name = ''
+    row.contact_person = ''
+    row.contact_phone = ''
+  }
+}
+
+async function loadSupplierOptions() {
+  const { data } = await http.get('/system/supplier/list', { params: { limit: 500 } })
+  const list = (data.data?.records ?? data.data ?? []) as Record<string, unknown>[]
+  supplierOptions.value = list
+    .filter((r) => r.id != null)
+    .map((r) => {
+      const name = String(r.supplier_name ?? '')
+      const code = r.supplier_code != null ? String(r.supplier_code) : ''
+      return {
+        id: String(r.id),
+        label: code ? `${code} ${name}` : name,
+        supplier_name: name,
+        contact_person: String(r.contact_person ?? ''),
+        contact_phone: String(r.contact_phone ?? '')
+      }
+    })
+}
+
+async function onBidUpload(row: SupplierRow, options: UploadRequestOptions) {
+  row._uploading = true
+  try {
+    const form = new FormData()
+    form.append('file', options.file as File)
+    const { data } = await http.post('/file/upload', form, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    if (data.code !== 0 || !data.data?.url) {
+      ElMessage.error(data.message || '上传失败')
+      return
+    }
+    row.bid_doc_url = String(data.data.url)
+    ElMessage.success('上传成功')
+  } catch {
+    ElMessage.error('上传失败')
+  } finally {
+    row._uploading = false
+  }
+}
+
+async function onBidDownload(row: SupplierRow) {
+  if (!row.bid_doc_url) return
+  row._downloading = true
+  try {
+    const name = row.supplier_name ? `${row.supplier_name}_投标信息` : '投标信息'
+    await downloadApiFile(row.bid_doc_url, name)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '下载失败'
+    ElMessage.error(msg || '下载失败')
+  } finally {
+    row._downloading = false
   }
 }
 
@@ -252,12 +391,20 @@ async function openBid(row: Record<string, unknown>) {
   bidRow.value = row
   bidVisible.value = true
   supplierRows.value = []
+  winnerKey.value = ''
   try {
+    await loadSupplierOptions()
     const { data } = await http.get(`/purchase/bidding/approved-items/${row.id}/suppliers`)
     const list = (data.data ?? []) as Record<string, unknown>[]
-    supplierRows.value = list.length
-      ? list.map((r) => ({
+    if (list.length) {
+      supplierRows.value = list.map((r) => {
+        const key = nextSupplierKey()
+        const winner = r.is_winner === true || r.is_winner === 'true' || r.is_winner === 1
+        if (winner) winnerKey.value = key
+        return {
+          _key: key,
           id: r.id != null ? String(r.id) : undefined,
+          supplier_id: r.supplier_id != null ? String(r.supplier_id) : '',
           supplier_name: String(r.supplier_name ?? ''),
           contact_person: String(r.contact_person ?? ''),
           contact_phone: String(r.contact_phone ?? ''),
@@ -265,9 +412,14 @@ async function openBid(row: Record<string, unknown>) {
           specification: String(r.specification ?? ''),
           final_amount: r.final_amount == null ? '' : String(r.final_amount),
           warranty_period: String(r.warranty_period ?? ''),
-          preferential_terms: String(r.preferential_terms ?? '')
-        }))
-      : [emptySupplier()]
+          preferential_terms: String(r.preferential_terms ?? ''),
+          bid_doc_url: String(r.bid_doc_url ?? ''),
+          is_winner: winner
+        }
+      })
+    } else {
+      supplierRows.value = [emptySupplier()]
+    }
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }
     ElMessage.error(err?.response?.data?.message || '加载供应商明细失败')
@@ -279,8 +431,9 @@ function addSupplierRow() {
   supplierRows.value.push(emptySupplier())
 }
 
-function removeSupplierRow(index: number) {
+function removeSupplierRow(row: SupplierRow, index: number) {
   supplierRows.value.splice(index, 1)
+  if (winnerKey.value === row._key) winnerKey.value = ''
   if (!supplierRows.value.length) {
     supplierRows.value.push(emptySupplier())
   }
@@ -291,6 +444,7 @@ async function submitBid() {
   if (!row?.id) return
   const items = supplierRows.value
     .map((r) => ({
+      supplier_id: r.supplier_id || null,
       supplier_name: r.supplier_name.trim(),
       contact_person: r.contact_person.trim(),
       contact_phone: r.contact_phone.trim(),
@@ -298,14 +452,25 @@ async function submitBid() {
       specification: r.specification.trim(),
       final_amount: r.final_amount.trim(),
       warranty_period: r.warranty_period.trim(),
-      preferential_terms: r.preferential_terms.trim()
+      preferential_terms: r.preferential_terms.trim(),
+      bid_doc_url: r.bid_doc_url.trim(),
+      is_winner: r._key === winnerKey.value
     }))
-    .filter((r) => r.supplier_name)
+    .filter((r) => r.supplier_id || r.supplier_name)
+  if (items.some((r) => !r.supplier_id)) {
+    ElMessage.warning('请选择供应商')
+    return
+  }
   for (const it of items) {
     if (it.final_amount && Number.isNaN(Number(it.final_amount))) {
       ElMessage.warning('最终金额须为数字')
       return
     }
+  }
+  const winners = items.filter((r) => r.is_winner)
+  if (winners.length > 1) {
+    ElMessage.warning('同一明细只能选择一个中标供应商')
+    return
   }
   bidSubmitting.value = true
   try {
@@ -431,6 +596,12 @@ onMounted(() => {
 .bid-supplier-table {
   width: max-content;
   min-width: 100%;
+}
+.bid-file-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
 }
 @media (max-width: 1100px) {
   .bid-split {

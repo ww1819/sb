@@ -597,6 +597,7 @@ COMMENT ON COLUMN purchase_plan_item.bargain_by_name IS '议价操作人姓名�
 CREATE TABLE purchase_plan_item_bid_supplier (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     plan_item_id UUID NOT NULL REFERENCES purchase_plan_item(id),
+    supplier_id UUID REFERENCES supplier(id),
     supplier_name VARCHAR(200) NOT NULL,
     contact_person VARCHAR(100),
     contact_phone VARCHAR(50),
@@ -605,6 +606,8 @@ CREATE TABLE purchase_plan_item_bid_supplier (
     final_amount DECIMAL(15,2),
     warranty_period VARCHAR(100),
     preferential_terms TEXT,
+    bid_doc_url VARCHAR(500),
+    is_winner BOOLEAN NOT NULL DEFAULT FALSE,
     sort_order INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -620,14 +623,17 @@ CREATE TABLE purchase_plan_item_bid_supplier (
 COMMENT ON TABLE purchase_plan_item_bid_supplier IS '采购计划明细招标供应商';
 COMMENT ON COLUMN purchase_plan_item_bid_supplier.id IS '主键';
 COMMENT ON COLUMN purchase_plan_item_bid_supplier.plan_item_id IS '计划明细';
-COMMENT ON COLUMN purchase_plan_item_bid_supplier.supplier_name IS '供应商名称';
-COMMENT ON COLUMN purchase_plan_item_bid_supplier.contact_person IS '联系人';
-COMMENT ON COLUMN purchase_plan_item_bid_supplier.contact_phone IS '联系电话';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.supplier_id IS '供应商';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.supplier_name IS '供应商名称快照';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.contact_person IS '联系人快照';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.contact_phone IS '联系电话快照';
 COMMENT ON COLUMN purchase_plan_item_bid_supplier.brand IS '品牌';
 COMMENT ON COLUMN purchase_plan_item_bid_supplier.specification IS '规格型号';
 COMMENT ON COLUMN purchase_plan_item_bid_supplier.final_amount IS '最终金额';
 COMMENT ON COLUMN purchase_plan_item_bid_supplier.warranty_period IS '质保期';
 COMMENT ON COLUMN purchase_plan_item_bid_supplier.preferential_terms IS '优惠条款';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.bid_doc_url IS '投标信息附件URL';
+COMMENT ON COLUMN purchase_plan_item_bid_supplier.is_winner IS '是否中标';
 COMMENT ON COLUMN purchase_plan_item_bid_supplier.sort_order IS '排序号';
 COMMENT ON COLUMN purchase_plan_item_bid_supplier.created_at IS '创建时间';
 COMMENT ON COLUMN purchase_plan_item_bid_supplier.updated_at IS '更新时间';

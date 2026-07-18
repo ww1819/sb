@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.util.*;
 
-/** PUR-UI-14/15：招标管理（议价通过明细 + 供应商） */
+/** PUR-UI-14/15/16：招标管理（议价通过明细 + 供应商） */
 @RestController
 @RequestMapping("/api/purchase/bidding")
 @RequiredArgsConstructor
@@ -29,13 +29,13 @@ public class PurchaseBiddingController {
         return Result.ok(PurchasePageQueries.bargainPassedPlanItemPage(jdbc, query));
     }
 
-    /** PUR-UI-15：招标供应商明细 */
+    /** PUR-UI-15/16：招标供应商明细 */
     @GetMapping("/approved-items/{itemId}/suppliers")
     public Result<List<Map<String, Object>>> listSuppliers(@PathVariable UUID itemId) {
         assertBargainPassed(itemId);
         var rows = jdbc.queryForList("""
-                SELECT id, plan_item_id, supplier_name, contact_person, contact_phone, brand, specification,
-                       final_amount, warranty_period, preferential_terms, sort_order
+                SELECT id, plan_item_id, supplier_id, supplier_name, contact_person, contact_phone, brand, specification,
+                       final_amount, warranty_period, preferential_terms, bid_doc_url, is_winner, sort_order
                 FROM purchase_plan_item_bid_supplier
                 WHERE plan_item_id = ?::uuid
                 """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan_item_bid_supplier", null) + """
@@ -55,6 +55,14 @@ public class PurchaseBiddingController {
         if (!(raw instanceof List<?> list)) {
             throw new BizException(400, "请提交供应商明细列表");
         }
+        int winnerCount = 0;
+        for (Object o : list) {
+            if (!(o instanceof Map<?, ?> m)) continue;
+            if (truthy(m.get("is_winner"))) winnerCount++;
+        }
+        if (winnerCount > 1) {
+            throw new BizException(400, "同一明细只能选择一个中标供应商");
+        }
         PermissionContext ctx = PermissionInterceptor.CTX.get();
         UUID actorId = null;
         String actorName = null;
@@ -62,7 +70,6 @@ public class PurchaseBiddingController {
             actorId = UUID.fromString(ctx.getUserId());
             actorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, actorId);
         }
-        // 软删旧行后整表替换插入
         jdbc.update("""
                 UPDATE purchase_plan_item_bid_supplier
                 SET is_deleted = 1,
@@ -80,28 +87,45 @@ public class PurchaseBiddingController {
             if (!(o instanceof Map<?, ?> m)) continue;
             @SuppressWarnings("unchecked")
             Map<String, Object> row = (Map<String, Object>) m;
+            UUID supplierId = parseUuid(row.get("supplier_id"));
             String name = blankToNull(row.get("supplier_name"));
+            String contactPerson = blankToNull(row.get("contact_person"));
+            String contactPhone = blankToNull(row.get("contact_phone"));
+            if (supplierId != null) {
+                var suppliers = jdbc.queryForList("""
+                        SELECT supplier_name, contact_person, contact_phone
+                        FROM supplier WHERE id = ?::uuid
+                        """ + SoftDeleteSupport.notDeletedClause(jdbc, "supplier", null), supplierId);
+                if (suppliers.isEmpty()) {
+                    throw new BizException(400, "供应商不存在或已删除");
+                }
+                Map<String, Object> s = suppliers.get(0);
+                name = blankToNull(s.get("supplier_name"));
+                contactPerson = blankToNull(s.get("contact_person"));
+                contactPhone = blankToNull(s.get("contact_phone"));
+            }
             if (name == null) continue;
+            boolean winner = truthy(row.get("is_winner"));
             jdbc.update("""
                     INSERT INTO purchase_plan_item_bid_supplier (
-                        id, plan_item_id, supplier_name, contact_person, contact_phone, brand, specification,
-                        final_amount, warranty_period, preferential_terms, sort_order,
+                        id, plan_item_id, supplier_id, supplier_name, contact_person, contact_phone, brand, specification,
+                        final_amount, warranty_period, preferential_terms, bid_doc_url, is_winner, sort_order,
                         created_at, updated_at, created_by, created_by_name, updated_by, updated_by_name, is_deleted
                     ) VALUES (
-                        ?::uuid, ?::uuid, ?, ?, ?, ?, ?,
-                        ?, ?, ?, ?,
+                        ?::uuid, ?::uuid, ?::uuid, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?,
                         NOW(), NOW(), ?::uuid, ?, ?::uuid, ?, 0
                     )
                     """,
-                    UUID.randomUUID(), itemId, name,
-                    blankToNull(row.get("contact_person")),
-                    blankToNull(row.get("contact_phone")),
+                    UUID.randomUUID(), itemId, supplierId, name,
+                    contactPerson, contactPhone,
                     blankToNull(row.get("brand")),
                     blankToNull(row.get("specification")),
                     toDecimal(row.get("final_amount")),
                     blankToNull(row.get("warranty_period")),
                     blankToNull(row.get("preferential_terms")),
-                    order++,
+                    blankToNull(row.get("bid_doc_url")),
+                    winner, order++,
                     actorId, actorName, actorId, actorName);
         }
         return listSuppliers(itemId);
@@ -121,6 +145,24 @@ public class PurchaseBiddingController {
         }
         if (!"passed".equals(String.valueOf(rows.get(0).get("bargain_review_result")))) {
             throw new BizException(400, "仅议价审核通过的明细可维护招标供应商");
+        }
+    }
+
+    private static boolean truthy(Object v) {
+        if (v == null) return false;
+        if (v instanceof Boolean b) return b;
+        String s = v.toString().trim();
+        return "true".equalsIgnoreCase(s) || "1".equals(s) || "yes".equalsIgnoreCase(s);
+    }
+
+    private static UUID parseUuid(Object v) {
+        if (v == null) return null;
+        String s = v.toString().trim();
+        if (s.isEmpty()) return null;
+        try {
+            return UUID.fromString(s);
+        } catch (IllegalArgumentException e) {
+            throw new BizException(400, "供应商ID格式不正确");
         }
     }
 

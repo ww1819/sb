@@ -379,6 +379,7 @@ ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_by_name VARCHAR(
 CREATE TABLE IF NOT EXISTS purchase_plan_item_bid_supplier (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     plan_item_id UUID NOT NULL REFERENCES purchase_plan_item(id),
+    supplier_id UUID REFERENCES supplier(id),
     supplier_name VARCHAR(200) NOT NULL,
     contact_person VARCHAR(100),
     contact_phone VARCHAR(50),
@@ -387,6 +388,8 @@ CREATE TABLE IF NOT EXISTS purchase_plan_item_bid_supplier (
     final_amount DECIMAL(15,2),
     warranty_period VARCHAR(100),
     preferential_terms TEXT,
+    bid_doc_url VARCHAR(500),
+    is_winner BOOLEAN NOT NULL DEFAULT FALSE,
     sort_order INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -412,3 +415,6 @@ ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS sort_order 
 ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
 ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(100);
 ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS deleted_by_name VARCHAR(100);
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS supplier_id UUID;
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS bid_doc_url VARCHAR(500);
+ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS is_winner BOOLEAN NOT NULL DEFAULT FALSE;
