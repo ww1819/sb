@@ -3,6 +3,7 @@ package com.meis.saas.purchase.support;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
+import com.meis.saas.common.purchase.PurchasePlanItemBiddingNos;
 import com.meis.saas.common.purchase.PurchasePlanItemOrderNos;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -168,15 +169,31 @@ public final class PurchasePageQueries {
     }
 
     /**
-     * 招标管理：仅议价审核通过（passed）的已审批计划明细（PUR-UI-14）。
+     * 招标管理：仅议价审核通过（passed）的已审批计划明细（PUR-UI-14/20）。
      */
     public static PageResult<Map<String, Object>> bargainPassedPlanItemPage(JdbcTemplate jdbc, PageQuery q) {
+        // 历史议价通过明细补齐招标单号（PUR-UI-20）
+        List<Integer> missing = jdbc.query("""
+                SELECT 1
+                FROM purchase_plan_item i
+                JOIN purchase_plan p ON p.id = i.plan_id
+                WHERE p.approval_status = 'approved'
+                  AND i.bargain_review_result = 'passed'
+                  AND (i.bidding_no IS NULL OR TRIM(i.bidding_no) = '')
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", "p")
+                + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan_item", "i") + """
+                LIMIT 1
+                """, (rs, rowNum) -> 1);
+        if (!missing.isEmpty()) {
+            PurchasePlanItemBiddingNos.allocateMissingPassed(jdbc);
+        }
         StringBuilder where = new StringBuilder(" WHERE p.approval_status = 'approved' ");
         where.append(" AND i.bargain_review_result = 'passed' ");
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", "p"));
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan_item", "i"));
         List<Object> args = new ArrayList<>();
-        appendKeyword(where, args, q.getKeyword(), "i.device_name", "d.dept_name", "i.specification");
+        appendKeyword(where, args, q.getKeyword(),
+                "i.bidding_no", "i.order_no", "p.plan_code", "i.device_name", "d.dept_name", "i.specification");
         PurchaseDataScope.applyPlanFilter(where, args, jdbc);
         String from = """
             FROM purchase_plan_item i
@@ -187,7 +204,7 @@ public final class PurchasePageQueries {
                 "i.bargain_reviewed_at DESC NULLS LAST, p.approved_at DESC NULLS LAST, i.created_at ASC NULLS LAST",
                 """
                 i.id, i.plan_id, i.device_name, i.specification, i.estimated_price, i.quantity, i.total_price,
-                i.bargain_review_result, i.bargain_reviewed_at,
+                i.order_no, i.bidding_no, i.bargain_review_result, i.bargain_reviewed_at,
                 p.plan_code, p.created_at, p.fill_date,
                 d.dept_name
                 """);

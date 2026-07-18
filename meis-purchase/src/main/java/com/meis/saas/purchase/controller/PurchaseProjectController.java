@@ -5,6 +5,7 @@ import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
+import com.meis.saas.common.purchase.PurchasePlanItemBiddingNos;
 import com.meis.saas.common.rbac.PermissionContext;
 import com.meis.saas.common.rbac.PermissionInterceptor;
 import com.meis.saas.common.result.Result;
@@ -198,8 +199,11 @@ public class PurchaseProjectController {
                     updated_at = NOW()
                 WHERE id = ?::uuid
                 """, result, comment, actorId, actorName, itemId);
+        if ("passed".equals(result)) {
+            PurchasePlanItemBiddingNos.assignIfAbsent(jdbc, itemId);
+        }
         var out = jdbc.queryForList("""
-                SELECT id, order_no, bargain_review_result, bargain_review_comment,
+                SELECT id, order_no, bidding_no, bargain_review_result, bargain_review_comment,
                        bargain_reviewed_at, bargain_reviewed_by, bargain_reviewed_by_name
                 FROM purchase_plan_item WHERE id = ?::uuid
                 """, itemId);

@@ -354,10 +354,13 @@ ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS is_large_equipment BOOLE
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS large_equipment_class VARCHAR(20);
 -- ---------- purchase_plan_item（订单号 / 订单审核 PUR-UI-09） ----------
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS order_no VARCHAR(20);
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bidding_no VARCHAR(20);
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS order_review_comment TEXT;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS order_reviewed_at TIMESTAMPTZ;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS order_reviewed_by UUID;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS order_reviewed_by_name VARCHAR(100);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_purchase_plan_item_bidding_no
+    ON purchase_plan_item(bidding_no) WHERE bidding_no IS NOT NULL;
 -- ---------- purchase_plan_item（询价议价会议记录 PUR-UI-10） ----------
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_meeting_location VARCHAR(100);
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_meeting_time DATE;

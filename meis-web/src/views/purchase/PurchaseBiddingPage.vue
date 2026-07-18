@@ -12,7 +12,7 @@
       <template #filterBar>
         <PageFilterBar
           v-model:keyword="keyword"
-          placeholder="设备名称 / 科室 / 规格型号"
+          placeholder="单号 / 订单号 / 计划单号 / 设备名称 / 科室 / 规格型号"
           @search="onSearch"
           @reset="onReset"
         >
@@ -33,8 +33,11 @@
       >
         <el-table-column type="selection" width="48" fixed="left" reserve-selection />
         <el-table-column type="index" label="序号" width="64" align="center" :index="rowSerial" />
+        <el-table-column prop="bidding_no" label="单号" min-width="150" show-overflow-tooltip />
         <el-table-column prop="device_name" label="设备名称" min-width="160" show-overflow-tooltip />
         <el-table-column prop="dept_name" label="申请科室" min-width="140" show-overflow-tooltip />
+        <el-table-column prop="order_no" label="订单号" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="plan_code" label="计划单号" min-width="140" show-overflow-tooltip />
         <el-table-column prop="specification" label="规格型号" min-width="160" show-overflow-tooltip />
         <el-table-column prop="quantity" label="数量" width="100" align="right">
           <template #default="{ row }">
@@ -504,10 +507,19 @@ async function exportCsv() {
       })
       list = (data.data?.records ?? []) as Record<string, unknown>[]
     }
-    const headers = ['设备名称', '申请科室', '规格型号', '数量', '总金额']
+    const headers = ['单号', '设备名称', '申请科室', '订单号', '计划单号', '规格型号', '数量', '总金额']
     const lines = [headers.join(',')]
     for (const r of list) {
-      const cells = [r.device_name, r.dept_name, r.specification, r.quantity, r.total_price].map((v) => {
+      const cells = [
+        r.bidding_no,
+        r.device_name,
+        r.dept_name,
+        r.order_no,
+        r.plan_code,
+        r.specification,
+        r.quantity,
+        r.total_price
+      ].map((v) => {
         const s = v == null ? '' : String(v).replace(/"/g, '""')
         return `"${s}"`
       })
