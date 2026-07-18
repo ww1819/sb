@@ -87,6 +87,62 @@ public class PurchaseProjectController {
         return Result.ok(out.isEmpty() ? Map.of() : out.get(0));
     }
 
+    /** PUR-UI-10：询价议价会议记录 */
+    @PostMapping("/approved-items/{itemId}/bargain")
+    @Transactional
+    @OperationLog(module = "purchase", description = "保存议价会议记录")
+    public Result<Map<String, Object>> saveBargain(@PathVariable UUID itemId, @RequestBody Map<String, Object> body) {
+        var rows = jdbc.queryForList("""
+                SELECT i.id, p.approval_status
+                FROM purchase_plan_item i
+                JOIN purchase_plan p ON p.id = i.plan_id
+                WHERE i.id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan_item", "i")
+                + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", "p"), itemId);
+        if (rows.isEmpty()) throw new BizException(404, "明细不存在");
+        if (!"approved".equals(String.valueOf(rows.get(0).get("approval_status")))) {
+            throw new BizException(400, "仅已审批通过的明细可填写议价记录");
+        }
+        PermissionContext ctx = PermissionInterceptor.CTX.get();
+        UUID actorId = null;
+        String actorName = null;
+        if (ctx != null && ctx.getUserId() != null && !ctx.getUserId().isBlank()) {
+            actorId = UUID.fromString(ctx.getUserId());
+            actorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, actorId);
+        }
+        jdbc.update("""
+                UPDATE purchase_plan_item
+                SET bargain_meeting_location = ?,
+                    bargain_meeting_time = ?::date,
+                    bargain_participant_depts = ?,
+                    bargain_dept_opinion = ?,
+                    bargain_meeting_content = ?,
+                    bargain_at = NOW(),
+                    bargain_by = ?::uuid,
+                    bargain_by_name = ?,
+                    updated_at = NOW()
+                WHERE id = ?::uuid
+                """,
+                blankToNull(body.get("bargain_meeting_location")),
+                blankToNull(body.get("bargain_meeting_time")),
+                blankToNull(body.get("bargain_participant_depts")),
+                blankToNull(body.get("bargain_dept_opinion")),
+                blankToNull(body.get("bargain_meeting_content")),
+                actorId, actorName, itemId);
+        var out = jdbc.queryForList("""
+                SELECT id, order_no, bargain_meeting_location, bargain_meeting_time, bargain_participant_depts,
+                       bargain_dept_opinion, bargain_meeting_content, bargain_at, bargain_by, bargain_by_name
+                FROM purchase_plan_item WHERE id = ?::uuid
+                """, itemId);
+        return Result.ok(out.isEmpty() ? Map.of() : out.get(0));
+    }
+
+    private static String blankToNull(Object v) {
+        if (v == null) return null;
+        String s = v.toString().trim();
+        return s.isEmpty() ? null : s;
+    }
+
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
         var rows = jdbc.queryForList(

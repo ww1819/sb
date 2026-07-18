@@ -358,3 +358,12 @@ ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS order_review_comment TEX
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS order_reviewed_at TIMESTAMPTZ;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS order_reviewed_by UUID;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS order_reviewed_by_name VARCHAR(100);
+-- ---------- purchase_plan_item（询价议价会议记录 PUR-UI-10） ----------
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_meeting_location VARCHAR(100);
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_meeting_time DATE;
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_participant_depts VARCHAR(200);
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_dept_opinion TEXT;
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_meeting_content TEXT;
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_at TIMESTAMPTZ;
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_by UUID;
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_by_name VARCHAR(100);

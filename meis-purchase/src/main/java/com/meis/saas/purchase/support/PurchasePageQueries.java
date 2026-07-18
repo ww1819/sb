@@ -141,9 +141,11 @@ public final class PurchasePageQueries {
         PageResult<Map<String, Object>> result = page(jdbc, from, where, args, q,
                 "p.approved_at DESC NULLS LAST, p.created_at DESC NULLS LAST, i.created_at ASC NULLS LAST",
                 """
-                i.id, i.plan_id, i.device_name, i.specification, i.estimated_price, i.quantity, i.total_price,
+                i.id, i.plan_id, i.device_name, i.specification, i.estimated_price, i.quantity, i.unit, i.total_price,
                 i.fund_source, i.justification AS purchase_purpose, i.brand_intent,
                 i.order_no, i.order_review_comment, i.order_reviewed_at, i.order_reviewed_by_name,
+                i.bargain_meeting_location, i.bargain_meeting_time, i.bargain_participant_depts,
+                i.bargain_dept_opinion, i.bargain_meeting_content, i.bargain_at, i.bargain_by_name,
                 p.plan_code, p.plan_year, p.fill_date, p.created_at, p.remark AS plan_remark,
                 d.dept_name,
                 inst.created_at AS submitted_at,

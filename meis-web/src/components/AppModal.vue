@@ -46,7 +46,7 @@ const props = withDefaults(
   defineProps<{
     modelValue: boolean
     title: string
-    size?: 'sm' | 'md' | 'lg' | 'xl'
+    size?: 'sm' | 'md' | 'lg' | 'xl' | 'xxl'
     /** center：内容区居中；right：贴内容区右侧（不遮挡顶栏/侧栏） */
     placement?: 'center' | 'right'
     closeOnClickModal?: boolean
@@ -66,6 +66,8 @@ const dialogWidth = computed(() => {
       return 'min(960px, 88vw)'
     case 'xl':
       return 'min(1200px, 92vw)'
+    case 'xxl':
+      return 'min(1480px, 96vw)'
     default:
       return '640px'
   }
