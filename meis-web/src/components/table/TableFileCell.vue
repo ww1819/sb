@@ -3,7 +3,15 @@
     <el-upload :show-file-list="false" :http-request="onUpload" :disabled="uploading || !canUpload">
       <el-button link type="primary" :loading="uploading">上传</el-button>
     </el-upload>
-    <el-link v-if="previewUrl" :href="previewUrl" target="_blank" type="primary" :underline="false">预览</el-link>
+    <el-button
+      v-if="previewUrl"
+      link
+      type="primary"
+      :loading="previewing"
+      @click.stop="onPreview"
+    >
+      预览
+    </el-button>
   </div>
 </template>
 
@@ -11,6 +19,7 @@
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/api/http'
+import { openFilePreview } from '@/composables/useFilePreview'
 
 const props = defineProps<{
   value?: unknown
@@ -25,6 +34,7 @@ const emit = defineEmits<{
 }>()
 
 const uploading = ref(false)
+const previewing = ref(false)
 
 const previewUrl = computed(() => {
   const v = props.value
@@ -34,6 +44,19 @@ const previewUrl = computed(() => {
 })
 
 const canUpload = computed(() => !!props.rowId && !!props.saveBase)
+
+async function onPreview() {
+  if (!previewUrl.value || previewing.value) return
+  previewing.value = true
+  try {
+    await openFilePreview(previewUrl.value, '议价记录预览')
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '预览失败'
+    ElMessage.error(msg || '预览失败')
+  } finally {
+    previewing.value = false
+  }
+}
 
 async function onUpload(options: { file: File }) {
   if (!canUpload.value) {

@@ -54,7 +54,7 @@ public class PurchaseProjectController {
         }
         String comment = commentObj.toString().trim();
         var rows = jdbc.queryForList("""
-                SELECT i.id, i.order_no, p.approval_status
+                SELECT i.id, i.order_no, i.order_reviewed_at, i.order_review_comment, p.approval_status
                 FROM purchase_plan_item i
                 JOIN purchase_plan p ON p.id = i.plan_id
                 WHERE i.id = ?::uuid
@@ -63,6 +63,9 @@ public class PurchaseProjectController {
         if (rows.isEmpty()) throw new BizException(404, "明细不存在");
         if (!"approved".equals(String.valueOf(rows.get(0).get("approval_status")))) {
             throw new BizException(400, "仅已审批通过的明细可填写订单审核意见");
+        }
+        if (isOrderReviewed(rows.get(0))) {
+            throw new BizException(400, "该订单已审核，不能重复审核");
         }
         PermissionContext ctx = PermissionInterceptor.CTX.get();
         UUID reviewerId = null;
@@ -93,7 +96,7 @@ public class PurchaseProjectController {
     @OperationLog(module = "purchase", description = "保存议价会议记录")
     public Result<Map<String, Object>> saveBargain(@PathVariable UUID itemId, @RequestBody Map<String, Object> body) {
         var rows = jdbc.queryForList("""
-                SELECT i.id, p.approval_status
+                SELECT i.id, i.order_reviewed_at, i.order_review_comment, p.approval_status
                 FROM purchase_plan_item i
                 JOIN purchase_plan p ON p.id = i.plan_id
                 WHERE i.id = ?::uuid
@@ -102,6 +105,9 @@ public class PurchaseProjectController {
         if (rows.isEmpty()) throw new BizException(404, "明细不存在");
         if (!"approved".equals(String.valueOf(rows.get(0).get("approval_status")))) {
             throw new BizException(400, "仅已审批通过的明细可填写议价记录");
+        }
+        if (!isOrderReviewed(rows.get(0))) {
+            throw new BizException(400, "请先完成订单审核后再议价");
         }
         PermissionContext ctx = PermissionInterceptor.CTX.get();
         UUID actorId = null;
@@ -117,6 +123,7 @@ public class PurchaseProjectController {
                     bargain_participant_depts = ?,
                     bargain_dept_opinion = ?,
                     bargain_meeting_content = ?,
+                    bargain_meeting_conclusion = ?,
                     bargain_at = NOW(),
                     bargain_by = ?::uuid,
                     bargain_by_name = ?,
@@ -128,13 +135,129 @@ public class PurchaseProjectController {
                 blankToNull(body.get("bargain_participant_depts")),
                 blankToNull(body.get("bargain_dept_opinion")),
                 blankToNull(body.get("bargain_meeting_content")),
+                blankToNull(body.get("bargain_meeting_conclusion")),
                 actorId, actorName, itemId);
         var out = jdbc.queryForList("""
                 SELECT id, order_no, bargain_meeting_location, bargain_meeting_time, bargain_participant_depts,
-                       bargain_dept_opinion, bargain_meeting_content, bargain_at, bargain_by, bargain_by_name
+                       bargain_dept_opinion, bargain_meeting_content, bargain_meeting_conclusion,
+                       bargain_at, bargain_by, bargain_by_name
                 FROM purchase_plan_item WHERE id = ?::uuid
                 """, itemId);
         return Result.ok(out.isEmpty() ? Map.of() : out.get(0));
+    }
+
+    /** PUR-UI-12：议价审核 */
+    @PostMapping("/approved-items/{itemId}/bargain-review")
+    @Transactional
+    @OperationLog(module = "purchase", description = "议价审核")
+    public Result<Map<String, Object>> bargainReview(@PathVariable UUID itemId, @RequestBody Map<String, Object> body) {
+        var rows = jdbc.queryForList("""
+                SELECT i.id, i.order_reviewed_at, i.order_review_comment, i.bargain_at, i.bargain_meeting_content,
+                       i.bargain_dept_opinion, i.bargain_meeting_conclusion, i.bargain_record_url, p.approval_status
+                FROM purchase_plan_item i
+                JOIN purchase_plan p ON p.id = i.plan_id
+                WHERE i.id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan_item", "i")
+                + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", "p"), itemId);
+        if (rows.isEmpty()) throw new BizException(404, "明细不存在");
+        Map<String, Object> row = rows.get(0);
+        if (!"approved".equals(String.valueOf(row.get("approval_status")))) {
+            throw new BizException(400, "仅已审批通过的明细可议价审核");
+        }
+        if (!isOrderReviewed(row)) {
+            throw new BizException(400, "请先完成订单审核后再议价审核");
+        }
+        if (!isBargained(row)) {
+            throw new BizException(400, "请先完成议价会议记录后再议价审核");
+        }
+        if (row.get("bargain_record_url") == null || row.get("bargain_record_url").toString().isBlank()) {
+            throw new BizException(400, "请先上传议价记录附件后再议价审核");
+        }
+        String result = blankToNull(body.get("result"));
+        if (result == null || (!"passed".equals(result) && !"rejected".equals(result))) {
+            throw new BizException(400, "请选择议价通过或议价未通过");
+        }
+        String comment = blankToNull(body.get("comment"));
+        if (comment == null) {
+            throw new BizException(400, "请填写议价建议");
+        }
+        PermissionContext ctx = PermissionInterceptor.CTX.get();
+        UUID actorId = null;
+        String actorName = null;
+        if (ctx != null && ctx.getUserId() != null && !ctx.getUserId().isBlank()) {
+            actorId = UUID.fromString(ctx.getUserId());
+            actorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, actorId);
+        }
+        jdbc.update("""
+                UPDATE purchase_plan_item
+                SET bargain_review_result = ?,
+                    bargain_review_comment = ?,
+                    bargain_reviewed_at = NOW(),
+                    bargain_reviewed_by = ?::uuid,
+                    bargain_reviewed_by_name = ?,
+                    updated_at = NOW()
+                WHERE id = ?::uuid
+                """, result, comment, actorId, actorName, itemId);
+        var out = jdbc.queryForList("""
+                SELECT id, order_no, bargain_review_result, bargain_review_comment,
+                       bargain_reviewed_at, bargain_reviewed_by, bargain_reviewed_by_name
+                FROM purchase_plan_item WHERE id = ?::uuid
+                """, itemId);
+        return Result.ok(out.isEmpty() ? Map.of() : out.get(0));
+    }
+
+    /** PUR-UI-11：议价记录附件 */
+    @PatchMapping("/approved-items/{itemId}/attachment")
+    @Transactional
+    @OperationLog(module = "purchase", description = "更新议价记录附件")
+    public Result<Map<String, Object>> updateAttachment(@PathVariable UUID itemId, @RequestBody Map<String, Object> body) {
+        Object fieldObj = body.get("field");
+        if (fieldObj == null || fieldObj.toString().isBlank()) {
+            throw new BizException(400, "缺少附件字段");
+        }
+        String field = fieldObj.toString();
+        if (!Set.of("bargain_record_url").contains(field)) {
+            throw new BizException(400, "不支持的附件字段");
+        }
+        var rows = jdbc.queryForList("""
+                SELECT i.id, i.order_reviewed_at, i.order_review_comment, p.approval_status
+                FROM purchase_plan_item i
+                JOIN purchase_plan p ON p.id = i.plan_id
+                WHERE i.id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan_item", "i")
+                + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", "p"), itemId);
+        if (rows.isEmpty()) throw new BizException(404, "明细不存在");
+        if (!"approved".equals(String.valueOf(rows.get(0).get("approval_status")))) {
+            throw new BizException(400, "仅已审批通过的明细可上传议价记录");
+        }
+        if (!isOrderReviewed(rows.get(0))) {
+            throw new BizException(400, "请先完成订单审核后再上传议价记录");
+        }
+        Object url = body.get("url");
+        String urlVal = url == null || url.toString().isBlank() ? null : url.toString().trim();
+        jdbc.update("UPDATE purchase_plan_item SET " + field + " = ?, updated_at = NOW() WHERE id = ?::uuid",
+                urlVal, itemId);
+        var out = jdbc.queryForList("""
+                SELECT id, order_no, bargain_record_url
+                FROM purchase_plan_item WHERE id = ?::uuid
+                """, itemId);
+        return Result.ok(out.isEmpty() ? Map.of() : out.get(0));
+    }
+
+    private static boolean isOrderReviewed(Map<String, Object> row) {
+        if (row.get("order_reviewed_at") != null) return true;
+        Object c = row.get("order_review_comment");
+        return c != null && !c.toString().isBlank();
+    }
+
+    private static boolean isBargained(Map<String, Object> row) {
+        if (row.get("bargain_at") != null) return true;
+        Object content = row.get("bargain_meeting_content");
+        Object opinion = row.get("bargain_dept_opinion");
+        Object conclusion = row.get("bargain_meeting_conclusion");
+        return (content != null && !content.toString().isBlank())
+                || (opinion != null && !opinion.toString().isBlank())
+                || (conclusion != null && !conclusion.toString().isBlank());
     }
 
     private static String blankToNull(Object v) {

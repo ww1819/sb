@@ -364,6 +364,13 @@ ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_meeting_time DAT
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_participant_depts VARCHAR(200);
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_dept_opinion TEXT;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_meeting_content TEXT;
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_meeting_conclusion TEXT;
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_record_url VARCHAR(500);
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_review_result VARCHAR(20);
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_review_comment VARCHAR(500);
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_reviewed_at TIMESTAMPTZ;
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_reviewed_by UUID;
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_reviewed_by_name VARCHAR(100);
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_at TIMESTAMPTZ;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_by UUID;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_by_name VARCHAR(100);

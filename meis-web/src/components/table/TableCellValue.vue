@@ -2,12 +2,21 @@
   <StatusTag v-if="showStatus" :value="value" :prop="field.prop" :dict-type="field.dictType" />
   <span v-else-if="showAmount" class="cell-number cell-amount">{{ formattedNumber }}</span>
   <span v-else-if="showNumeric" class="cell-number">{{ formattedNumber }}</span>
-  <el-link v-else-if="showFile" :href="fileUrl" target="_blank" type="primary" :underline="false">预览</el-link>
+  <el-button
+    v-else-if="showFile"
+    link
+    type="primary"
+    :loading="previewing"
+    @click="onPreview"
+  >
+    预览
+  </el-button>
   <span v-else>{{ displayText }}</span>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import StatusTag from './StatusTag.vue'
 import type { FieldSchema } from '@/config/pageSchemas'
 import {
@@ -20,6 +29,7 @@ import {
 } from '@/utils/tableCell'
 import { resolveRefLabel, labelCacheVersion } from '@/composables/useRefLabelMap'
 import { useDict } from '@/composables/useDict'
+import { openFilePreview } from '@/composables/useFilePreview'
 
 const props = defineProps<{
   field: FieldSchema
@@ -27,6 +37,7 @@ const props = defineProps<{
 }>()
 
 const { loadDict, resolveDictLabel } = useDict()
+const previewing = ref(false)
 
 onMounted(() => {
   if (props.field.dictType) void loadDict(props.field.dictType)
@@ -51,6 +62,19 @@ const fileUrl = computed(() => {
   return s.startsWith('http') || s.startsWith('/api') ? s : `/api${s}`
 })
 const showFile = computed(() => props.field.type === 'file' && !!fileUrl.value)
+
+async function onPreview() {
+  if (!fileUrl.value || previewing.value) return
+  previewing.value = true
+  try {
+    await openFilePreview(fileUrl.value, '附件预览')
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '预览失败'
+    ElMessage.error(msg || '预览失败')
+  } finally {
+    previewing.value = false
+  }
+}
 
 const formattedNumber = computed(() => formatCellNumber(props.value, showAmount.value))
 const displayText = computed(() => {

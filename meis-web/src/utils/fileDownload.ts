@@ -25,8 +25,23 @@ export function resolveTemplateFilename(templateUrl: string, fallback = 'import_
   return `${name}_import_template.xlsx`
 }
 
+/** 存库/href 常带 `/api` 前缀；axios baseURL 已是 `/api`，需去掉避免双前缀 */
+export function toHttpPath(url: string) {
+  if (!url) return ''
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  if (url.startsWith('/api/')) return url.slice(4)
+  if (url.startsWith('/api')) return url.slice(4) || '/'
+  return url.startsWith('/') ? url : `/${url}`
+}
+
+/** 带登录态拉取附件并弹窗预览（兼容旧调用名） */
+export async function previewApiFile(url: string, title = '附件预览') {
+  const { openFilePreview } = await import('@/composables/useFilePreview')
+  await openFilePreview(url, title)
+}
+
 export async function downloadApiFile(url: string, filename = 'download.xlsx') {
-  const res = await http.get(url, { responseType: 'blob' })
+  const res = await http.get(toHttpPath(url), { responseType: 'blob' })
   const blob = res.data as Blob
 
   const contentType = (res.headers['content-type'] as string | undefined)?.toLowerCase() ?? ''

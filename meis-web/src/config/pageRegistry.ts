@@ -155,6 +155,13 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'purchase_plan_item',
     listPageUrl: '/purchase/project/page'
   },
+  '/purchase/bidding': {
+    title: '招标管理',
+    apiBase: '/purchase',
+    table: 'purchase_plan_item',
+    listPageUrl: '/purchase/bidding/page',
+    showRowSelection: true
+  },
   '/purchase/contract': {
     title: '设备合同管理',
     apiBase: '/purchase',

@@ -27,6 +27,7 @@ const pageMap: Record<string, ReturnType<typeof defineAsyncComponent>> = {
   '/purchase/apply': defineAsyncComponent(() => import('@/views/purchase/PurchaseApplyPage.vue')),
   '/purchase/approval': defineAsyncComponent(() => import('@/views/purchase/PurchaseApprovalPage.vue')),
   '/purchase/project': defineAsyncComponent(() => import('@/views/purchase/PurchaseProjectPage.vue')),
+  '/purchase/bidding': defineAsyncComponent(() => import('@/views/purchase/PurchaseBiddingPage.vue')),
   '/purchase/contract': defineAsyncComponent(() => import('@/views/purchase/PurchaseContractPage.vue')),
   '/purchase/acceptance': defineAsyncComponent(() => import('@/views/purchase/PurchaseAcceptancePage.vue')),
   '/purchase/supplier': defineAsyncComponent(() => import('@/views/purchase/SupplierPage.vue')),

@@ -36,7 +36,7 @@ const apiPrefix = computed(() => {
 const table = computed(() => {
   const key = `${route.params.module}/${route.params.page}`
   const map: Record<string, string> = {
-    'purchase/plan': 'purchase_plan', 'purchase/project': 'purchase_project', 'purchase/contract': 'purchase_contract',
+    'purchase/plan': 'purchase_plan', 'purchase/project': 'purchase_project', 'purchase/bidding': 'purchase_plan_item', 'purchase/contract': 'purchase_contract',
     'asset/device': 'medical_device', 'asset/entry': 'device_entry', 'asset/transfer': 'asset_transfer',
     'asset/inventory': 'inventory_check', 'asset/scrap': 'device_scrap',
     'repair/workorder': 'repair_workorder', 'repair/engineer': 'engineer', 'repair/spare': 'spare_part',

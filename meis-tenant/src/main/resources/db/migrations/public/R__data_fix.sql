@@ -300,9 +300,19 @@ ON CONFLICT (menu_code) DO UPDATE SET
     sort_order = EXCLUDED.sort_order,
     is_active = TRUE;
 
-UPDATE sys_menu SET menu_name = '设备合同管理', sort_order = 4 WHERE menu_code = 'purchase_contract';
-UPDATE sys_menu SET menu_name = '安装验收', sort_order = 5 WHERE menu_code = 'purchase_acceptance';
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('purchase_bidding', 'mod_purchase', '招标管理', 'menu', '/purchase/bidding', 4)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+UPDATE sys_menu SET menu_name = '设备合同管理', sort_order = 5 WHERE menu_code = 'purchase_contract';
+UPDATE sys_menu SET menu_name = '安装验收', sort_order = 6 WHERE menu_code = 'purchase_acceptance';
 UPDATE sys_menu SET menu_name = '设备采购计划表', sort_order = 3 WHERE menu_code = 'purchase_project';
+UPDATE sys_menu SET menu_name = '招标管理', sort_order = 4 WHERE menu_code = 'purchase_bidding';
 UPDATE sys_menu SET is_active = FALSE WHERE menu_code = 'purchase_plan';
 
 INSERT INTO sys_package_menu (package_code, menu_code)

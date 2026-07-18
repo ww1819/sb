@@ -203,6 +203,13 @@ COMMENT ON COLUMN purchase_plan_item.bargain_meeting_time IS '议价会议时间
 COMMENT ON COLUMN purchase_plan_item.bargain_participant_depts IS '议价参与部门';
 COMMENT ON COLUMN purchase_plan_item.bargain_dept_opinion IS '议价设备科意见';
 COMMENT ON COLUMN purchase_plan_item.bargain_meeting_content IS '议价会议内容';
+COMMENT ON COLUMN purchase_plan_item.bargain_meeting_conclusion IS '议价会议结论';
+COMMENT ON COLUMN purchase_plan_item.bargain_record_url IS '议价记录附件URL';
+COMMENT ON COLUMN purchase_plan_item.bargain_review_result IS '议价审核结果(passed/rejected)';
+COMMENT ON COLUMN purchase_plan_item.bargain_review_comment IS '议价建议';
+COMMENT ON COLUMN purchase_plan_item.bargain_reviewed_at IS '议价审核时间';
+COMMENT ON COLUMN purchase_plan_item.bargain_reviewed_by IS '议价审核人';
+COMMENT ON COLUMN purchase_plan_item.bargain_reviewed_by_name IS '议价审核人姓名快照';
 COMMENT ON COLUMN purchase_plan_item.bargain_at IS '议价保存时间';
 COMMENT ON COLUMN purchase_plan_item.bargain_by IS '议价操作人';
 COMMENT ON COLUMN purchase_plan_item.bargain_by_name IS '议价操作人姓名快照';

@@ -121,6 +121,13 @@ body {
   gap: 16px;
 }
 
+.app-modal__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .app-modal__header .el-dialog__title {
   display: flex;
   align-items: center;

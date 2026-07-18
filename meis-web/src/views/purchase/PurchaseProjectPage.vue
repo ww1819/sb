@@ -66,6 +66,24 @@
           </template>
         </el-table-column>
         <el-table-column prop="purchase_purpose" label="购买用途" min-width="140" show-overflow-tooltip />
+        <el-table-column label="议价状态" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag :type="isBargained(row) ? 'success' : 'info'" size="small" effect="plain">
+              {{ isBargained(row) ? '已议价' : '未议价' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="议价记录" width="140" align="center">
+          <template #default="{ row }">
+            <TableFileCell
+              :value="row.bargain_record_url"
+              prop="bargain_record_url"
+              :row-id="String(row.id)"
+              save-base="/purchase/project/approved-items"
+              @updated="(url) => onBargainFileUpdated(row, url)"
+            />
+          </template>
+        </el-table-column>
         <el-table-column prop="fill_date" label="申请日期" width="120">
           <template #default="{ row }">{{ formatDay(row.fill_date) }}</template>
         </el-table-column>
@@ -79,9 +97,10 @@
         <el-table-column prop="plan_remark" label="备注" min-width="140" show-overflow-tooltip>
           <template #default="{ row }">{{ row.plan_remark || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right" align="center">
+        <el-table-column label="操作" width="220" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button link type="primary" @click="openReview(row)">审核</el-button>
+            <el-button v-if="!isOrderReviewed(row)" link type="primary" @click="openReview(row)">审核</el-button>
+            <el-button link type="primary" @click="openBargainReview(row)">议价审核</el-button>
             <el-button link type="primary" @click="openBargain(row)">议价</el-button>
           </template>
         </el-table-column>
@@ -113,45 +132,80 @@
       </template>
     </AppModal>
 
-    <AppModal v-model="bargainVisible" title="询价议价" size="xxl">
+    <AppModal v-model="bargainReviewVisible" title="议价审核" size="sm">
+      <el-form label-width="110px">
+        <el-form-item label="订单号">
+          <span>{{ bargainReviewRow?.order_no || '-' }}</span>
+        </el-form-item>
+        <el-form-item label="审核结果" required>
+          <el-radio-group v-model="bargainReviewResult" @change="onBargainReviewResultChange">
+            <el-radio value="passed">议价通过</el-radio>
+            <el-radio value="rejected">议价未通过</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="议价建议" required>
+          <el-input
+            v-model="bargainReviewComment"
+            type="textarea"
+            :rows="4"
+            maxlength="500"
+            show-word-limit
+            placeholder="请填写议价建议"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="bargainReviewVisible = false">取消</el-button>
+        <el-button type="primary" :loading="bargainReviewSubmitting" @click="submitBargainReview">
+          确认
+        </el-button>
+      </template>
+    </AppModal>
+
+    <AppModal v-model="bargainVisible" title="询价议价" size="xl">
+      <template #header-actions>
+        <el-button plain @click="downloadBargainTemplate">下载模板</el-button>
+        <el-button plain @click="printBargainTemplate">打印</el-button>
+      </template>
       <div class="bargain-split">
         <div class="bargain-left">
-          <el-table
-            ref="bargainTableRef"
-            :data="bargainItems"
-            size="small"
-            border
-            highlight-current-row
-            row-key="id"
-            height="100%"
-            class="bargain-item-table"
-            table-layout="fixed"
-          >
-            <el-table-column type="index" label="序号" width="52" align="center" />
-            <el-table-column label="状态" width="78" align="center">
-              <template #default="{ row }">
-                <span :class="isBargained(row) ? 'st-done' : 'st-todo'">
-                  {{ isBargained(row) ? '已议价' : '未议价' }}
-                </span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="dept_name" label="申请科室" width="110" show-overflow-tooltip />
-            <el-table-column prop="device_name" label="设备名称" width="140" show-overflow-tooltip />
-            <el-table-column prop="estimated_price" label="预计单价" width="100" align="right">
-              <template #default="{ row }">
-                <TableCellValue :field="priceField" :value="row.estimated_price" />
-              </template>
-            </el-table-column>
-            <el-table-column prop="quantity" label="数量" width="72" align="right">
-              <template #default="{ row }">
-                <TableCellValue :field="qtyField" :value="row.quantity" />
-              </template>
-            </el-table-column>
-            <el-table-column prop="unit" label="单位" width="72" align="center" show-overflow-tooltip>
-              <template #default="{ row }">{{ row.unit || '-' }}</template>
-            </el-table-column>
-            <el-table-column prop="specification" label="规格型号" width="160" show-overflow-tooltip />
-          </el-table>
+          <div class="bargain-left-scroll">
+            <el-table
+              ref="bargainTableRef"
+              :data="bargainItems"
+              size="small"
+              border
+              highlight-current-row
+              row-key="id"
+              class="bargain-item-table"
+              style="width: 784px"
+            >
+              <el-table-column type="index" label="序号" width="52" align="center" />
+              <el-table-column label="状态" width="78" align="center">
+                <template #default="{ row }">
+                  <span :class="isBargained(row) ? 'st-done' : 'st-todo'">
+                    {{ isBargained(row) ? '已议价' : '未议价' }}
+                  </span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="dept_name" label="申请科室" width="110" show-overflow-tooltip />
+              <el-table-column prop="device_name" label="设备名称" width="140" show-overflow-tooltip />
+              <el-table-column prop="estimated_price" label="预计单价" width="100" align="right">
+                <template #default="{ row }">
+                  <TableCellValue :field="priceField" :value="row.estimated_price" />
+                </template>
+              </el-table-column>
+              <el-table-column prop="quantity" label="数量" width="72" align="right">
+                <template #default="{ row }">
+                  <TableCellValue :field="qtyField" :value="row.quantity" />
+                </template>
+              </el-table-column>
+              <el-table-column prop="unit" label="单位" width="72" align="center" show-overflow-tooltip>
+                <template #default="{ row }">{{ row.unit || '-' }}</template>
+              </el-table-column>
+              <el-table-column prop="specification" label="规格型号" width="160" show-overflow-tooltip />
+            </el-table>
+          </div>
         </div>
         <div class="bargain-right">
           <div class="bargain-a4">
@@ -192,7 +246,7 @@
                     <el-input
                       v-model="bargainForm.bargain_dept_opinion"
                       type="textarea"
-                      :rows="8"
+                      :rows="6"
                       placeholder="请填写设备科意见"
                     />
                   </td>
@@ -203,8 +257,19 @@
                     <el-input
                       v-model="bargainForm.bargain_meeting_content"
                       type="textarea"
-                      :rows="12"
+                      :rows="8"
                       placeholder="请填写会议内容"
+                    />
+                  </td>
+                </tr>
+                <tr class="bargain-tall">
+                  <th>会议结论</th>
+                  <td colspan="3">
+                    <el-input
+                      v-model="bargainForm.bargain_meeting_conclusion"
+                      type="textarea"
+                      :rows="8"
+                      placeholder="请填写会议结论"
                     />
                   </td>
                 </tr>
@@ -233,6 +298,11 @@ import type { FieldSchema } from '@/config/pageSchemas'
 import { useDict } from '@/composables/useDict'
 import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
 import { promptListActionScope } from '@/composables/useListActionScope'
+import {
+  downloadBargainMeetingDoc,
+  printBargainMeetingDoc
+} from '@/utils/bargainMeetingDoc'
+import TableFileCell from '@/components/table/TableFileCell.vue'
 
 const { loadDict, resolveDictLabel } = useDict()
 const { selectedCount, selectedIds, syncFromTable, clearAll } = useCrossPageSelection()
@@ -265,8 +335,15 @@ const bargainForm = reactive({
   bargain_meeting_time: '',
   bargain_participant_depts: '',
   bargain_dept_opinion: '',
-  bargain_meeting_content: ''
+  bargain_meeting_content: '',
+  bargain_meeting_conclusion: ''
 })
+
+const bargainReviewVisible = ref(false)
+const bargainReviewSubmitting = ref(false)
+const bargainReviewRow = ref<Record<string, unknown> | null>(null)
+const bargainReviewResult = ref<'passed' | 'rejected'>('passed')
+const bargainReviewComment = ref('议价通过')
 
 const priceField: FieldSchema = { prop: 'estimated_price', label: '预算单价', type: 'number' }
 const qtyField: FieldSchema = { prop: 'quantity', label: '数量', type: 'number' }
@@ -336,10 +413,21 @@ function onReset() {
   onSearch()
 }
 
+function pendingReviewIds() {
+  return selectedIds().filter((id) => {
+    const row = selectedRowMap.value.get(id)
+    return row ? !isOrderReviewed(row) : true
+  })
+}
+
 function openReview(row: Record<string, unknown>) {
+  if (isOrderReviewed(row)) {
+    ElMessage.warning('该订单已审核，不能重复审核')
+    return
+  }
   reviewMode.value = 'single'
   reviewRow.value = row
-  reviewComment.value = String(row.order_review_comment || '同意审核')
+  reviewComment.value = '同意审核'
   reviewVisible.value = true
 }
 
@@ -347,6 +435,14 @@ function openBatchReview() {
   if (selectedCount.value === 0) {
     ElMessage.warning('请先勾选要审核的明细')
     return
+  }
+  const pending = pendingReviewIds()
+  if (!pending.length) {
+    ElMessage.warning('勾选的明细均已审核，无需重复审核')
+    return
+  }
+  if (pending.length < selectedCount.value) {
+    ElMessage.info(`已跳过 ${selectedCount.value - pending.length} 条已审核明细`)
   }
   reviewMode.value = 'batch'
   reviewRow.value = null
@@ -365,9 +461,11 @@ async function submitReview() {
       ? reviewRow.value?.id
         ? [String(reviewRow.value.id)]
         : []
-      : selectedIds()
+      : pendingReviewIds()
   if (!targets.length) {
-    ElMessage.warning('没有可审核的明细')
+    ElMessage.warning(
+      reviewMode.value === 'batch' ? '勾选的明细均已审核，无需重复审核' : '没有可审核的明细'
+    )
     return
   }
   reviewSubmitting.value = true
@@ -387,14 +485,98 @@ async function submitReview() {
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }
     ElMessage.error(err?.response?.data?.message || `审核失败（已成功 ${ok} 条）`)
+    if (ok > 0) load()
   } finally {
     reviewSubmitting.value = false
   }
 }
 
+function isOrderReviewed(row: Record<string, unknown> | undefined) {
+  if (!row) return false
+  return !!(row.order_reviewed_at || (row.order_review_comment && String(row.order_review_comment).trim()))
+}
+
 function isBargained(row: Record<string, unknown> | undefined) {
   if (!row) return false
-  return !!(row.bargain_at || row.bargain_meeting_content || row.bargain_dept_opinion)
+  return !!(
+    row.bargain_at ||
+    row.bargain_meeting_content ||
+    row.bargain_dept_opinion ||
+    row.bargain_meeting_conclusion
+  )
+}
+
+function hasBargainRecordFile(row: Record<string, unknown> | undefined) {
+  if (!row) return false
+  return !!(row.bargain_record_url && String(row.bargain_record_url).trim())
+}
+
+function onBargainFileUpdated(row: Record<string, unknown>, url: string) {
+  row.bargain_record_url = url
+}
+
+function onBargainReviewResultChange(v: string | number | boolean | undefined) {
+  const result = String(v)
+  const defaults = { passed: '议价通过', rejected: '议价未通过' } as const
+  const prevDefaults = Object.values(defaults)
+  const cur = bargainReviewComment.value.trim()
+  if (!cur || prevDefaults.includes(cur as '议价通过' | '议价未通过')) {
+    bargainReviewComment.value = result === 'rejected' ? defaults.rejected : defaults.passed
+  }
+}
+
+function openBargainReview(row: Record<string, unknown>) {
+  if (!isOrderReviewed(row)) {
+    ElMessage.warning('请先完成订单审核后再议价审核')
+    return
+  }
+  if (!isBargained(row)) {
+    ElMessage.warning('请先完成议价会议记录后再议价审核')
+    return
+  }
+  if (!hasBargainRecordFile(row)) {
+    ElMessage.warning('请先上传议价记录附件后再议价审核')
+    return
+  }
+  bargainReviewRow.value = row
+  const savedResult = String(row.bargain_review_result || '')
+  if (savedResult === 'rejected') {
+    bargainReviewResult.value = 'rejected'
+    bargainReviewComment.value = String(row.bargain_review_comment || '议价未通过')
+  } else if (savedResult === 'passed') {
+    bargainReviewResult.value = 'passed'
+    bargainReviewComment.value = String(row.bargain_review_comment || '议价通过')
+  } else {
+    bargainReviewResult.value = 'passed'
+    bargainReviewComment.value = '议价通过'
+  }
+  bargainReviewVisible.value = true
+}
+
+async function submitBargainReview() {
+  const row = bargainReviewRow.value
+  if (!row?.id) return
+  if (!bargainReviewComment.value.trim()) {
+    ElMessage.warning('请填写议价建议')
+    return
+  }
+  bargainReviewSubmitting.value = true
+  try {
+    const { data } = await http.post(`/purchase/project/approved-items/${row.id}/bargain-review`, {
+      result: bargainReviewResult.value,
+      comment: bargainReviewComment.value.trim()
+    })
+    const saved = data.data ?? {}
+    Object.assign(row, saved)
+    ElMessage.success('议价审核已保存')
+    bargainReviewVisible.value = false
+    load()
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    ElMessage.error(err?.response?.data?.message || '议价审核失败')
+  } finally {
+    bargainReviewSubmitting.value = false
+  }
 }
 
 function fillBargainForm(row: Record<string, unknown>) {
@@ -413,12 +595,40 @@ function fillBargainForm(row: Record<string, unknown>) {
   bargainForm.bargain_meeting_content = String(
     row.bargain_meeting_content || (device ? `${device} 议价` : '')
   )
+  bargainForm.bargain_meeting_conclusion = String(row.bargain_meeting_conclusion || '')
   nextTick(() => {
     bargainTableRef.value?.setCurrentRow(row)
   })
 }
 
+function currentBargainDoc() {
+  return {
+    meetingLocation: bargainForm.bargain_meeting_location,
+    meetingTime: bargainForm.bargain_meeting_time,
+    deptName: bargainForm.dept_name,
+    deviceName: bargainForm.device_name,
+    participantDepts: bargainForm.bargain_participant_depts,
+    deptOpinion: bargainForm.bargain_dept_opinion,
+    meetingContent: bargainForm.bargain_meeting_content,
+    meetingConclusion: bargainForm.bargain_meeting_conclusion
+  }
+}
+
+function printBargainTemplate() {
+  const ok = printBargainMeetingDoc(currentBargainDoc())
+  if (!ok) ElMessage.warning('无法打开打印窗口，请检查浏览器是否拦截弹窗')
+}
+
+function downloadBargainTemplate() {
+  downloadBargainMeetingDoc(currentBargainDoc(), '设备购置询价议价会议记录表.doc')
+  ElMessage.success('已开始下载 Word 文档')
+}
+
 function openBargain(row: Record<string, unknown>) {
+  if (!isOrderReviewed(row)) {
+    ElMessage.warning('请先完成订单审核后再议价')
+    return
+  }
   bargainDeptName.value = String(row.dept_name ?? '')
   bargainVisible.value = true
   // 仅展示当前点击的这一条产品明细
@@ -443,7 +653,8 @@ async function submitBargain() {
       bargain_meeting_time: bargainForm.bargain_meeting_time,
       bargain_participant_depts: bargainForm.bargain_participant_depts,
       bargain_dept_opinion: bargainForm.bargain_dept_opinion,
-      bargain_meeting_content: bargainForm.bargain_meeting_content
+      bargain_meeting_content: bargainForm.bargain_meeting_content,
+      bargain_meeting_conclusion: bargainForm.bargain_meeting_conclusion
     })
     const saved = data.data ?? {}
     // 同步左侧状态
@@ -498,6 +709,10 @@ async function exportCsv() {
       '提交日期',
       '经费来源',
       '购买用途',
+      '议价状态',
+      '议价记录',
+      '议价审核结果',
+      '议价建议',
       '申请日期',
       '审核建议',
       '订单审核意见',
@@ -507,12 +722,19 @@ async function exportCsv() {
       '会议时间',
       '参与部门',
       '设备科意见',
-      '会议内容'
+      '会议内容',
+      '会议结论'
     ]
     const lines = [headers.join(',')]
     for (const r of list) {
       const fund =
         resolveDictLabel('fund_source', r.fund_source) || String(r.fund_source ?? '')
+      const reviewResult =
+        r.bargain_review_result === 'passed'
+          ? '议价通过'
+          : r.bargain_review_result === 'rejected'
+            ? '议价未通过'
+            : ''
       const cells = [
         r.order_no,
         r.plan_code,
@@ -526,6 +748,10 @@ async function exportCsv() {
         formatDay(r.submitted_at),
         fund,
         r.purchase_purpose,
+        isBargained(r) ? '已议价' : '未议价',
+        r.bargain_record_url,
+        reviewResult,
+        r.bargain_review_comment,
         formatDay(r.fill_date),
         r.approval_comment,
         r.order_review_comment,
@@ -535,7 +761,8 @@ async function exportCsv() {
         formatDay(r.bargain_meeting_time),
         r.bargain_participant_depts,
         r.bargain_dept_opinion,
-        r.bargain_meeting_content
+        r.bargain_meeting_content,
+        r.bargain_meeting_conclusion
       ].map((v) => {
         const s = v == null ? '' : String(v).replace(/"/g, '""')
         return `"${s}"`
@@ -563,28 +790,35 @@ onMounted(async () => {
 <style scoped>
 .bargain-split {
   display: grid;
-  grid-template-columns: minmax(300px, 34%) minmax(620px, 1fr);
-  gap: 20px;
-  min-height: 720px;
-  align-items: stretch;
+  grid-template-columns: minmax(320px, 40%) minmax(480px, 1fr);
+  gap: 16px;
+  align-items: start;
 }
 .bargain-left {
   min-width: 0;
-  height: 720px;
+  height: 280px;
   border: 1px solid var(--el-border-color);
   border-radius: 4px;
   overflow: hidden;
 }
-.bargain-item-table {
+.bargain-left-scroll {
   width: 100%;
+  height: 100%;
+  overflow-x: scroll;
+  overflow-y: auto;
+  /* 始终显示滚动条，避免悬停才出现 */
+  scrollbar-gutter: stable;
 }
-/* 列宽合计超出左侧容器时由表格内部横向滚动 */
-.bargain-item-table :deep(.el-table__header-wrapper),
-.bargain-item-table :deep(.el-table__body-wrapper) {
-  overflow-x: auto !important;
+.bargain-left-scroll::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
 }
-.bargain-item-table :deep(.el-scrollbar__wrap) {
-  overflow-x: auto !important;
+.bargain-left-scroll::-webkit-scrollbar-thumb {
+  background: #c0c4cc;
+  border-radius: 5px;
+}
+.bargain-left-scroll::-webkit-scrollbar-track {
+  background: #f0f2f5;
 }
 .bargain-item-table :deep(.el-table__row) {
   cursor: pointer;
@@ -597,28 +831,42 @@ onMounted(async () => {
 }
 .bargain-right {
   min-width: 0;
-  max-height: 78vh;
+  height: 640px;
+  max-height: 70vh;
   overflow: auto;
   display: flex;
   justify-content: center;
-  padding: 4px 8px 8px;
+  align-items: flex-start;
+  padding: 8px;
   background: #eceff3;
   border-radius: 4px;
+  scrollbar-gutter: stable;
+}
+.bargain-right::-webkit-scrollbar {
+  width: 10px;
+}
+.bargain-right::-webkit-scrollbar-thumb {
+  background: #c0c4cc;
+  border-radius: 5px;
+}
+.bargain-right::-webkit-scrollbar-track {
+  background: #f0f2f5;
 }
 .bargain-a4 {
-  /* A4 竖版可视宽度（约 210mm） */
-  width: min(100%, 794px);
-  min-height: 1123px;
+  /* 在弹窗原尺寸内尽量接近 A4 纸面；超出右侧框可上下滚动 */
+  width: 100%;
+  max-width: 680px;
+  min-height: 960px;
   background: #fff;
   border: 1px solid #1a1a1a;
-  padding: 28px 32px 36px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+  padding: 24px 28px 32px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   box-sizing: border-box;
 }
 .bargain-a4__title {
-  margin: 8px 0 22px;
+  margin: 4px 0 18px;
   text-align: center;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: 2px;
   color: #111;
@@ -632,14 +880,14 @@ onMounted(async () => {
 .bargain-table th,
 .bargain-table td {
   border: 1px solid #222;
-  padding: 12px 14px;
+  padding: 10px 12px;
   vertical-align: middle;
-  font-size: 15px;
-  line-height: 1.55;
+  font-size: 14px;
+  line-height: 1.5;
   color: #222;
 }
 .bargain-table th {
-  width: 118px;
+  width: 110px;
   background: #f5f5f5;
   font-weight: 600;
   text-align: center;
@@ -656,18 +904,17 @@ onMounted(async () => {
 }
 .bargain-table :deep(.el-textarea__inner) {
   padding: 0;
-  min-height: 120px;
 }
-@media (max-width: 1200px) {
+@media (max-width: 1100px) {
   .bargain-split {
     grid-template-columns: 1fr;
-    min-height: auto;
   }
   .bargain-left {
-    height: 260px;
+    height: 220px;
   }
-  .bargain-a4 {
-    min-height: 900px;
+  .bargain-right {
+    height: 480px;
+    max-height: 60vh;
   }
 }
 </style>

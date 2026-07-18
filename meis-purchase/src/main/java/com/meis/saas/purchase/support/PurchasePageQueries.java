@@ -145,11 +145,51 @@ public final class PurchasePageQueries {
                 i.fund_source, i.justification AS purchase_purpose, i.brand_intent,
                 i.order_no, i.order_review_comment, i.order_reviewed_at, i.order_reviewed_by_name,
                 i.bargain_meeting_location, i.bargain_meeting_time, i.bargain_participant_depts,
-                i.bargain_dept_opinion, i.bargain_meeting_content, i.bargain_at, i.bargain_by_name,
+                i.bargain_dept_opinion, i.bargain_meeting_content, i.bargain_meeting_conclusion,
+                i.bargain_record_url, i.bargain_review_result, i.bargain_review_comment,
+                i.bargain_reviewed_at, i.bargain_reviewed_by_name,
+                i.bargain_at, i.bargain_by_name,
                 p.plan_code, p.plan_year, p.fill_date, p.created_at, p.remark AS plan_remark,
                 d.dept_name,
                 inst.created_at AS submitted_at,
                 last_rec.comment AS approval_comment
+                """);
+        for (Map<String, Object> row : result.getRecords()) {
+            fillDateFallback(row);
+            if (row.get("total_price") == null) {
+                Object qty = row.get("quantity");
+                Object price = row.get("estimated_price");
+                if (qty instanceof Number qn && price instanceof Number pn) {
+                    row.put("total_price", qn.doubleValue() * pn.doubleValue());
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 招标管理：仅议价审核通过（passed）的已审批计划明细（PUR-UI-14）。
+     */
+    public static PageResult<Map<String, Object>> bargainPassedPlanItemPage(JdbcTemplate jdbc, PageQuery q) {
+        StringBuilder where = new StringBuilder(" WHERE p.approval_status = 'approved' ");
+        where.append(" AND i.bargain_review_result = 'passed' ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", "p"));
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan_item", "i"));
+        List<Object> args = new ArrayList<>();
+        appendKeyword(where, args, q.getKeyword(), "i.device_name", "d.dept_name", "i.specification");
+        PurchaseDataScope.applyPlanFilter(where, args, jdbc);
+        String from = """
+            FROM purchase_plan_item i
+            JOIN purchase_plan p ON p.id = i.plan_id
+            LEFT JOIN department d ON d.id = p.dept_id
+            """ + SoftDeleteSupport.notDeletedClause(jdbc, "department", "d");
+        PageResult<Map<String, Object>> result = page(jdbc, from, where, args, q,
+                "i.bargain_reviewed_at DESC NULLS LAST, p.approved_at DESC NULLS LAST, i.created_at ASC NULLS LAST",
+                """
+                i.id, i.plan_id, i.device_name, i.specification, i.estimated_price, i.quantity, i.total_price,
+                i.bargain_review_result, i.bargain_reviewed_at,
+                p.plan_code, p.created_at, p.fill_date,
+                d.dept_name
                 """);
         for (Map<String, Object> row : result.getRecords()) {
             fillDateFallback(row);

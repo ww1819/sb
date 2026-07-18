@@ -17,7 +17,10 @@
     <template #header="{ close, titleId, titleClass }">
       <div class="app-modal__header">
         <span :id="titleId" :class="titleClass">{{ title }}</span>
-        <el-button plain @click="close">关闭</el-button>
+        <div class="app-modal__header-actions">
+          <slot name="header-actions" />
+          <el-button plain @click="close">关闭</el-button>
+        </div>
       </div>
     </template>
     <div class="app-modal__body">
