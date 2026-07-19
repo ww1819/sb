@@ -374,7 +374,7 @@ FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
 CROSS JOIN sys_menu m
 WHERE m.menu_code IN (
     'mod_warehouse',
-    'warehouse_entry', 'asset_stock_query', 'warehouse_outbound', 'warehouse_return',
+    'warehouse_entry', 'warehouse_goods_return', 'asset_stock_query', 'warehouse_outbound', 'warehouse_return',
     'warehouse_transfer', 'warehouse_inventory', 'warehouse_scrap'
 )
 ON CONFLICT DO NOTHING;
@@ -385,7 +385,7 @@ FROM sys_tenant t
 CROSS JOIN sys_menu m
 WHERE m.menu_code IN (
     'mod_warehouse',
-    'warehouse_entry', 'asset_stock_query', 'warehouse_outbound', 'warehouse_return',
+    'warehouse_entry', 'warehouse_goods_return', 'asset_stock_query', 'warehouse_outbound', 'warehouse_return',
     'warehouse_transfer', 'warehouse_inventory', 'warehouse_scrap'
 )
 ON CONFLICT DO NOTHING;
@@ -794,14 +794,14 @@ UPDATE sys_menu SET sort_order = 8, is_active = FALSE WHERE menu_code = 'asset_s
 -- AST-UI-04 / SHR-UI-01→02：调配中心更名；库存查询迁库房（入库后）
 UPDATE sys_menu SET menu_name = '调配中心' WHERE menu_code = 'mod_shared';
 UPDATE sys_menu SET parent_code = 'mod_warehouse', menu_name = '库存查询', path = '/asset/stock',
-    sort_order = 3, is_active = TRUE
+    sort_order = 4, is_active = TRUE
 WHERE menu_code = 'asset_stock_query';
 UPDATE sys_menu SET sort_order = 2, is_active = TRUE WHERE menu_code = 'warehouse_entry';
-UPDATE sys_menu SET sort_order = 4, is_active = TRUE WHERE menu_code = 'warehouse_outbound';
-UPDATE sys_menu SET sort_order = 5, is_active = TRUE WHERE menu_code = 'warehouse_return';
-UPDATE sys_menu SET sort_order = 6, is_active = TRUE WHERE menu_code = 'warehouse_transfer';
-UPDATE sys_menu SET sort_order = 7, is_active = TRUE WHERE menu_code = 'warehouse_inventory';
-UPDATE sys_menu SET sort_order = 8, is_active = TRUE WHERE menu_code = 'warehouse_scrap';
+UPDATE sys_menu SET sort_order = 5, is_active = TRUE WHERE menu_code = 'warehouse_outbound';
+UPDATE sys_menu SET menu_name = '设备退库', sort_order = 6, is_active = TRUE WHERE menu_code = 'warehouse_return';
+UPDATE sys_menu SET sort_order = 7, is_active = TRUE WHERE menu_code = 'warehouse_transfer';
+UPDATE sys_menu SET sort_order = 8, is_active = TRUE WHERE menu_code = 'warehouse_inventory';
+UPDATE sys_menu SET sort_order = 9, is_active = TRUE WHERE menu_code = 'warehouse_scrap';
 -- 系统管理侧「仓库维护」：保留菜单定义但不启用（与基础字典 /dict/warehouse 重复）
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order, is_active) VALUES
 ('system_warehouse', 'mod_system', '仓库维护', 'menu', '/system/warehouse', 2, FALSE)
@@ -1010,3 +1010,40 @@ ON CONFLICT DO NOTHING;
 -- ---------- NAV-UI-01：一级模块顺序 — 库房管理在资产台账之上 ----------
 UPDATE sys_menu SET sort_order = 4 WHERE menu_code = 'mod_warehouse';
 UPDATE sys_menu SET sort_order = 5 WHERE menu_code = 'mod_asset';
+
+-- ---------- WH-UI-01：库房子菜单 — 入库→退货→库存查询→出库→退库→调拨→盘点→报废 ----------
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('warehouse_goods_return', 'mod_warehouse', '设备退货', 'menu', '/warehouse/goods-return', 3)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+UPDATE sys_menu SET sort_order = 2, is_active = TRUE WHERE menu_code = 'warehouse_entry';
+UPDATE sys_menu SET menu_name = '设备退货', path = '/warehouse/goods-return', sort_order = 3, is_active = TRUE
+WHERE menu_code = 'warehouse_goods_return';
+UPDATE sys_menu SET parent_code = 'mod_warehouse', menu_name = '库存查询', path = '/asset/stock',
+    sort_order = 4, is_active = TRUE
+WHERE menu_code = 'asset_stock_query';
+UPDATE sys_menu SET sort_order = 5, is_active = TRUE WHERE menu_code = 'warehouse_outbound';
+UPDATE sys_menu SET menu_name = '设备退库', path = '/warehouse/return', sort_order = 6, is_active = TRUE
+WHERE menu_code = 'warehouse_return';
+UPDATE sys_menu SET sort_order = 7, is_active = TRUE WHERE menu_code = 'warehouse_transfer';
+UPDATE sys_menu SET sort_order = 8, is_active = TRUE WHERE menu_code = 'warehouse_inventory';
+UPDATE sys_menu SET sort_order = 9, is_active = TRUE WHERE menu_code = 'warehouse_scrap';
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code = 'warehouse_goods_return'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code = 'warehouse_goods_return'
+ON CONFLICT DO NOTHING;

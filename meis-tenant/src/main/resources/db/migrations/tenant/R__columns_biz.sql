@@ -530,3 +530,82 @@ BEGIN
       ALTER COLUMN approved_at TYPE DATE USING (approved_at AT TIME ZONE 'Asia/Shanghai')::date;
   END IF;
 END $$;
+
+-- ---------- device_goods_return 供应商退货（WH-UI-01） ----------
+CREATE TABLE IF NOT EXISTS device_goods_return (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    return_no VARCHAR(30) UNIQUE NOT NULL,
+    warehouse_id UUID,
+    supplier_id UUID,
+    entry_id UUID,
+    return_date DATE,
+    reason TEXT,
+    doc_status VARCHAR(20) DEFAULT 'draft',
+    status VARCHAR(20) DEFAULT 'draft',
+    approval_status VARCHAR(20) DEFAULT 'draft',
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    deleted_by_name VARCHAR(100)
+);
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS return_no VARCHAR(30);
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS warehouse_id UUID;
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS supplier_id UUID;
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS entry_id UUID;
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS return_date DATE;
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS reason TEXT;
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS doc_status VARCHAR(20) DEFAULT 'draft';
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'draft';
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20) DEFAULT 'draft';
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS remark TEXT;
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS created_by UUID;
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS updated_by UUID;
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS deleted_by UUID;
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(100);
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS deleted_by_name VARCHAR(100);
+
+CREATE TABLE IF NOT EXISTS device_goods_return_item (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    return_id UUID NOT NULL,
+    device_id UUID,
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
+    quantity INTEGER DEFAULT 1,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    deleted_by_name VARCHAR(100)
+);
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS return_id UUID;
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS device_id UUID;
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS device_code VARCHAR(50);
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS quantity INTEGER DEFAULT 1;
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS created_by UUID;
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS updated_by UUID;
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS deleted_by UUID;
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(100);
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS deleted_by_name VARCHAR(100);

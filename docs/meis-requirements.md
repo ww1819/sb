@@ -677,18 +677,30 @@
 |--------|------|------|
 | ~~库房维护~~ | `/warehouse/setting` | **菜单已停用**（`warehouse_setting`）；仓库主数据入口在基础字典 `/dict/warehouse` |
 | 设备入库 | `/warehouse/entry` | 同资产入库（用户口语「备货入库」） |
-| 库存查询 | `/asset/stock` | 由资产台账迁入，排在设备入库之后（AST-UI-04） |
+| 设备退货 | `/warehouse/goods-return` | 供应商退货（WH-UI-01）；主从 `device_goods_return*` |
+| 库存查询 | `/asset/stock` | 由资产台账迁入（AST-UI-04） |
 | 设备出库 | `/warehouse/outbound` | |
-| 设备退货 | `/warehouse/return` | 主从 |
+| 设备退库 | `/warehouse/return` | 科室设备退回库房（原「设备退货」改名，WH-UI-01）；主从 `device_return*` |
 | 库房调拨 | `/warehouse/transfer` | |
 | 库存盘点 | `/warehouse/inventory` | |
 | 设备报废 | `/warehouse/scrap` | |
+
+**WH-UI-01 定稿（2026-07-19 20:05）**
+
+| 项 | 定稿 |
+|----|------|
+| **菜单顺序** | 入库 → **退货** → 库存查询 → 出库 → **退库** → 调拨 → 盘点 → 报废 |
+| **设备退库** | 沿用 `device_return` / `/warehouse/return` / `/api/asset/return`；展示名改为「设备退库」 |
+| **设备退货** | 新建供应商退货：`/warehouse/goods-return`，表 `device_goods_return` + `device_goods_return_item`，API `/api/asset/goods-return` |
+| **退货完成** | 「确认退货」：明细设备 `device_status=returned`，清空 `warehouse_id` |
+| **退库完成** | 保持现有「确认退库」逻辑 |
 
 **需求摘要（待补充）**：
 
 - [x] WH-M-01 停用重复仓库维护菜单：`warehouse_setting`、`system_warehouse`（入口统一 `dict_warehouse`）
 - [x] WH-M-02 / AST-UI-04 库存查询菜单归属库房管理（入库之后）
 - [x] NAV-UI-01 一级菜单：库房管理排在资产台账之上（`mod_warehouse` sort=4，`mod_asset` sort=5）
+- [x] WH-UI-01 退货/退库拆分与菜单重排（见上定稿）
 - [ ] WH-B-01 库房与科室/院区关系
 - [ ] WH-B-02 入库来源：采购验收 / 调拨 / 其他
 - [ ] WH-F-01 退货流程与台账状态回滚
@@ -1350,6 +1362,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+| 2.27 | 2026-07-19 20:05:00 | — | WH-UI-01：库房退货/退库拆分；菜单入库→退货→库存查询→出库→退库… |
 | 2.26 | 2026-07-19 19:35:00 | — | NAV-UI-01：一级菜单库房管理移至资产台账之上 |
 | 2.25 | 2026-07-19 19:15:00 | — | PUR-UI-30 补：审核日期仅日期；已审核操作列仅查看 |
 | 2.24 | 2026-07-19 19:10:00 | — | PUR-UI-30：验收列表去入库/业务链/验收状态；增审核人/审核日期 |

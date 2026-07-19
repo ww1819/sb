@@ -266,10 +266,27 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('transfer_type', 'warehouse', '库房间调拨', 'warehouse', 4)
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
 INSERT INTO sys_approval_flow (flow_code, flow_name, business_type) VALUES
-('device_return_default', '设备退货审批', 'device_return')
-ON CONFLICT (flow_code) DO NOTHING;
+('device_return_default', '设备退库审批', 'device_return')
+ON CONFLICT (flow_code) DO UPDATE SET flow_name = EXCLUDED.flow_name;
 INSERT INTO sys_approval_node (flow_id, node_order, node_name, approver_role, amount_threshold)
 SELECT f.id, 1, '装备部审核', 'equipment_head', 0 FROM sys_approval_flow f WHERE f.flow_code = 'device_return_default'
+AND NOT EXISTS (SELECT 1 FROM sys_approval_node n WHERE n.flow_id = f.id AND n.node_order = 1);
+
+-- WH-UI-01：供应商退货状态 + 审批流
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('goods_return_status', 'draft', '草稿', 'draft', 1),
+('goods_return_status', 'pending', '待审批', 'pending', 2),
+('goods_return_status', 'approved', '已审批', 'approved', 3),
+('goods_return_status', 'returned', '已退货', 'returned', 4)
+ON CONFLICT (dict_type, dict_code) DO NOTHING;
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('device_status', 'returned', '已退货', 'returned', 90)
+ON CONFLICT (dict_type, dict_code) DO NOTHING;
+INSERT INTO sys_approval_flow (flow_code, flow_name, business_type) VALUES
+('device_goods_return_default', '设备退货审批', 'device_goods_return')
+ON CONFLICT (flow_code) DO NOTHING;
+INSERT INTO sys_approval_node (flow_id, node_order, node_name, approver_role, amount_threshold)
+SELECT f.id, 1, '装备部审核', 'equipment_head', 0 FROM sys_approval_flow f WHERE f.flow_code = 'device_goods_return_default'
 AND NOT EXISTS (SELECT 1 FROM sys_approval_node n WHERE n.flow_id = f.id AND n.node_order = 1);
 -- ---------- 特种设备模块：字典种子 ----------
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES

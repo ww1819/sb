@@ -246,6 +246,10 @@ public class ApprovalInstanceService {
                 jdbc.update("UPDATE device_return SET approval_status = ?, doc_status = ? WHERE id = ?::uuid", status, status, businessId);
                 if ("approved".equals(status)) autoCompleteReturn(businessId);
             }
+            case "device_goods_return" -> {
+                jdbc.update("UPDATE device_goods_return SET approval_status = ?, doc_status = ? WHERE id = ?", status, status, businessId);
+                if ("approved".equals(status)) autoCompleteGoodsReturn(businessId);
+            }
             case "shared_device_loan" -> {
                 if ("approved".equals(status)) {
                     jdbc.update("""
@@ -299,6 +303,23 @@ public class ApprovalInstanceService {
             }
         }
         jdbc.update("UPDATE device_return SET status = 'returned', doc_status = 'returned', updated_at = NOW() WHERE id = ?::uuid", id);
+    }
+
+    private void autoCompleteGoodsReturn(UUID id) {
+        var items = jdbc.queryForList("SELECT device_id FROM device_goods_return_item WHERE return_id = ?", id);
+        for (Map<String, Object> item : items) {
+            if (item.get("device_id") != null) {
+                jdbc.update("""
+                    UPDATE medical_device SET device_status = 'returned', warehouse_id = NULL, updated_at = NOW()
+                    WHERE id = ?
+                    """, item.get("device_id"));
+            }
+        }
+        jdbc.update("""
+                UPDATE device_goods_return
+                SET status = 'returned', doc_status = 'returned', updated_at = NOW()
+                WHERE id = ?
+                """, id);
     }
 
     private void autoCompleteSharedReturn(UUID returnId) {

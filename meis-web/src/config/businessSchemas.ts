@@ -460,18 +460,18 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'remark', label: '备注', type: 'textarea', detail: true }
   ],
   device_return: [
-    { prop: 'return_no', label: '退货单号', list: true, readonly: true },
+    { prop: 'return_no', label: '退库单号', list: true, readonly: true },
     { prop: 'outbound_id', label: '关联出库单', linkTable: 'device_outbound', group: 'basic' },
     { prop: 'outbound_no', label: '出库单号', list: true, readonly: true },
     { prop: 'warehouse_id', label: '退回库房', linkTable: 'warehouse', list: true },
     { prop: 'warehouse_name', label: '库房', list: true, readonly: true },
-    { prop: 'dept_id', label: '退货科室', linkTable: 'department', list: true },
-    { prop: 'returner_id', label: '退货人', linkTable: 'sys_user' },
-    { prop: 'return_date', label: '退货日期', type: 'date', list: true },
-    { prop: 'return_type', label: '退货类型', dictType: 'return_type', list: true },
-    { prop: 'reason', label: '退货原因', type: 'textarea', list: true },
+    { prop: 'dept_id', label: '退库科室', linkTable: 'department', list: true },
+    { prop: 'returner_id', label: '退库人', linkTable: 'sys_user' },
+    { prop: 'return_date', label: '退库日期', type: 'date', list: true },
+    { prop: 'return_type', label: '退库类型', dictType: 'return_type', list: true },
+    { prop: 'reason', label: '退库原因', type: 'textarea', list: true },
     { prop: 'approval_status', label: '审批状态', dictType: 'approval_status', list: true, readonly: true },
-    { prop: 'status', label: '退货状态', dictType: 'return_status', list: true },
+    { prop: 'status', label: '退库状态', dictType: 'return_status', list: true },
     { prop: 'remark', label: '备注', type: 'textarea' }
   ],
   device_return_item: [
@@ -480,6 +480,26 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'device_id', label: '设备', linkTable: 'medical_device', detail: true },
     { prop: 'quantity', label: '数量', type: 'number', detail: true },
     { prop: 'condition_note', label: '状况说明', type: 'textarea', detail: true }
+  ],
+  device_goods_return: [
+    { prop: 'return_no', label: '退货单号', list: true, readonly: true },
+    { prop: 'return_date', label: '退货日期', type: 'date', list: true },
+    { prop: 'supplier_id', label: '供应商', linkTable: 'supplier', list: true },
+    { prop: 'supplier_name', label: '供应商', list: true, readonly: true, form: false },
+    { prop: 'warehouse_id', label: '退货库房', linkTable: 'warehouse', list: true },
+    { prop: 'warehouse_name', label: '库房', list: true, readonly: true, form: false },
+    { prop: 'entry_id', label: '关联入库单', linkTable: 'device_entry' },
+    { prop: 'entry_no', label: '入库单号', list: true, readonly: true, form: false },
+    { prop: 'reason', label: '退货原因', type: 'textarea' },
+    { prop: 'doc_status', label: '审批状态', dictType: 'approval_status', list: true, readonly: true },
+    { prop: 'status', label: '退货状态', dictType: 'goods_return_status', list: true },
+    { prop: 'remark', label: '备注', type: 'textarea' }
+  ],
+  device_goods_return_item: [
+    { prop: 'device_code', label: '设备编码', list: true, detail: true },
+    { prop: 'device_name', label: '设备名称', list: true, detail: true },
+    { prop: 'device_id', label: '设备', linkTable: 'medical_device', detail: true },
+    { prop: 'quantity', label: '数量', type: 'number', detail: true }
   ],
   adverse_event: [
     { prop: 'event_no', label: '事件编号', list: true, group: 'basic', readonly: true },

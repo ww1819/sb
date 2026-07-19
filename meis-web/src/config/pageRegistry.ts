@@ -437,7 +437,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     listFilters: [{ key: 'doc_status', label: '审批状态', dictType: 'approval_status' }]
   },
   '/warehouse/return': {
-    title: '设备退货',
+    title: '设备退库',
     apiBase: '/asset',
     table: 'device_return',
     masterDetail: true,
@@ -446,6 +446,17 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/asset/return/page',
     saveUrl: '/asset/return',
     listFilters: [{ key: 'status', label: '状态', dictType: 'return_status' }]
+  },
+  '/warehouse/goods-return': {
+    title: '设备退货',
+    apiBase: '/asset',
+    table: 'device_goods_return',
+    masterDetail: true,
+    detailTable: 'device_goods_return_item',
+    foreignKey: 'return_id',
+    listPageUrl: '/asset/goods-return/page',
+    saveUrl: '/asset/goods-return',
+    listFilters: [{ key: 'doc_status', label: '审批状态', dictType: 'approval_status' }]
   },
   '/warehouse/transfer': { title: '库房调拨', apiBase: '/asset', table: 'asset_transfer', saveUrl: '/asset/transfer' },
   '/warehouse/inventory': {

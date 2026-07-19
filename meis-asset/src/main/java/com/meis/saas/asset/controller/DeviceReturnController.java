@@ -73,7 +73,7 @@ public class DeviceReturnController {
 
     @PostMapping
     @Transactional
-    @OperationLog(module = "asset", description = "保存退货单")
+    @OperationLog(module = "asset", description = "保存退库单")
     public Result<Map<String, Object>> save(@RequestBody Map<String, Object> body) {
         UUID id = body.containsKey("id") && body.get("id") != null
                 ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
@@ -114,24 +114,24 @@ public class DeviceReturnController {
     }
 
     @PostMapping("/{id}/submit")
-    @OperationLog(module = "asset", description = "提交退货审批")
+    @OperationLog(module = "asset", description = "提交退库审批")
     public Result<Map<String, Object>> submit(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
         Map<String, Object> r = get(id).getData();
-        approvalService.submit("device_return", id, r.get("return_no").toString(), "设备退货 " + r.get("return_no"),
+        approvalService.submit("device_return", id, r.get("return_no").toString(), "设备退库 " + r.get("return_no"),
                 UUID.fromString(body.get("applicantId").toString()), 0);
         return get(id);
     }
 
     @PostMapping("/{id}/complete")
     @Transactional
-    @OperationLog(module = "asset", description = "退货入库")
+    @OperationLog(module = "asset", description = "确认退库")
     public Result<Map<String, Object>> complete(@PathVariable UUID id) {
         var row = jdbc.queryForList(
                 "SELECT * FROM device_return WHERE id = ?::uuid"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "device_return", null), id);
         if (row.isEmpty()) throw new BizException(404, "not found");
         if ("returned".equals(String.valueOf(row.get(0).get("status")))) {
-            throw new BizException(400, "退货单已完成");
+            throw new BizException(400, "退库单已完成");
         }
         Object warehouseId = row.get(0).get("warehouse_id");
         var items = jdbc.queryForList(

@@ -92,6 +92,7 @@ const pageMap: Record<string, ReturnType<typeof defineAsyncComponent>> = {
   '/warehouse/entry': defineAsyncComponent(() => import('@/views/asset/DeviceEntryPage.vue')),
   '/warehouse/outbound': defineAsyncComponent(() => import('@/views/warehouse/WarehouseOutboundPage.vue')),
   '/warehouse/return': defineAsyncComponent(() => import('@/views/warehouse/WarehouseReturnPage.vue')),
+  '/warehouse/goods-return': defineAsyncComponent(() => import('@/views/warehouse/WarehouseGoodsReturnPage.vue')),
   '/warehouse/transfer': defineAsyncComponent(() => import('@/views/warehouse/WarehouseTransferPage.vue')),
   '/warehouse/inventory': defineAsyncComponent(() => import('@/views/asset/InventoryCheckPage.vue')),
   '/warehouse/scrap': defineAsyncComponent(() => import('@/views/warehouse/WarehouseScrapPage.vue')),

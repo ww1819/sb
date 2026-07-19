@@ -3947,18 +3947,18 @@ CREATE TABLE IF NOT EXISTS device_return (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-COMMENT ON TABLE device_return IS '设备退货单';
+COMMENT ON TABLE device_return IS '设备退库单';
 COMMENT ON COLUMN device_return.id IS '主键';
-COMMENT ON COLUMN device_return.return_no IS '退货单号';
+COMMENT ON COLUMN device_return.return_no IS '退库单号';
 COMMENT ON COLUMN device_return.outbound_id IS '关联出库单';
 COMMENT ON COLUMN device_return.warehouse_id IS '退回库房';
-COMMENT ON COLUMN device_return.dept_id IS '退货科室';
-COMMENT ON COLUMN device_return.returner_id IS '退货人';
-COMMENT ON COLUMN device_return.return_date IS '退货日期';
-COMMENT ON COLUMN device_return.return_type IS '退货类型';
-COMMENT ON COLUMN device_return.reason IS '退货原因';
+COMMENT ON COLUMN device_return.dept_id IS '退库科室';
+COMMENT ON COLUMN device_return.returner_id IS '退库人';
+COMMENT ON COLUMN device_return.return_date IS '退库日期';
+COMMENT ON COLUMN device_return.return_type IS '退库类型';
+COMMENT ON COLUMN device_return.reason IS '退库原因';
 COMMENT ON COLUMN device_return.doc_status IS '单据状态';
-COMMENT ON COLUMN device_return.status IS '退货状态';
+COMMENT ON COLUMN device_return.status IS '退库状态';
 COMMENT ON COLUMN device_return.approval_status IS '审批状态';
 COMMENT ON COLUMN device_return.operator_id IS '经办人';
 COMMENT ON COLUMN device_return.remark IS '备注';
@@ -3973,11 +3973,74 @@ CREATE TABLE IF NOT EXISTS device_return_item (
     condition_note TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-COMMENT ON TABLE device_return_item IS '设备退货明细';
+COMMENT ON TABLE device_return_item IS '设备退库明细';
 COMMENT ON COLUMN device_return_item.id IS '主键';
-COMMENT ON COLUMN device_return_item.return_id IS '所属退货单';
+COMMENT ON COLUMN device_return_item.return_id IS '所属退库单';
 COMMENT ON COLUMN device_return_item.device_id IS '关联设备';
 COMMENT ON COLUMN device_return_item.device_code IS '设备编码';
 COMMENT ON COLUMN device_return_item.device_name IS '设备名称';
 COMMENT ON COLUMN device_return_item.quantity IS '数量';
 COMMENT ON COLUMN device_return_item.condition_note IS '设备状况说明';
+
+-- 模块8：库房管理 — 设备退货（供应商，WH-UI-01）
+CREATE TABLE IF NOT EXISTS device_goods_return (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    return_no VARCHAR(30) UNIQUE NOT NULL,
+    warehouse_id UUID REFERENCES warehouse(id),
+    supplier_id UUID REFERENCES supplier(id),
+    entry_id UUID REFERENCES device_entry(id),
+    return_date DATE,
+    reason TEXT,
+    doc_status VARCHAR(20) DEFAULT 'draft',
+    status VARCHAR(20) DEFAULT 'draft',
+    approval_status VARCHAR(20) DEFAULT 'draft',
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    deleted_by_name VARCHAR(100)
+);
+COMMENT ON TABLE device_goods_return IS '设备退货单（供应商）';
+COMMENT ON COLUMN device_goods_return.id IS '主键';
+COMMENT ON COLUMN device_goods_return.return_no IS '退货单号';
+COMMENT ON COLUMN device_goods_return.warehouse_id IS '退货库房';
+COMMENT ON COLUMN device_goods_return.supplier_id IS '供应商';
+COMMENT ON COLUMN device_goods_return.entry_id IS '关联入库单';
+COMMENT ON COLUMN device_goods_return.return_date IS '退货日期';
+COMMENT ON COLUMN device_goods_return.reason IS '退货原因';
+COMMENT ON COLUMN device_goods_return.doc_status IS '单据状态';
+COMMENT ON COLUMN device_goods_return.status IS '退货状态';
+COMMENT ON COLUMN device_goods_return.approval_status IS '审批状态';
+COMMENT ON COLUMN device_goods_return.remark IS '备注';
+
+CREATE TABLE IF NOT EXISTS device_goods_return_item (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    return_id UUID NOT NULL REFERENCES device_goods_return(id) ON DELETE CASCADE,
+    device_id UUID REFERENCES medical_device(id),
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
+    quantity INTEGER DEFAULT 1,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    deleted_by_name VARCHAR(100)
+);
+COMMENT ON TABLE device_goods_return_item IS '设备退货明细（供应商）';
+COMMENT ON COLUMN device_goods_return_item.id IS '主键';
+COMMENT ON COLUMN device_goods_return_item.return_id IS '所属退货单';
+COMMENT ON COLUMN device_goods_return_item.device_id IS '关联设备';
+COMMENT ON COLUMN device_goods_return_item.device_code IS '设备编码';
+COMMENT ON COLUMN device_goods_return_item.device_name IS '设备名称';
+COMMENT ON COLUMN device_goods_return_item.quantity IS '数量';

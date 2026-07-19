@@ -127,8 +127,12 @@ export function ensureExtraMenus(modules: NavModule[]): NavModule[] {
           i.title.includes('设备入库') ||
           i.title.includes('备货入库')
       )
+      const goodsReturnIdx = items.findIndex(
+        (i) => i.path === '/warehouse/goods-return' || i.title === '设备退货'
+      )
       const stockItem: NavMenuItem = { id: 'asset-stock-query', title: '库存查询', path: '/asset/stock' }
-      if (entryIdx >= 0) items.splice(entryIdx + 1, 0, stockItem)
+      if (goodsReturnIdx >= 0) items.splice(goodsReturnIdx + 1, 0, stockItem)
+      else if (entryIdx >= 0) items.splice(entryIdx + 1, 0, stockItem)
       else items.push(stockItem)
       groups[0] = { ...groups[0], items }
       result[whIdx] = { ...wh, groups }
