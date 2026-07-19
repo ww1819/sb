@@ -120,6 +120,7 @@
         :align="columnAlign(f.prop, f.type)"
         :width="f.width"
         :min-width="f.width ?? 120"
+        :fixed="f.fixed"
         show-overflow-tooltip
       >
         <template v-if="isSortable(f.prop)" #header>

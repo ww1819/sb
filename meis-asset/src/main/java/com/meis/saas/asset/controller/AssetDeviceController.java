@@ -40,10 +40,15 @@ public class AssetDeviceController {
             @RequestParam(value = "dept_name", required = false) String dept_name,
             @RequestParam(value = "manage_dept_name", required = false) String manage_dept_name,
             @RequestParam(value = "serial_number", required = false) String serial_number,
-            @RequestParam(value = "warehouse_id", required = false) String warehouse_id) {
+            @RequestParam(value = "warehouse_id", required = false) String warehouse_id,
+            @RequestParam(value = "stock_scope", required = false) String stock_scope) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d"));
         List<Object> args = new ArrayList<>();
+        // 库房库存查询：仅仓库在库 + 已出库（WH-UI-05）
+        if ("warehouse".equalsIgnoreCase(stock_scope)) {
+            where.append(" AND (d.warehouse_id IS NOT NULL OR d.device_status = 'in_use') ");
+        }
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
             String kw = "%" + query.getKeyword().trim() + "%";
             where.append("""
@@ -63,9 +68,10 @@ public class AssetDeviceController {
         appendUuidEq(where, args, "d.warehouse_id", warehouse_id);
         boolean needSupplier = hasText(supplier_name);
         boolean needManufacturer = hasText(manufacturer_name) && !hasText(manufacturer_id);
-        // 列表须带出科室名称；按科室名排序/筛选也依赖 join
+        // 列表须带出科室/仓库名称；按科室名排序/筛选也依赖 join
         boolean needUseDept = true;
         boolean needManageDept = true;
+        boolean needWarehouse = true;
         if (hasText(supplier_name)) {
             appendSupplierSearch(where, args, supplier_name);
         }
@@ -90,7 +96,7 @@ public class AssetDeviceController {
             where.append(" AND d.enable_date <= ?::date ");
             args.add(enable_dateTo.trim());
         }
-        String from = buildFrom(needSupplier, needManufacturer, needUseDept, needManageDept);
+        String from = buildFrom(needSupplier, needManufacturer, needUseDept, needManageDept, needWarehouse);
         long total = Optional.ofNullable(jdbc.queryForObject(
                 "SELECT COUNT(*) " + from + where, Long.class, args.toArray())).orElse(0L);
         int offset = (query.getPage() - 1) * query.getSize();
@@ -99,7 +105,8 @@ public class AssetDeviceController {
         var rows = jdbc.queryForList("""
                 SELECT d.*,
                        use_dept.dept_name AS dept_name,
-                       mgr_dept.dept_name AS manage_dept_name
+                       mgr_dept.dept_name AS manage_dept_name,
+                       wh.warehouse_name AS warehouse_name
                 """ + from + where + buildOrderBy(query) + " LIMIT ? OFFSET ?", args.toArray());
         MedicalDeviceDeleteGuard.enrichCanDelete(jdbc, rows);
         return Result.ok(new PageResult<>(rows, total, query.getPage(), query.getSize()));
@@ -142,7 +149,7 @@ public class AssetDeviceController {
     }
 
     private String buildFrom(boolean needSupplier, boolean needManufacturer,
-                             boolean needUseDept, boolean needManageDept) {
+                             boolean needUseDept, boolean needManageDept, boolean needWarehouse) {
         StringBuilder from = new StringBuilder(" FROM medical_device d ");
         if (needSupplier) {
             from.append(" LEFT JOIN supplier sup ON d.supplier_id = sup.id ")
@@ -159,6 +166,10 @@ public class AssetDeviceController {
         if (needManageDept) {
             from.append(" LEFT JOIN department mgr_dept ON d.manage_dept_id = mgr_dept.id ")
                     .append(SoftDeleteSupport.notDeletedClause(jdbc, "department", "mgr_dept"));
+        }
+        if (needWarehouse) {
+            from.append(" LEFT JOIN warehouse wh ON d.warehouse_id = wh.id ")
+                    .append(SoftDeleteSupport.notDeletedClause(jdbc, "warehouse", "wh"));
         }
         return from.toString();
     }

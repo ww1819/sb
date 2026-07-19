@@ -14,7 +14,7 @@ export const refSelectConfig: Record<string, RefSelectMeta> = {
   campus: { url: '/system/campuses', labelKey: 'campus_name', codeKey: 'campus_code' },
   building: { url: '/system/building/list', labelKey: 'building_name', codeKey: 'building_code' },
   sys_user: { url: '/system/users', labelKey: 'real_name', codeKey: 'username' },
-  supplier: { url: '/system/supplier/list', labelKey: 'supplier_name', codeKey: 'supplier_code', lookupUrl: '/system/supplier/lookup' },
+  supplier: { url: '/system/supplier/list', labelKey: 'supplier_name', codeKey: 'supplier_code', lookupUrl: '/system/supplier/lookup', showCode: false },
   manufacturer: { url: '/system/manufacturer/list', labelKey: 'manufacturer_name', codeKey: 'manufacturer_code', lookupUrl: '/system/manufacturer/lookup' },
   medical_device_category: {
     url: '/system/medical_device_category/list',
@@ -50,7 +50,7 @@ export const refSelectConfig: Record<string, RefSelectMeta> = {
   engineer: { url: '/repair/engineer/options', labelKey: 'real_name', codeKey: 'employee_no' },
   fault_type_dict: { url: '/repair/fault_type_dict/list', labelKey: 'fault_name' },
   spare_part: { url: '/repair/spare_part/list', labelKey: 'part_name', codeKey: 'part_code' },
-  warehouse: { url: '/system/warehouses', labelKey: 'warehouse_name' },
+  warehouse: { url: '/system/warehouse/list', labelKey: 'warehouse_name', codeKey: 'warehouse_code', showCode: false },
   maintenance_template: { url: '/maintain/maintenance_template/list', labelKey: 'template_name' },
   maintenance_level: { url: '/maintain/maintenance_level/list', labelKey: 'level_name' },
   inspection_template: { url: '/inspect/inspection_template/list', labelKey: 'template_name' },

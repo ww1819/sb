@@ -131,13 +131,17 @@ public class DeviceGoodsReturnController {
         for (Map<String, Object> item : items) {
             jdbc.update("""
                 INSERT INTO device_goods_return_item (
-                    id, return_id, device_id, device_code, device_name, quantity,
+                    id, return_id, device_id, device_code, device_name, specification, unit,
+                    quantity, unit_price, total_price, manufacturer_id, serial_number,
                     created_at, updated_at, created_by, created_by_name, updated_by, updated_by_name, is_deleted
-                ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW(), ?, ?, ?, ?, 0)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?, ?, ?, ?, 0)
                 """,
                     UUID.randomUUID(), id, parseUuid(item.get("device_id")),
                     blankToNull(item.get("device_code")), blankToNull(item.get("device_name")),
+                    blankToNull(item.get("specification")), blankToNull(item.get("unit")),
                     item.getOrDefault("quantity", 1),
+                    item.get("unit_price"), item.get("total_price"),
+                    parseUuid(item.get("manufacturer_id")), blankToNull(item.get("serial_number")),
                     actorId, actorName, actorId, actorName);
         }
         return get(id);

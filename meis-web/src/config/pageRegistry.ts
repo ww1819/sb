@@ -360,7 +360,25 @@ export const pageRegistry: Record<string, PageConfig> = {
     foreignKey: 'entry_id',
     listPageUrl: '/asset/entry/page',
     saveUrl: '/asset/entry',
-    listFilters: [{ key: 'status', label: '状态', dictType: 'entry_status' }]
+    formDrawerSize: 'xl',
+    formGroupColumns: { basic: 6 },
+    showRowIndex: true,
+    showRowSelection: true,
+    columns: [
+      'entry_no',
+      'warehouse_name',
+      'entry_date',
+      'entry_type',
+      'contract_code',
+      'supplier_name',
+      'created_by_name',
+      'created_at',
+      'total_amount',
+      'approval_status',
+      'approved_by_name',
+      'approved_at'
+    ],
+    listFilters: [{ key: 'approval_status', label: '状态', dictType: 'acceptance_review_status' }]
   },
   '/asset/stock': {
     title: '库存查询',
@@ -370,6 +388,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     showRowIndex: true,
     showRowSelection: true,
     sortableColumns: ['device_code', 'device_name', 'specification', 'dept_name'],
+    listParams: { stock_scope: 'warehouse' },
     listFilters: [
       { key: 'warehouse_id', label: '仓库', linkTable: 'warehouse', prepend: true },
       { key: 'enable_dateFrom', label: '起', type: 'date', actionBar: true },
@@ -423,7 +442,25 @@ export const pageRegistry: Record<string, PageConfig> = {
     foreignKey: 'entry_id',
     listPageUrl: '/asset/entry/page',
     saveUrl: '/asset/entry',
-    listFilters: [{ key: 'status', label: '状态', dictType: 'entry_status' }]
+    formDrawerSize: 'xl',
+    formGroupColumns: { basic: 6 },
+    showRowIndex: true,
+    showRowSelection: true,
+    columns: [
+      'entry_no',
+      'warehouse_name',
+      'entry_date',
+      'entry_type',
+      'contract_code',
+      'supplier_name',
+      'created_by_name',
+      'created_at',
+      'total_amount',
+      'approval_status',
+      'approved_by_name',
+      'approved_at'
+    ],
+    listFilters: [{ key: 'approval_status', label: '状态', dictType: 'acceptance_review_status' }]
   },
   '/warehouse/outbound': {
     title: '设备出库',
@@ -456,6 +493,8 @@ export const pageRegistry: Record<string, PageConfig> = {
     foreignKey: 'return_id',
     listPageUrl: '/asset/goods-return/page',
     saveUrl: '/asset/goods-return',
+    formDrawerSize: 'xl',
+    formGroupColumns: { basic: 6 },
     listFilters: [{ key: 'doc_status', label: '审批状态', dictType: 'approval_status' }]
   },
   '/warehouse/transfer': { title: '库房调拨', apiBase: '/asset', table: 'asset_transfer', saveUrl: '/asset/transfer' },

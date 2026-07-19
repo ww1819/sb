@@ -12,14 +12,14 @@
   >
     <el-option v-for="o in options" :key="o.value" :label="o.label" :value="o.value" />
   </el-select>
-  <RefSelect
-    v-else-if="filter.linkTable"
-    :model-value="modelValue"
-    :link-table="filter.linkTable"
-    :placeholder="filter.label"
-    class="filter-item filter-ref"
-    @update:model-value="onChange"
-  />
+  <div v-else-if="filter.linkTable" class="filter-item filter-ref">
+    <RefSelect
+      :model-value="modelValue"
+      :link-table="filter.linkTable"
+      :placeholder="filter.label"
+      @update:model-value="onChange"
+    />
+  </div>
   <el-date-picker
     v-else-if="filter.type === 'date'"
     :model-value="modelValue"

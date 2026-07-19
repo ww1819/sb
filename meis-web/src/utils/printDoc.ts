@@ -206,3 +206,255 @@ export function printAcceptanceDoc(acc: Record<string, unknown>) {
     signatures: ['质控签字', '工程签字', '临床签字', '设备科签字']
   })
 }
+
+/** 金额转中文大写（财务习惯，精确到分） */
+export function amountToChineseYuan(amount: number): string {
+  if (!Number.isFinite(amount)) return ''
+  const neg = amount < 0
+  const n = Math.round(Math.abs(amount) * 100)
+  if (n === 0) return '零元整'
+  const digits = ['零', '壹', '贰', '叁', '肆', '伍', '陆', '柒', '捌', '玖']
+  const intUnits = ['', '拾', '佰', '仟']
+  const secUnits = ['', '万', '亿']
+  const yuan = Math.floor(n / 100)
+  const jiao = Math.floor((n % 100) / 10)
+  const fen = n % 10
+  let intStr = ''
+  if (yuan > 0) {
+    const s = String(yuan)
+    const sections: string[] = []
+    let secIdx = 0
+    for (let end = s.length; end > 0; end -= 4, secIdx++) {
+      const start = Math.max(0, end - 4)
+      const part = s.slice(start, end)
+      let partStr = ''
+      let zero = false
+      for (let i = 0; i < part.length; i++) {
+        const d = Number(part[i])
+        const u = intUnits[part.length - 1 - i]
+        if (d === 0) {
+          zero = true
+        } else {
+          if (zero) partStr += '零'
+          zero = false
+          partStr += digits[d] + u
+        }
+      }
+      if (partStr) sections.unshift(partStr + secUnits[secIdx])
+      else if (secIdx > 0 && sections.length) {
+        // skip empty section
+      }
+    }
+    intStr = sections.join('').replace(/零+/g, '零').replace(/零$/, '') + '元'
+  }
+  let decStr = ''
+  if (jiao === 0 && fen === 0) decStr = '整'
+  else {
+    if (jiao > 0) decStr += digits[jiao] + '角'
+    else if (fen > 0 && yuan > 0) decStr += '零'
+    if (fen > 0) decStr += digits[fen] + '分'
+  }
+  return (neg ? '负' : '') + (intStr || '零元') + decStr
+}
+
+function fmtMoney(v: unknown, digits = 2): string {
+  if (v == null || v === '') return ''
+  const n = Number(v)
+  return Number.isFinite(n) ? n.toFixed(digits) : String(v)
+}
+
+function fmtDate(v: unknown): string {
+  if (v == null || v === '') return ''
+  const s = String(v)
+  return s.length >= 10 ? s.slice(0, 10) : s
+}
+
+export interface EntryPrintRow {
+  name: string
+  spec: string
+  batch: string
+  qty: string
+  price: string
+  amount: string
+}
+
+export interface EntryPrintModel {
+  hospital: string
+  warehouse: string
+  docNo: string
+  approvedAt: string
+  operator: string
+  approver: string
+  printDate: string
+  chineseTotal: string
+  qtySum: string
+  amountSum: string
+  rows: EntryPrintRow[]
+}
+
+/** 组装设备入库单打印数据（供弹窗预览 / 打印） */
+export function buildEntryPrintModel(
+  entry: Record<string, unknown>,
+  hospitalName?: string
+): EntryPrintModel {
+  const hospital = hospitalName || DEFAULT_HOSPITAL
+  const items = (entry.items as Record<string, unknown>[]) ?? []
+  const today = new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')
+  let qtySum = 0
+  let amtSum = 0
+  const rows: EntryPrintRow[] = items.map((i) => {
+    const qty = Number(i.quantity ?? 0)
+    const price = Number(i.unit_price ?? 0)
+    let amt = Number(i.total_price)
+    if (!Number.isFinite(amt)) amt = Number.isFinite(qty) && Number.isFinite(price) ? qty * price : 0
+    if (Number.isFinite(qty)) qtySum += qty
+    if (Number.isFinite(amt)) amtSum += amt
+    return {
+      name: String(i.device_name ?? ''),
+      spec: String(i.specification ?? i.model ?? ''),
+      batch: String(i.serial_number ?? ''),
+      qty: Number.isFinite(qty) ? String(qty) : '',
+      price: fmtMoney(price, 2),
+      amount: fmtMoney(amt, 2)
+    }
+  })
+  if (!rows.length && entry.total_amount != null) {
+    amtSum = Number(entry.total_amount) || 0
+  }
+  return {
+    hospital,
+    warehouse: String(entry.warehouse_name ?? ''),
+    docNo: String(entry.entry_no ?? ''),
+    approvedAt: fmtDate(entry.approved_at ?? entry.entry_date),
+    operator: String(entry.created_by_name ?? entry.operator_name ?? ''),
+    approver: String(entry.approved_by_name ?? ''),
+    printDate: today,
+    chineseTotal: amountToChineseYuan(Math.round(amtSum * 100) / 100),
+    qtySum: qtySum ? String(qtySum) : '',
+    amountSum: fmtMoney(amtSum, 2),
+    rows
+  }
+}
+
+/** 当前页内 iframe 打印，不新开浏览器标签 */
+export function printHtmlInPage(html: string) {
+  const iframe = document.createElement('iframe')
+  iframe.setAttribute('aria-hidden', 'true')
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none'
+  document.body.appendChild(iframe)
+  const doc = iframe.contentDocument || iframe.contentWindow?.document
+  if (!doc) {
+    document.body.removeChild(iframe)
+    return false
+  }
+  doc.open()
+  doc.write(html)
+  doc.close()
+  const win = iframe.contentWindow
+  if (!win) {
+    document.body.removeChild(iframe)
+    return false
+  }
+  const cleanup = () => {
+    setTimeout(() => {
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe)
+    }, 800)
+  }
+  win.focus()
+  setTimeout(() => {
+    try {
+      win.print()
+    } finally {
+      cleanup()
+    }
+  }, 80)
+  return true
+}
+
+/**
+ * 设备入库单打印（版式对齐科室退库单：标题 / 元信息 / 明细表 / 合计 / 签栏）
+ * @deprecated 列表请用弹窗预览；保留供需要直接出纸的场景
+ */
+export function printEntryDoc(entry: Record<string, unknown>, hospitalName?: string) {
+  const model = buildEntryPrintModel(entry, hospitalName)
+  return printHtmlInPage(renderEntryPrintHtml(model))
+}
+
+export function renderEntryPrintHtml(model: EntryPrintModel) {
+  const rowsHtml = model.rows
+    .map(
+      (r) => `<tr>
+      <td class="left">${esc(r.name)}</td>
+      <td class="left">${esc(r.spec)}</td>
+      <td>${esc(r.batch)}</td>
+      <td class="num">${esc(r.qty)}</td>
+      <td class="num">${esc(r.price)}</td>
+      <td class="num">${esc(r.amount)}</td>
+    </tr>`
+    )
+    .join('')
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>设备入库单</title>
+<style>
+@page{size:A4;margin:14mm 12mm}
+*{box-sizing:border-box}
+body{font-family:"SimSun","宋体",serif;font-size:13px;color:#000;margin:0;padding:0}
+.sheet{width:100%}
+.title{text-align:center;font-size:22px;font-weight:bold;letter-spacing:3px;margin:0 0 14px}
+.meta-row{display:flex;justify-content:space-between;gap:12px;margin:4px 0 10px;font-size:13px}
+.meta-row .cell{flex:1}
+.meta-row .cell.center{text-align:center}
+.meta-row .cell.right{text-align:right}
+table.grid{width:100%;border-collapse:collapse;table-layout:fixed}
+table.grid th,table.grid td{border:1px solid #000;padding:6px 5px;vertical-align:middle}
+table.grid th{font-weight:bold;text-align:center;background:#fff}
+table.grid td{text-align:center}
+table.grid td.left{text-align:left}
+table.grid td.num{text-align:right}
+table.grid .total-label{text-align:left;font-weight:bold}
+.footer{display:flex;justify-content:space-between;margin-top:28px;font-size:13px;padding:0 4px}
+.footer .cell{flex:1}
+.footer .cell.center{text-align:center}
+.footer .cell.right{text-align:right}
+</style></head><body>
+<div class="sheet">
+  <div class="title">${esc(model.hospital)}设备入库单</div>
+  <div class="meta-row">
+    <div class="cell">仓库：${esc(model.warehouse || '-')}</div>
+    <div class="cell center"></div>
+    <div class="cell right">单据号：${esc(model.docNo || '-')}</div>
+  </div>
+  <div class="meta-row">
+    <div class="cell">审核时间：${esc(model.approvedAt || '-')}</div>
+    <div class="cell"></div>
+    <div class="cell"></div>
+  </div>
+  <table class="grid">
+    <thead>
+      <tr>
+        <th style="width:22%">设备名称</th>
+        <th style="width:18%">规格型号</th>
+        <th style="width:16%">批次(序列号)</th>
+        <th style="width:10%">数量</th>
+        <th style="width:16%">单价</th>
+        <th style="width:18%">金额</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml || `<tr><td colspan="6" style="height:36px"></td></tr>`}
+      <tr>
+        <td class="total-label" colspan="3">合计：${esc(model.chineseTotal)}</td>
+        <td class="num">${esc(model.qtySum)}</td>
+        <td></td>
+        <td class="num">${esc(model.amountSum)}</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="footer">
+    <div class="cell">入库经办人：${esc(model.operator)}</div>
+    <div class="cell center">审核人：${esc(model.approver)}</div>
+    <div class="cell right">打印日期：${esc(model.printDate)}</div>
+  </div>
+</div>
+</body></html>`
+}

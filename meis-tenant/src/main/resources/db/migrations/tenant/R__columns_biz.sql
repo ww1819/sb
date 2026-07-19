@@ -582,7 +582,13 @@ CREATE TABLE IF NOT EXISTS device_goods_return_item (
     device_id UUID,
     device_code VARCHAR(50),
     device_name VARCHAR(200),
+    specification VARCHAR(200),
+    unit VARCHAR(50),
     quantity INTEGER DEFAULT 1,
+    unit_price DECIMAL(15,2),
+    total_price DECIMAL(15,2),
+    manufacturer_id UUID,
+    serial_number VARCHAR(100),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by UUID,
@@ -598,7 +604,13 @@ ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS return_id UUID;
 ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS device_id UUID;
 ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS device_code VARCHAR(50);
 ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS specification VARCHAR(200);
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS unit VARCHAR(50);
 ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS quantity INTEGER DEFAULT 1;
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS unit_price DECIMAL(15,2);
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS total_price DECIMAL(15,2);
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS manufacturer_id UUID;
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS serial_number VARCHAR(100);
 ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS created_by UUID;
@@ -609,3 +621,35 @@ ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS is_deleted SMALLIN
 ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
 ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(100);
 ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS deleted_by_name VARCHAR(100);
+
+-- ---------- device_entry 发票字段（WH-UI-02） ----------
+ALTER TABLE device_entry ADD COLUMN IF NOT EXISTS invoice_amount DECIMAL(15,2);
+ALTER TABLE device_entry ADD COLUMN IF NOT EXISTS invoice_no VARCHAR(50);
+ALTER TABLE device_entry ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20);
+ALTER TABLE device_entry ADD COLUMN IF NOT EXISTS approved_by UUID;
+ALTER TABLE device_entry ADD COLUMN IF NOT EXISTS approved_by_name VARCHAR(100);
+ALTER TABLE device_entry ADD COLUMN IF NOT EXISTS approved_at DATE;
+UPDATE device_entry SET approval_status = 'approved'
+WHERE status = 'completed' AND COALESCE(approval_status, '') IS DISTINCT FROM 'approved';
+UPDATE device_entry SET approval_status = 'draft'
+WHERE approval_status IS NULL;
+
+-- ---------- device_entry_item 入库明细扩展（WH-UI-02） ----------
+ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS specification VARCHAR(200);
+ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS unit VARCHAR(50);
+ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS dept_id UUID;
+ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS manufacturer_id UUID;
+ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS manufacturer_name VARCHAR(200);
+ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS factory_code VARCHAR(100);
+ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS financial_code VARCHAR(50);
+ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS depreciation_years INTEGER;
+ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS production_date DATE;
+ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS warranty_period VARCHAR(100);
+ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS purchase_method VARCHAR(50);
+ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS storage_location VARCHAR(200);
+ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS category_id UUID;
+ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS finance_category_id UUID;
+ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS asset_category_id UUID;
+-- 兼容旧数据：型号回填规格型号
+UPDATE device_entry_item SET specification = model
+WHERE (specification IS NULL OR specification = '') AND model IS NOT NULL AND model <> '';

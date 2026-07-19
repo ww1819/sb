@@ -72,13 +72,16 @@ async function load() {
   loading.value = true
   try {
     const { data } = await http.get(meta.url, { params: { limit: 500 } })
-    const rows = data.data?.records ?? data.data ?? []
+    const raw = data.data?.records ?? data.data ?? []
+    const rows = Array.isArray(raw) ? raw : []
     const vk = props.valueKey || meta.valueKey || 'id'
     const hideCode = props.hideCode || meta.showCode === false
-    allOptions.value = rows.map((r: Record<string, unknown>) => ({
-      label: refRowLabel(r, meta, hideCode),
-      value: String(r[vk] ?? '')
-    }))
+    allOptions.value = rows
+      .filter((r: Record<string, unknown>) => r && r[vk] != null && String(r[vk]) !== '')
+      .map((r: Record<string, unknown>) => ({
+        label: refRowLabel(r, meta, hideCode),
+        value: String(r[vk])
+      }))
     loaded.value = true
   } finally {
     loading.value = false

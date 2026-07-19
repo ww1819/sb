@@ -12,10 +12,16 @@
       <template #actions-after>
         <el-button v-if="showApproval" type="primary" @click="submitApproval">提交</el-button>
         <el-button v-if="showApproval" @click="withdrawApproval">撤回审批</el-button>
-        <slot name="actions-after" :master="master" :reload="reloadMaster" :selected-id="selectedId" />
+        <slot
+          name="actions-after"
+          :master="master"
+          :reload="reloadList"
+          :selected-id="selectedId"
+          :get-selected-rows="getSelectedRows"
+        />
       </template>
       <template #toolbar-extra>
-        <slot name="toolbar-extra" :master="master" :reload="reloadMaster" />
+        <slot name="toolbar-extra" :master="master" :reload="reloadList" :get-selected-rows="getSelectedRows" />
       </template>
       <template v-if="showApproval" #row-actions-before="{ row }">
         <el-button
@@ -26,6 +32,9 @@
         >
           进度
         </el-button>
+      </template>
+      <template v-if="$slots['row-actions']" #row-actions="{ row }">
+        <slot name="row-actions" :row="row" />
       </template>
     </CrudPage>
 
@@ -38,6 +47,15 @@
     />
 
     <AppModal v-model="detailVisible" :title="config.title + ' 编辑'" size="xl">
+      <template #header-actions>
+        <slot
+          name="detail-header-actions"
+          :master="master"
+          :items="items"
+          :replace-items="replaceItems"
+          :visible="detailVisible"
+        />
+      </template>
       <template v-if="master">
         <GroupedFormFields
           :table="config.table"
@@ -63,7 +81,7 @@
               </template>
               <template #default="{ row }">
                 <FieldRenderer
-                  v-if="f.linkTable || f.dictType || f.type === 'boolean'"
+                  v-if="f.linkTable || f.dictType || f.type === 'boolean' || f.type === 'date' || f.type === 'datetime' || f.type === 'file'"
                   v-model="row[f.prop]"
                   :field="f"
                   @update:model-value="() => onDetailFieldChange(row, f.prop)"
@@ -78,7 +96,7 @@
                   style="width:100%"
                   @change="() => onDetailFieldChange(row, f.prop)"
                 />
-                <el-input v-else v-model="row[f.prop]" />
+                <el-input v-else v-model="row[f.prop]" :disabled="f.readonly" />
               </template>
             </el-table-column>
           </template>
@@ -158,6 +176,8 @@ function approvalStatusOf(row: Record<string, unknown> | null | undefined) {
 }
 
 function canEditRow(row: Record<string, unknown>) {
+  const st = String(row.status ?? '')
+  if (st === 'completed' || st === 'issued' || st === 'returned') return false
   const s = approvalStatusOf(row)
   return s === 'draft' || s === 'rejected'
 }
@@ -218,7 +238,7 @@ function numberMin(f: FieldSchema): number {
 
 function recalcLineAmount(row: Record<string, unknown>) {
   const qty = toNumber(row.quantity)
-  const price = toNumber(row.estimated_price)
+  const price = toNumber(row.unit_price ?? row.estimated_price)
   if (qty == null || price == null) {
     row.total_price = null
     return
@@ -241,7 +261,7 @@ function syncTotalBudget() {
 }
 
 function onDetailFieldChange(row: Record<string, unknown>, prop: string) {
-  if (prop === 'quantity' || prop === 'estimated_price') {
+  if (prop === 'quantity' || prop === 'estimated_price' || prop === 'unit_price') {
     recalcLineAmount(row)
     syncTotalBudget()
   }
@@ -338,6 +358,43 @@ async function openCreate() {
       // 编号接口失败时仍可打开表单，保存时后端会兜底生成
     }
   }
+  if (props.config.table === 'device_entry') {
+    defaults.entry_date = todayStr()
+    defaults.entry_type = 'purchase'
+    defaults.status = 'draft'
+    defaults.approval_status = 'draft'
+    try {
+      const { data } = await http.get(`${props.saveUrl}/next-no`)
+      if (data.data?.entry_no) defaults.entry_no = data.data.entry_no
+    } catch {
+      // 编号接口失败时仍可打开表单，保存时后端会兜底生成
+    }
+    try {
+      const { data } = await http.get('/system/warehouse/list', { params: { limit: 50 } })
+      const rows = (data.data?.records ?? data.data ?? []) as Record<string, unknown>[]
+      const first = rows.find((r) => r.is_active !== false && r.id != null)
+      if (first?.id != null) defaults.warehouse_id = String(first.id)
+    } catch {
+      // 仓库列表失败时仍可打开表单，保存时必填校验会提示
+    }
+  }
+  if (props.config.table === 'device_goods_return') {
+    defaults.return_date = todayStr()
+    defaults.created_at = todayStr()
+    defaults.status = 'draft'
+    defaults.doc_status = 'draft'
+    defaults.approval_status = 'draft'
+    if (auth.user?.realName) defaults.created_by_name = auth.user.realName
+    else if (auth.user?.username) defaults.created_by_name = auth.user.username
+    try {
+      const { data } = await http.get('/system/warehouse/list', { params: { limit: 50 } })
+      const rows = (data.data?.records ?? data.data ?? []) as Record<string, unknown>[]
+      const first = rows.find((r) => r.is_active !== false && r.id != null)
+      if (first?.id != null) defaults.warehouse_id = String(first.id)
+    } catch {
+      // 仓库列表失败时仍可打开表单
+    }
+  }
   master.value = defaults
   items.value = []
   syncTotalBudget()
@@ -346,6 +403,14 @@ async function openCreate() {
 
 function addItem() {
   items.value.push(defaultItem())
+  syncTotalBudget()
+}
+
+function replaceItems(rows: Record<string, unknown>[]) {
+  items.value = rows.map((row) => {
+    const base = defaultItem()
+    return { ...base, ...row }
+  })
   syncTotalBudget()
 }
 
@@ -377,6 +442,13 @@ async function saveMaster() {
     ElMessage.warning(`请填写：${missing.map((f) => f.label).join('、')}`)
     return
   }
+  if (props.config.table === 'device_entry') {
+    const wh = master.value.warehouse_id
+    if (wh == null || String(wh).trim() === '') {
+      ElMessage.warning('请选择仓库')
+      return
+    }
+  }
   const payloadItems = items.value.filter((it) => {
     const name = it.device_name
     return name != null && String(name).trim() !== ''
@@ -392,23 +464,27 @@ async function saveMaster() {
   }
   for (const row of payloadItems) recalcLineAmount(row)
   syncTotalBudget()
-  const planYear = master.value.plan_year
-  const yearNum =
-    typeof planYear === 'number'
-      ? planYear
-      : planYear != null && String(planYear).trim() !== ''
-        ? Number(planYear)
-        : undefined
-  if (yearNum == null || Number.isNaN(yearNum)) {
-    ElMessage.warning('请填写计划年度')
-    return
+  const payload: Record<string, unknown> = {
+    ...master.value,
+    items: payloadItems
+  }
+  // 计划年度仅采购计划需要；勿套用到入库/出库等其它主从单据
+  if (props.config.table === 'purchase_plan') {
+    const planYear = master.value.plan_year
+    const yearNum =
+      typeof planYear === 'number'
+        ? planYear
+        : planYear != null && String(planYear).trim() !== ''
+          ? Number(planYear)
+          : undefined
+    if (yearNum == null || Number.isNaN(yearNum)) {
+      ElMessage.warning('请填写计划年度')
+      return
+    }
+    payload.plan_year = yearNum
   }
   try {
-    await http.post(props.saveUrl, {
-      ...master.value,
-      plan_year: yearNum,
-      items: payloadItems
-    })
+    await http.post(props.saveUrl, payload)
     ElMessage.success('保存成功')
     detailVisible.value = false
     crudRef.value?.load()
@@ -491,7 +567,16 @@ async function reloadMaster() {
   await loadApprovalState()
 }
 
-defineExpose({ selectedId, resolveTargetRow })
+function getSelectedRows(): Record<string, unknown>[] {
+  return crudRef.value?.getSelectedRows?.() ?? []
+}
+
+function reloadList() {
+  crudRef.value?.load()
+  void reloadMaster()
+}
+
+defineExpose({ selectedId, resolveTargetRow, getSelectedRows })
 </script>
 
 <style scoped>

@@ -41,6 +41,8 @@ export interface FieldSchema {
   width?: number
   span?: number
   placeholder?: string
+  /** 列表列固定：left / right */
+  fixed?: 'left' | 'right'
   /** 是否出现在表单，默认 true；false 仅列表等展示 */
   form?: boolean
   /** textarea 行数，默认 3 */

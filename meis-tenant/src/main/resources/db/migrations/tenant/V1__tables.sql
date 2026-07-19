@@ -1050,7 +1050,13 @@ CREATE TABLE device_entry (
     plan_id UUID REFERENCES purchase_plan(id),
     trace_no VARCHAR(60),
     business_chain_no VARCHAR(40),
-    warehouse_id UUID REFERENCES warehouse(id)
+    warehouse_id UUID REFERENCES warehouse(id),
+    invoice_amount DECIMAL(15,2),
+    invoice_no VARCHAR(50),
+    approval_status VARCHAR(20) DEFAULT 'draft',
+    approved_by UUID REFERENCES sys_user(id),
+    approved_by_name VARCHAR(100),
+    approved_at DATE
 );
 COMMENT ON TABLE device_entry IS '设备入库记录表';
 COMMENT ON COLUMN device_entry.id IS '主键';
@@ -1077,6 +1083,13 @@ COMMENT ON COLUMN device_entry.project_id IS '采购项目';
 COMMENT ON COLUMN device_entry.plan_id IS '采购计划';
 COMMENT ON COLUMN device_entry.trace_no IS '入库追溯编号';
 COMMENT ON COLUMN device_entry.business_chain_no IS '采购业务链编号（计划→入库追溯）';
+COMMENT ON COLUMN device_entry.warehouse_id IS '仓库';
+COMMENT ON COLUMN device_entry.invoice_amount IS '发票金额';
+COMMENT ON COLUMN device_entry.invoice_no IS '发票号';
+COMMENT ON COLUMN device_entry.approval_status IS '审核状态';
+COMMENT ON COLUMN device_entry.approved_by IS '审核人';
+COMMENT ON COLUMN device_entry.approved_by_name IS '审核人姓名';
+COMMENT ON COLUMN device_entry.approved_at IS '审核日期';
 
 -- 4.4 设备入库明细表
 CREATE TABLE device_entry_item (
@@ -1086,10 +1099,25 @@ CREATE TABLE device_entry_item (
     device_name VARCHAR(200) NOT NULL,
     brand VARCHAR(100),
     model VARCHAR(100),
+    specification VARCHAR(200),
+    unit VARCHAR(50),
     serial_number VARCHAR(100),
     quantity INTEGER DEFAULT 1,
     unit_price DECIMAL(15,2),
     total_price DECIMAL(15,2),
+    dept_id UUID REFERENCES department(id),
+    manufacturer_id UUID REFERENCES manufacturer(id),
+    manufacturer_name VARCHAR(200),
+    factory_code VARCHAR(100),
+    financial_code VARCHAR(50),
+    depreciation_years INTEGER,
+    production_date DATE,
+    warranty_period VARCHAR(100),
+    purchase_method VARCHAR(50),
+    storage_location VARCHAR(200),
+    category_id UUID REFERENCES medical_device_category(id),
+    finance_category_id UUID REFERENCES finance_category(id),
+    asset_category_id UUID REFERENCES asset_category(id),
     is_accepted BOOLEAN DEFAULT FALSE,
     accepted_device_id UUID,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -1101,10 +1129,25 @@ COMMENT ON COLUMN device_entry_item.device_id IS '关联设备';
 COMMENT ON COLUMN device_entry_item.device_name IS '设备名称';
 COMMENT ON COLUMN device_entry_item.brand IS '品牌';
 COMMENT ON COLUMN device_entry_item.model IS '型号';
-COMMENT ON COLUMN device_entry_item.serial_number IS '出厂序列号';
+COMMENT ON COLUMN device_entry_item.specification IS '规格型号';
+COMMENT ON COLUMN device_entry_item.unit IS '单位';
+COMMENT ON COLUMN device_entry_item.serial_number IS '批次(序列号)';
 COMMENT ON COLUMN device_entry_item.quantity IS '数量';
-COMMENT ON COLUMN device_entry_item.unit_price IS 'unit price';
+COMMENT ON COLUMN device_entry_item.unit_price IS '单价';
 COMMENT ON COLUMN device_entry_item.total_price IS '合计金额';
+COMMENT ON COLUMN device_entry_item.dept_id IS '申请科室';
+COMMENT ON COLUMN device_entry_item.manufacturer_id IS '生产厂家';
+COMMENT ON COLUMN device_entry_item.manufacturer_name IS '生产厂家名称';
+COMMENT ON COLUMN device_entry_item.factory_code IS '出厂编码';
+COMMENT ON COLUMN device_entry_item.financial_code IS '财务编码';
+COMMENT ON COLUMN device_entry_item.depreciation_years IS '折旧年限';
+COMMENT ON COLUMN device_entry_item.production_date IS '出厂日期';
+COMMENT ON COLUMN device_entry_item.warranty_period IS '保修期限';
+COMMENT ON COLUMN device_entry_item.purchase_method IS '采购方式';
+COMMENT ON COLUMN device_entry_item.storage_location IS '存放地点';
+COMMENT ON COLUMN device_entry_item.category_id IS '设备分类';
+COMMENT ON COLUMN device_entry_item.finance_category_id IS '财务分类';
+COMMENT ON COLUMN device_entry_item.asset_category_id IS '资产分类';
 COMMENT ON COLUMN device_entry_item.is_accepted IS '是否accepted';
 COMMENT ON COLUMN device_entry_item.accepted_device_id IS '关联accepteddevice';
 COMMENT ON COLUMN device_entry_item.created_at IS '创建时间';
@@ -4025,7 +4068,13 @@ CREATE TABLE IF NOT EXISTS device_goods_return_item (
     device_id UUID REFERENCES medical_device(id),
     device_code VARCHAR(50),
     device_name VARCHAR(200),
+    specification VARCHAR(200),
+    unit VARCHAR(50),
     quantity INTEGER DEFAULT 1,
+    unit_price DECIMAL(15,2),
+    total_price DECIMAL(15,2),
+    manufacturer_id UUID REFERENCES manufacturer(id),
+    serial_number VARCHAR(100),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by UUID,
@@ -4043,4 +4092,10 @@ COMMENT ON COLUMN device_goods_return_item.return_id IS '所属退货单';
 COMMENT ON COLUMN device_goods_return_item.device_id IS '关联设备';
 COMMENT ON COLUMN device_goods_return_item.device_code IS '设备编码';
 COMMENT ON COLUMN device_goods_return_item.device_name IS '设备名称';
+COMMENT ON COLUMN device_goods_return_item.specification IS '规格型号';
+COMMENT ON COLUMN device_goods_return_item.unit IS '单位';
 COMMENT ON COLUMN device_goods_return_item.quantity IS '数量';
+COMMENT ON COLUMN device_goods_return_item.unit_price IS '单价';
+COMMENT ON COLUMN device_goods_return_item.total_price IS '金额';
+COMMENT ON COLUMN device_goods_return_item.manufacturer_id IS '生产厂家';
+COMMENT ON COLUMN device_goods_return_item.serial_number IS '序列号(SN)';
