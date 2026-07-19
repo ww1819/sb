@@ -68,10 +68,11 @@ public class AssetDeviceController {
         appendUuidEq(where, args, "d.warehouse_id", warehouse_id);
         boolean needSupplier = hasText(supplier_name);
         boolean needManufacturer = hasText(manufacturer_name) && !hasText(manufacturer_id);
-        // 列表须带出科室/仓库名称；按科室名排序/筛选也依赖 join
+        // 列表须带出科室/仓库/分类名称
         boolean needUseDept = true;
         boolean needManageDept = true;
         boolean needWarehouse = true;
+        boolean needCategory = true;
         if (hasText(supplier_name)) {
             appendSupplierSearch(where, args, supplier_name);
         }
@@ -96,7 +97,7 @@ public class AssetDeviceController {
             where.append(" AND d.enable_date <= ?::date ");
             args.add(enable_dateTo.trim());
         }
-        String from = buildFrom(needSupplier, needManufacturer, needUseDept, needManageDept, needWarehouse);
+        String from = buildFrom(needSupplier, needManufacturer, needUseDept, needManageDept, needWarehouse, needCategory);
         long total = Optional.ofNullable(jdbc.queryForObject(
                 "SELECT COUNT(*) " + from + where, Long.class, args.toArray())).orElse(0L);
         int offset = (query.getPage() - 1) * query.getSize();
@@ -106,7 +107,11 @@ public class AssetDeviceController {
                 SELECT d.*,
                        use_dept.dept_name AS dept_name,
                        mgr_dept.dept_name AS manage_dept_name,
-                       wh.warehouse_name AS warehouse_name
+                       wh.warehouse_name AS warehouse_name,
+                       mdc.category_name AS category_name,
+                       ac.category_name AS asset_category_name,
+                       fc.finance_name AS finance_category_name,
+                       u.unit_name AS unit_name
                 """ + from + where + buildOrderBy(query) + " LIMIT ? OFFSET ?", args.toArray());
         MedicalDeviceDeleteGuard.enrichCanDelete(jdbc, rows);
         return Result.ok(new PageResult<>(rows, total, query.getPage(), query.getSize()));
@@ -149,7 +154,8 @@ public class AssetDeviceController {
     }
 
     private String buildFrom(boolean needSupplier, boolean needManufacturer,
-                             boolean needUseDept, boolean needManageDept, boolean needWarehouse) {
+                             boolean needUseDept, boolean needManageDept, boolean needWarehouse,
+                             boolean needCategory) {
         StringBuilder from = new StringBuilder(" FROM medical_device d ");
         if (needSupplier) {
             from.append(" LEFT JOIN supplier sup ON d.supplier_id = sup.id ")
@@ -170,6 +176,16 @@ public class AssetDeviceController {
         if (needWarehouse) {
             from.append(" LEFT JOIN warehouse wh ON d.warehouse_id = wh.id ")
                     .append(SoftDeleteSupport.notDeletedClause(jdbc, "warehouse", "wh"));
+        }
+        if (needCategory) {
+            from.append(" LEFT JOIN medical_device_category mdc ON d.category_id = mdc.id ")
+                    .append(SoftDeleteSupport.notDeletedClause(jdbc, "medical_device_category", "mdc"));
+            from.append(" LEFT JOIN asset_category ac ON d.asset_category_id = ac.id ")
+                    .append(SoftDeleteSupport.notDeletedClause(jdbc, "asset_category", "ac"));
+            from.append(" LEFT JOIN finance_category fc ON d.finance_category_id = fc.id ")
+                    .append(SoftDeleteSupport.notDeletedClause(jdbc, "finance_category", "fc"));
+            from.append(" LEFT JOIN unit_dict u ON d.unit_id = u.id ")
+                    .append(SoftDeleteSupport.notDeletedClause(jdbc, "unit_dict", "u"));
         }
         return from.toString();
     }

@@ -80,8 +80,18 @@
                 <span :class="{ 'detail-col-required': f.required }">{{ f.label }}</span>
               </template>
               <template #default="{ row }">
+                <WarehouseStockDeviceSelect
+                  v-if="isGoodsReturnStockField(f.prop)"
+                  :model-value="String(row[f.prop] ?? '')"
+                  :warehouse-id="goodsReturnWarehouseId"
+                  :mode="f.prop === 'device_name' ? 'name' : 'code'"
+                  :exclude-ids="goodsReturnExcludeIds"
+                  @update:model-value="(v) => (row[f.prop] = v)"
+                  @select="(device) => applyGoodsReturnStock(row, device)"
+                  @clear="() => clearGoodsReturnStock(row)"
+                />
                 <FieldRenderer
-                  v-if="f.linkTable || f.dictType || f.type === 'boolean' || f.type === 'date' || f.type === 'datetime' || f.type === 'file'"
+                  v-else-if="f.linkTable || f.dictType || f.type === 'boolean' || f.type === 'date' || f.type === 'datetime' || f.type === 'file'"
                   v-model="row[f.prop]"
                   :field="f"
                   @update:model-value="() => onDetailFieldChange(row, f.prop)"
@@ -130,6 +140,7 @@ import MasterDetailForm from './MasterDetailForm.vue'
 import FieldRenderer from './FieldRenderer.vue'
 import AppModal from './AppModal.vue'
 import GroupedFormFields from './form/GroupedFormFields.vue'
+import WarehouseStockDeviceSelect from './form/WarehouseStockDeviceSelect.vue'
 import ApprovalProgressDrawer from './ApprovalProgressDrawer.vue'
 import type { PageConfig } from '@/config/pageRegistry'
 import { getDetailFields, getSchema } from '@/config/pageSchemas'
@@ -170,6 +181,68 @@ const extraFormFields = computed(() =>
 const canApprove = computed(
   () => !!selectedId.value && !!props.businessType && !!approvalInstanceId.value && master.value?.approval_status === 'pending'
 )
+
+const isGoodsReturn = computed(() => props.config.table === 'device_goods_return')
+const goodsReturnWarehouseId = computed(() => {
+  const v = master.value?.warehouse_id
+  return v != null && String(v).trim() !== '' ? String(v) : ''
+})
+const goodsReturnExcludeIds = computed(() =>
+  items.value.map((it) => String(it.device_id ?? '')).filter((id) => id && id !== 'undefined')
+)
+
+function isGoodsReturnStockField(prop: string) {
+  return isGoodsReturn.value && (prop === 'device_code' || prop === 'device_name')
+}
+
+function toPrice(v: unknown): number | null {
+  const n = toNumber(v)
+  return n
+}
+
+function applyGoodsReturnStock(row: Record<string, unknown>, device: Record<string, unknown>) {
+  row.device_id = device.id != null ? String(device.id) : null
+  row.device_code = device.device_code ?? ''
+  row.device_name = device.device_name ?? ''
+  row.specification = device.specification ?? device.model ?? ''
+  row.unit = device.unit_name ?? device.unit ?? ''
+  if (row.quantity == null || row.quantity === '' || Number(row.quantity) <= 0) {
+    row.quantity = 1
+  }
+  const price = toPrice(device.original_value) ?? toPrice(device.contract_price)
+  if (price != null) row.unit_price = price
+  row.manufacturer_id = device.manufacturer_id ?? null
+  row.serial_number = device.serial_number ?? ''
+  row.brand = device.brand ?? ''
+  row.category_id = device.category_id ?? null
+  row.category_name = device.category_name ?? ''
+  row.asset_category_id = device.asset_category_id ?? null
+  row.asset_category_name = device.asset_category_name ?? ''
+  row.finance_category_id = device.finance_category_id ?? null
+  row.finance_category_name = device.finance_category_name ?? ''
+  recalcLineAmount(row)
+  syncTotalBudget()
+}
+
+function clearGoodsReturnStock(row: Record<string, unknown>) {
+  row.device_id = null
+  row.device_code = ''
+  row.device_name = ''
+  row.specification = ''
+  row.unit = ''
+  row.unit_price = null
+  row.total_price = null
+  row.manufacturer_id = null
+  row.serial_number = ''
+  row.brand = ''
+  row.category_id = null
+  row.category_name = ''
+  row.asset_category_id = null
+  row.asset_category_name = ''
+  row.finance_category_id = null
+  row.finance_category_name = ''
+  syncTotalBudget()
+}
 
 function approvalStatusOf(row: Record<string, unknown> | null | undefined) {
   return String(row?.approval_status ?? 'draft')
@@ -402,6 +475,10 @@ async function openCreate() {
 }
 
 function addItem() {
+  if (isGoodsReturn.value && !goodsReturnWarehouseId.value) {
+    ElMessage.warning('请先选择仓库')
+    return
+  }
   items.value.push(defaultItem())
   syncTotalBudget()
 }
@@ -449,13 +526,27 @@ async function saveMaster() {
       return
     }
   }
+  if (isGoodsReturn.value) {
+    const wh = master.value.warehouse_id
+    if (wh == null || String(wh).trim() === '') {
+      ElMessage.warning('请选择仓库')
+      return
+    }
+  }
   const payloadItems = items.value.filter((it) => {
     const name = it.device_name
     return name != null && String(name).trim() !== ''
   })
   if (items.value.length > 0 && payloadItems.length === 0) {
-    ElMessage.warning('请填写明细设备名称，或删除空白明细行')
+    ElMessage.warning('请填写明细资产名称，或删除空白明细行')
     return
+  }
+  if (isGoodsReturn.value) {
+    const missingDevice = payloadItems.find((it) => !it.device_id)
+    if (missingDevice) {
+      ElMessage.warning('请从库存中选择资产（输入资产编码或名称后点选）')
+      return
+    }
   }
   const detailErr = validateDetailItems(payloadItems)
   if (detailErr) {

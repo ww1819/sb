@@ -521,16 +521,23 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'status', label: '退货状态', dictType: 'goods_return_status', list: true, form: false, width: 100 }
   ],
   device_goods_return_item: [
-    { prop: 'device_code', label: '设备编码', list: true, detail: true, width: 120 },
-    { prop: 'device_name', label: '设备名称', list: true, detail: true, width: 140 },
-    { prop: 'specification', label: '规格型号', detail: true, width: 120 },
-    { prop: 'unit', label: '单位', detail: true, width: 72 },
+    { prop: 'device_code', label: '资产编码', list: true, detail: true, width: 140 },
+    { prop: 'device_name', label: '资产名称', list: true, detail: true, width: 140 },
+    { prop: 'specification', label: '规格型号', detail: true, readonly: true, width: 120 },
+    { prop: 'unit', label: '单位', detail: true, readonly: true, width: 72 },
     { prop: 'quantity', label: '数量', type: 'number', detail: true, width: 80 },
     { prop: 'unit_price', label: '单价', type: 'number', detail: true, width: 100 },
     { prop: 'total_price', label: '金额', type: 'number', detail: true, readonly: true, width: 100 },
-    { prop: 'manufacturer_id', label: '生产厂家', linkTable: 'manufacturer', detail: true, width: 140 },
-    { prop: 'serial_number', label: '序列号(SN)', detail: true, width: 120 },
-    { prop: 'device_id', label: '设备', linkTable: 'medical_device', form: false }
+    { prop: 'manufacturer_id', label: '生产厂家', linkTable: 'manufacturer', detail: true, readonly: true, width: 140 },
+    { prop: 'serial_number', label: '序列号(SN)', detail: true, readonly: true, width: 120 },
+    { prop: 'brand', label: '品牌', detail: true, readonly: true, width: 100 },
+    { prop: 'category_name', label: '设备分类(68)', detail: true, readonly: true, width: 130 },
+    { prop: 'asset_category_name', label: '资产分类', detail: true, readonly: true, width: 120 },
+    { prop: 'finance_category_name', label: '财务分类', detail: true, readonly: true, width: 120 },
+    { prop: 'device_id', label: '设备', linkTable: 'medical_device', form: false },
+    { prop: 'category_id', label: '设备分类', linkTable: 'medical_device_category', form: false },
+    { prop: 'asset_category_id', label: '资产分类', linkTable: 'asset_category', form: false },
+    { prop: 'finance_category_id', label: '财务分类', linkTable: 'finance_category', form: false }
   ],
   adverse_event: [
     { prop: 'event_no', label: '事件编号', list: true, group: 'basic', readonly: true },
