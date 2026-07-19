@@ -204,7 +204,7 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('contract_status', 'completed', '已完成', 'completed', 2),
 ('contract_status', 'terminated', '已终止', 'terminated', 3),
 ('acceptance_status', 'pending', '待验收', 'pending', 1),
-('acceptance_status', 'passed', '验收通过', 'passed', 2),
+('acceptance_status', 'passed', '已经验收', 'passed', 2),
 ('acceptance_status', 'failed', '验收不通过', 'failed', 3),
 ('payment_stage', 'advance', '预付款', 'advance', 1),
 ('payment_stage', 'delivery', '到货款', 'delivery', 2),

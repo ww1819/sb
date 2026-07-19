@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.util.*;
 
-/** PUR-UI-14/15/16：招标管理（议价通过明细 + 供应商） */
+/** PUR-UI-14/15/16/21：招标管理（议价通过明细 + 供应商 + 招标审核） */
 @RestController
 @RequestMapping("/api/purchase/bidding")
 @RequiredArgsConstructor
@@ -25,8 +25,9 @@ public class PurchaseBiddingController {
     private final JdbcTemplate jdbc;
 
     @GetMapping("/page")
-    public Result<PageResult<Map<String, Object>>> page(PageQuery query) {
-        return Result.ok(PurchasePageQueries.bargainPassedPlanItemPage(jdbc, query));
+    public Result<PageResult<Map<String, Object>>> page(PageQuery query,
+            @RequestParam(required = false) String bidding_review_result) {
+        return Result.ok(PurchasePageQueries.bargainPassedPlanItemPage(jdbc, query, bidding_review_result));
     }
 
     /** PUR-UI-15/16：招标供应商明细 */
@@ -50,6 +51,7 @@ public class PurchaseBiddingController {
     public Result<List<Map<String, Object>>> saveSuppliers(@PathVariable UUID itemId,
             @RequestBody Map<String, Object> body) {
         assertBargainPassed(itemId);
+        assertNotBiddingReviewed(itemId);
         Object raw = body.get("items");
         if (raw == null) raw = body.get("suppliers");
         if (!(raw instanceof List<?> list)) {
@@ -131,6 +133,50 @@ public class PurchaseBiddingController {
         return listSuppliers(itemId);
     }
 
+    /** PUR-UI-21：招标审核 */
+    @PostMapping("/approved-items/{itemId}/bidding-review")
+    @Transactional
+    @OperationLog(module = "purchase", description = "招标审核")
+    public Result<Map<String, Object>> biddingReview(@PathVariable UUID itemId, @RequestBody Map<String, Object> body) {
+        assertBargainPassed(itemId);
+        assertNotBiddingReviewed(itemId);
+        assertReadyForBiddingReview(itemId);
+        String result = blankToNull(body.get("result"));
+        if (result == null || (!"passed".equals(result) && !"rejected".equals(result))) {
+            throw new BizException(400, "请选择招标通过或招标未通过");
+        }
+        String comment = blankToNull(body.get("comment"));
+        if (comment == null) {
+            throw new BizException(400, "请填写招标建议");
+        }
+        PermissionContext ctx = PermissionInterceptor.CTX.get();
+        UUID actorId = null;
+        String actorName = null;
+        if (ctx != null && ctx.getUserId() != null && !ctx.getUserId().isBlank()) {
+            actorId = UUID.fromString(ctx.getUserId());
+            actorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, actorId);
+        }
+        jdbc.update("""
+                UPDATE purchase_plan_item
+                SET bidding_review_result = ?,
+                    bidding_review_comment = ?,
+                    bidding_reviewed_at = NOW(),
+                    bidding_reviewed_by = ?::uuid,
+                    bidding_reviewed_by_name = ?,
+                    updated_at = NOW()
+                WHERE id = ?::uuid
+                """, result, comment, actorId, actorName, itemId);
+        var out = jdbc.queryForList("""
+                SELECT id, order_no, bidding_no, bidding_review_result, bidding_review_comment,
+                       bidding_reviewed_at, bidding_reviewed_by, bidding_reviewed_by_name
+                FROM purchase_plan_item WHERE id = ?::uuid
+                """, itemId);
+        Map<String, Object> row = out.isEmpty() ? new LinkedHashMap<>() : new LinkedHashMap<>(out.get(0));
+        row.put("bidding_status", "passed".equals(String.valueOf(row.get("bidding_review_result")))
+                ? "已招标" : "未招标");
+        return Result.ok(row);
+    }
+
     private void assertBargainPassed(UUID itemId) {
         var rows = jdbc.queryForList("""
                 SELECT i.id, i.bargain_review_result, p.approval_status
@@ -145,6 +191,33 @@ public class PurchaseBiddingController {
         }
         if (!"passed".equals(String.valueOf(rows.get(0).get("bargain_review_result")))) {
             throw new BizException(400, "仅议价审核通过的明细可维护招标供应商");
+        }
+    }
+
+    private void assertNotBiddingReviewed(UUID itemId) {
+        var rows = jdbc.queryForList("""
+                SELECT bidding_reviewed_at FROM purchase_plan_item WHERE id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan_item", null), itemId);
+        if (rows.isEmpty()) throw new BizException(404, "明细不存在");
+        if (rows.get(0).get("bidding_reviewed_at") != null) {
+            throw new BizException(400, "该明细已招标审核，不能重复审核或修改供应商");
+        }
+    }
+
+    private void assertReadyForBiddingReview(UUID itemId) {
+        var suppliers = jdbc.queryForList("""
+                SELECT id, is_winner FROM purchase_plan_item_bid_supplier
+                WHERE plan_item_id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan_item_bid_supplier", null), itemId);
+        if (suppliers.isEmpty()) {
+            throw new BizException(400, "请先维护招标供应商后再招标审核");
+        }
+        long winners = suppliers.stream().filter(r -> truthy(r.get("is_winner"))).count();
+        if (winners == 0) {
+            throw new BizException(400, "请先选定中标供应商后再招标审核");
+        }
+        if (winners > 1) {
+            throw new BizException(400, "同一明细只能选择一个中标供应商");
         }
     }
 

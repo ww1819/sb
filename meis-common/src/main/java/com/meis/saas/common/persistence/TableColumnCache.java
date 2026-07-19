@@ -20,25 +20,21 @@ public final class TableColumnCache {
             return cached;
         }
         Set<String> loaded = loadColumns(jdbc, table);
-        // 空结果不缓存：迁库后新建表/加列可被下次读到
-        if (!loaded.isEmpty()) {
-            CACHE.put(key, loaded);
-        }
-        return loaded;
+        Set<String> stored = loaded.isEmpty() ? Set.of() : Collections.unmodifiableSet(new HashSet<>(loaded));
+        CACHE.put(key, stored);
+        return stored;
     }
 
     public static boolean hasColumn(JdbcTemplate jdbc, String table, String column) {
-        if (columns(jdbc, table).contains(column)) {
-            return true;
-        }
-        // 缓存可能早于迁库加列：未命中时刷新一次
         String key = cacheKey(jdbc, table);
-        CACHE.remove(key);
-        Set<String> reloaded = loadColumns(jdbc, table);
-        if (!reloaded.isEmpty()) {
-            CACHE.put(key, reloaded);
+        Set<String> cached = CACHE.get(key);
+        if (cached != null) {
+            return cached.contains(column);
         }
-        return reloaded.contains(column);
+        Set<String> loaded = loadColumns(jdbc, table);
+        // 空表也缓存，避免缺列时每次 hasColumn 都反复打 information_schema
+        CACHE.put(key, loaded.isEmpty() ? Set.of() : Collections.unmodifiableSet(new HashSet<>(loaded)));
+        return CACHE.get(key).contains(column);
     }
 
     public static boolean hasTable(JdbcTemplate jdbc, String table) {

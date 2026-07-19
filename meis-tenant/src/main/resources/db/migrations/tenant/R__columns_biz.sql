@@ -377,6 +377,12 @@ ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_reviewed_by_name
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_at TIMESTAMPTZ;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_by UUID;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_by_name VARCHAR(100);
+-- ---------- purchase_plan_item（招标审核 PUR-UI-21） ----------
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bidding_review_result VARCHAR(20);
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bidding_review_comment VARCHAR(500);
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bidding_reviewed_at TIMESTAMPTZ;
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bidding_reviewed_by UUID;
+ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bidding_reviewed_by_name VARCHAR(100);
 
 -- ---------- purchase_plan_item_bid_supplier（招标供应商 PUR-UI-15） ----------
 CREATE TABLE IF NOT EXISTS purchase_plan_item_bid_supplier (
@@ -424,7 +430,7 @@ ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS is_winner B
 
 -- ---------- purchase_contract_item（合同设备明细 PUR-UI-17） ----------
 CREATE TABLE IF NOT EXISTS purchase_contract_item (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
     contract_id UUID NOT NULL REFERENCES purchase_contract(id),
     device_name VARCHAR(200) NOT NULL,
     specification VARCHAR(200),
@@ -462,3 +468,48 @@ ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS deleted_by_name VARC
 
 -- ---------- purchase_contract 资金来源（PUR-UI-19） ----------
 ALTER TABLE purchase_contract ADD COLUMN IF NOT EXISTS fund_source VARCHAR(30);
+-- ---------- contract_payment（付款计划 PUR-UI-23） ----------
+ALTER TABLE contract_payment ADD COLUMN IF NOT EXISTS payment_ratio DECIMAL(8,2);
+ALTER TABLE contract_payment ADD COLUMN IF NOT EXISTS payment_condition VARCHAR(500);
+
+-- ---------- purchase_acceptance_device（验收设备明细 PUR-UI-24） ----------
+CREATE TABLE IF NOT EXISTS purchase_acceptance_device (
+    id UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
+    acceptance_id UUID NOT NULL REFERENCES purchase_acceptance(id) ON DELETE CASCADE,
+    device_name VARCHAR(200) NOT NULL,
+    specification VARCHAR(200),
+    brand VARCHAR(100),
+    quantity DECIMAL(15,2),
+    unit_price DECIMAL(15,2),
+    amount DECIMAL(15,2),
+    manufacturer_id UUID REFERENCES manufacturer(id),
+    manufacturer_name VARCHAR(200),
+    sort_order INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by UUID,
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMPTZ,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100)
+);
+ALTER TABLE purchase_acceptance_device ADD COLUMN IF NOT EXISTS acceptance_id UUID;
+ALTER TABLE purchase_acceptance_device ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
+ALTER TABLE purchase_acceptance_device ADD COLUMN IF NOT EXISTS specification VARCHAR(200);
+ALTER TABLE purchase_acceptance_device ADD COLUMN IF NOT EXISTS brand VARCHAR(100);
+ALTER TABLE purchase_acceptance_device ADD COLUMN IF NOT EXISTS quantity DECIMAL(15,2);
+ALTER TABLE purchase_acceptance_device ADD COLUMN IF NOT EXISTS unit_price DECIMAL(15,2);
+ALTER TABLE purchase_acceptance_device ADD COLUMN IF NOT EXISTS amount DECIMAL(15,2);
+ALTER TABLE purchase_acceptance_device ADD COLUMN IF NOT EXISTS manufacturer_id UUID;
+ALTER TABLE purchase_acceptance_device ADD COLUMN IF NOT EXISTS manufacturer_name VARCHAR(200);
+ALTER TABLE purchase_acceptance_device ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+ALTER TABLE purchase_acceptance_device ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
+ALTER TABLE purchase_acceptance_device ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(100);
+ALTER TABLE purchase_acceptance_device ADD COLUMN IF NOT EXISTS deleted_by_name VARCHAR(100);
+
+-- ---------- purchase_acceptance_member（验收参数 PUR-UI-25） ----------
+ALTER TABLE purchase_acceptance_member ADD COLUMN IF NOT EXISTS acceptance_content VARCHAR(500);
+ALTER TABLE purchase_acceptance_member ADD COLUMN IF NOT EXISTS acceptance_result VARCHAR(100);

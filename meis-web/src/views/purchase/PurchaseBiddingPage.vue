@@ -49,15 +49,28 @@
             <TableCellValue :field="totalField" :value="row.total_price" />
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="90" fixed="right" align="center">
+        <el-table-column prop="bidding_status" label="招标状态" width="100" align="center">
+          <template #default="{ row }">
+            {{ biddingStatusText(row) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="160" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" @click="openBid(row)">招标</el-button>
+            <el-button
+              v-if="!isBiddingReviewed(row)"
+              link
+              type="primary"
+              @click="openBiddingReview(row)"
+            >
+              招标审核
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
     </SystemPageCard>
 
-    <AppModal v-model="bidVisible" title="招标" size="xl">
+    <AppModal v-model="bidVisible" :title="bidReadonly ? '招标（只读）' : '招标'" size="xl">
       <div class="bid-split">
         <div class="bid-left">
           <div class="bid-panel-title">产品明细</div>
@@ -83,7 +96,7 @@
         <div class="bid-right">
           <div class="bid-panel-head">
             <div class="bid-panel-title">供应商信息</div>
-            <el-button type="primary" link @click="addSupplierRow">新增行</el-button>
+            <el-button v-if="!bidReadonly" type="primary" link @click="addSupplierRow">新增行</el-button>
           </div>
           <div class="bid-panel-scroll">
             <el-table :data="supplierRows" border size="small" class="bid-supplier-table" style="width: 1380px">
@@ -92,6 +105,7 @@
                   <el-radio
                     :model-value="winnerKey"
                     :value="row._key"
+                    :disabled="bidReadonly"
                     @change="() => setWinner(row._key)"
                   />
                 </template>
@@ -103,6 +117,7 @@
                     v-model="row.supplier_id"
                     filterable
                     clearable
+                    :disabled="bidReadonly"
                     placeholder="请选择供应商"
                     style="width: 100%"
                     @change="(v) => onSupplierChange(row, v ? String(v) : null)"
@@ -124,33 +139,37 @@
               </el-table-column>
               <el-table-column label="品牌" width="110">
                 <template #default="{ row }">
-                  <el-input v-model="row.brand" placeholder="品牌" />
+                  <el-input v-model="row.brand" placeholder="品牌" :disabled="bidReadonly" />
                 </template>
               </el-table-column>
               <el-table-column label="规格型号" min-width="120">
                 <template #default="{ row }">
-                  <el-input v-model="row.specification" placeholder="规格型号" />
+                  <el-input v-model="row.specification" placeholder="规格型号" :disabled="bidReadonly" />
                 </template>
               </el-table-column>
               <el-table-column label="最终金额" width="120">
                 <template #default="{ row }">
-                  <el-input v-model="row.final_amount" placeholder="最终金额" />
+                  <el-input v-model="row.final_amount" placeholder="最终金额" :disabled="bidReadonly" />
                 </template>
               </el-table-column>
               <el-table-column label="质保期" width="100">
                 <template #default="{ row }">
-                  <el-input v-model="row.warranty_period" placeholder="质保期" />
+                  <el-input v-model="row.warranty_period" placeholder="质保期" :disabled="bidReadonly" />
                 </template>
               </el-table-column>
               <el-table-column label="优惠条款" min-width="140">
                 <template #default="{ row }">
-                  <el-input v-model="row.preferential_terms" placeholder="优惠条款" />
+                  <el-input v-model="row.preferential_terms" placeholder="优惠条款" :disabled="bidReadonly" />
                 </template>
               </el-table-column>
               <el-table-column label="投标信息" width="140" align="center">
                 <template #default="{ row }">
                   <div class="bid-file-cell">
-                    <el-upload :show-file-list="false" :http-request="(opt) => onBidUpload(row, opt)">
+                    <el-upload
+                      v-if="!bidReadonly"
+                      :show-file-list="false"
+                      :http-request="(opt) => onBidUpload(row, opt)"
+                    >
                       <el-button link type="primary" :loading="row._uploading">上传</el-button>
                     </el-upload>
                     <el-button
@@ -165,7 +184,7 @@
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="70" align="center" fixed="right">
+              <el-table-column v-if="!bidReadonly" label="操作" width="70" align="center" fixed="right">
                 <template #default="{ row, $index }">
                   <el-button link type="danger" @click="removeSupplierRow(row, $index)">删除</el-button>
                 </template>
@@ -175,8 +194,40 @@
         </div>
       </div>
       <template #footer>
-        <el-button @click="bidVisible = false">取消</el-button>
-        <el-button type="primary" :loading="bidSubmitting" @click="submitBid">确认</el-button>
+        <el-button @click="bidVisible = false">{{ bidReadonly ? '关闭' : '取消' }}</el-button>
+        <el-button v-if="!bidReadonly" type="primary" :loading="bidSubmitting" @click="submitBid">
+          确认
+        </el-button>
+      </template>
+    </AppModal>
+
+    <AppModal v-model="biddingReviewVisible" title="招标审核" size="sm">
+      <el-form label-width="110px">
+        <el-form-item label="单号">
+          <span>{{ biddingReviewRow?.bidding_no || '-' }}</span>
+        </el-form-item>
+        <el-form-item label="审核结果" required>
+          <el-radio-group v-model="biddingReviewResult" @change="onBiddingReviewResultChange">
+            <el-radio value="passed">招标通过</el-radio>
+            <el-radio value="rejected">招标未通过</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="招标建议" required>
+          <el-input
+            v-model="biddingReviewComment"
+            type="textarea"
+            :rows="4"
+            maxlength="500"
+            show-word-limit
+            placeholder="请填写招标建议"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="biddingReviewVisible = false">取消</el-button>
+        <el-button type="primary" :loading="biddingReviewSubmitting" @click="submitBiddingReview">
+          确认
+        </el-button>
       </template>
     </AppModal>
   </div>
@@ -240,10 +291,29 @@ const supplierRows = ref<SupplierRow[]>([])
 const supplierOptions = ref<SupplierOption[]>([])
 const winnerKey = ref('')
 
+const biddingReviewVisible = ref(false)
+const biddingReviewSubmitting = ref(false)
+const biddingReviewRow = ref<Record<string, unknown> | null>(null)
+const biddingReviewResult = ref<'passed' | 'rejected'>('passed')
+const biddingReviewComment = ref('招标通过')
+
 const qtyField: FieldSchema = { prop: 'quantity', label: '数量', type: 'number' }
 const totalField: FieldSchema = { prop: 'total_price', label: '总金额', type: 'number' }
 
 const bidLeftRows = computed(() => (bidRow.value ? [bidRow.value] : []))
+const bidReadonly = computed(() => isBiddingReviewed(bidRow.value))
+
+function isBiddingReviewed(row: Record<string, unknown> | null | undefined) {
+  if (!row) return false
+  return row.bidding_reviewed_at != null && String(row.bidding_reviewed_at).trim() !== ''
+}
+
+function biddingStatusText(row: Record<string, unknown>) {
+  if (row.bidding_status != null && String(row.bidding_status).trim() !== '') {
+    return String(row.bidding_status)
+  }
+  return row.bidding_review_result === 'passed' ? '已招标' : '未招标'
+}
 
 let supplierKeySeq = 0
 function nextSupplierKey() {
@@ -269,6 +339,7 @@ function emptySupplier(): SupplierRow {
 }
 
 function setWinner(key: string) {
+  if (bidReadonly.value) return
   winnerKey.value = key
   for (const r of supplierRows.value) {
     r.is_winner = r._key === key
@@ -431,10 +502,12 @@ async function openBid(row: Record<string, unknown>) {
 }
 
 function addSupplierRow() {
+  if (bidReadonly.value) return
   supplierRows.value.push(emptySupplier())
 }
 
 function removeSupplierRow(row: SupplierRow, index: number) {
+  if (bidReadonly.value) return
   supplierRows.value.splice(index, 1)
   if (winnerKey.value === row._key) winnerKey.value = ''
   if (!supplierRows.value.length) {
@@ -445,6 +518,10 @@ function removeSupplierRow(row: SupplierRow, index: number) {
 async function submitBid() {
   const row = bidRow.value
   if (!row?.id) return
+  if (isBiddingReviewed(row)) {
+    ElMessage.warning('该明细已招标审核，不能修改供应商')
+    return
+  }
   const items = supplierRows.value
     .map((r) => ({
       supplier_id: r.supplier_id || null,
@@ -480,11 +557,77 @@ async function submitBid() {
     await http.put(`/purchase/bidding/approved-items/${row.id}/suppliers`, { items })
     ElMessage.success('招标供应商已保存')
     bidVisible.value = false
+    load()
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }
     ElMessage.error(err?.response?.data?.message || '保存失败')
   } finally {
     bidSubmitting.value = false
+  }
+}
+
+function onBiddingReviewResultChange(result: 'passed' | 'rejected') {
+  const defaults = { passed: '招标通过', rejected: '招标未通过' }
+  const cur = biddingReviewComment.value.trim()
+  if (!cur || cur === defaults.passed || cur === defaults.rejected) {
+    biddingReviewComment.value = result === 'rejected' ? defaults.rejected : defaults.passed
+  }
+}
+
+async function openBiddingReview(row: Record<string, unknown>) {
+  if (!row.id) return
+  if (isBiddingReviewed(row)) {
+    ElMessage.warning('该明细已招标审核，不能重复审核')
+    return
+  }
+  try {
+    const { data } = await http.get(`/purchase/bidding/approved-items/${row.id}/suppliers`)
+    const list = (data.data ?? []) as Record<string, unknown>[]
+    if (!list.length) {
+      ElMessage.warning('请先维护招标供应商后再招标审核')
+      return
+    }
+    const winners = list.filter(
+      (r) => r.is_winner === true || r.is_winner === 'true' || r.is_winner === 1
+    )
+    if (!winners.length) {
+      ElMessage.warning('请先选定中标供应商后再招标审核')
+      return
+    }
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    ElMessage.error(err?.response?.data?.message || '校验招标供应商失败')
+    return
+  }
+  biddingReviewRow.value = row
+  biddingReviewResult.value = 'passed'
+  biddingReviewComment.value = '招标通过'
+  biddingReviewVisible.value = true
+}
+
+async function submitBiddingReview() {
+  const row = biddingReviewRow.value
+  if (!row?.id) return
+  if (!biddingReviewComment.value.trim()) {
+    ElMessage.warning('请填写招标建议')
+    return
+  }
+  biddingReviewSubmitting.value = true
+  try {
+    const { data } = await http.post(`/purchase/bidding/approved-items/${row.id}/bidding-review`, {
+      result: biddingReviewResult.value,
+      comment: biddingReviewComment.value.trim()
+    })
+    const saved = data.data ?? {}
+    Object.assign(row, saved)
+    ElMessage.success('招标审核已保存')
+    biddingReviewVisible.value = false
+    load()
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    ElMessage.error(err?.response?.data?.message || '招标审核失败')
+  } finally {
+    biddingReviewSubmitting.value = false
   }
 }
 
@@ -507,7 +650,17 @@ async function exportCsv() {
       })
       list = (data.data?.records ?? []) as Record<string, unknown>[]
     }
-    const headers = ['单号', '设备名称', '申请科室', '订单号', '计划单号', '规格型号', '数量', '总金额']
+    const headers = [
+      '单号',
+      '设备名称',
+      '申请科室',
+      '订单号',
+      '计划单号',
+      '规格型号',
+      '数量',
+      '总金额',
+      '招标状态'
+    ]
     const lines = [headers.join(',')]
     for (const r of list) {
       const cells = [
@@ -518,7 +671,8 @@ async function exportCsv() {
         r.plan_code,
         r.specification,
         r.quantity,
-        r.total_price
+        r.total_price,
+        biddingStatusText(r)
       ].map((v) => {
         const s = v == null ? '' : String(v).replace(/"/g, '""')
         return `"${s}"`

@@ -102,7 +102,70 @@
               </el-table-column>
             </el-table>
           </div>
+          <div class="contract-items">
+            <div class="contract-items__head">
+              <span class="contract-items__title">付款计划</span>
+              <el-button v-if="mode !== 'view'" type="primary" link @click="addPaymentRow(form)">
+                新增行
+              </el-button>
+            </div>
+            <el-table :data="ensurePayments(form)" border size="small">
+              <el-table-column type="index" label="序号" width="56" align="center" />
+              <el-table-column label="付款日期" width="160">
+                <template #default="{ row }">
+                  <el-date-picker
+                    v-model="row.payment_date"
+                    type="date"
+                    value-format="YYYY-MM-DD"
+                    placeholder="付款日期"
+                    style="width: 100%"
+                    :disabled="mode === 'view'"
+                  />
+                </template>
+              </el-table-column>
+              <el-table-column label="支付比例(%)" width="130">
+                <template #default="{ row }">
+                  <el-input
+                    v-model="row.payment_ratio"
+                    placeholder="比例"
+                    :disabled="mode === 'view'"
+                  />
+                </template>
+              </el-table-column>
+              <el-table-column label="付款条件" min-width="180">
+                <template #default="{ row }">
+                  <el-input
+                    v-model="row.payment_condition"
+                    placeholder="付款条件"
+                    :disabled="mode === 'view'"
+                  />
+                </template>
+              </el-table-column>
+              <el-table-column label="付款状态" width="140">
+                <template #default="{ row }">
+                  <FieldRenderer
+                    v-model="row.status"
+                    :field="{
+                      prop: 'status',
+                      label: '付款状态',
+                      dictType: 'payment_status',
+                      readonly: mode === 'view'
+                    }"
+                    :model="row"
+                  />
+                </template>
+              </el-table-column>
+              <el-table-column v-if="mode !== 'view'" label="操作" width="70" align="center" fixed="right">
+                <template #default="{ $index }">
+                  <el-button link type="danger" @click="removePaymentRow(form, $index)">删除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
         </el-form>
+      </template>
+      <template #toolbar-after-add>
+        <el-button type="primary" @click="reviewSelected">审核</el-button>
       </template>
       <template #toolbar-extra>
         <el-button v-if="contract?.id" type="warning" @click="save">保存合同</el-button>
@@ -122,6 +185,8 @@
         @selection-change="onBiddingSelectionChange"
       >
         <el-table-column type="selection" width="48" align="center" />
+        <el-table-column type="index" label="序号" width="64" align="center" />
+        <el-table-column prop="bidding_no" label="单号" min-width="150" show-overflow-tooltip />
         <el-table-column prop="device_name" label="设备名称" min-width="140" show-overflow-tooltip />
         <el-table-column prop="specification" label="设备规格型号" min-width="140" show-overflow-tooltip />
         <el-table-column prop="quantity" label="数量" width="90" align="right" />
@@ -227,7 +292,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 import CrudPage from '@/components/CrudPage.vue'
@@ -249,6 +314,17 @@ type ItemRow = {
   amount: string | number
   manufacturer_id: string
   manufacturer_name: string
+}
+
+type PaymentRow = {
+  id?: string
+  payment_no?: string
+  payment_date: string
+  payment_ratio: string | number
+  payment_condition: string
+  payment_amount?: string | number
+  status: string
+  approval_status?: string
 }
 
 const ATTACH_PROPS = ['registration_cert_url', 'contract_file_url', 'acceptance_report_url'] as const
@@ -285,7 +361,7 @@ async function openBiddingRef(form: Record<string, unknown>) {
   biddingLoading.value = true
   try {
     const { data } = await http.get('/purchase/bidding/page', {
-      params: { page: 1, size: 500 }
+      params: { page: 1, size: 500, bidding_review_result: 'passed' }
     })
     biddingRows.value = data.data?.records ?? []
   } catch {
@@ -346,11 +422,28 @@ function emptyItem(): ItemRow {
   }
 }
 
+function emptyPayment(): PaymentRow {
+  return {
+    payment_date: '',
+    payment_ratio: '',
+    payment_condition: '',
+    status: 'pending',
+    approval_status: 'draft'
+  }
+}
+
 function ensureItems(form: Record<string, unknown>) {
   if (!Array.isArray(form.items)) {
     form.items = [emptyItem()]
   }
   return form.items as ItemRow[]
+}
+
+function ensurePayments(form: Record<string, unknown>) {
+  if (!Array.isArray(form.payments)) {
+    form.payments = [emptyPayment()]
+  }
+  return form.payments as PaymentRow[]
 }
 
 function addItem(form: Record<string, unknown>) {
@@ -361,6 +454,16 @@ function removeItem(form: Record<string, unknown>, index: number) {
   const list = ensureItems(form)
   list.splice(index, 1)
   if (!list.length) list.push(emptyItem())
+}
+
+function addPaymentRow(form: Record<string, unknown>) {
+  ensurePayments(form).push(emptyPayment())
+}
+
+function removePaymentRow(form: Record<string, unknown>, index: number) {
+  const list = ensurePayments(form)
+  list.splice(index, 1)
+  if (!list.length) list.push(emptyPayment())
 }
 
 function recalcAmount(row: ItemRow) {
@@ -406,6 +509,49 @@ async function openDetail(row: Record<string, unknown>) {
 
 function onSaved() {
   // list reloads inside CrudPage
+}
+
+function isContractApproved(row: Record<string, unknown>) {
+  return String(row.approval_status ?? '') === 'approved'
+}
+
+async function reviewSelected() {
+  const selected = crudRef.value?.getSelectedRows?.() ?? []
+  if (!selected.length) {
+    ElMessage.warning('请先勾选要审核的合同')
+    return
+  }
+  const pending = selected.filter((r) => !isContractApproved(r))
+  if (!pending.length) {
+    ElMessage.warning('勾选的合同均已审批，无需重复审核')
+    return
+  }
+  if (pending.length < selected.length) {
+    ElMessage.info(`已跳过 ${selected.length - pending.length} 条已审批合同`)
+  }
+  try {
+    await ElMessageBox.confirm(`确认审核通过选中的 ${pending.length} 份合同？`, '合同审核', {
+      type: 'warning',
+      confirmButtonText: '确认审核'
+    })
+  } catch {
+    return
+  }
+  try {
+    const { data } = await http.post('/purchase/contract/review', {
+      ids: pending.map((r) => r.id)
+    })
+    if (data?.code != null && data.code !== 0) {
+      ElMessage.error(data.message || '审核失败')
+      return
+    }
+    const approved = data?.data?.approved ?? pending.length
+    ElMessage.success(`已审核 ${approved} 条`)
+    crudRef.value?.load()
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } }; message?: string }
+    ElMessage.error(err?.response?.data?.message || err?.message || '审核失败')
+  }
 }
 
 function addPayment() {

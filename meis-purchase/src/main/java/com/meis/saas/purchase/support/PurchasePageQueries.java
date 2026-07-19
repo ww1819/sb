@@ -169,9 +169,16 @@ public final class PurchasePageQueries {
     }
 
     /**
-     * 招标管理：仅议价审核通过（passed）的已审批计划明细（PUR-UI-14/20）。
+     * 招标管理：仅议价审核通过（passed）的已审批计划明细（PUR-UI-14/20/21/22）。
+     *
+     * @param biddingReviewResult 可选；传入 {@code passed} 时仅返回招标审核通过明细（引用招标计划）
      */
     public static PageResult<Map<String, Object>> bargainPassedPlanItemPage(JdbcTemplate jdbc, PageQuery q) {
+        return bargainPassedPlanItemPage(jdbc, q, null);
+    }
+
+    public static PageResult<Map<String, Object>> bargainPassedPlanItemPage(JdbcTemplate jdbc, PageQuery q,
+            String biddingReviewResult) {
         // 历史议价通过明细补齐招标单号（PUR-UI-20）
         List<Integer> missing = jdbc.query("""
                 SELECT 1
@@ -189,9 +196,13 @@ public final class PurchasePageQueries {
         }
         StringBuilder where = new StringBuilder(" WHERE p.approval_status = 'approved' ");
         where.append(" AND i.bargain_review_result = 'passed' ");
+        List<Object> args = new ArrayList<>();
+        if (biddingReviewResult != null && !biddingReviewResult.isBlank()) {
+            where.append(" AND i.bidding_review_result = ? ");
+            args.add(biddingReviewResult.trim());
+        }
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", "p"));
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan_item", "i"));
-        List<Object> args = new ArrayList<>();
         appendKeyword(where, args, q.getKeyword(),
                 "i.bidding_no", "i.order_no", "p.plan_code", "i.device_name", "d.dept_name", "i.specification");
         PurchaseDataScope.applyPlanFilter(where, args, jdbc);
@@ -205,6 +216,7 @@ public final class PurchasePageQueries {
                 """
                 i.id, i.plan_id, i.device_name, i.specification, i.estimated_price, i.quantity, i.total_price,
                 i.order_no, i.bidding_no, i.bargain_review_result, i.bargain_reviewed_at,
+                i.bidding_review_result, i.bidding_review_comment, i.bidding_reviewed_at, i.bidding_reviewed_by_name,
                 p.plan_code, p.created_at, p.fill_date,
                 d.dept_name
                 """);
@@ -217,6 +229,8 @@ public final class PurchasePageQueries {
                     row.put("total_price", qn.doubleValue() * pn.doubleValue());
                 }
             }
+            row.put("bidding_status", "passed".equals(String.valueOf(row.get("bidding_review_result")))
+                    ? "已招标" : "未招标");
         }
         return result;
     }
@@ -228,8 +242,12 @@ public final class PurchasePageQueries {
         List<Object> args = new ArrayList<>();
         appendKeyword(where, args, q.getKeyword(), "c.contract_code", "c.contract_name", "pj.project_name", "s.supplier_name");
         if (approvalStatus != null && !approvalStatus.isBlank()) {
-            where.append(" AND c.approval_status = ? ");
-            args.add(approvalStatus);
+            if ("unapproved".equalsIgnoreCase(approvalStatus.trim())) {
+                where.append(" AND (c.approval_status IS NULL OR c.approval_status <> 'approved') ");
+            } else {
+                where.append(" AND c.approval_status = ? ");
+                args.add(approvalStatus.trim());
+            }
         }
         if (acceptanceStatus != null && !acceptanceStatus.isBlank()) {
             where.append(" AND c.acceptance_status = ? ");
@@ -243,8 +261,56 @@ public final class PurchasePageQueries {
             """ + SoftDeleteSupport.notDeletedClause(jdbc, "supplier", "s") + """
             LEFT JOIN purchase_acceptance pa ON pa.contract_id = c.id
             """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_acceptance", "pa");
-        return page(jdbc, from, where, args, q, "c.created_at DESC NULLS LAST",
+        PageResult<Map<String, Object>> result = page(jdbc, from, where, args, q, "c.created_at DESC NULLS LAST",
                 "c.*, pj.project_name, s.supplier_name, pa.acceptance_no, pa.acceptance_status AS acc_status, pa.entry_id");
+        for (Map<String, Object> row : result.getRecords()) {
+            Object st = row.get("approval_status");
+            if (st == null || st.toString().isBlank()) {
+                row.put("approval_status", "draft");
+            }
+        }
+        return result;
+    }
+
+    /** 已审批合同设备明细（验收引入合同） */
+    public static PageResult<Map<String, Object>> contractRefItemPage(JdbcTemplate jdbc, PageQuery q) {
+        StringBuilder where = new StringBuilder(" WHERE c.approval_status = 'approved' ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "purchase_contract", "c"));
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "purchase_contract_item", "ci"));
+        List<Object> args = new ArrayList<>();
+        appendKeyword(where, args, q.getKeyword(),
+                "c.contract_code", "c.contract_name", "ci.device_name", "ci.specification");
+        String from = """
+            FROM purchase_contract_item ci
+            JOIN purchase_contract c ON c.id = ci.contract_id
+            """;
+        PageResult<Map<String, Object>> result = page(jdbc, from, where, args, q,
+                "c.created_at DESC NULLS LAST, ci.sort_order ASC NULLS LAST, ci.created_at ASC NULLS LAST",
+                """
+                ci.id, ci.contract_id, c.contract_code, c.contract_name, c.supplier_id,
+                ci.device_name, ci.specification, ci.brand, ci.quantity, ci.unit_price, ci.amount,
+                ci.manufacturer_id, ci.manufacturer_name, ci.sort_order
+                """);
+        for (Map<String, Object> row : result.getRecords()) {
+            if (row.get("amount") == null) {
+                Double qn = toDouble(row.get("quantity"));
+                Double pn = toDouble(row.get("unit_price"));
+                if (qn != null && pn != null) {
+                    row.put("amount", Math.round(qn * pn * 100.0) / 100.0);
+                }
+            }
+        }
+        return result;
+    }
+
+    private static Double toDouble(Object v) {
+        if (v == null) return null;
+        if (v instanceof Number n) return n.doubleValue();
+        try {
+            return Double.parseDouble(v.toString().trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     public static PageResult<Map<String, Object>> acceptancePage(JdbcTemplate jdbc, PageQuery q,

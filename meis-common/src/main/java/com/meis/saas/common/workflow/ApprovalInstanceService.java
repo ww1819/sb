@@ -190,6 +190,21 @@ public class ApprovalInstanceService {
         updateBusinessStatus(businessType, businessId, status, null);
     }
 
+    /** 业务侧快捷审核：直接置为已审批并触发通过后副作用（如合同生成验收单） */
+    @Transactional
+    public void forceApprove(String businessType, UUID businessId) {
+        updateBusinessStatus(businessType, businessId, "approved", null);
+    }
+
+    /** 合同已审批后确保生成验收单（幂等；失败不影响已审批落库） */
+    public void ensurePurchaseAcceptance(UUID contractId) {
+        try {
+            createPurchaseAcceptance(contractId);
+        } catch (Exception ignored) {
+            // 验收单创建失败不回滚合同已审批状态
+        }
+    }
+
     private void updateBusinessStatus(String businessType, UUID businessId, String status, UUID actorId) {
         switch (businessType) {
             case "purchase_plan" -> {
@@ -206,7 +221,7 @@ public class ApprovalInstanceService {
                 }
             }
             case "purchase_contract" -> {
-                jdbc.update("UPDATE purchase_contract SET approval_status = ? WHERE id = ?::uuid", status, businessId);
+                jdbc.update("UPDATE purchase_contract SET approval_status = ?, updated_at = NOW() WHERE id = ?", status, businessId);
                 if ("approved".equals(status)) createPurchaseAcceptance(businessId);
             }
             case "purchase_project" -> jdbc.update("UPDATE purchase_project SET approval_status = ? WHERE id = ?::uuid", status, businessId);
@@ -352,20 +367,59 @@ public class ApprovalInstanceService {
 
     private void createPurchaseAcceptance(UUID contractId) {
         var existing = jdbc.queryForList(
-                "SELECT id FROM purchase_acceptance WHERE contract_id = ?::uuid LIMIT 1", contractId);
+                "SELECT id FROM purchase_acceptance WHERE contract_id = ? LIMIT 1", contractId);
         if (!existing.isEmpty()) return;
-        var contracts = jdbc.queryForList("SELECT * FROM purchase_contract WHERE id = ?::uuid", contractId);
+        var contracts = jdbc.queryForList("SELECT * FROM purchase_contract WHERE id = ?", contractId);
         if (contracts.isEmpty()) return;
         Map<String, Object> contract = contracts.get(0);
         UUID id = UUID.randomUUID();
         Object chainNo = contract.get("business_chain_no");
+        UUID projectId = toUuidOrNull(contract.get("project_id"));
+        UUID supplierId = toUuidOrNull(contract.get("supplier_id"));
         jdbc.update("""
             INSERT INTO purchase_acceptance (id, acceptance_no, contract_id, project_id, supplier_id, acceptance_status, business_chain_no)
-            VALUES (?::uuid, ?, ?::uuid, ?::uuid, ?::uuid, 'pending', ?)
+            VALUES (?, ?, ?, ?, ?, 'pending', ?)
             """,
-                id, "AC" + System.currentTimeMillis(), contractId,
-                contract.get("project_id"), contract.get("supplier_id"), chainNo);
-        jdbc.update("UPDATE purchase_contract SET acceptance_status = 'pending', updated_at = NOW() WHERE id = ?::uuid", contractId);
+                id, "AC" + System.currentTimeMillis(), contractId, projectId, supplierId, chainNo);
+        jdbc.update("UPDATE purchase_contract SET acceptance_status = 'pending', updated_at = NOW() WHERE id = ?", contractId);
+        // 尽量回写合同设备明细到验收设备明细（表可能尚未迁库时静默跳过）
+        try {
+            var items = jdbc.queryForList("""
+                    SELECT device_name, specification, brand, quantity, unit_price, amount,
+                           manufacturer_id, manufacturer_name, sort_order
+                    FROM purchase_contract_item
+                    WHERE contract_id = ? AND COALESCE(is_deleted, 0) = 0
+                    ORDER BY sort_order ASC NULLS LAST, created_at ASC NULLS LAST
+                    """, contractId);
+            int order = 1;
+            for (Map<String, Object> row : items) {
+                if (row.get("device_name") == null || row.get("device_name").toString().isBlank()) continue;
+                jdbc.update("""
+                        INSERT INTO purchase_acceptance_device (
+                            id, acceptance_id, device_name, specification, brand, quantity, unit_price, amount,
+                            manufacturer_id, manufacturer_name, sort_order, is_deleted
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+                        """,
+                        UUID.randomUUID(), id, row.get("device_name"), row.get("specification"), row.get("brand"),
+                        row.get("quantity"), row.get("unit_price"), row.get("amount"),
+                        toUuidOrNull(row.get("manufacturer_id")), row.get("manufacturer_name"),
+                        row.getOrDefault("sort_order", order++));
+            }
+        } catch (Exception ignored) {
+            // 老租户未迁 purchase_acceptance_device 时不影响合同审批通过
+        }
+    }
+
+    private static UUID toUuidOrNull(Object v) {
+        if (v == null) return null;
+        if (v instanceof UUID u) return u;
+        String s = v.toString().trim();
+        if (s.isEmpty()) return null;
+        try {
+            return UUID.fromString(s);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private void markPaymentPaid(UUID paymentId) {

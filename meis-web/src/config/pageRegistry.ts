@@ -187,7 +187,14 @@ export const pageRegistry: Record<string, PageConfig> = {
       view: '查看(设备购置合同)'
     },
     listFilters: [
-      { key: 'approval_status', label: '审批状态', dictType: 'approval_status' },
+      {
+        key: 'approval_status',
+        label: '审批状态',
+        options: [
+          { value: 'unapproved', label: '未审批' },
+          { value: 'approved', label: '已审批' }
+        ]
+      },
       { key: 'acceptance_status', label: '验收状态', dictType: 'acceptance_status' }
     ]
   },
@@ -196,6 +203,17 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/purchase',
     table: 'purchase_acceptance',
     listPageUrl: '/purchase/acceptance/page',
+    saveUrl: '/purchase/acceptance',
+    showRowSelection: true,
+    showRowIndex: true,
+    formGroupColumns: { basic: 4 },
+    formDrawerSize: 'xl',
+    loadFormDetail: true,
+    formTitles: {
+      create: '新增(设备验收)',
+      edit: '编辑(设备验收)',
+      view: '查看(设备验收)'
+    },
     listFilters: [{ key: 'acceptance_status', label: '验收状态', dictType: 'acceptance_status' }]
   },
   '/purchase/supplier': {

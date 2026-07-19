@@ -542,7 +542,12 @@ CREATE TABLE purchase_plan_item (
     bargain_reviewed_by_name VARCHAR(100),
     bargain_at TIMESTAMPTZ,
     bargain_by UUID,
-    bargain_by_name VARCHAR(100)
+    bargain_by_name VARCHAR(100),
+    bidding_review_result VARCHAR(20),
+    bidding_review_comment VARCHAR(500),
+    bidding_reviewed_at TIMESTAMPTZ,
+    bidding_reviewed_by UUID,
+    bidding_reviewed_by_name VARCHAR(100)
 );
 COMMENT ON TABLE purchase_plan_item IS '采购计划明细表';
 COMMENT ON COLUMN purchase_plan_item.id IS '主键';
@@ -594,6 +599,11 @@ COMMENT ON COLUMN purchase_plan_item.bargain_reviewed_by_name IS '议价审核�
 COMMENT ON COLUMN purchase_plan_item.bargain_at IS '议价保存时间';
 COMMENT ON COLUMN purchase_plan_item.bargain_by IS '议价操作人';
 COMMENT ON COLUMN purchase_plan_item.bargain_by_name IS '议价操作人姓名快照';
+COMMENT ON COLUMN purchase_plan_item.bidding_review_result IS '招标审核结果(passed/rejected)';
+COMMENT ON COLUMN purchase_plan_item.bidding_review_comment IS '招标建议';
+COMMENT ON COLUMN purchase_plan_item.bidding_reviewed_at IS '招标审核时间';
+COMMENT ON COLUMN purchase_plan_item.bidding_reviewed_by IS '招标审核人';
+COMMENT ON COLUMN purchase_plan_item.bidding_reviewed_by_name IS '招标审核人姓名快照';
 
 -- 3.2b 计划明细招标供应商（PUR-UI-15）
 CREATE TABLE purchase_plan_item_bid_supplier (
@@ -814,6 +824,8 @@ CREATE TABLE contract_payment (
     payment_no VARCHAR(30) UNIQUE NOT NULL,
     payment_stage VARCHAR(50),
     payment_amount DECIMAL(15,2),
+    payment_ratio DECIMAL(8,2),
+    payment_condition VARCHAR(500),
     payment_date DATE,
     invoice_no VARCHAR(50),
     invoice_url VARCHAR(500),
@@ -835,6 +847,8 @@ COMMENT ON COLUMN contract_payment.contract_id IS '采购合同';
 COMMENT ON COLUMN contract_payment.payment_no IS '付款编号';
 COMMENT ON COLUMN contract_payment.payment_stage IS 'payment stage';
 COMMENT ON COLUMN contract_payment.payment_amount IS 'payment金额';
+COMMENT ON COLUMN contract_payment.payment_ratio IS '支付比例(%)';
+COMMENT ON COLUMN contract_payment.payment_condition IS '付款条件';
 COMMENT ON COLUMN contract_payment.payment_date IS 'payment日期';
 COMMENT ON COLUMN contract_payment.invoice_no IS '发票编号';
 COMMENT ON COLUMN contract_payment.invoice_url IS 'invoice附件地址';
@@ -3701,22 +3715,73 @@ COMMENT ON COLUMN purchase_acceptance_item.sort_order IS '排序号';
 CREATE TABLE IF NOT EXISTS purchase_acceptance_member (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     acceptance_id UUID NOT NULL REFERENCES purchase_acceptance(id) ON DELETE CASCADE,
-    member_role VARCHAR(30) NOT NULL,
+    member_role VARCHAR(50) NOT NULL,
     user_id UUID REFERENCES sys_user(id),
-    member_name VARCHAR(100),
+    member_name VARCHAR(200),
+    acceptance_content VARCHAR(500),
+    acceptance_result VARCHAR(100),
     signed_at TIMESTAMP WITH TIME ZONE,
     signature_url VARCHAR(500),
     remark TEXT
 );
-COMMENT ON TABLE purchase_acceptance_member IS 'purchase acceptance member';
+COMMENT ON TABLE purchase_acceptance_member IS '安装验收参数';
 COMMENT ON COLUMN purchase_acceptance_member.id IS '主键';
 COMMENT ON COLUMN purchase_acceptance_member.acceptance_id IS '安装验收单';
-COMMENT ON COLUMN purchase_acceptance_member.member_role IS 'member role';
-COMMENT ON COLUMN purchase_acceptance_member.user_id IS '关联用户';
-COMMENT ON COLUMN purchase_acceptance_member.member_name IS 'member名称';
+COMMENT ON COLUMN purchase_acceptance_member.member_role IS '验收单号（参数行）';
+COMMENT ON COLUMN purchase_acceptance_member.user_id IS '关联用户（兼容旧字段）';
+COMMENT ON COLUMN purchase_acceptance_member.member_name IS '项目';
+COMMENT ON COLUMN purchase_acceptance_member.acceptance_content IS '验收内容';
+COMMENT ON COLUMN purchase_acceptance_member.acceptance_result IS '验收结果';
 COMMENT ON COLUMN purchase_acceptance_member.signed_at IS 'signed时间';
 COMMENT ON COLUMN purchase_acceptance_member.signature_url IS 'signature附件地址';
 COMMENT ON COLUMN purchase_acceptance_member.remark IS '备注';
+
+-- 验收设备明细（PUR-UI-24）
+CREATE TABLE IF NOT EXISTS purchase_acceptance_device (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    acceptance_id UUID NOT NULL REFERENCES purchase_acceptance(id) ON DELETE CASCADE,
+    device_name VARCHAR(200) NOT NULL,
+    specification VARCHAR(200),
+    brand VARCHAR(100),
+    quantity DECIMAL(15,2),
+    unit_price DECIMAL(15,2),
+    amount DECIMAL(15,2),
+    manufacturer_id UUID REFERENCES manufacturer(id),
+    manufacturer_name VARCHAR(200),
+    sort_order INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by UUID,
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMPTZ,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100)
+);
+COMMENT ON TABLE purchase_acceptance_device IS '安装验收设备明细';
+COMMENT ON COLUMN purchase_acceptance_device.id IS '主键';
+COMMENT ON COLUMN purchase_acceptance_device.acceptance_id IS '安装验收单';
+COMMENT ON COLUMN purchase_acceptance_device.device_name IS '设备名称';
+COMMENT ON COLUMN purchase_acceptance_device.specification IS '设备规格型号';
+COMMENT ON COLUMN purchase_acceptance_device.brand IS '品牌';
+COMMENT ON COLUMN purchase_acceptance_device.quantity IS '数量';
+COMMENT ON COLUMN purchase_acceptance_device.unit_price IS '单价';
+COMMENT ON COLUMN purchase_acceptance_device.amount IS '金额';
+COMMENT ON COLUMN purchase_acceptance_device.manufacturer_id IS '生产厂家';
+COMMENT ON COLUMN purchase_acceptance_device.manufacturer_name IS '生产厂家名称快照';
+COMMENT ON COLUMN purchase_acceptance_device.sort_order IS '排序号';
+COMMENT ON COLUMN purchase_acceptance_device.created_at IS '创建时间';
+COMMENT ON COLUMN purchase_acceptance_device.updated_at IS '更新时间';
+COMMENT ON COLUMN purchase_acceptance_device.created_by IS '创建人';
+COMMENT ON COLUMN purchase_acceptance_device.created_by_name IS '创建人姓名快照';
+COMMENT ON COLUMN purchase_acceptance_device.updated_by IS '更新人';
+COMMENT ON COLUMN purchase_acceptance_device.updated_by_name IS '更新人姓名快照';
+COMMENT ON COLUMN purchase_acceptance_device.is_deleted IS '软删标记';
+COMMENT ON COLUMN purchase_acceptance_device.deleted_at IS '删除时间';
+COMMENT ON COLUMN purchase_acceptance_device.deleted_by IS '删除人';
+COMMENT ON COLUMN purchase_acceptance_device.deleted_by_name IS '删除人姓名快照';
 
 -- 投标人（结构化）
 CREATE TABLE IF NOT EXISTS purchase_bidder (

@@ -18,7 +18,20 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public Result<Void> handleOther(Exception e) {
-        log.error("Unhandled exception: {}", e.getMessage(), e);
-        return Result.fail(e.getMessage());
+        Throwable root = e;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        String detail = root.getMessage();
+        if (detail == null || detail.isBlank()) {
+            detail = e.getMessage();
+        }
+        // Spring 包装 SQL 异常时常只有 “bad SQL grammar [SQL]”，把根因拼进返回，便于排查
+        String top = e.getMessage();
+        String msg = (top != null && detail != null && !top.contains(detail))
+                ? top + " | " + detail
+                : (detail != null ? detail : "服务器错误");
+        log.error("Unhandled exception: {}", msg, e);
+        return Result.fail(msg);
     }
 }

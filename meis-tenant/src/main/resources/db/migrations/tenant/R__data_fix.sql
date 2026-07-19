@@ -13,6 +13,43 @@
 UPDATE sys_dict SET dict_label = '未提交'
 WHERE dict_type = 'approval_status' AND dict_code = 'draft' AND dict_label IS DISTINCT FROM '未提交';
 
+-- 设备合同简化审批状态（PUR-UI-27）
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('contract_approval_status', 'draft', '未审批', 'draft', 1),
+('contract_approval_status', 'pending', '未审批', 'pending', 2),
+('contract_approval_status', 'rejected', '未审批', 'rejected', 3),
+('contract_approval_status', 'unapproved', '未审批', 'unapproved', 4),
+('contract_approval_status', 'approved', '已审批', 'approved', 5)
+ON CONFLICT (dict_type, dict_code) DO NOTHING;
+UPDATE sys_dict SET dict_label = '未审批'
+WHERE dict_type = 'contract_approval_status' AND dict_code IN ('draft', 'pending', 'rejected', 'unapproved')
+  AND dict_label IS DISTINCT FROM '未审批';
+UPDATE sys_dict SET dict_label = '已审批'
+WHERE dict_type = 'contract_approval_status' AND dict_code = 'approved'
+  AND dict_label IS DISTINCT FROM '已审批';
+
+-- 安装验收列表审批状态文案（PUR-UI-29）
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('acceptance_review_status', 'draft', '未审核', 'draft', 1),
+('acceptance_review_status', 'pending', '未审核', 'pending', 2),
+('acceptance_review_status', 'rejected', '未审核', 'rejected', 3),
+('acceptance_review_status', 'approved', '已审核', 'approved', 4)
+ON CONFLICT (dict_type, dict_code) DO NOTHING;
+UPDATE sys_dict SET dict_label = '未审核'
+WHERE dict_type = 'acceptance_review_status' AND dict_code IN ('draft', 'pending', 'rejected')
+  AND dict_label IS DISTINCT FROM '未审核';
+UPDATE sys_dict SET dict_label = '已审核'
+WHERE dict_type = 'acceptance_review_status' AND dict_code = 'approved'
+  AND dict_label IS DISTINCT FROM '已审核';
+
+-- 安装验收状态：passed 展示为「已经验收」（PUR-UI-29）
+UPDATE sys_dict SET dict_label = '已经验收'
+WHERE dict_type = 'acceptance_status' AND dict_code = 'passed'
+  AND dict_label IS DISTINCT FROM '已经验收';
+UPDATE sys_dict SET dict_label = '待验收'
+WHERE dict_type = 'acceptance_status' AND dict_code = 'pending'
+  AND dict_label IS DISTINCT FROM '待验收';
+
 -- 已通过采购计划若缺审核人，回填终审记录
 UPDATE purchase_plan p
 SET approved_by = r.approver_id,

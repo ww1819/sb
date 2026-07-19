@@ -104,6 +104,8 @@ COMMENT ON INDEX idx_purchase_acceptance_status IS '索引：安装验收.安装
 
 CREATE INDEX IF NOT EXISTS idx_acceptance_member_acc ON purchase_acceptance_member(acceptance_id);
 COMMENT ON INDEX idx_acceptance_member_acc IS '索引：purchase acceptance member.安装验收单';
+CREATE INDEX IF NOT EXISTS idx_acceptance_device_acc ON purchase_acceptance_device(acceptance_id);
+COMMENT ON INDEX idx_acceptance_device_acc IS '索引：安装验收设备明细.安装验收单';
 
 CREATE INDEX IF NOT EXISTS idx_bidder_project ON purchase_bidder(project_id);
 COMMENT ON INDEX idx_bidder_project IS '索引：purchase bidder.采购项目';

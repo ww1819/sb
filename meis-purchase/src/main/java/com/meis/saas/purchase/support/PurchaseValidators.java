@@ -56,6 +56,23 @@ public final class PurchaseValidators {
         }
     }
 
+    /** PUR-UI-23：支付比例合计不得超过 100% */
+    public static void validatePaymentRatioTotal(List<Map<String, Object>> payments) {
+        if (payments == null || payments.isEmpty()) return;
+        boolean anyRatio = false;
+        double sum = 0;
+        for (Map<String, Object> p : payments) {
+            double ratio = toDouble(p.get("payment_ratio"));
+            if (ratio > 0) {
+                anyRatio = true;
+                sum += ratio;
+            }
+        }
+        if (anyRatio && sum > 100.001) {
+            throw new BizException(400, "支付比例合计不能超过100%");
+        }
+    }
+
     public static void recalcContractPaymentProgress(JdbcTemplate jdbc, UUID contractId) {
         var contract = jdbc.queryForList(
                 "SELECT contract_amount FROM purchase_contract WHERE id = ?::uuid"
