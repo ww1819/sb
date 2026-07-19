@@ -333,13 +333,14 @@ ON CONFLICT DO NOTHING;
 -- 模块8：库房管理 — 独立菜单模块
 
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
-('mod_warehouse', NULL, '库房管理', 'module', NULL, 5)
+('mod_warehouse', NULL, '库房管理', 'module', NULL, 4)
 ON CONFLICT (menu_code) DO UPDATE SET
     menu_name = EXCLUDED.menu_name,
     menu_type = EXCLUDED.menu_type,
     sort_order = EXCLUDED.sort_order,
     is_active = TRUE;
 
+UPDATE sys_menu SET sort_order = 5 WHERE menu_code = 'mod_asset';
 UPDATE sys_menu SET sort_order = 6 WHERE menu_code = 'mod_ops';
 UPDATE sys_menu SET sort_order = 7 WHERE menu_code = 'mod_quality';
 UPDATE sys_menu SET sort_order = 8 WHERE menu_code = 'mod_analytics';
@@ -1005,3 +1006,7 @@ FROM sys_tenant t
 CROSS JOIN sys_menu m
 WHERE m.menu_code = 'ops_repair'
 ON CONFLICT DO NOTHING;
+
+-- ---------- NAV-UI-01：一级模块顺序 — 库房管理在资产台账之上 ----------
+UPDATE sys_menu SET sort_order = 4 WHERE menu_code = 'mod_warehouse';
+UPDATE sys_menu SET sort_order = 5 WHERE menu_code = 'mod_asset';

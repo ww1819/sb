@@ -214,7 +214,7 @@ export const pageRegistry: Record<string, PageConfig> = {
       edit: '编辑(设备验收)',
       view: '查看(设备验收)'
     },
-    listFilters: [{ key: 'acceptance_status', label: '验收状态', dictType: 'acceptance_status' }]
+    listFilters: [{ key: 'approval_status', label: '审批状态', dictType: 'acceptance_review_status' }]
   },
   '/purchase/supplier': {
     title: '供应商管理',

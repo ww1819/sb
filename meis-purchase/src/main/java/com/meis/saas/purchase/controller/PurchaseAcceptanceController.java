@@ -27,17 +27,25 @@ public class PurchaseAcceptanceController {
 
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(PageQuery query,
-            @RequestParam(required = false) String acceptance_status) {
-        return Result.ok(PurchasePageQueries.acceptancePage(jdbc, query, acceptance_status));
+            @RequestParam(required = false) String acceptance_status,
+            @RequestParam(required = false) String approval_status) {
+        return Result.ok(PurchasePageQueries.acceptancePage(jdbc, query, acceptance_status, approval_status));
     }
 
-    /** 列表快捷审核：验收状态→已经验收，审批状态→已审核 */
+    /** 列表快捷审核：验收状态→已经验收，审批状态→已审核，并记录审核人/日期 */
     @PostMapping("/review")
     @OperationLog(module = "purchase", description = "安装验收列表审核")
     public Result<Map<String, Object>> review(@RequestBody Map<String, Object> body) {
         Object raw = body.get("ids");
         if (!(raw instanceof List<?> list) || list.isEmpty()) {
             throw new BizException(400, "请先勾选要审核的验收单");
+        }
+        var ctx = com.meis.saas.common.rbac.PermissionInterceptor.CTX.get();
+        UUID actorId = null;
+        String actorName = null;
+        if (ctx != null && ctx.getUserId() != null && !ctx.getUserId().isBlank()) {
+            actorId = UUID.fromString(ctx.getUserId());
+            actorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, actorId);
         }
         int ok = 0;
         int skipped = 0;
@@ -57,9 +65,12 @@ public class PurchaseAcceptanceController {
                     SET acceptance_status = 'passed',
                         approval_status = 'approved',
                         acceptance_date = COALESCE(acceptance_date, CURRENT_DATE),
+                        approved_by = ?,
+                        approved_by_name = ?,
+                        approved_at = CURRENT_DATE,
                         updated_at = NOW()
                     WHERE id = ? AND COALESCE(approval_status, '') <> 'approved'
-                    """, id);
+                    """, actorId, actorName, id);
             if (updated <= 0) {
                 skipped++;
                 continue;
@@ -144,6 +155,12 @@ public class PurchaseAcceptanceController {
                 "SELECT 1 FROM purchase_acceptance WHERE id = ?::uuid"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_acceptance", null), id).isEmpty();
         if (exists) {
+            var st = jdbc.queryForList(
+                    "SELECT approval_status FROM purchase_acceptance WHERE id = ?"
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_acceptance", null), id);
+            if (!st.isEmpty() && "approved".equals(String.valueOf(st.get(0).get("approval_status")))) {
+                throw new BizException(400, "已审核的验收单不可编辑");
+            }
             jdbc.update("""
                 UPDATE purchase_acceptance SET contract_id=?, project_id=?, supplier_id=?,
                 acceptance_date=?, acceptance_status=?, quality_check_passed=?,
@@ -195,6 +212,21 @@ public class PurchaseAcceptanceController {
         List<Map<String, Object>> devices = (List<Map<String, Object>>) body.get("devices");
         if (devices != null) AcceptanceChecklistService.saveDevices(jdbc, id, devices);
         return get(id);
+    }
+
+    @DeleteMapping("/{id}")
+    @Transactional
+    @OperationLog(module = "purchase", description = "删除安装验收")
+    public Result<Void> delete(@PathVariable UUID id) {
+        var rows = jdbc.queryForList(
+                "SELECT approval_status FROM purchase_acceptance WHERE id = ?"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_acceptance", null), id);
+        if (rows.isEmpty()) throw new BizException(404, "not found");
+        if ("approved".equals(String.valueOf(rows.get(0).get("approval_status")))) {
+            throw new BizException(400, "已审核的验收单不可删除");
+        }
+        SoftDeleteSupport.softDelete(jdbc, "purchase_acceptance", id.toString());
+        return Result.ok();
     }
 
     @PostMapping("/{id}/submit")

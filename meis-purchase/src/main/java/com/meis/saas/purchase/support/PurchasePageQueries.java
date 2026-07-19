@@ -314,7 +314,7 @@ public final class PurchasePageQueries {
     }
 
     public static PageResult<Map<String, Object>> acceptancePage(JdbcTemplate jdbc, PageQuery q,
-            String acceptanceStatus) {
+            String acceptanceStatus, String approvalStatus) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "purchase_acceptance", "a"));
         List<Object> args = new ArrayList<>();
@@ -322,6 +322,10 @@ public final class PurchasePageQueries {
         if (acceptanceStatus != null && !acceptanceStatus.isBlank()) {
             where.append(" AND a.acceptance_status = ? ");
             args.add(acceptanceStatus);
+        }
+        if (approvalStatus != null && !approvalStatus.isBlank()) {
+            where.append(" AND a.approval_status = ? ");
+            args.add(approvalStatus);
         }
         String from = """
             FROM purchase_acceptance a

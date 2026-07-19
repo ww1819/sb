@@ -3659,7 +3659,10 @@ CREATE TABLE IF NOT EXISTS purchase_acceptance (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     approval_status VARCHAR(20) DEFAULT 'draft',
-    business_chain_no VARCHAR(40)
+    business_chain_no VARCHAR(40),
+    approved_by UUID REFERENCES sys_user(id),
+    approved_by_name VARCHAR(100),
+    approved_at DATE
 );
 COMMENT ON TABLE purchase_acceptance IS '安装验收';
 COMMENT ON COLUMN purchase_acceptance.id IS '主键';
@@ -3686,6 +3689,9 @@ COMMENT ON COLUMN purchase_acceptance.created_at IS '创建时间';
 COMMENT ON COLUMN purchase_acceptance.updated_at IS '更新时间';
 COMMENT ON COLUMN purchase_acceptance.approval_status IS '审批状态';
 COMMENT ON COLUMN purchase_acceptance.business_chain_no IS '采购业务链编号（计划→入库追溯）';
+COMMENT ON COLUMN purchase_acceptance.approved_by IS '审核人';
+COMMENT ON COLUMN purchase_acceptance.approved_by_name IS '审核人姓名';
+COMMENT ON COLUMN purchase_acceptance.approved_at IS '审核日期';
 
 -- MEIS V11: 采购101112阶段 — 验收专用表单、招标结构化、数据权限报表
 -- 验收清单项

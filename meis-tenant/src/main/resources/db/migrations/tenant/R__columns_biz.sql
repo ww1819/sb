@@ -513,3 +513,20 @@ ALTER TABLE purchase_acceptance_device ADD COLUMN IF NOT EXISTS deleted_by_name 
 -- ---------- purchase_acceptance_member（验收参数 PUR-UI-25） ----------
 ALTER TABLE purchase_acceptance_member ADD COLUMN IF NOT EXISTS acceptance_content VARCHAR(500);
 ALTER TABLE purchase_acceptance_member ADD COLUMN IF NOT EXISTS acceptance_result VARCHAR(100);
+
+-- ---------- purchase_acceptance 审核人/审核日期（PUR-UI-30） ----------
+ALTER TABLE purchase_acceptance ADD COLUMN IF NOT EXISTS approved_by UUID;
+ALTER TABLE purchase_acceptance ADD COLUMN IF NOT EXISTS approved_by_name VARCHAR(100);
+ALTER TABLE purchase_acceptance ADD COLUMN IF NOT EXISTS approved_at DATE;
+-- 若早期以 timestamptz 建列，收成 DATE（仅日期）
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'purchase_acceptance' AND column_name = 'approved_at'
+      AND data_type = 'timestamp with time zone'
+  ) THEN
+    ALTER TABLE purchase_acceptance
+      ALTER COLUMN approved_at TYPE DATE USING (approved_at AT TIME ZONE 'Asia/Shanghai')::date;
+  END IF;
+END $$;

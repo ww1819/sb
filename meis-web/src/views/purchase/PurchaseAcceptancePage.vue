@@ -1,6 +1,16 @@
 <template>
   <div class="workflow-crud">
-    <CrudPage ref="crudRef" :config="config" @detail="openDetail" @saved="onSaved">
+    <CrudPage
+      ref="crudRef"
+      :config="config"
+      enable-view
+      :can-view="isAcceptancePassed"
+      :can-edit="canEditAcceptance"
+      :can-delete="canEditAcceptance"
+      delete-url="/purchase/acceptance"
+      @detail="openDetail"
+      @saved="onSaved"
+    >
       <template #form-header-actions="{ form, mode }">
         <el-button v-if="mode !== 'view'" type="primary" plain @click="openContractRef(form)">
           引入合同
@@ -490,6 +500,10 @@ function onSaved() {
 
 function isAcceptancePassed(row: Record<string, unknown>) {
   return String(row.approval_status ?? '') === 'approved'
+}
+
+function canEditAcceptance(row: Record<string, unknown>) {
+  return !isAcceptancePassed(row)
 }
 
 async function reviewSelected() {
