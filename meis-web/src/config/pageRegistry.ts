@@ -589,7 +589,9 @@ export const pageRegistry: Record<string, PageConfig> = {
     saveUrl: '/asset/inventory',
     listFilters: [{ key: 'audit_status', label: '审核状态', dictType: 'audit_status' }]
   },
-  '/warehouse/scrap': { title: '设备报废', apiBase: '/asset', table: 'device_scrap', saveUrl: '/asset/scrap' },
+  '/warehouse/scrap': { title: '报废申请', apiBase: '/asset', table: 'device_scrap', saveUrl: '/asset/scrap' },
+  '/warehouse/scrap-review': { title: '报废审核', apiBase: '/asset', table: 'device_scrap', saveUrl: '/asset/scrap' },
+  '/warehouse/scrap-query': { title: '报废查询', apiBase: '/asset', table: 'device_scrap', saveUrl: '/asset/scrap' },
   '/asset/inspection': { title: '设备巡检', apiBase: '/asset', table: 'inspection_plan' },
   '/repair/apply': {
     title: '报修申请',

@@ -1089,7 +1089,7 @@ ON CONFLICT (menu_code) DO UPDATE SET
     sort_order = EXCLUDED.sort_order,
     is_active = TRUE;
 
-UPDATE sys_menu SET parent_code = 'asset_scrap_mgmt', menu_name = '设备报废', path = '/warehouse/scrap',
+UPDATE sys_menu SET parent_code = 'asset_scrap_mgmt', menu_name = '报废申请', path = '/warehouse/scrap',
     sort_order = 1, is_active = TRUE
 WHERE menu_code = 'warehouse_scrap';
 UPDATE sys_menu SET parent_code = 'asset_query_group', menu_name = '资产综合查询', path = '/asset/query',
@@ -1302,4 +1302,34 @@ CROSS JOIN sys_menu m
 WHERE m.menu_code IN (
     'analytics_benefit_query', 'analytics_efficiency_view', 'analytics_charge_audit'
 )
+ON CONFLICT DO NOTHING;
+
+-- ---------- AST-UI-10：报废管理 — 报废申请/审核/查询 ----------
+UPDATE sys_menu SET parent_code = 'asset_scrap_mgmt', menu_name = '报废申请', path = '/warehouse/scrap',
+    sort_order = 1, is_active = TRUE
+WHERE menu_code = 'warehouse_scrap';
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('warehouse_scrap_review', 'asset_scrap_mgmt', '报废审核', 'menu', '/warehouse/scrap-review', 2),
+('warehouse_scrap_query', 'asset_scrap_mgmt', '报废查询', 'menu', '/warehouse/scrap-query', 3)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    menu_type = EXCLUDED.menu_type,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('warehouse_scrap_review', 'warehouse_scrap_query')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('warehouse_scrap_review', 'warehouse_scrap_query')
 ON CONFLICT DO NOTHING;
