@@ -811,22 +811,25 @@ export const pageRegistry: Record<string, PageConfig> = {
   },
   '/pm/query': { title: '预防性维护记录', apiBase: '/pm', table: 'pm_execution_item' },
   '/analytics/mapping': {
-    title: '对照管理',
+    title: '效益分析对照',
     apiBase: '/analytics',
     table: 'benefit_mapping',
     listPageUrl: '/analytics/mapping/page',
     saveUrl: '/analytics/mapping'
   },
-  '/analytics/sync': { title: '数据抓取', apiBase: '/analytics', table: 'integration_sync_task' },
+  '/analytics/efficiency': { title: '效率分析', apiBase: '/analytics', table: 'medical_device' },
+  '/analytics/benefit-query': { title: '效益分析查询', apiBase: '/analytics', table: 'medical_device' },
+  '/analytics/charge-audit': { title: '收费项目审核', apiBase: '/analytics', table: 'medical_device' },
+  '/analytics/sync': { title: '效益分析提取', apiBase: '/analytics', table: 'integration_sync_task' },
   '/analytics/summary': {
-    title: '效益分析汇总',
+    title: '效益分析报表',
     apiBase: '/analytics',
     table: 'device_benefit_summary',
     listPageUrl: '/analytics/summary/page',
     listFilters: [{ key: 'benefitLevel', label: '效益等级', dictType: 'benefit_level' }]
   },
   '/analytics/cost': {
-    title: '成本上报',
+    title: '效益分析上报',
     apiBase: '/analytics',
     table: 'device_cost_record',
     listPageUrl: '/analytics/cost/page',

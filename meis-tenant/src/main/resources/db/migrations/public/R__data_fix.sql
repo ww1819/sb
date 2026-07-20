@@ -1151,3 +1151,155 @@ FROM sys_tenant t
 CROSS JOIN sys_menu m
 WHERE m.menu_code = 'asset_dynamic_stats'
 ON CONFLICT DO NOTHING;
+
+-- ---------- QC-UI-02 / AST-UI-09 / ANA-UI-01：质控不良事件分组、资产维保管理、PM 分组、数据决策效益/效率 ----------
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('qc_adverse_group', 'mod_quality', '不良事件', 'group', NULL, 2),
+('qc_pm_group', 'mod_quality', '预防性维护', 'group', NULL, 3),
+('asset_maint_mgmt', 'mod_asset', '维保管理', 'group', NULL, 4),
+('analytics_benefit_group', 'mod_analytics', '效益分析', 'group', NULL, 1),
+('analytics_efficiency', 'mod_analytics', '效率分析', 'menu', '/analytics/efficiency', 2)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    menu_type = EXCLUDED.menu_type,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+-- 质控：风险评估 / 不良事件上报 / 查询 → 不良事件分组
+UPDATE sys_menu SET parent_code = 'qc_adverse_group', menu_name = '风险评估', path = '/qc/risk',
+    sort_order = 1, is_active = TRUE
+WHERE menu_code = 'qc_risk';
+UPDATE sys_menu SET parent_code = 'qc_adverse_group', menu_name = '不良事件上报', path = '/qc/adverse/report',
+    sort_order = 2, is_active = TRUE
+WHERE menu_code = 'qc_adverse_report';
+UPDATE sys_menu SET parent_code = 'qc_adverse_group', menu_name = '不良事件查询', path = '/qc/adverse/query',
+    sort_order = 3, is_active = TRUE
+WHERE menu_code = 'qc_adverse_query';
+UPDATE sys_menu SET is_active = FALSE WHERE menu_code = 'qc_adverse';
+
+-- 质控：预防性维护计划/执行/记录 → 预防性维护分组（参数一并收纳，避免散落）
+UPDATE sys_menu SET parent_code = 'qc_pm_group', menu_name = '预防性维护参数', path = '/pm/param',
+    sort_order = 1, is_active = TRUE
+WHERE menu_code = 'pm_param';
+UPDATE sys_menu SET parent_code = 'qc_pm_group', menu_name = '预防性维护计划', path = '/pm/plan',
+    sort_order = 2, is_active = TRUE
+WHERE menu_code = 'pm_plan';
+UPDATE sys_menu SET parent_code = 'qc_pm_group', menu_name = '预防性维护执行', path = '/pm/execution',
+    sort_order = 3, is_active = TRUE
+WHERE menu_code = 'pm_execution';
+UPDATE sys_menu SET parent_code = 'qc_pm_group', menu_name = '预防性维护记录', path = '/pm/query',
+    sort_order = 4, is_active = TRUE
+WHERE menu_code = 'pm_query';
+
+-- 质控剩余直挂项排序
+UPDATE sys_menu SET sort_order = 1, is_active = TRUE WHERE menu_code = 'qc_adverse_group';
+UPDATE sys_menu SET sort_order = 2, is_active = TRUE WHERE menu_code = 'qc_pm_group';
+
+-- 资产管理：维保合同 / 履约记录 / 性能检测 → 维保管理
+UPDATE sys_menu SET parent_code = 'asset_maint_mgmt', menu_name = '维保合同', path = '/maintenance-contract/list',
+    sort_order = 1, is_active = TRUE
+WHERE menu_code = 'mcontract_list';
+UPDATE sys_menu SET parent_code = 'asset_maint_mgmt', menu_name = '履约记录', path = '/maintenance-contract/fulfillment',
+    sort_order = 2, is_active = TRUE
+WHERE menu_code = 'mcontract_fulfillment';
+UPDATE sys_menu SET parent_code = 'asset_maint_mgmt', menu_name = '性能检测', path = '/qc/performance',
+    sort_order = 3, is_active = TRUE
+WHERE menu_code = 'qc_performance';
+UPDATE sys_menu SET sort_order = 4, is_active = TRUE WHERE menu_code = 'asset_maint_mgmt';
+
+-- 数据决策：既有效益相关页收入「效益分析」；新增「效率分析」占位
+UPDATE sys_menu SET parent_code = 'analytics_benefit_group', menu_name = '对照管理', path = '/analytics/mapping',
+    sort_order = 1, is_active = TRUE
+WHERE menu_code = 'analytics_mapping';
+UPDATE sys_menu SET parent_code = 'analytics_benefit_group', menu_name = '数据抓取', path = '/analytics/sync',
+    sort_order = 2, is_active = TRUE
+WHERE menu_code = 'analytics_sync';
+UPDATE sys_menu SET parent_code = 'analytics_benefit_group', menu_name = '效益分析汇总', path = '/analytics/summary',
+    sort_order = 3, is_active = TRUE
+WHERE menu_code = 'analytics_summary';
+UPDATE sys_menu SET parent_code = 'analytics_benefit_group', menu_name = '成本上报', path = '/analytics/cost',
+    sort_order = 4, is_active = TRUE
+WHERE menu_code = 'analytics_cost';
+UPDATE sys_menu SET parent_code = 'analytics_benefit_group', menu_name = '单机效益分析', path = '/analytics/device',
+    sort_order = 5, is_active = TRUE
+WHERE menu_code = 'analytics_device';
+UPDATE sys_menu SET is_active = FALSE WHERE menu_code = 'analytics_benefit';
+UPDATE sys_menu SET parent_code = 'mod_analytics', menu_name = '统计报表', path = '/analytics/reports',
+    sort_order = 3, is_active = TRUE
+WHERE menu_code = 'analytics_reports';
+UPDATE sys_menu SET sort_order = 1, is_active = TRUE WHERE menu_code = 'analytics_benefit_group';
+UPDATE sys_menu SET sort_order = 2, is_active = TRUE WHERE menu_code = 'analytics_efficiency';
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN (
+    'qc_adverse_group', 'qc_pm_group', 'asset_maint_mgmt',
+    'analytics_benefit_group', 'analytics_efficiency'
+)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN (
+    'qc_adverse_group', 'qc_pm_group', 'asset_maint_mgmt',
+    'analytics_benefit_group', 'analytics_efficiency'
+)
+ON CONFLICT DO NOTHING;
+
+-- ---------- ANA-UI-02：效益分析子菜单更名/增查询；效率分析改为分组 ----------
+UPDATE sys_menu SET parent_code = 'analytics_benefit_group', menu_name = '效益分析对照', path = '/analytics/mapping',
+    sort_order = 1, is_active = TRUE
+WHERE menu_code = 'analytics_mapping';
+UPDATE sys_menu SET parent_code = 'analytics_benefit_group', menu_name = '效益分析提取', path = '/analytics/sync',
+    sort_order = 2, is_active = TRUE
+WHERE menu_code = 'analytics_sync';
+UPDATE sys_menu SET parent_code = 'analytics_benefit_group', menu_name = '效益分析报表', path = '/analytics/summary',
+    sort_order = 3, is_active = TRUE
+WHERE menu_code = 'analytics_summary';
+UPDATE sys_menu SET parent_code = 'analytics_benefit_group', menu_name = '效益分析上报', path = '/analytics/cost',
+    sort_order = 4, is_active = TRUE
+WHERE menu_code = 'analytics_cost';
+UPDATE sys_menu SET parent_code = 'analytics_benefit_group', menu_name = '单机效益分析', path = '/analytics/device',
+    sort_order = 6, is_active = TRUE
+WHERE menu_code = 'analytics_device';
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('analytics_benefit_query', 'analytics_benefit_group', '效益分析查询', 'menu', '/analytics/benefit-query', 5),
+('analytics_efficiency_view', 'analytics_efficiency', '效率分析', 'menu', '/analytics/efficiency', 1),
+('analytics_charge_audit', 'analytics_efficiency', '收费项目审核', 'menu', '/analytics/charge-audit', 2)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    menu_type = EXCLUDED.menu_type,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+-- 效率分析：由叶子菜单改为分组
+UPDATE sys_menu SET parent_code = 'mod_analytics', menu_name = '效率分析', menu_type = 'group', path = NULL,
+    sort_order = 2, is_active = TRUE
+WHERE menu_code = 'analytics_efficiency';
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN (
+    'analytics_benefit_query', 'analytics_efficiency_view', 'analytics_charge_audit'
+)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN (
+    'analytics_benefit_query', 'analytics_efficiency_view', 'analytics_charge_audit'
+)
+ON CONFLICT DO NOTHING;
