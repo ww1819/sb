@@ -23,6 +23,7 @@
     :link-table="field.linkTable"
     :value-key="field.linkValueKey"
     :hide-code="field.linkHideCode"
+    :fallback-label="linkFallbackLabel"
     :placeholder="field.placeholder || '请选择' + field.label"
     :disabled="field.readonly"
     :exclude-values="linkExcludeValues"
@@ -84,6 +85,16 @@ const linkExcludeValues = computed(() => {
   if (!props.field.linkTable || props.field.prop !== 'parent_id') return []
   const id = props.model?.id
   return id != null && id !== '' ? [String(id)] : []
+})
+
+/** 详情带回的名称快照，供下拉在选项未加载/未命中时回显 */
+const linkFallbackLabel = computed(() => {
+  if (!props.field.linkTable || !props.model) return ''
+  const prop = props.field.prop
+  if (!prop.endsWith('_id')) return ''
+  const nameKey = prop.slice(0, -3) + '_name'
+  const name = props.model[nameKey]
+  return name != null && String(name).trim() !== '' ? String(name).trim() : ''
 })
 
 function onPickerModel(v: Record<string, unknown>) {

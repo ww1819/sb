@@ -1,4 +1,4 @@
-export interface PrintTableSection {
+﻿export interface PrintTableSection {
   title?: string
   headers: string[]
   rows: string[][]
@@ -573,6 +573,300 @@ table.grid .total-label{text-align:left;font-weight:bold}
   <div class="meta-row">
     <div class="cell">审核时间：${esc(model.approvedAt || '-')}</div>
     <div class="cell">退货原因：${esc(model.reason || '-')}</div>
+    <div class="cell"></div>
+  </div>
+  <table class="grid">
+    <thead>
+      <tr>
+        <th style="width:22%">资产名称</th>
+        <th style="width:18%">规格型号</th>
+        <th style="width:16%">序列号(SN)</th>
+        <th style="width:10%">数量</th>
+        <th style="width:16%">单价</th>
+        <th style="width:18%">金额</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml || `<tr><td colspan="6" style="height:36px"></td></tr>`}
+      <tr>
+        <td class="total-label" colspan="3">合计：${esc(model.chineseTotal)}</td>
+        <td class="num">${esc(model.qtySum)}</td>
+        <td></td>
+        <td class="num">${esc(model.amountSum)}</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="footer">
+    <div class="cell">制单人：${esc(model.operator)}</div>
+    <div class="cell center">审核人：${esc(model.approver)}</div>
+    <div class="cell right">打印日期：${esc(model.printDate)}</div>
+  </div>
+</div>
+</body></html>`
+}
+
+/** 设备出库单打印（版式对齐设备退货单） */
+export function printOutboundDoc(doc: Record<string, unknown>, hospitalName?: string) {
+  const model = buildOutboundPrintModel(doc, hospitalName)
+  return printHtmlInPage(renderOutboundPrintHtml(model))
+}
+
+export interface OutboundPrintModel {
+  hospital: string
+  warehouse: string
+  dept: string
+  docNo: string
+  receiver: string
+  purpose: string
+  approvedAt: string
+  operator: string
+  approver: string
+  printDate: string
+  chineseTotal: string
+  qtySum: string
+  amountSum: string
+  rows: EntryPrintRow[]
+}
+
+export function buildOutboundPrintModel(
+  doc: Record<string, unknown>,
+  hospitalName?: string
+): OutboundPrintModel {
+  const hospital = hospitalName || DEFAULT_HOSPITAL
+  const items = (doc.items as Record<string, unknown>[]) ?? []
+  const today = new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')
+  let qtySum = 0
+  let amtSum = 0
+  const rows: EntryPrintRow[] = items.map((i) => {
+    const qty = Number(i.quantity ?? 0)
+    const price = Number(i.unit_price ?? 0)
+    let amt = Number(i.total_price)
+    if (!Number.isFinite(amt)) amt = Number.isFinite(qty) && Number.isFinite(price) ? qty * price : 0
+    if (Number.isFinite(qty)) qtySum += qty
+    if (Number.isFinite(amt)) amtSum += amt
+    return {
+      name: String(i.device_name ?? ''),
+      spec: String(i.specification ?? i.model ?? ''),
+      batch: String(i.serial_number ?? ''),
+      qty: Number.isFinite(qty) ? String(qty) : '',
+      price: fmtMoney(price, 2),
+      amount: fmtMoney(amt, 2)
+    }
+  })
+  if (!rows.length && doc.total_amount != null) {
+    amtSum = Number(doc.total_amount) || 0
+  }
+  return {
+    hospital,
+    warehouse: String(doc.warehouse_name ?? ''),
+    dept: String(doc.dept_name ?? ''),
+    docNo: String(doc.outbound_no ?? ''),
+    receiver: String(doc.receiver_name ?? ''),
+    purpose: String(doc.purpose ?? ''),
+    approvedAt: fmtDate(doc.approved_at ?? doc.outbound_date),
+    operator: String(doc.created_by_name ?? ''),
+    approver: String(doc.approved_by_name ?? ''),
+    printDate: today,
+    chineseTotal: amountToChineseYuan(Math.round(amtSum * 100) / 100),
+    qtySum: qtySum ? String(qtySum) : '',
+    amountSum: fmtMoney(amtSum, 2),
+    rows
+  }
+}
+
+export function renderOutboundPrintHtml(model: OutboundPrintModel) {
+  const rowsHtml = model.rows
+    .map(
+      (r) => `<tr>
+      <td class="left">${esc(r.name)}</td>
+      <td class="left">${esc(r.spec)}</td>
+      <td>${esc(r.batch)}</td>
+      <td class="num">${esc(r.qty)}</td>
+      <td class="num">${esc(r.price)}</td>
+      <td class="num">${esc(r.amount)}</td>
+    </tr>`
+    )
+    .join('')
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>设备出库单</title>
+<style>
+@page{size:A4;margin:14mm 12mm}
+*{box-sizing:border-box}
+body{font-family:"SimSun","宋体",serif;font-size:13px;color:#000;margin:0;padding:0}
+.sheet{width:100%}
+.title{text-align:center;font-size:22px;font-weight:bold;letter-spacing:3px;margin:0 0 14px}
+.meta-row{display:flex;justify-content:space-between;gap:12px;margin:4px 0 10px;font-size:13px}
+.meta-row .cell{flex:1}
+.meta-row .cell.center{text-align:center}
+.meta-row .cell.right{text-align:right}
+table.grid{width:100%;border-collapse:collapse;table-layout:fixed}
+table.grid th,table.grid td{border:1px solid #000;padding:6px 5px;vertical-align:middle}
+table.grid th{font-weight:bold;text-align:center;background:#fff}
+table.grid td{text-align:center}
+table.grid td.left{text-align:left}
+table.grid td.num{text-align:right}
+table.grid .total-label{text-align:left;font-weight:bold}
+.footer{display:flex;justify-content:space-between;margin-top:28px;font-size:13px;padding:0 4px}
+.footer .cell{flex:1}
+.footer .cell.center{text-align:center}
+.footer .cell.right{text-align:right}
+</style></head><body>
+<div class="sheet">
+  <div class="title">${esc(model.hospital)}设备出库单</div>
+  <div class="meta-row">
+    <div class="cell">仓库：${esc(model.warehouse || '-')}</div>
+    <div class="cell center">科室：${esc(model.dept || '-')}</div>
+    <div class="cell right">单据号：${esc(model.docNo || '-')}</div>
+  </div>
+  <div class="meta-row">
+    <div class="cell">审核时间：${esc(model.approvedAt || '-')}</div>
+    <div class="cell">领用人：${esc(model.receiver || '-')}</div>
+    <div class="cell right">用途：${esc(model.purpose || '-')}</div>
+  </div>
+  <table class="grid">
+    <thead>
+      <tr>
+        <th style="width:22%">资产名称</th>
+        <th style="width:18%">规格型号</th>
+        <th style="width:16%">序列号(SN)</th>
+        <th style="width:10%">数量</th>
+        <th style="width:16%">单价</th>
+        <th style="width:18%">金额</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml || `<tr><td colspan="6" style="height:36px"></td></tr>`}
+      <tr>
+        <td class="total-label" colspan="3">合计：${esc(model.chineseTotal)}</td>
+        <td class="num">${esc(model.qtySum)}</td>
+        <td></td>
+        <td class="num">${esc(model.amountSum)}</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="footer">
+    <div class="cell">制单人：${esc(model.operator)}</div>
+    <div class="cell center">审核人：${esc(model.approver)}</div>
+    <div class="cell right">打印日期：${esc(model.printDate)}</div>
+  </div>
+</div>
+</body></html>`
+}
+
+/** 设备退库单打印（版式对齐设备退货单） */
+export function printDeviceReturnDoc(doc: Record<string, unknown>, hospitalName?: string) {
+  const model = buildDeviceReturnPrintModel(doc, hospitalName)
+  return printHtmlInPage(renderDeviceReturnPrintHtml(model))
+}
+
+export interface DeviceReturnPrintModel {
+  hospital: string
+  warehouse: string
+  dept: string
+  docNo: string
+  reason: string
+  approvedAt: string
+  operator: string
+  approver: string
+  printDate: string
+  chineseTotal: string
+  qtySum: string
+  amountSum: string
+  rows: EntryPrintRow[]
+}
+
+export function buildDeviceReturnPrintModel(
+  doc: Record<string, unknown>,
+  hospitalName?: string
+): DeviceReturnPrintModel {
+  const hospital = hospitalName || DEFAULT_HOSPITAL
+  const items = (doc.items as Record<string, unknown>[]) ?? []
+  const today = new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')
+  let qtySum = 0
+  let amtSum = 0
+  const rows: EntryPrintRow[] = items.map((i) => {
+    const qty = Number(i.quantity ?? 0)
+    const price = Number(i.unit_price ?? 0)
+    let amt = Number(i.total_price)
+    if (!Number.isFinite(amt)) amt = Number.isFinite(qty) && Number.isFinite(price) ? qty * price : 0
+    if (Number.isFinite(qty)) qtySum += qty
+    if (Number.isFinite(amt)) amtSum += amt
+    return {
+      name: String(i.device_name ?? ''),
+      spec: String(i.specification ?? i.model ?? ''),
+      batch: String(i.serial_number ?? ''),
+      qty: Number.isFinite(qty) ? String(qty) : '',
+      price: fmtMoney(price, 2),
+      amount: fmtMoney(amt, 2)
+    }
+  })
+  if (!rows.length && doc.total_amount != null) {
+    amtSum = Number(doc.total_amount) || 0
+  }
+  return {
+    hospital,
+    warehouse: String(doc.warehouse_name ?? ''),
+    dept: String(doc.dept_name ?? ''),
+    docNo: String(doc.return_no ?? ''),
+    reason: String(doc.reason ?? ''),
+    approvedAt: fmtDate(doc.approved_at ?? doc.return_date),
+    operator: String(doc.created_by_name ?? ''),
+    approver: String(doc.approved_by_name ?? ''),
+    printDate: today,
+    chineseTotal: amountToChineseYuan(Math.round(amtSum * 100) / 100),
+    qtySum: qtySum ? String(qtySum) : '',
+    amountSum: fmtMoney(amtSum, 2),
+    rows
+  }
+}
+
+export function renderDeviceReturnPrintHtml(model: DeviceReturnPrintModel) {
+  const rowsHtml = model.rows
+    .map(
+      (r) => `<tr>
+      <td class="left">${esc(r.name)}</td>
+      <td class="left">${esc(r.spec)}</td>
+      <td>${esc(r.batch)}</td>
+      <td class="num">${esc(r.qty)}</td>
+      <td class="num">${esc(r.price)}</td>
+      <td class="num">${esc(r.amount)}</td>
+    </tr>`
+    )
+    .join('')
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>设备退库单</title>
+<style>
+@page{size:A4;margin:14mm 12mm}
+*{box-sizing:border-box}
+body{font-family:"SimSun","宋体",serif;font-size:13px;color:#000;margin:0;padding:0}
+.sheet{width:100%}
+.title{text-align:center;font-size:22px;font-weight:bold;letter-spacing:3px;margin:0 0 14px}
+.meta-row{display:flex;justify-content:space-between;gap:12px;margin:4px 0 10px;font-size:13px}
+.meta-row .cell{flex:1}
+.meta-row .cell.center{text-align:center}
+.meta-row .cell.right{text-align:right}
+table.grid{width:100%;border-collapse:collapse;table-layout:fixed}
+table.grid th,table.grid td{border:1px solid #000;padding:6px 5px;vertical-align:middle}
+table.grid th{font-weight:bold;text-align:center;background:#fff}
+table.grid td{text-align:center}
+table.grid td.left{text-align:left}
+table.grid td.num{text-align:right}
+table.grid .total-label{text-align:left;font-weight:bold}
+.footer{display:flex;justify-content:space-between;margin-top:28px;font-size:13px;padding:0 4px}
+.footer .cell{flex:1}
+.footer .cell.center{text-align:center}
+.footer .cell.right{text-align:right}
+</style></head><body>
+<div class="sheet">
+  <div class="title">${esc(model.hospital)}设备退库单</div>
+  <div class="meta-row">
+    <div class="cell">仓库：${esc(model.warehouse || '-')}</div>
+    <div class="cell center">科室：${esc(model.dept || '-')}</div>
+    <div class="cell right">单据号：${esc(model.docNo || '-')}</div>
+  </div>
+  <div class="meta-row">
+    <div class="cell">审核时间：${esc(model.approvedAt || '-')}</div>
+    <div class="cell">退库原因：${esc(model.reason || '-')}</div>
     <div class="cell"></div>
   </div>
   <table class="grid">

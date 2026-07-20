@@ -319,6 +319,9 @@ export const pageRegistry: Record<string, PageConfig> = {
   '/purchase/dashboard': { title: '采购看板', apiBase: '/purchase', table: 'purchase_plan' },
   '/purchase/trace': { title: '业务追溯', apiBase: '/purchase', table: 'purchase_plan' },
   '/asset/query': { title: '资产综合查询', apiBase: '/asset', table: 'medical_device' },
+  '/asset/dynamic-stats': { title: '资产动态统计', apiBase: '/asset', table: 'medical_device' },
+  '/asset/dept-inventory-apply': { title: '科室盘点申请', apiBase: '/asset', table: 'medical_device' },
+  '/asset/dept-inventory-report': { title: '设备盘点报表', apiBase: '/asset', table: 'medical_device' },
   '/asset/import': {
     title: '资产导入',
     apiBase: '/asset',
@@ -345,7 +348,7 @@ export const pageRegistry: Record<string, PageConfig> = {
       { key: 'device_name', label: '资产名称', placeholder: '资产名称/简码' },
       { key: 'specification', label: '规格', placeholder: '规格模糊' },
       { key: 'model', label: '型号', placeholder: '型号模糊' },
-      { key: 'dept_id', label: '领用科室', placeholder: '科室名称/编码', linkTable: 'department' },
+      { key: 'dept_id', label: '科室', placeholder: '科室名称/编码', linkTable: 'department' },
       { key: 'manage_dept_id', label: '管理科室', placeholder: '科室名称/编码', linkTable: 'department' },
       { key: 'serial_number', label: '序列号(SN)', placeholder: '序列号模糊' }
     ],
@@ -387,8 +390,21 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/asset/device/page',
     showRowIndex: true,
     showRowSelection: true,
-    sortableColumns: ['device_code', 'device_name', 'specification', 'dept_name'],
+    sortableColumns: ['device_code', 'device_name', 'specification'],
     listParams: { stock_scope: 'warehouse' },
+    columns: [
+      'device_code',
+      'device_name',
+      'brand',
+      'specification',
+      'model',
+      'warehouse_name',
+      'stock_quantity',
+      'original_value',
+      'net_value',
+      'enable_date',
+      'device_status'
+    ],
     listFilters: [
       { key: 'warehouse_id', label: '仓库', linkTable: 'warehouse', prepend: true },
       { key: 'enable_dateFrom', label: '起', type: 'date', actionBar: true },
@@ -400,7 +416,6 @@ export const pageRegistry: Record<string, PageConfig> = {
       { key: 'device_name', label: '资产名称', placeholder: '资产名称/简码' },
       { key: 'specification', label: '规格', placeholder: '规格模糊' },
       { key: 'model', label: '型号', placeholder: '型号模糊' },
-      { key: 'dept_id', label: '领用科室', placeholder: '科室名称/编码', linkTable: 'department' },
       { key: 'manage_dept_id', label: '管理科室', placeholder: '科室名称/编码', linkTable: 'department' },
       { key: 'serial_number', label: '序列号(SN)', placeholder: '序列号模糊' }
     ],
@@ -415,7 +430,24 @@ export const pageRegistry: Record<string, PageConfig> = {
     foreignKey: 'outbound_id',
     listPageUrl: '/asset/outbound/page',
     saveUrl: '/asset/outbound',
-    listFilters: [{ key: 'doc_status', label: '审批状态', dictType: 'approval_status' }]
+    formDrawerSize: 'xl',
+    formGroupColumns: { basic: 7 },
+    showRowIndex: true,
+    showRowSelection: true,
+    columns: [
+      'outbound_no',
+      'warehouse_name',
+      'dept_id',
+      'created_by_name',
+      'outbound_date',
+      'receiver_id',
+      'total_amount',
+      'approved_by_name',
+      'approved_at',
+      'approval_status',
+      'remark'
+    ],
+    listFilters: [{ key: 'approval_status', label: '审批状态', dictType: 'acceptance_review_status' }]
   },
   '/asset/transfer': { title: '资产流转', apiBase: '/asset', table: 'asset_transfer', saveUrl: '/asset/transfer' },
   '/asset/inventory': {
@@ -471,7 +503,24 @@ export const pageRegistry: Record<string, PageConfig> = {
     foreignKey: 'outbound_id',
     listPageUrl: '/asset/outbound/page',
     saveUrl: '/asset/outbound',
-    listFilters: [{ key: 'doc_status', label: '审批状态', dictType: 'approval_status' }]
+    formDrawerSize: 'xl',
+    formGroupColumns: { basic: 7 },
+    showRowIndex: true,
+    showRowSelection: true,
+    columns: [
+      'outbound_no',
+      'warehouse_name',
+      'dept_id',
+      'created_by_name',
+      'outbound_date',
+      'receiver_id',
+      'total_amount',
+      'approved_by_name',
+      'approved_at',
+      'approval_status',
+      'remark'
+    ],
+    listFilters: [{ key: 'approval_status', label: '审批状态', dictType: 'acceptance_review_status' }]
   },
   '/warehouse/return': {
     title: '设备退库',
@@ -482,7 +531,24 @@ export const pageRegistry: Record<string, PageConfig> = {
     foreignKey: 'return_id',
     listPageUrl: '/asset/return/page',
     saveUrl: '/asset/return',
-    listFilters: [{ key: 'status', label: '状态', dictType: 'return_status' }]
+    formDrawerSize: 'xl',
+    formGroupColumns: { basic: 7 },
+    showRowIndex: true,
+    showRowSelection: true,
+    columns: [
+      'return_no',
+      'warehouse_name',
+      'dept_id',
+      'return_date',
+      'created_by_name',
+      'total_amount',
+      'approved_by_name',
+      'approved_at',
+      'approval_status',
+      'reason',
+      'remark'
+    ],
+    listFilters: [{ key: 'approval_status', label: '审批状态', dictType: 'acceptance_review_status' }]
   },
   '/warehouse/goods-return': {
     title: '设备退货',

@@ -368,13 +368,17 @@ public class ApprovalInstanceService {
     }
 
     private void autoIssueOutbound(UUID id) {
+        var outs = jdbc.queryForList("SELECT dept_id FROM device_outbound WHERE id = ?::uuid", id);
+        Object deptId = outs.isEmpty() ? null : outs.get(0).get("dept_id");
         var items = jdbc.queryForList("SELECT device_id FROM device_outbound_item WHERE outbound_id = ?::uuid", id);
         for (Map<String, Object> item : items) {
             if (item.get("device_id") != null) {
                 jdbc.update("""
-                    UPDATE medical_device SET device_status = 'in_use', warehouse_id = NULL, updated_at = NOW()
+                    UPDATE medical_device
+                    SET device_status = 'in_use', warehouse_id = NULL, dept_id = COALESCE(?::uuid, dept_id),
+                        updated_at = NOW()
                     WHERE id = ?::uuid
-                    """, item.get("device_id"));
+                    """, deptId, item.get("device_id"));
             }
         }
         jdbc.update("UPDATE device_outbound SET status = 'issued', doc_status = 'approved', updated_at = NOW() WHERE id = ?::uuid", id);

@@ -36,7 +36,7 @@ export const deviceFieldLabels: Record<string, string> = {
   depreciation_status: '折旧状态',
   campus_id: '院区',
   building_id: '楼宇',
-  dept_id: '领用科室',
+  dept_id: '科室',
   use_dept_head: '领用科室负责人',
   manage_dept_id: '管理科室',
   manage_dept_head: '管理科室负责人',

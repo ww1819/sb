@@ -141,7 +141,12 @@
             :save-base="config.saveUrl"
             @updated="(url) => onFileFieldUpdated(row, f.prop, url)"
           />
-          <TableCellValue v-else :field="f" :value="row[f.prop]" />
+          <TableCellValue
+            v-else
+            :field="f"
+            :value="row[f.prop]"
+            :label-hint="linkNameHint(f, row)"
+          />
         </template>
       </el-table-column>
       <slot name="extra-columns" />
@@ -364,6 +369,13 @@ function isSortable(prop: string) {
   return props.config.sortableColumns?.includes(prop) ?? false
 }
 
+function linkNameHint(field: { prop: string; linkTable?: string }, row: Record<string, unknown>) {
+  if (!field.linkTable || !field.prop.endsWith('_id')) return undefined
+  const name = row[field.prop.slice(0, -3) + '_name']
+  if (name == null || String(name).trim() === '') return undefined
+  return String(name).trim()
+}
+
 function setSort(prop: string, order: 'asc' | 'desc') {
   if (sortField.value === prop && sortOrder.value === order) {
     sortField.value = null
@@ -385,7 +397,8 @@ const listFields = computed(() => {
   let s = getListFields(props.config.table)
   const cols = props.config.columns
   if (cols?.length) {
-    const map = new Map(s.map((f) => [f.prop, f]))
+    // 显式 columns 时允许引用 list:false 的展示列（如库存数量）
+    const map = new Map(getSchema(props.config.table).map((f) => [f.prop, f]))
     s = cols.map((p) => map.get(p)).filter((f): f is NonNullable<typeof f> => !!f)
   }
   if (s.length) return s

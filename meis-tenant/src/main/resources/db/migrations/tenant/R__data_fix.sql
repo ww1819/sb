@@ -612,3 +612,30 @@ WHERE d.unit_id IS NULL
     LOWER(TRIM(u.unit_name)) = LOWER(TRIM(d.device_unit))
     OR LOWER(TRIM(u.unit_code)) = LOWER(TRIM(d.device_unit))
   );
+
+-- ---------- WH-UI-19：已发放出库单回填设备科室（可重复） ----------
+-- 设备已出库（在用且无仓库）且科室为空时，取最近一次已发放出库单的 dept_id
+UPDATE medical_device d
+SET dept_id = x.dept_id,
+    updated_at = NOW()
+FROM (
+  SELECT DISTINCT ON (i.device_id)
+         i.device_id,
+         o.dept_id
+  FROM device_outbound_item i
+  JOIN device_outbound o ON o.id = i.outbound_id
+  WHERE COALESCE(i.is_deleted, 0) = 0
+    AND COALESCE(o.is_deleted, 0) = 0
+    AND o.dept_id IS NOT NULL
+    AND (
+      o.status = 'issued'
+      OR o.approval_status = 'approved'
+      OR o.doc_status IN ('issued', 'approved')
+    )
+  ORDER BY i.device_id, o.updated_at DESC NULLS LAST, o.created_at DESC NULLS LAST
+) x
+WHERE d.id = x.device_id
+  AND d.dept_id IS NULL
+  AND d.warehouse_id IS NULL
+  AND d.device_status = 'in_use'
+  AND COALESCE(d.is_deleted, 0) = 0;
