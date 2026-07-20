@@ -494,8 +494,22 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/asset/goods-return/page',
     saveUrl: '/asset/goods-return',
     formDrawerSize: 'xl',
-    formGroupColumns: { basic: 6 },
-    listFilters: [{ key: 'doc_status', label: '审批状态', dictType: 'approval_status' }]
+    formGroupColumns: { basic: 7 },
+    showRowIndex: true,
+    showRowSelection: true,
+    columns: [
+      'return_no',
+      'warehouse_name',
+      'supplier_name',
+      'created_by_name',
+      'created_at',
+      'total_amount',
+      'approval_status',
+      'approved_by_name',
+      'approved_at',
+      'reason'
+    ],
+    listFilters: [{ key: 'approval_status', label: '审批状态', dictType: 'acceptance_review_status' }]
   },
   '/warehouse/transfer': { title: '库房调拨', apiBase: '/asset', table: 'asset_transfer', saveUrl: '/asset/transfer' },
   '/warehouse/inventory': {

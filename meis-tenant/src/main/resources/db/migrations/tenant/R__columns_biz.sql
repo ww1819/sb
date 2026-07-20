@@ -575,6 +575,9 @@ ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS is_deleted SMALLINT NOT
 ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
 ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(100);
 ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS deleted_by_name VARCHAR(100);
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS approved_by UUID;
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS approved_by_name VARCHAR(100);
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS approved_at DATE;
 
 CREATE TABLE IF NOT EXISTS device_goods_return_item (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -611,6 +614,13 @@ ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS unit_price DECIMAL
 ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS total_price DECIMAL(15,2);
 ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS manufacturer_id UUID;
 ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS serial_number VARCHAR(100);
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS brand VARCHAR(100);
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS category_id UUID;
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS category_name VARCHAR(200);
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS asset_category_id UUID;
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS asset_category_name VARCHAR(200);
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS finance_category_id UUID;
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS finance_category_name VARCHAR(200);
 ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS created_by UUID;

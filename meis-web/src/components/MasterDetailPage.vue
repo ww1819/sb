@@ -62,7 +62,7 @@
           :model="master"
           :fields="basicFormFields"
           :group-columns="config.formGroupColumns"
-          :highlight-labels="['plan_type', 'campus_id', 'dept_id', 'total_budget']"
+          :highlight-labels="['plan_type', 'campus_id', 'dept_id', 'total_budget', 'total_amount']"
         />
         <MasterDetailForm :items="items" :show-add-button="false" @add-item="addItem">
           <template #detail-columns>
@@ -90,6 +90,16 @@
                   @select="(device) => applyGoodsReturnStock(row, device)"
                   @clear="() => clearGoodsReturnStock(row)"
                 />
+                <RefDisplay
+                  v-else-if="f.readonly && f.linkTable"
+                  :link-table="f.linkTable"
+                  :value="row[f.prop]"
+                />
+                <TableCellValue
+                  v-else-if="f.readonly"
+                  :field="f"
+                  :value="row[f.prop]"
+                />
                 <FieldRenderer
                   v-else-if="f.linkTable || f.dictType || f.type === 'boolean' || f.type === 'date' || f.type === 'datetime' || f.type === 'file'"
                   v-model="row[f.prop]"
@@ -102,11 +112,10 @@
                   v-model="row[f.prop]"
                   :min="numberMin(f)"
                   :controls="false"
-                  :disabled="f.readonly"
                   style="width:100%"
                   @change="() => onDetailFieldChange(row, f.prop)"
                 />
-                <el-input v-else v-model="row[f.prop]" :disabled="f.readonly" />
+                <el-input v-else v-model="row[f.prop]" />
               </template>
             </el-table-column>
           </template>
@@ -138,6 +147,8 @@ import { useAuthStore } from '@/stores/auth'
 import CrudPage from './CrudPage.vue'
 import MasterDetailForm from './MasterDetailForm.vue'
 import FieldRenderer from './FieldRenderer.vue'
+import TableCellValue from './table/TableCellValue.vue'
+import RefDisplay from './form/RefDisplay.vue'
 import AppModal from './AppModal.vue'
 import GroupedFormFields from './form/GroupedFormFields.vue'
 import WarehouseStockDeviceSelect from './form/WarehouseStockDeviceSelect.vue'
@@ -200,8 +211,13 @@ function toPrice(v: unknown): number | null {
   return n
 }
 
+function idOrNull(v: unknown): string | null {
+  if (v == null || String(v).trim() === '') return null
+  return String(v)
+}
+
 function applyGoodsReturnStock(row: Record<string, unknown>, device: Record<string, unknown>) {
-  row.device_id = device.id != null ? String(device.id) : null
+  row.device_id = idOrNull(device.id)
   row.device_code = device.device_code ?? ''
   row.device_name = device.device_name ?? ''
   row.specification = device.specification ?? device.model ?? ''
@@ -211,14 +227,14 @@ function applyGoodsReturnStock(row: Record<string, unknown>, device: Record<stri
   }
   const price = toPrice(device.original_value) ?? toPrice(device.contract_price)
   if (price != null) row.unit_price = price
-  row.manufacturer_id = device.manufacturer_id ?? null
+  row.manufacturer_id = idOrNull(device.manufacturer_id)
   row.serial_number = device.serial_number ?? ''
   row.brand = device.brand ?? ''
-  row.category_id = device.category_id ?? null
+  row.category_id = idOrNull(device.category_id)
   row.category_name = device.category_name ?? ''
-  row.asset_category_id = device.asset_category_id ?? null
+  row.asset_category_id = idOrNull(device.asset_category_id)
   row.asset_category_name = device.asset_category_name ?? ''
-  row.finance_category_id = device.finance_category_id ?? null
+  row.finance_category_id = idOrNull(device.finance_category_id)
   row.finance_category_name = device.finance_category_name ?? ''
   recalcLineAmount(row)
   syncTotalBudget()
@@ -330,7 +346,9 @@ function syncTotalBudget() {
     const line = toNumber(row.total_price)
     if (line != null) sum += line
   }
-  master.value.total_budget = Math.round(sum * 100) / 100
+  const rounded = Math.round(sum * 100) / 100
+  master.value.total_budget = rounded
+  master.value.total_amount = rounded
 }
 
 function onDetailFieldChange(row: Record<string, unknown>, prop: string) {
@@ -460,6 +478,12 @@ async function openCreate() {
     if (auth.user?.realName) defaults.created_by_name = auth.user.realName
     else if (auth.user?.username) defaults.created_by_name = auth.user.username
     try {
+      const { data } = await http.get(`${props.saveUrl}/next-no`)
+      if (data.data?.return_no) defaults.return_no = data.data.return_no
+    } catch {
+      // 编号接口失败时仍可打开表单，保存时后端会兜底生成
+    }
+    try {
       const { data } = await http.get('/system/warehouse/list', { params: { limit: 50 } })
       const rows = (data.data?.records ?? data.data ?? []) as Record<string, unknown>[]
       const first = rows.find((r) => r.is_active !== false && r.id != null)
@@ -511,7 +535,7 @@ async function saveMaster() {
   applyCurrentUserDefaults(master.value)
   const missing = basicFormFields.value.filter((f) => {
     if (!f.required) return false
-    if (f.prop === 'total_budget') return false // 由明细自动汇总
+    if (f.prop === 'total_budget' || f.prop === 'total_amount') return false // 由明细自动汇总
     const v = master.value![f.prop]
     return v === null || v === undefined || v === ''
   })

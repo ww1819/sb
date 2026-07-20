@@ -317,7 +317,10 @@ public class ApprovalInstanceService {
         }
         jdbc.update("""
                 UPDATE device_goods_return
-                SET status = 'returned', doc_status = 'returned', updated_at = NOW()
+                SET status = 'returned',
+                    doc_status = 'approved',
+                    approval_status = 'approved',
+                    updated_at = NOW()
                 WHERE id = ?
                 """, id);
     }

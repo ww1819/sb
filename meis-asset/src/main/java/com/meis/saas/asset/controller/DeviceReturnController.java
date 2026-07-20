@@ -83,7 +83,7 @@ public class DeviceReturnController {
             jdbc.update("""
                 INSERT INTO device_return (id, return_no, outbound_id, warehouse_id, dept_id, returner_id,
                 return_date, return_type, reason, doc_status, status, approval_status, operator_id, remark)
-                VALUES (?::uuid,?,?::uuid,?::uuid,?::uuid,?::uuid,?,?,?,?,?,?,?::uuid,?)
+                VALUES (?::uuid,?,?::uuid,?::uuid,?::uuid,?::uuid,?::date,?,?,?,?,?,?::uuid,?)
                 """,
                     id, body.getOrDefault("return_no", "RT" + System.currentTimeMillis()),
                     body.get("outbound_id"), body.get("warehouse_id"), body.get("dept_id"), returnerId,
@@ -92,7 +92,7 @@ public class DeviceReturnController {
         } else {
             jdbc.update("""
                 UPDATE device_return SET outbound_id=?::uuid, warehouse_id=?::uuid, dept_id=?::uuid,
-                returner_id=?::uuid, return_date=?, return_type=?, reason=?, operator_id=?::uuid, remark=?, updated_at=NOW()
+                returner_id=?::uuid, return_date=?::date, return_type=?, reason=?, operator_id=?::uuid, remark=?, updated_at=NOW()
                 WHERE id=?::uuid
                 """,
                     body.get("outbound_id"), body.get("warehouse_id"), body.get("dept_id"), returnerId,
