@@ -42,6 +42,22 @@
               </el-card>
             </el-col>
           </el-row>
+          <el-card shadow="never" class="panel-card progress-panel">
+            <template #header>
+              <div class="panel-header">状态概览</div>
+            </template>
+            <div class="progress-circle-row">
+              <ProgressCircle
+                v-for="item in progressCircleDemo"
+                :key="item.variant"
+                :variant="item.variant"
+                :value="item.value"
+                :radius="50"
+              >
+                <span class="progress-circle-label">{{ item.label }}</span>
+              </ProgressCircle>
+            </div>
+          </el-card>
         </el-tab-pane>
 
         <el-tab-pane v-if="activeCharts.length" name="charts" lazy>
@@ -95,12 +111,27 @@ import StatCard from '@/components/dashboard/StatCard.vue'
 import ChartCard from '@/components/dashboard/ChartCard.vue'
 import QuickEntryGrid from '@/components/dashboard/QuickEntryGrid.vue'
 import FeedList from '@/components/dashboard/FeedList.vue'
-import { buildBarOption, buildLineOption, buildPieOption } from '@/composables/useChartTheme'
+import ProgressCircle, { type ProgressCircleVariant } from '@/components/ProgressCircle.vue'
+import {
+  buildBarOption,
+  buildLineOption,
+  buildMultiKpiGaugeOption,
+  buildPieOption,
+  buildRosePieOption
+} from '@/composables/useChartTheme'
 
 const router = useRouter()
 const tabs = useTabsStore()
 const layoutStore = useLayoutStore()
 const { profile } = useDashboardProfile()
+
+const progressCircleDemo: { variant: ProgressCircleVariant; label: string; value: number }[] = [
+  { variant: 'default', label: 'Default', value: 62 },
+  { variant: 'neutral', label: 'Neutral', value: 62 },
+  { variant: 'warning', label: 'Warning', value: 62 },
+  { variant: 'success', label: 'Success', value: 62 },
+  { variant: 'error', label: 'Error', value: 62 }
+]
 
 const stats = ref<Record<string, unknown>>({})
 const todos = ref<Record<string, unknown>[]>([])
@@ -164,11 +195,27 @@ const unreadCount = computed(() =>
 const emptyLine: EChartsOption = buildLineOption([], [])
 const emptyBar: EChartsOption = buildBarOption([], [])
 const emptyPie: EChartsOption = buildPieOption([])
+const emptyRose: EChartsOption = buildRosePieOption([])
+
+/** DASH-UI-04：示意多环 KPI（对齐 Highcharts Multiple KPI gauge） */
+function buildKpiGaugeDemo(): EChartsOption {
+  return buildMultiKpiGaugeOption(
+    [
+      { name: 'KPI A', value: 75, color: '#2CAFFE', trackColor: '#D6EEFF' },
+      { name: 'KPI B', value: 60, color: '#544FC5', trackColor: '#E8E7F8' },
+      { name: 'KPI C', value: 85, color: '#00E272', trackColor: '#D6FCE9' }
+    ],
+    'Conversion',
+    '80%'
+  )
+}
 
 function chartOptions() {
   const trend = (stats.value.repairTrend as { month: string; count: number }[]) ?? []
   const brands = (stats.value.brandTop10 as { brand: string; count: number }[]) ?? []
   const status = (stats.value.deviceStatus as { device_status: string; count: number }[]) ?? []
+  const category =
+    (stats.value.deviceCategory as { category_name: string; count: number }[]) ?? []
   const origin = (stats.value.importDomestic as { country: string; count: number }[]) ?? []
   const nd = (stats.value.newDevices as { month: string; count: number }[]) ?? []
   const dept = (stats.value.deptValue as { dept_name: string; total_value: number }[]) ?? []
@@ -194,6 +241,12 @@ function chartOptions() {
           status.map((s) => ({ name: s.device_status, value: s.count })),
           '设备状态'
         ),
+    category: !category.length
+      ? emptyRose
+      : buildRosePieOption(
+          category.map((c) => ({ name: c.category_name, value: Number(c.count) })),
+          '设备分类'
+        ),
     origin: !origin.length
       ? emptyPie
       : buildPieOption(
@@ -207,6 +260,7 @@ function chartOptions() {
           nd.map((n) => n.count),
           '新增'
         ),
+    kpiGauge: buildKpiGaugeDemo(),
     deptValue: !dept.length
       ? emptyBar
       : buildBarOption(
@@ -221,8 +275,10 @@ const chartMeta: Record<DashboardChartKey, { title: string; height: string; wide
   trend: { title: '维修趋势', height: '320px', wide: true },
   brand: { title: '品牌 TOP10', height: '320px', wide: true },
   status: { title: '设备状态', height: '300px' },
+  category: { title: '设备分类', height: '300px' },
   origin: { title: '国产/进口', height: '300px' },
   newDevice: { title: '新增设备', height: '300px', wide: true },
+  kpiGauge: { title: 'Multiple KPI gauge', height: '300px', wide: true },
   deptValue: { title: '科室资产价值', height: '320px', wide: true }
 }
 
@@ -230,16 +286,23 @@ const activeCharts = computed(() => {
   void layoutStore.themeRevision
   const options = chartOptions()
   const keys = profile.value.charts
+  const triplePies =
+    keys.includes('status') && keys.includes('category') && keys.includes('origin')
+  const newDevicePair = keys.includes('newDevice') && keys.includes('kpiGauge')
   return keys.map((key, index) => {
     const meta = chartMeta[key]
     const isWide = meta.wide ?? false
     const isLastOdd = keys.length % 2 === 1 && index === keys.length - 1
+    const isTriplePie =
+      triplePies && (key === 'status' || key === 'category' || key === 'origin')
+    const isNewDevicePair =
+      newDevicePair && (key === 'newDevice' || key === 'kpiGauge')
     return {
       key,
       title: meta.title,
       height: meta.height,
       option: options[key],
-      span: isLastOdd ? 24 : isWide ? 12 : 12
+      span: isTriplePie ? 8 : isNewDevicePair ? 12 : isLastOdd ? 24 : isWide ? 12 : 12
     }
   })
 })
@@ -359,5 +422,24 @@ function numVal(v: unknown) {
   width: 3px;
   border-radius: 2px;
   background: var(--el-color-primary);
+}
+
+.progress-panel {
+  margin-top: 16px;
+}
+
+.progress-circle-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 32px;
+  padding: 12px 8px 8px;
+}
+
+.progress-circle-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--meis-text-primary, #111827);
 }
 </style>

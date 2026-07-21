@@ -28,10 +28,32 @@ const props = withDefaults(
 const chartRef = ref<HTMLElement>()
 const layoutStore = useLayoutStore()
 let chart: echarts.ECharts | null = null
+let optionSig = ''
+
+function optionSignature(option: EChartsOption) {
+  try {
+    return JSON.stringify(option)
+  } catch {
+    return String(Date.now())
+  }
+}
 
 function render() {
   if (!chartRef.value || !props.option) return
-  if (!chart) chart = echarts.init(chartRef.value)
+  if (!chart) {
+    chart = echarts.init(chartRef.value)
+    chart.getZr().on('mousemove', () => {
+      const el = chartRef.value
+      if (el) el.style.cursor = 'pointer'
+    })
+    chart.getZr().on('globalout', () => {
+      const el = chartRef.value
+      if (el) el.style.cursor = 'default'
+    })
+  }
+  const nextSig = optionSignature(props.option)
+  if (nextSig === optionSig) return
+  optionSig = nextSig
   chart.setOption(props.option, true)
 }
 
@@ -51,7 +73,10 @@ onUnmounted(() => {
 })
 
 watch(() => props.option, render, { deep: true })
-watch(() => layoutStore.themeRevision, render)
+watch(() => layoutStore.themeRevision, () => {
+  optionSig = ''
+  render()
+})
 </script>
 
 <style scoped>
