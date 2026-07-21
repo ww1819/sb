@@ -27,6 +27,7 @@
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useAuthStore } from '@/stores/auth'
+import { requestSubscribe } from '@/utils/subscribe'
 
 const auth = useAuthStore()
 const tenantCode = ref('demo')
@@ -49,6 +50,7 @@ async function onLogin() {
   loading.value = true
   try {
     await auth.login(tenantCode.value.trim(), username.value.trim(), password.value)
+    await requestSubscribe('login')
     uni.showToast({ title: '登录成功', icon: 'success' })
     setTimeout(() => {
       uni.reLaunch({ url: '/pages/home/index' })

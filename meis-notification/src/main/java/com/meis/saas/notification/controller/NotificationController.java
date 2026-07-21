@@ -1,5 +1,6 @@
 package com.meis.saas.notification.controller;
 
+import com.meis.saas.common.ops.OpsDueReminderSupport;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +48,13 @@ public class NotificationController {
         return Result.ok(alerts);
     }
 
+    /** 手动触发运维到期扫描（调试/运维）；日常由定时任务调用。 */
+    @PostMapping("/ops-due/scan")
+    public Result<Map<String, Object>> scanOpsDue() {
+        int n = OpsDueReminderSupport.scanAndNotify(jdbc);
+        return Result.ok(Map.of("notified", n));
+    }
+
     @Scheduled(cron = "0 0 8 * * ?")
     public void dailyExpiryScan() {
         if (TenantContext.getSchemaName() == null) return;
@@ -56,5 +64,6 @@ public class NotificationController {
             jdbc.update("INSERT INTO sys_notification (title, content, notification_type, is_read) VALUES (?,?,?,false)",
                     "保修到期提醒", d.get("device_name") + " (" + d.get("device_code") + ") 将于7天后到期", "warranty_due");
         }
+        OpsDueReminderSupport.scanAndNotify(jdbc);
     }
 }

@@ -8,12 +8,16 @@ import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
+import com.meis.saas.common.rbac.PermissionContext;
+import com.meis.saas.common.rbac.PermissionInterceptor;
 import com.meis.saas.common.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.*;
 
 @RestController
@@ -22,6 +26,57 @@ import java.util.*;
 public class AssetDeviceController {
     private final JdbcTemplate jdbc;
     private final DeviceCodeGenerator codeGenerator;
+
+    /** App 台账增量同步（MOB.8）：按 updated_at 水位 + 数据权限过滤。 */
+    @GetMapping("/sync")
+    public Result<Map<String, Object>> sync(
+            @RequestParam(required = false) String updatedAfter,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "500") int size) {
+        if (page < 1) page = 1;
+        if (size < 1 || size > 1000) size = 500;
+        StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d"));
+        List<Object> args = new ArrayList<>();
+        if (updatedAfter != null && !updatedAfter.isBlank()) {
+            where.append(" AND d.updated_at > ?::timestamptz ");
+            args.add(updatedAfter.trim());
+        }
+        PermissionContext ctx = PermissionInterceptor.CTX.get();
+        if (ctx != null && ctx.getDataScope() != null && !"all".equals(ctx.getDataScope())) {
+            List<String> deptIds = ctx.getDeptIds();
+            if (deptIds != null && !deptIds.isEmpty()) {
+                String ph = String.join(",", Collections.nCopies(deptIds.size(), "?::uuid"));
+                where.append(" AND d.dept_id IN (").append(ph).append(") ");
+                args.addAll(deptIds);
+            } else if (ctx.getDeptId() != null && !ctx.getDeptId().isBlank()) {
+                where.append(" AND d.dept_id = ?::uuid ");
+                args.add(ctx.getDeptId());
+            }
+        }
+        Long total = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM medical_device d" + where, Long.class, args.toArray());
+        int offset = (page - 1) * size;
+        List<Object> pageArgs = new ArrayList<>(args);
+        pageArgs.add(size);
+        pageArgs.add(offset);
+        var rows = jdbc.queryForList("""
+                SELECT d.id, d.device_code, d.device_name, d.specification, d.serial_number,
+                       d.dept_id, d.device_status, d.updated_at, dept.dept_name
+                FROM medical_device d
+                LEFT JOIN department dept ON dept.id = d.dept_id
+                """ + where + " ORDER BY d.updated_at ASC NULLS FIRST, d.id ASC LIMIT ? OFFSET ?",
+                pageArgs.toArray());
+        String watermark = rows.isEmpty() ? updatedAfter : Objects.toString(rows.get(rows.size() - 1).get("updated_at"), updatedAfter);
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("records", rows);
+        data.put("total", total != null ? total : 0);
+        data.put("page", page);
+        data.put("size", size);
+        data.put("sync_at", Instant.now().toString());
+        data.put("watermark", watermark);
+        return Result.ok(data);
+    }
 
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(

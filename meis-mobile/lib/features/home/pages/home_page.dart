@@ -7,7 +7,12 @@ import 'repair_page.dart';
 import 'inventory_page.dart';
 import 'maintain_page.dart';
 import 'inspection_page.dart';
+import 'pm_page.dart';
 import 'message_page.dart';
+import 'my_repairs_page.dart';
+import 'engineer_hub_page.dart';
+import 'metrology_hub_page.dart';
+import 'label_reprint_page.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -48,9 +53,32 @@ class HomePage extends ConsumerWidget {
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RepairPage())),
           ),
           _HomeTile(
+            icon: Icons.assignment,
+            title: '我的报修',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyRepairsPage())),
+          ),
+          _HomeTile(
+            icon: Icons.verified_user,
+            title: '待我验收',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MyRepairsPage(pendingVerifyOnly: true)),
+            ),
+          ),
+          _HomeTile(
+            icon: Icons.handyman,
+            title: '工程师维修',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EngineerHubPage())),
+          ),
+          _HomeTile(
             icon: Icons.inventory,
             title: '移动盘点',
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InventoryPage())),
+          ),
+          _HomeTile(
+            icon: Icons.print,
+            title: '标签补打',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LabelReprintPage())),
           ),
           _HomeTile(
             icon: Icons.engineering,
@@ -61,6 +89,16 @@ class HomePage extends ConsumerWidget {
             icon: Icons.fact_check,
             title: '移动巡检',
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InspectionPage())),
+          ),
+          _HomeTile(
+            icon: Icons.health_and_safety,
+            title: '移动预防性维护',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PmPage())),
+          ),
+          _HomeTile(
+            icon: Icons.science,
+            title: '移动计量',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MetrologyHubPage())),
           ),
           _HomeTile(
             icon: Icons.notifications,

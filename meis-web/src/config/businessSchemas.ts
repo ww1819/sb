@@ -648,23 +648,25 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'is_active', label: '启用', type: 'boolean', list: true }
   ],
   inspection_plan: [
-    { prop: 'plan_code', label: '计划编号', list: true },
+    { prop: 'plan_no', label: '计划单号', list: true },
     { prop: 'plan_name', label: '计划名称', list: true, required: true },
     { prop: 'template_id', label: '巡检模板', linkTable: 'inspection_template', list: true },
-    { prop: 'device_id', label: '设备', linkTable: 'medical_device', list: true },
+    { prop: 'inspection_type_id', label: '巡检类别', linkTable: 'inspection_type', list: true },
     { prop: 'dept_id', label: '责任科室', linkTable: 'department', list: true },
     { prop: 'cycle_days', label: '周期(天)', type: 'number', list: true },
-    { prop: 'next_due_date', label: '下次巡检', type: 'date', list: true },
-    { prop: 'last_inspected_at', label: '上次巡检', type: 'date' },
+    { prop: 'next_due_date', label: '最近到期(汇总)', type: 'date', list: true, readonly: true },
     { prop: 'approval_status', label: '审核状态', dictType: 'inspect_approval_status', list: true },
     { prop: 'status', label: '状态', dictType: 'plan_status', list: true }
   ],
   inspection_execution: [
     { prop: 'execution_no', label: '执行单号', list: true, readonly: true },
+    { prop: 'plan_no', label: '计划单号', list: true, readonly: true },
+    { prop: 'source_type', label: '来源', list: true, readonly: true },
     { prop: 'template_id', label: '巡检模板', linkTable: 'inspection_template', list: true },
     { prop: 'planned_date', label: '计划日期', type: 'date', list: true },
-    { prop: 'assigned_inspector_id', label: '指派巡检人', linkTable: 'sys_user', list: true },
     { prop: 'status', label: '状态', dictType: 'inspect_exec_status', list: true },
+    { prop: 'submitter_name', label: '提交人', list: true, readonly: true },
+    { prop: 'auditor_name', label: '审核人', list: true, readonly: true },
     { prop: 'remark', label: '备注', type: 'textarea' }
   ],
   inspection_execution_item: [
@@ -856,26 +858,50 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'is_active', label: '启用', type: 'boolean', list: true }
   ],
   maintenance_plan: [
-    { prop: 'plan_code', label: '计划编码', list: true },
+    { prop: 'plan_no', label: '计划单号', list: true },
     { prop: 'plan_name', label: '计划名称', list: true, required: true },
     { prop: 'template_id', label: '保养模板', linkTable: 'maintenance_template', list: true },
-    { prop: 'device_id', label: '设备', linkTable: 'medical_device', list: true },
+    { prop: 'maintenance_level', label: '保养级别', list: true },
     { prop: 'dept_id', label: '责任科室', linkTable: 'department' },
     { prop: 'cycle_type', label: '周期类型', dictType: 'cycle_type', list: true },
     { prop: 'cycle_value', label: '周期值', type: 'number' },
     { prop: 'cycle_days', label: '周期(天)', type: 'number', list: true },
-    { prop: 'next_due_date', label: '下次保养', type: 'date', list: true },
-    { prop: 'last_maintained_at', label: '上次保养', type: 'date' },
+    { prop: 'next_due_date', label: '最近到期(汇总)', type: 'date', list: true, readonly: true },
     { prop: 'approval_status', label: '审核状态', dictType: 'maintain_approval_status', list: true },
     { prop: 'status', label: '状态', dictType: 'maintain_plan_status', list: true }
   ],
   maintenance_execution: [
     { prop: 'execution_no', label: '执行单号', list: true, readonly: true },
+    { prop: 'plan_no', label: '计划单号', list: true, readonly: true },
+    { prop: 'source_type', label: '来源', list: true, readonly: true },
     { prop: 'template_id', label: '保养模板', linkTable: 'maintenance_template', list: true },
+    { prop: 'maintenance_level', label: '保养级别', list: true },
     { prop: 'planned_date', label: '计划日期', type: 'date', list: true },
-    { prop: 'assigned_engineer_id', label: '指派工程师', linkTable: 'engineer', list: true },
     { prop: 'status', label: '状态', dictType: 'maintain_exec_status', list: true },
+    { prop: 'submitter_name', label: '提交人', list: true, readonly: true },
+    { prop: 'auditor_name', label: '审核人', list: true, readonly: true },
     { prop: 'remark', label: '备注', type: 'textarea' }
+  ],
+  ops_maintain_device: [
+    { prop: 'device_code', label: '设备编码', list: true, readonly: true },
+    { prop: 'device_name', label: '设备名称', list: true, readonly: true },
+    { prop: 'dept_name', label: '科室', list: true, readonly: true },
+    { prop: 'plan_count', label: '计划数', list: true, readonly: true },
+    { prop: 'execution_item_count', label: '执行明细数', list: true, readonly: true }
+  ],
+  ops_inspect_device: [
+    { prop: 'device_code', label: '设备编码', list: true, readonly: true },
+    { prop: 'device_name', label: '设备名称', list: true, readonly: true },
+    { prop: 'dept_name', label: '科室', list: true, readonly: true },
+    { prop: 'plan_count', label: '计划数', list: true, readonly: true },
+    { prop: 'execution_item_count', label: '执行明细数', list: true, readonly: true }
+  ],
+  ops_pm_device: [
+    { prop: 'device_code', label: '设备编码', list: true, readonly: true },
+    { prop: 'device_name', label: '设备名称', list: true, readonly: true },
+    { prop: 'dept_name', label: '科室', list: true, readonly: true },
+    { prop: 'plan_count', label: '计划数', list: true, readonly: true },
+    { prop: 'execution_item_count', label: '执行明细数', list: true, readonly: true }
   ],
   maintenance_execution_item: [
     { prop: 'device_code', label: '设备编码', list: true, readonly: true },
@@ -1048,25 +1074,27 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'is_active', label: '启用', type: 'boolean', list: true }
   ],
   pm_plan: [
-    { prop: 'plan_code', label: '计划编码', list: true },
+    { prop: 'plan_no', label: '计划单号', list: true },
     { prop: 'plan_name', label: '计划名称', list: true, required: true },
     { prop: 'template_id', label: 'PM模板', linkTable: 'pm_template', list: true },
-    { prop: 'device_id', label: '设备', linkTable: 'medical_device', list: true },
+    { prop: 'pm_type_id', label: 'PM类别', linkTable: 'pm_type', list: true },
     { prop: 'dept_id', label: '责任科室', linkTable: 'department' },
     { prop: 'cycle_type', label: '周期类型', dictType: 'cycle_type', list: true },
     { prop: 'cycle_value', label: '周期值', type: 'number' },
     { prop: 'cycle_days', label: '周期(天)', type: 'number', list: true },
-    { prop: 'next_due_date', label: '下次维护', type: 'date', list: true },
-    { prop: 'last_maintained_at', label: '上次维护', type: 'date' },
+    { prop: 'next_due_date', label: '最近到期(汇总)', type: 'date', list: true, readonly: true },
     { prop: 'approval_status', label: '审核状态', dictType: 'maintain_approval_status', list: true },
     { prop: 'status', label: '状态', dictType: 'maintain_plan_status', list: true }
   ],
   pm_execution: [
     { prop: 'execution_no', label: '执行单号', list: true, readonly: true },
+    { prop: 'plan_no', label: '计划单号', list: true, readonly: true },
+    { prop: 'source_type', label: '来源', list: true, readonly: true },
     { prop: 'template_id', label: 'PM模板', linkTable: 'pm_template', list: true },
     { prop: 'planned_date', label: '计划日期', type: 'date', list: true },
-    { prop: 'assigned_engineer_id', label: '指派工程师', linkTable: 'engineer', list: true },
     { prop: 'status', label: '状态', dictType: 'maintain_exec_status', list: true },
+    { prop: 'submitter_name', label: '提交人', list: true, readonly: true },
+    { prop: 'auditor_name', label: '审核人', list: true, readonly: true },
     { prop: 'remark', label: '备注', type: 'textarea' }
   ],
   pm_execution_item: [

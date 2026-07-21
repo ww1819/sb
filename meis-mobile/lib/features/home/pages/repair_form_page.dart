@@ -5,12 +5,15 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/storage/app_prefs.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/services/repair_draft_store.dart';
 import 'repair_scan_page.dart';
 
 class RepairFormPage extends ConsumerStatefulWidget {
-  const RepairFormPage({super.key, this.workorderId});
+  const RepairFormPage({super.key, this.workorderId, this.localDraftId});
 
   final String? workorderId;
+  /// 本地 SQLite 草稿 id（MOB.12）
+  final String? localDraftId;
 
   @override
   ConsumerState<RepairFormPage> createState() => _RepairFormPageState();
@@ -26,6 +29,7 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
   List<Map<String, dynamic>> faultTypes = [];
   List<String> photos = [];
   String? workorderId;
+  String? localDraftId;
   String urgency = 'normal';
   String? faultTypeId;
   var loading = false;
@@ -42,9 +46,14 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
   void initState() {
     super.initState();
     workorderId = widget.workorderId;
+    localDraftId = widget.localDraftId;
     Future.microtask(() async {
       await loadFaultTypes();
-      if (workorderId != null) await loadWorkorder(workorderId!);
+      if (workorderId != null) {
+        await loadWorkorder(workorderId!);
+      } else if (localDraftId != null) {
+        await loadLocalDraft(localDraftId!);
+      }
     });
   }
 
@@ -101,6 +110,107 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
       }
     } finally {
       if (mounted) setState(() => loading = false);
+    }
+  }
+
+  Future<void> loadLocalDraft(String id) async {
+    setState(() => loading = true);
+    try {
+      final row = await ref.read(repairDraftStoreProvider).get(id);
+      if (row == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('本地草稿不存在')));
+        }
+        return;
+      }
+      final payload = row['payload'] is Map
+          ? Map<String, dynamic>.from(row['payload'] as Map)
+          : <String, dynamic>{};
+      setState(() {
+        localDraftId = id;
+        codeCtrl.text = payload['device_code']?.toString() ?? row['device_code']?.toString() ?? '';
+        faultCtrl.text = payload['fault_description']?.toString() ?? '';
+        remarkCtrl.text = payload['remark']?.toString() ?? '';
+        urgency = payload['urgency_level']?.toString() ?? 'normal';
+        faultTypeId = payload['fault_type_id']?.toString();
+        final fp = payload['fault_photos'];
+        photos = fp is List ? fp.map((e) => e.toString()).toList() : <String>[];
+        if (payload['device_id'] != null || row['device_id'] != null) {
+          device = {
+            'id': payload['device_id'] ?? row['device_id'],
+            'device_code': payload['device_code'] ?? row['device_code'],
+            'device_name': payload['device_name'] ?? row['device_name'],
+            'dept_id': payload['report_dept_id'],
+            'dept_name': payload['dept_name'],
+            'can_report': true,
+          };
+        }
+      });
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  Map<String, dynamic> _buildBody() {
+    final user = ref.read(appPrefsProvider).user;
+    return <String, dynamic>{
+      'device_id': device!['id'],
+      'device_code': device!['device_code'],
+      'device_name': device!['device_name'],
+      'reporter_id': user?.userId,
+      'report_dept_id': device!['dept_id'],
+      'report_method': 'app',
+      'fault_description': faultCtrl.text.trim(),
+      'urgency_level': urgency,
+      'fault_type_id': faultTypeId,
+      'remark': remarkCtrl.text.trim().isEmpty ? null : remarkCtrl.text.trim(),
+      'fault_photos': photos,
+      'dept_name': device!['dept_name'],
+    };
+  }
+
+  Future<void> saveLocal() async {
+    if (readonly) return;
+    final user = ref.read(appPrefsProvider).user;
+    if (user == null || user.userId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('未登录，无法存本地')));
+      return;
+    }
+    if (faultCtrl.text.trim().isEmpty && device == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请至少填写设备或故障描述')));
+      return;
+    }
+    final payload = <String, dynamic>{
+      if (device != null) ...{
+        'device_id': device!['id'],
+        'device_code': device!['device_code'],
+        'device_name': device!['device_name'],
+        'report_dept_id': device!['dept_id'],
+        'dept_name': device!['dept_name'],
+      },
+      'fault_description': faultCtrl.text.trim(),
+      'urgency_level': urgency,
+      'fault_type_id': faultTypeId,
+      'remark': remarkCtrl.text.trim().isEmpty ? null : remarkCtrl.text.trim(),
+      'fault_photos': photos,
+    };
+    try {
+      final id = await ref.read(repairDraftStoreProvider).upsert(
+            id: localDraftId,
+            userId: user.userId,
+            deviceId: device?['id']?.toString(),
+            deviceCode: device?['device_code']?.toString() ?? codeCtrl.text.trim(),
+            deviceName: device?['device_name']?.toString(),
+            payload: payload,
+          );
+      setState(() => localDraftId = id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已存本地（无网可稍后再上传）')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('存本地失败: $e')));
+      }
     }
   }
 
@@ -223,20 +333,9 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
       return;
     }
 
-    final user = ref.read(appPrefsProvider).user;
-    final body = <String, dynamic>{
-      'device_id': device!['id'],
-      'device_code': device!['device_code'],
-      'device_name': device!['device_name'],
-      'reporter_id': user?.userId,
-      'report_dept_id': device!['dept_id'],
-      'report_method': 'app',
-      'fault_description': faultCtrl.text.trim(),
-      'urgency_level': urgency,
-      'fault_type_id': faultTypeId,
-      'remark': remarkCtrl.text.trim().isEmpty ? null : remarkCtrl.text.trim(),
-      'fault_photos': photos,
-    };
+    final body = _buildBody();
+    // 去掉仅本地用的字段
+    body.remove('dept_name');
 
     setState(() => loading = true);
     try {
@@ -245,6 +344,10 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
           : await api.putData('/repair/workorder/$workorderId', body);
       final saved = Map<String, dynamic>.from(data as Map);
       workorderId = saved['id']?.toString();
+      if (localDraftId != null) {
+        await ref.read(repairDraftStoreProvider).delete(localDraftId!);
+        localDraftId = null;
+      }
       if (!mounted) return;
       final submit = await showDialog<bool>(
         context: context,
@@ -430,7 +533,12 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                if (!readonly)
+                if (!readonly) ...[
+                  OutlinedButton(
+                    onPressed: loading ? null : saveLocal,
+                    child: Text(localDraftId == null ? '存本地（无网）' : '更新本地草稿'),
+                  ),
+                  const SizedBox(height: 12),
                   FilledButton(
                     onPressed: loading || !canContinue ? null : saveAndAskSubmit,
                     child: loading
@@ -439,8 +547,9 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
-                        : const Text('确定'),
+                        : Text(localDraftId != null ? '上传到服务器' : '确定'),
                   ),
+                ],
               ],
             ),
     );

@@ -54,6 +54,7 @@ import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { http } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
+import { requestSubscribe } from '@/utils/subscribe'
 
 interface DeviceInfo {
   id: string
@@ -173,6 +174,7 @@ async function submit() {
     const draft = await http.post<{ id: string }>('/repair/workorder', body)
     if (!draft?.id) throw new Error('创建报修单失败')
     const done = await http.post<{ wo_no?: string }>(`/repair/workorder/${draft.id}/submit`)
+    await requestSubscribe('repair_submit')
     uni.showModal({
       title: '报修成功',
       content: `工单号：${done?.wo_no || draft.id}`,

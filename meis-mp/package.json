@@ -2,7 +2,7 @@
   "name": "meis-mp",
   "version": "1.0.0",
   "private": true,
-  "description": "MEIS 微信小程序：登录、资产查询、扫码报修",
+  "description": "MEIS 微信小程序：扫码查询/报修/保养/巡检/PM（附录 MP）",
   "scripts": {
     "dev:mp-weixin": "uni -p mp-weixin",
     "build:mp-weixin": "uni build -p mp-weixin"

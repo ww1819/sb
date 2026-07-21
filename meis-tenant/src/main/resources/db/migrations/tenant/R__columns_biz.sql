@@ -1,22 +1,22 @@
 -- =============================================================================
--- 租户 schema 业务补列（可重复迁移 R__）—— 老租户缺列兜底
+-- ?? schema ?????????? R__??? ???????
 -- =============================================================================
--- 槽位：R__columns_biz.sql（按字母序：columns_audit → columns_biz → data_fix）
--- 约定：
---   1. 新建表 / 完整字段 → 只改 V1__tables.sql
---   2. 本文件只做业务结构性变更：ALTER TABLE ... ADD COLUMN / FK / RENAME / DROP COLUMN
---   3. 禁止 CREATE TABLE / CREATE INDEX（归 V1 / V2__indexes）
---   4. 标准七列归 R__columns_audit.sql；数据更正归 R__data_fix.sql
---   5. 不要在本文件 COMMENT ON
+-- ???R__columns_biz.sql??????columns_audit ? columns_biz ? data_fix?
+-- ???
+--   1. ??? / ???? ? ?? V1__tables.sql
+--   2. ?????????????ALTER TABLE ... ADD COLUMN / FK / RENAME / DROP COLUMN
+--   3. ?? CREATE TABLE / CREATE INDEX?? V1 / V2__indexes?
+--   4. ????? R__columns_audit.sql?????? R__data_fix.sql
+--   5. ?????? COMMENT ON
 -- =============================================================================
 
 ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS audit_status VARCHAR(20) DEFAULT 'pending';
--- ---------- repair_workorder（每列一条） ----------
+-- ---------- repair_workorder?????? ----------
 ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS repair_sub_status VARCHAR(30);
 ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS dispatch_started_at TIMESTAMP WITH TIME ZONE;
 ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMP WITH TIME ZONE;
 ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS closed_at TIMESTAMP WITH TIME ZONE;
--- ---------- 基础字典模块：补列 ----------
+-- ---------- ????????? ----------
 ALTER TABLE supplier ADD COLUMN IF NOT EXISTS pinyin_code VARCHAR(50);
 ALTER TABLE manufacturer ADD COLUMN IF NOT EXISTS pinyin_code VARCHAR(50);
 ALTER TABLE department ADD COLUMN IF NOT EXISTS pinyin_code VARCHAR(50);
@@ -27,7 +27,7 @@ ALTER TABLE asset_category ADD COLUMN IF NOT EXISTS depreciation_years INTEGER;
 ALTER TABLE asset_category ADD COLUMN IF NOT EXISTS residual_rate DECIMAL(5,2);
 ALTER TABLE finance_category ADD COLUMN IF NOT EXISTS account_subject VARCHAR(50);
 ALTER TABLE finance_category ADD COLUMN IF NOT EXISTS fund_source VARCHAR(50);
--- 设备 68 码三级编码为 8 位（如 68010101），历史 VARCHAR(6) 不够
+-- ?? 68 ?????? 8 ??? 68010101???? VARCHAR(6) ??
 ALTER TABLE medical_device_category ALTER COLUMN category_code TYPE VARCHAR(16);
 ALTER TABLE medical_device_category ALTER COLUMN parent_code TYPE VARCHAR(16);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS residual_rate DECIMAL(5,2);
@@ -84,7 +84,7 @@ ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS standard_function_count INTE
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS purchase_expected_benefit VARCHAR(200);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS rated_workload VARCHAR(100);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS device_unit VARCHAR(30);
--- AST-UI-02：台账单位改 FK → unit_dict（对齐 spare_part）；旧 device_unit 文本由 R__data_fix 迁移
+-- AST-UI-02?????? FK ? unit_dict??? spare_part??? device_unit ??? R__data_fix ??
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS unit_id UUID;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS manage_dept_id UUID;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS location_floor VARCHAR(50);
@@ -92,7 +92,7 @@ ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS room_number VARCHAR(50);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS card_code VARCHAR(50);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS use_dept_head VARCHAR(100);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS manage_dept_head VARCHAR(100);
--- 历史库 finance_category 误用 asset 列名 category_code/category_name，纠正为 finance_code/finance_name
+-- ??? finance_category ?? asset ?? category_code/category_name???? finance_code/finance_name
 DO $finance_cat_fix$
 BEGIN
     IF EXISTS (
@@ -106,7 +106,7 @@ BEGIN
         ALTER TABLE finance_category RENAME COLUMN category_name TO finance_name;
     END IF;
 END $finance_cat_fix$;
--- ---------- 资产台账模块：设备档案补列 ----------
+-- ---------- ????????????? ----------
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS specification VARCHAR(200);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS registration_no VARCHAR(100);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS production_date DATE;
@@ -121,14 +121,14 @@ ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_metrology BOOLEAN DEFAULT
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_maintain_device BOOLEAN DEFAULT FALSE;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_inspection_device BOOLEAN DEFAULT FALSE;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS pinyin_code VARCHAR(50);
--- ---------- 维修管理模块：配件档案补列 ----------
+-- ---------- ????????????? ----------
 ALTER TABLE spare_part ADD COLUMN IF NOT EXISTS model VARCHAR(100);
 ALTER TABLE spare_part ADD COLUMN IF NOT EXISTS unit_id UUID;
 ALTER TABLE spare_part ADD COLUMN IF NOT EXISTS manufacturer_id UUID;
 ALTER TABLE spare_part ADD COLUMN IF NOT EXISTS warehouse_id UUID;
 ALTER TABLE spare_part_transaction ADD COLUMN IF NOT EXISTS ref_no VARCHAR(50);
 ALTER TABLE spare_part_transaction ADD COLUMN IF NOT EXISTS remark TEXT;
--- ---------- 保养管理模块：参数/计划/执行补列 ----------
+-- ---------- ?????????/??/???? ----------
 ALTER TABLE maintenance_template ADD COLUMN IF NOT EXISTS template_code VARCHAR(30);
 ALTER TABLE maintenance_template ADD COLUMN IF NOT EXISTS maintenance_level_id UUID;
 ALTER TABLE maintenance_template ADD COLUMN IF NOT EXISTS description TEXT;
@@ -137,7 +137,7 @@ ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20
 ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS created_by UUID;
 ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS approved_by UUID;
 ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP WITH TIME ZONE;
--- ---------- 巡检管理模块：参数/计划/执行补列 ----------
+-- ---------- ?????????/??/???? ----------
 ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS template_id UUID;
 ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS inspection_type_id UUID;
 ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS cycle_days INTEGER;
@@ -150,12 +150,12 @@ ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS approved_by UUID;
 ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP WITH TIME ZONE;
 ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS remark TEXT;
 ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
--- 计量检定类型：纠正错误绑定到 public.metrology_type 的自引用外键（历史 search_path 串写）
+-- ?????????????? public.metrology_type ????????? search_path ???
 ALTER TABLE "${flyway:defaultSchema}".metrology_type DROP CONSTRAINT IF EXISTS metrology_type_parent_id_fkey;
 ALTER TABLE "${flyway:defaultSchema}".metrology_type
   ADD CONSTRAINT metrology_type_parent_id_fkey
   FOREIGN KEY (parent_id) REFERENCES "${flyway:defaultSchema}".metrology_type(id);
--- ---------- 库房管理模块：补列 ----------
+-- ---------- ????????? ----------
 ALTER TABLE device_entry ADD COLUMN IF NOT EXISTS warehouse_id UUID;
 ALTER TABLE device_outbound ADD COLUMN IF NOT EXISTS warehouse_id UUID;
 ALTER TABLE device_outbound ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'draft';
@@ -186,7 +186,7 @@ ALTER TABLE device_outbound_item ADD COLUMN IF NOT EXISTS created_by_name VARCHA
 ALTER TABLE device_outbound_item ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(100);
 ALTER TABLE device_outbound_item ADD COLUMN IF NOT EXISTS deleted_by_name VARCHAR(100);
 
--- ---------- 设备退库：主表/明细补列（WH-UI-22） ----------
+-- ---------- ???????/?????WH-UI-22? ----------
 ALTER TABLE device_return ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
 ALTER TABLE device_return ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(100);
 ALTER TABLE device_return ADD COLUMN IF NOT EXISTS deleted_by_name VARCHAR(100);
@@ -214,16 +214,17 @@ ALTER TABLE device_return_item ADD COLUMN IF NOT EXISTS deleted_by_name VARCHAR(
 ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS from_warehouse_id UUID;
 ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS to_warehouse_id UUID;
 ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS warehouse_id UUID;
--- ---------- 盘点补打标签 / 统一打印流水（附录 AST.INV） ----------
+-- ---------- ?????? / ????????? AST.INV? ----------
 ALTER TABLE inventory_check_item ADD COLUMN IF NOT EXISTS need_reprint_label BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE inventory_check_item ADD COLUMN IF NOT EXISTS label_printed BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE inventory_check_item ADD COLUMN IF NOT EXISTS label_print_count INT NOT NULL DEFAULT 0;
+ALTER TABLE inventory_check_item ADD COLUMN IF NOT EXISTS row_version INTEGER DEFAULT 1;
 ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS printed_by_name VARCHAR(100);
 ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS biz_type VARCHAR(50);
 ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS biz_id UUID;
 ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS biz_no VARCHAR(50);
 ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS biz_item_id UUID;
--- ---------- 公用设备借调模块（附录 N） ----------
+-- ---------- ??????????? N? ----------
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_shared_device BOOLEAN DEFAULT FALSE;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS metrology_type_code VARCHAR(50);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS shared_fee_mode VARCHAR(20);
@@ -234,23 +235,23 @@ ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS fee_time_unit VARCHAR(10
 ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS fee_unit_price DECIMAL(12,2);
 ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS billing_start_at TIMESTAMPTZ;
 ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS billing_end_at TIMESTAMPTZ;
--- ---------- 预防性维护模块 ----------
+-- ---------- ??????? ----------
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_pm_device BOOLEAN DEFAULT FALSE;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS standby_current_max_ma DECIMAL(10,2);
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS standby_current_min_ma DECIMAL(10,2);
 ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS device_code VARCHAR(20);
 ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
--- ---------- REP-03：维修工程师 sys_user + assigned_user_id ----------
+-- ---------- REP-03?????? sys_user + assigned_user_id ----------
 ALTER TABLE sys_user ADD COLUMN IF NOT EXISTS is_repair_engineer BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS assigned_user_id UUID;
--- ---------- U.14：进程段确认固化 + 工程师工作内容 ----------
+-- ---------- U.14???????? + ??????? ----------
 ALTER TABLE repair_workorder_segment ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMP WITH TIME ZONE;
 ALTER TABLE repair_workorder_segment ADD COLUMN IF NOT EXISTS confirmed_by UUID;
 ALTER TABLE repair_workorder_segment_user ADD COLUMN IF NOT EXISTS work_content TEXT;
-COMMENT ON COLUMN repair_workorder_segment.confirmed_at IS '段确认固化时间';
-COMMENT ON COLUMN repair_workorder_segment.confirmed_by IS '段确认人';
-COMMENT ON COLUMN repair_workorder_segment_user.work_content IS '工程师工作内容（选填）';
--- ---------- U.15 / 附录 W：配件供应商、拼音简码、业务冗余 device_* ----------
+COMMENT ON COLUMN repair_workorder_segment.confirmed_at IS '???????';
+COMMENT ON COLUMN repair_workorder_segment.confirmed_by IS '????';
+COMMENT ON COLUMN repair_workorder_segment_user.work_content IS '???????????';
+-- ---------- U.15 / ?? W???????????????? device_* ----------
 ALTER TABLE spare_part ADD COLUMN IF NOT EXISTS pinyin_code VARCHAR(50);
 ALTER TABLE repair_workorder_segment_part ADD COLUMN IF NOT EXISTS supplier_id UUID;
 ALTER TABLE repair_workorder_segment_part ADD COLUMN IF NOT EXISTS device_id UUID;
@@ -271,7 +272,7 @@ ALTER TABLE spare_part_usage ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
 ALTER TABLE spare_part_transaction ADD COLUMN IF NOT EXISTS device_id UUID;
 ALTER TABLE spare_part_transaction ADD COLUMN IF NOT EXISTS device_code VARCHAR(50);
 ALTER TABLE spare_part_transaction ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
--- ---------- 附录 W.5：维修业务责任人姓名快照 ----------
+-- ---------- ?? W.5???????????? ----------
 ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS reporter_name VARCHAR(100);
 ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS assigned_user_name VARCHAR(100);
 ALTER TABLE repair_workorder_event ADD COLUMN IF NOT EXISTS operator_name VARCHAR(100);
@@ -287,7 +288,7 @@ ALTER TABLE repair_workorder_segment ADD COLUMN IF NOT EXISTS confirmed_by_name 
 ALTER TABLE repair_workorder_segment_user ADD COLUMN IF NOT EXISTS user_name VARCHAR(100);
 ALTER TABLE repair_workorder_segment_user ADD COLUMN IF NOT EXISTS labor_cost DECIMAL(10,2);
 ALTER TABLE spare_part_usage ADD COLUMN IF NOT EXISTS operator_name VARCHAR(100);
--- ---------- 系统配置：分类 + 编号/名称 + 值1~值6 ----------
+-- ---------- ??????? + ??/?? + ?1~?6 ----------
 ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS category_code VARCHAR(20);
 ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS category_name VARCHAR(100);
 ALTER TABLE sys_config ADD COLUMN IF NOT EXISTS item_code VARCHAR(20);
@@ -348,7 +349,7 @@ BEGIN
         ALTER TABLE repair_workorder_event RENAME COLUMN to_engineer_id TO to_user_id;
     END IF;
 END $rep03_rename_event$;
--- ---------- purchase_plan（采购申请基本信息扩展 PUR-UI-01） ----------
+-- ---------- purchase_plan??????????? PUR-UI-01? ----------
 ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS campus_id UUID;
 DO $purchase_plan_campus_fk$
 BEGIN
@@ -392,7 +393,7 @@ BEGIN
             FOREIGN KEY (category_id) REFERENCES medical_device_category(id);
     END IF;
 END $purchase_plan_category_fk$;
--- ---------- purchase_plan_item（明细扩展字段 PUR-UI-01） ----------
+-- ---------- purchase_plan_item??????? PUR-UI-01? ----------
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS similar_device_count INTEGER;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS demand_level VARCHAR(30);
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS product_attribute_req TEXT;
@@ -403,7 +404,7 @@ ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS existing_device_usage_fr
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS other_condition_confirm TEXT;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS is_large_equipment BOOLEAN DEFAULT false;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS large_equipment_class VARCHAR(20);
--- ---------- purchase_plan_item（订单号 / 订单审核 PUR-UI-09） ----------
+-- ---------- purchase_plan_item???? / ???? PUR-UI-09? ----------
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS order_no VARCHAR(20);
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bidding_no VARCHAR(20);
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS order_review_comment TEXT;
@@ -412,7 +413,7 @@ ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS order_reviewed_by UUID;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS order_reviewed_by_name VARCHAR(100);
 CREATE UNIQUE INDEX IF NOT EXISTS uk_purchase_plan_item_bidding_no
     ON purchase_plan_item(bidding_no) WHERE bidding_no IS NOT NULL;
--- ---------- purchase_plan_item（询价议价会议记录 PUR-UI-10） ----------
+-- ---------- purchase_plan_item????????? PUR-UI-10? ----------
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_meeting_location VARCHAR(100);
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_meeting_time DATE;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_participant_depts VARCHAR(200);
@@ -428,14 +429,14 @@ ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_reviewed_by_name
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_at TIMESTAMPTZ;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_by UUID;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bargain_by_name VARCHAR(100);
--- ---------- purchase_plan_item（招标审核 PUR-UI-21） ----------
+-- ---------- purchase_plan_item????? PUR-UI-21? ----------
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bidding_review_result VARCHAR(20);
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bidding_review_comment VARCHAR(500);
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bidding_reviewed_at TIMESTAMPTZ;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bidding_reviewed_by UUID;
 ALTER TABLE purchase_plan_item ADD COLUMN IF NOT EXISTS bidding_reviewed_by_name VARCHAR(100);
 
--- ---------- purchase_plan_item_bid_supplier（招标供应商 PUR-UI-15） ----------
+-- ---------- purchase_plan_item_bid_supplier?????? PUR-UI-15? ----------
 CREATE TABLE IF NOT EXISTS purchase_plan_item_bid_supplier (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     plan_item_id UUID NOT NULL REFERENCES purchase_plan_item(id),
@@ -479,7 +480,7 @@ ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS supplier_id
 ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS bid_doc_url VARCHAR(500);
 ALTER TABLE purchase_plan_item_bid_supplier ADD COLUMN IF NOT EXISTS is_winner BOOLEAN NOT NULL DEFAULT FALSE;
 
--- ---------- purchase_contract_item（合同设备明细 PUR-UI-17） ----------
+-- ---------- purchase_contract_item??????? PUR-UI-17? ----------
 CREATE TABLE IF NOT EXISTS purchase_contract_item (
     id UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
     contract_id UUID NOT NULL REFERENCES purchase_contract(id),
@@ -517,13 +518,13 @@ ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS created_by_name VARC
 ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(100);
 ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS deleted_by_name VARCHAR(100);
 
--- ---------- purchase_contract 资金来源（PUR-UI-19） ----------
+-- ---------- purchase_contract ?????PUR-UI-19? ----------
 ALTER TABLE purchase_contract ADD COLUMN IF NOT EXISTS fund_source VARCHAR(30);
--- ---------- contract_payment（付款计划 PUR-UI-23） ----------
+-- ---------- contract_payment????? PUR-UI-23? ----------
 ALTER TABLE contract_payment ADD COLUMN IF NOT EXISTS payment_ratio DECIMAL(8,2);
 ALTER TABLE contract_payment ADD COLUMN IF NOT EXISTS payment_condition VARCHAR(500);
 
--- ---------- purchase_acceptance_device（验收设备明细 PUR-UI-24） ----------
+-- ---------- purchase_acceptance_device??????? PUR-UI-24? ----------
 CREATE TABLE IF NOT EXISTS purchase_acceptance_device (
     id UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
     acceptance_id UUID NOT NULL REFERENCES purchase_acceptance(id) ON DELETE CASCADE,
@@ -561,15 +562,15 @@ ALTER TABLE purchase_acceptance_device ADD COLUMN IF NOT EXISTS created_by_name 
 ALTER TABLE purchase_acceptance_device ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(100);
 ALTER TABLE purchase_acceptance_device ADD COLUMN IF NOT EXISTS deleted_by_name VARCHAR(100);
 
--- ---------- purchase_acceptance_member（验收参数 PUR-UI-25） ----------
+-- ---------- purchase_acceptance_member????? PUR-UI-25? ----------
 ALTER TABLE purchase_acceptance_member ADD COLUMN IF NOT EXISTS acceptance_content VARCHAR(500);
 ALTER TABLE purchase_acceptance_member ADD COLUMN IF NOT EXISTS acceptance_result VARCHAR(100);
 
--- ---------- purchase_acceptance 审核人/审核日期（PUR-UI-30） ----------
+-- ---------- purchase_acceptance ???/?????PUR-UI-30? ----------
 ALTER TABLE purchase_acceptance ADD COLUMN IF NOT EXISTS approved_by UUID;
 ALTER TABLE purchase_acceptance ADD COLUMN IF NOT EXISTS approved_by_name VARCHAR(100);
 ALTER TABLE purchase_acceptance ADD COLUMN IF NOT EXISTS approved_at DATE;
--- 若早期以 timestamptz 建列，收成 DATE（仅日期）
+-- ???? timestamptz ????? DATE?????
 DO $$
 BEGIN
   IF EXISTS (
@@ -582,7 +583,7 @@ BEGIN
   END IF;
 END $$;
 
--- ---------- device_goods_return 供应商退货（WH-UI-01） ----------
+-- ---------- device_goods_return ??????WH-UI-01? ----------
 CREATE TABLE IF NOT EXISTS device_goods_return (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     return_no VARCHAR(30) UNIQUE NOT NULL,
@@ -683,7 +684,7 @@ ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS created_by_name VA
 ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(100);
 ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS deleted_by_name VARCHAR(100);
 
--- ---------- device_entry 发票字段（WH-UI-02） ----------
+-- ---------- device_entry ?????WH-UI-02? ----------
 ALTER TABLE device_entry ADD COLUMN IF NOT EXISTS invoice_amount DECIMAL(15,2);
 ALTER TABLE device_entry ADD COLUMN IF NOT EXISTS invoice_no VARCHAR(50);
 ALTER TABLE device_entry ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20);
@@ -695,7 +696,7 @@ WHERE status = 'completed' AND COALESCE(approval_status, '') IS DISTINCT FROM 'a
 UPDATE device_entry SET approval_status = 'draft'
 WHERE approval_status IS NULL;
 
--- ---------- device_entry_item 入库明细扩展（WH-UI-02） ----------
+-- ---------- device_entry_item ???????WH-UI-02? ----------
 ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS specification VARCHAR(200);
 ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS unit VARCHAR(50);
 ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS dept_id UUID;
@@ -711,6 +712,125 @@ ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS storage_location VARCHAR(
 ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS category_id UUID;
 ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS finance_category_id UUID;
 ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS asset_category_id UUID;
--- 兼容旧数据：型号回填规格型号
+-- ??????????????
 UPDATE device_entry_item SET specification = model
 WHERE (specification IS NULL OR specification = '') AND model IS NOT NULL AND model <> '';
+
+-- ---------- ?? OPS????? / ???? / ?????2026-07-21? ----------
+ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS plan_no VARCHAR(30);
+ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS template_name VARCHAR(200);
+ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS maintenance_level_id UUID;
+ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS assigned_user_id UUID;
+ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS assigned_user_name VARCHAR(100);
+ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS approved_by_name VARCHAR(100);
+ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS campus_id UUID;
+
+ALTER TABLE pm_plan ADD COLUMN IF NOT EXISTS plan_no VARCHAR(30);
+ALTER TABLE pm_plan ADD COLUMN IF NOT EXISTS template_name VARCHAR(200);
+ALTER TABLE pm_plan ADD COLUMN IF NOT EXISTS assigned_user_id UUID;
+ALTER TABLE pm_plan ADD COLUMN IF NOT EXISTS assigned_user_name VARCHAR(100);
+ALTER TABLE pm_plan ADD COLUMN IF NOT EXISTS approved_by_name VARCHAR(100);
+ALTER TABLE pm_plan ADD COLUMN IF NOT EXISTS campus_id UUID;
+
+ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS plan_no VARCHAR(30);
+ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS template_name VARCHAR(200);
+
+ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS plan_no VARCHAR(30);
+ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS source_type VARCHAR(20) DEFAULT 'from_plan';
+ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS template_name VARCHAR(200);
+ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS maintenance_level VARCHAR(20);
+ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS assigned_user_id UUID;
+ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS assigned_user_name VARCHAR(100);
+ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS executor_name VARCHAR(100);
+ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS submitter_id UUID;
+ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS submitter_name VARCHAR(100);
+ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS auditor_id UUID;
+ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS auditor_name VARCHAR(100);
+ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS audited_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS audit_comment TEXT;
+
+ALTER TABLE pm_execution ADD COLUMN IF NOT EXISTS plan_no VARCHAR(30);
+ALTER TABLE pm_execution ADD COLUMN IF NOT EXISTS source_type VARCHAR(20) DEFAULT 'from_plan';
+ALTER TABLE pm_execution ADD COLUMN IF NOT EXISTS template_name VARCHAR(200);
+ALTER TABLE pm_execution ADD COLUMN IF NOT EXISTS assigned_user_id UUID;
+ALTER TABLE pm_execution ADD COLUMN IF NOT EXISTS assigned_user_name VARCHAR(100);
+ALTER TABLE pm_execution ADD COLUMN IF NOT EXISTS executor_name VARCHAR(100);
+ALTER TABLE pm_execution ADD COLUMN IF NOT EXISTS submitter_id UUID;
+ALTER TABLE pm_execution ADD COLUMN IF NOT EXISTS submitter_name VARCHAR(100);
+ALTER TABLE pm_execution ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE pm_execution ADD COLUMN IF NOT EXISTS auditor_id UUID;
+ALTER TABLE pm_execution ADD COLUMN IF NOT EXISTS auditor_name VARCHAR(100);
+ALTER TABLE pm_execution ADD COLUMN IF NOT EXISTS audited_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE pm_execution ADD COLUMN IF NOT EXISTS audit_comment TEXT;
+
+ALTER TABLE inspection_execution ADD COLUMN IF NOT EXISTS plan_no VARCHAR(30);
+ALTER TABLE inspection_execution ADD COLUMN IF NOT EXISTS source_type VARCHAR(20) DEFAULT 'from_plan';
+ALTER TABLE inspection_execution ADD COLUMN IF NOT EXISTS template_name VARCHAR(200);
+ALTER TABLE inspection_execution ADD COLUMN IF NOT EXISTS executor_name VARCHAR(100);
+ALTER TABLE inspection_execution ADD COLUMN IF NOT EXISTS submitter_id UUID;
+ALTER TABLE inspection_execution ADD COLUMN IF NOT EXISTS submitter_name VARCHAR(100);
+ALTER TABLE inspection_execution ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE inspection_execution ADD COLUMN IF NOT EXISTS auditor_id UUID;
+ALTER TABLE inspection_execution ADD COLUMN IF NOT EXISTS auditor_name VARCHAR(100);
+ALTER TABLE inspection_execution ADD COLUMN IF NOT EXISTS audited_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE inspection_execution ADD COLUMN IF NOT EXISTS audit_comment TEXT;
+
+ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS execution_no VARCHAR(30);
+ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS plan_item_id UUID;
+ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS executor_id UUID;
+ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS executor_name VARCHAR(100);
+ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS start_time TIMESTAMP WITH TIME ZONE;
+ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS end_time TIMESTAMP WITH TIME ZONE;
+ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS issues_found TEXT;
+ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS photos JSONB;
+ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS signature_url VARCHAR(500);
+ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS row_version INTEGER DEFAULT 1;
+
+ALTER TABLE pm_execution_item ADD COLUMN IF NOT EXISTS execution_no VARCHAR(30);
+ALTER TABLE pm_execution_item ADD COLUMN IF NOT EXISTS plan_item_id UUID;
+ALTER TABLE pm_execution_item ADD COLUMN IF NOT EXISTS executor_id UUID;
+ALTER TABLE pm_execution_item ADD COLUMN IF NOT EXISTS executor_name VARCHAR(100);
+ALTER TABLE pm_execution_item ADD COLUMN IF NOT EXISTS start_time TIMESTAMP WITH TIME ZONE;
+ALTER TABLE pm_execution_item ADD COLUMN IF NOT EXISTS end_time TIMESTAMP WITH TIME ZONE;
+ALTER TABLE pm_execution_item ADD COLUMN IF NOT EXISTS issues_found TEXT;
+ALTER TABLE pm_execution_item ADD COLUMN IF NOT EXISTS photos JSONB;
+ALTER TABLE pm_execution_item ADD COLUMN IF NOT EXISTS signature_url VARCHAR(500);
+ALTER TABLE pm_execution_item ADD COLUMN IF NOT EXISTS row_version INTEGER DEFAULT 1;
+
+ALTER TABLE inspection_execution_item ADD COLUMN IF NOT EXISTS execution_no VARCHAR(30);
+ALTER TABLE inspection_execution_item ADD COLUMN IF NOT EXISTS plan_item_id UUID;
+ALTER TABLE inspection_execution_item ADD COLUMN IF NOT EXISTS executor_id UUID;
+ALTER TABLE inspection_execution_item ADD COLUMN IF NOT EXISTS executor_name VARCHAR(100);
+ALTER TABLE inspection_execution_item ADD COLUMN IF NOT EXISTS start_time TIMESTAMP WITH TIME ZONE;
+ALTER TABLE inspection_execution_item ADD COLUMN IF NOT EXISTS end_time TIMESTAMP WITH TIME ZONE;
+ALTER TABLE inspection_execution_item ADD COLUMN IF NOT EXISTS issues_found TEXT;
+ALTER TABLE inspection_execution_item ADD COLUMN IF NOT EXISTS photos JSONB;
+ALTER TABLE inspection_execution_item ADD COLUMN IF NOT EXISTS signature_url VARCHAR(500);
+ALTER TABLE inspection_execution_item ADD COLUMN IF NOT EXISTS row_version INTEGER DEFAULT 1;
+
+ALTER TABLE maintenance_execution_result ADD COLUMN IF NOT EXISTS standard_value VARCHAR(200);
+ALTER TABLE maintenance_execution_result ADD COLUMN IF NOT EXISTS check_method VARCHAR(200);
+ALTER TABLE maintenance_execution_result ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+ALTER TABLE maintenance_execution_result ADD COLUMN IF NOT EXISTS is_required BOOLEAN DEFAULT TRUE;
+ALTER TABLE maintenance_execution_result ADD COLUMN IF NOT EXISTS photos JSONB;
+ALTER TABLE maintenance_execution_result ADD COLUMN IF NOT EXISTS row_version INTEGER DEFAULT 1;
+
+ALTER TABLE pm_execution_result ADD COLUMN IF NOT EXISTS standard_value VARCHAR(200);
+ALTER TABLE pm_execution_result ADD COLUMN IF NOT EXISTS check_method VARCHAR(200);
+ALTER TABLE pm_execution_result ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+ALTER TABLE pm_execution_result ADD COLUMN IF NOT EXISTS is_required BOOLEAN DEFAULT TRUE;
+ALTER TABLE pm_execution_result ADD COLUMN IF NOT EXISTS photos JSONB;
+ALTER TABLE pm_execution_result ADD COLUMN IF NOT EXISTS row_version INTEGER DEFAULT 1;
+
+ALTER TABLE inspection_execution_result ADD COLUMN IF NOT EXISTS standard_value VARCHAR(200);
+ALTER TABLE inspection_execution_result ADD COLUMN IF NOT EXISTS check_method VARCHAR(200);
+ALTER TABLE inspection_execution_result ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+ALTER TABLE inspection_execution_result ADD COLUMN IF NOT EXISTS is_required BOOLEAN DEFAULT TRUE;
+ALTER TABLE inspection_execution_result ADD COLUMN IF NOT EXISTS photos JSONB;
+ALTER TABLE inspection_execution_result ADD COLUMN IF NOT EXISTS row_version INTEGER DEFAULT 1;
+
+-- ---------- MP.3: WeChat mini-program openid (subscribe message) ----------
+ALTER TABLE sys_user ADD COLUMN IF NOT EXISTS wx_openid VARCHAR(64);
+COMMENT ON COLUMN sys_user.wx_openid IS 'WeChat mini-program openid for subscribe message';
+CREATE UNIQUE INDEX IF NOT EXISTS uk_sys_user_wx_openid ON sys_user (wx_openid) WHERE wx_openid IS NOT NULL AND wx_openid <> '';

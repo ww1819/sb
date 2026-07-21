@@ -85,6 +85,8 @@ export interface PageConfig {
    * 避免列表行字段不全导致保存丢明细。
    */
   loadFormDetail?: boolean
+  /** 隐藏新增按钮（过滤列表等） */
+  hideAdd?: boolean
 }
 
 export const pageRegistry: Record<string, PageConfig> = {
@@ -651,6 +653,13 @@ export const pageRegistry: Record<string, PageConfig> = {
   },
   '/maintain/template': { title: '保养模板', apiBase: '/maintain', table: 'maintenance_template', saveUrl: '/maintain/template' },
   '/maintain/record': { title: '保养记录', apiBase: '/maintain', table: 'maintenance_record', saveUrl: '/maintain/record' },
+  '/maintain/device': {
+    title: '保养设备管理',
+    apiBase: '/maintain',
+    table: 'ops_maintain_device',
+    listPageUrl: '/maintain/device/page',
+    hideAdd: true
+  },
   '/inspect/param': { title: '巡检参数设置', apiBase: '/inspect', table: 'inspection_type' },
   '/inspect/plan': {
     title: '巡检计划',
@@ -671,6 +680,13 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/inspect',
     table: 'inspection_execution_item',
     listPageUrl: '/inspect/query/page'
+  },
+  '/inspect/device': {
+    title: '巡检设备管理',
+    apiBase: '/inspect',
+    table: 'ops_inspect_device',
+    listPageUrl: '/inspect/device/page',
+    hideAdd: true
   },
   '/metrology/param': { title: '计量参数设置', apiBase: '/metrology', table: 'metrology_category' },
   '/metrology/plan': {
@@ -804,7 +820,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     listFilters: [{ key: 'status', label: '状态', dictType: 'loan_status' }]
   },
   '/pm/param': { title: '预防性维护参数', apiBase: '/pm', table: 'pm_type' },
-  '/pm/plan': { title: '预防性维护计划', apiBase: '/pm', table: 'pm_plan', saveUrl: '/pm/plan' },
+  '/pm/plan': { title: '预防性维护计划', apiBase: '/pm', table: 'pm_plan', saveUrl: '/pm/plan', loadFormDetail: true },
   '/pm/execution': {
     title: '预防性维护执行',
     apiBase: '/pm',
@@ -812,6 +828,13 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/pm/execution/page'
   },
   '/pm/query': { title: '预防性维护记录', apiBase: '/pm', table: 'pm_execution_item' },
+  '/pm/device': {
+    title: '预防性维护设备管理',
+    apiBase: '/pm',
+    table: 'ops_pm_device',
+    listPageUrl: '/pm/device/page',
+    hideAdd: true
+  },
   '/analytics/mapping': {
     title: '效益分析对照',
     apiBase: '/analytics',

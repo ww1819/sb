@@ -138,6 +138,131 @@ public class RepairWorkorderController {
         return Result.ok(out);
     }
 
+    /**
+     * 工程师工作台（MOB-F-07）：
+     * scope=grab 可抢单；pending 待我接单；mine 我负责中的单；all=上述合并。
+     */
+    @GetMapping("/engineer-inbox")
+    public Result<PageResult<Map<String, Object>>> engineerInbox(
+            PageQuery query,
+            @RequestParam(required = false, defaultValue = "all") String scope) {
+        assertRepairEngineer();
+        String uid = operatorId();
+        StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null));
+        List<Object> args = new ArrayList<>();
+        String sc = scope == null ? "all" : scope.trim().toLowerCase();
+        switch (sc) {
+            case "grab" -> {
+                where.append(" AND status IN ('reported','dispatching') AND assigned_user_id IS NULL ");
+            }
+            case "pending" -> {
+                where.append(" AND status IN ('pending_accept','dispatching') AND assigned_user_id = ?::uuid ");
+                args.add(uid);
+            }
+            case "mine" -> {
+                where.append("""
+                         AND assigned_user_id = ?::uuid
+                         AND status IN ('accepted','repairing','suspended','verify_rejected','pending_verify')
+                        """);
+                args.add(uid);
+            }
+            default -> {
+                where.append("""
+                         AND (
+                           (status IN ('reported','dispatching') AND assigned_user_id IS NULL)
+                           OR (assigned_user_id = ?::uuid AND status IN (
+                               'pending_accept','dispatching','accepted','repairing',
+                               'suspended','verify_rejected','pending_verify'))
+                         )
+                        """);
+                args.add(uid);
+            }
+        }
+        if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
+            String kw = "%" + query.getKeyword().trim() + "%";
+            where.append("""
+                     AND (wo_no ILIKE ? OR device_code ILIKE ? OR device_name ILIKE ? OR fault_description ILIKE ?)
+                    """);
+            args.add(kw);
+            args.add(kw);
+            args.add(kw);
+            args.add(kw);
+        }
+        Long total = jdbc.queryForObject("SELECT COUNT(*) FROM repair_workorder" + where, Long.class, args.toArray());
+        List<Object> pageArgs = new ArrayList<>(args);
+        pageArgs.add(query.limit());
+        pageArgs.add(query.offset());
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT * FROM repair_workorder" + where + " ORDER BY report_time DESC NULLS LAST, created_at DESC LIMIT ? OFFSET ?",
+                pageArgs.toArray());
+        for (Map<String, Object> row : rows) {
+            normalizeFaultPhotosField(row);
+            String st = str(row.get("status"));
+            boolean unassigned = isUnassigned(row);
+            boolean mine = uid != null && uid.equalsIgnoreCase(str(row.get("assigned_user_id")));
+            row.put("can_grab", unassigned && Set.of("reported", "dispatching").contains(st));
+            row.put("can_accept", mine && Set.of("pending_accept", "dispatching").contains(st));
+            row.put("can_complete", mine && Set.of("repairing", "verify_rejected").contains(st));
+            row.put("can_segment",
+                    (mine && Set.of("reported", "dispatching", "pending_accept", "accepted",
+                            "repairing", "verify_rejected", "suspended").contains(st))
+                            || (unassigned && Set.of("reported", "dispatching").contains(st)));
+        }
+        processService.enrichWorkorders(rows);
+        return Result.ok(PageResult.of(rows, total != null ? total : 0, query.getPage(), query.getSize()));
+    }
+
+    /**
+     * 我的报修（MOB-F-06）：当前登录人为报修人的工单；可选仅待验收。
+     */
+    @GetMapping("/mine")
+    public Result<PageResult<Map<String, Object>>> mine(
+            PageQuery query,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String statuses,
+            @RequestParam(required = false) Boolean pendingVerifyOnly) {
+        String uid = operatorId();
+        if (uid == null || uid.isBlank()) {
+            throw new BizException(401, "未登录");
+        }
+        StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null));
+        List<Object> args = new ArrayList<>();
+        where.append(" AND reporter_id = ?::uuid ");
+        args.add(uid);
+        if (Boolean.TRUE.equals(pendingVerifyOnly)) {
+            where.append(" AND status = 'pending_verify' ");
+        } else if (statuses != null && !statuses.isBlank()) {
+            appendStatusFilter(where, args, null, null, statuses);
+        } else if (status != null && !status.isBlank()) {
+            where.append(" AND status = ? ");
+            args.add(status);
+        }
+        if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
+            String kw = "%" + query.getKeyword().trim() + "%";
+            where.append("""
+                     AND (wo_no ILIKE ? OR device_code ILIKE ? OR device_name ILIKE ? OR fault_description ILIKE ?)
+                    """);
+            args.add(kw);
+            args.add(kw);
+            args.add(kw);
+            args.add(kw);
+        }
+        Long total = jdbc.queryForObject("SELECT COUNT(*) FROM repair_workorder" + where, Long.class, args.toArray());
+        List<Object> pageArgs = new ArrayList<>(args);
+        pageArgs.add(query.limit());
+        pageArgs.add(query.offset());
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT * FROM repair_workorder" + where + " ORDER BY report_time DESC NULLS LAST, created_at DESC LIMIT ? OFFSET ?",
+                pageArgs.toArray());
+        for (Map<String, Object> row : rows) {
+            normalizeFaultPhotosField(row);
+        }
+        processService.enrichWorkorders(rows);
+        return Result.ok(PageResult.of(rows, total != null ? total : 0, query.getPage(), query.getSize()));
+    }
+
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(
             PageQuery query,
@@ -146,6 +271,7 @@ public class RepairWorkorderController {
             @RequestParam(required = false) String statuses,
             @RequestParam(required = false) String urgencyLevel,
             @RequestParam(required = false) String reportDeptId,
+            @RequestParam(required = false) String reporterId,
             @RequestParam(required = false) String assignedUserId,
             @RequestParam(required = false) String assignment,
             @RequestParam(required = false) String reportTimeFrom,
@@ -172,6 +298,10 @@ public class RepairWorkorderController {
         if (reportDeptId != null && !reportDeptId.isBlank()) {
             where.append(" AND report_dept_id = ?::uuid ");
             args.add(reportDeptId);
+        }
+        if (reporterId != null && !reporterId.isBlank()) {
+            where.append(" AND reporter_id = ?::uuid ");
+            args.add(reporterId);
         }
         if (assignedUserId != null && !assignedUserId.isBlank()) {
             where.append(" AND assigned_user_id = ?::uuid ");
@@ -833,9 +963,21 @@ public class RepairWorkorderController {
         if (!"pending_verify".equals(str(wo.get("status")))) {
             throw new BizException(400, "仅待验收工单可验收");
         }
+        // 移动端/小程序：报修人确认（MOB-F-04）；Web 设备科仍可验收
+        String client = body != null ? str(body.get("client")) : "";
+        if ("app".equalsIgnoreCase(client) || "mp".equalsIgnoreCase(client) || "miniprogram".equalsIgnoreCase(client)) {
+            String uid = str(operatorId());
+            String reporter = str(wo.get("reporter_id"));
+            if (uid.isBlank() || reporter.isBlank() || !uid.equalsIgnoreCase(reporter)) {
+                throw new BizException(403, "仅报修人可在移动端确认验收");
+            }
+        }
         String result = str(body.getOrDefault("verify_result", "pass"));
         boolean pass = !"fail".equalsIgnoreCase(result);
         Object verifierId = blankToNull(body.get("verifier_id"));
+        if (verifierId == null) {
+            verifierId = blankToNull(operatorId());
+        }
         if (pass) {
             OffsetDateTime lastPendingVerifyAt = segmentService.lastSegmentStartedAt(id, "pending_verify");
             processService.insertProcess(id, ProcessRecord.builder("verify_pass")

@@ -705,15 +705,30 @@ WHERE t.status = 'active'
   AND pm.menu_code NOT LIKE 'platform_%' AND pm.menu_code <> 'mod_platform'
 ON CONFLICT DO NOTHING;
 
--- ---------- 附录 O：停用独立「设备管理」子菜单（设备主数据统一在资产台账） ----------
+-- ---------- 附录 O：停用计量设备管理；保养/巡检/PM 设备管理按 O.5 恢复为台账过滤页 ----------
 UPDATE sys_menu SET is_active = FALSE
-WHERE menu_code IN ('maintain_device', 'inspect_device', 'metrology_device', 'pm_device');
+WHERE menu_code = 'metrology_device';
 
-DELETE FROM sys_package_menu
-WHERE menu_code IN ('maintain_device', 'inspect_device', 'metrology_device', 'pm_device');
+DELETE FROM sys_package_menu WHERE menu_code = 'metrology_device';
+DELETE FROM sys_tenant_menu WHERE menu_code = 'metrology_device';
 
-DELETE FROM sys_tenant_menu
-WHERE menu_code IN ('maintain_device', 'inspect_device', 'metrology_device', 'pm_device');
+-- ---------- 附录 OPS / O.5：恢复运维设备管理菜单（台账过滤视图） ----------
+UPDATE sys_menu SET is_active = TRUE, menu_name = COALESCE(menu_name, menu_code)
+WHERE menu_code IN ('maintain_device', 'inspect_device', 'pm_device');
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship'), ('professional')) AS p(pkg)
+CROSS JOIN (VALUES ('maintain_device'), ('inspect_device'), ('pm_device')) AS m(menu_code)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN (VALUES ('maintain_device'), ('inspect_device'), ('pm_device')) AS m(menu_code)
+WHERE t.status = 'active'
+ON CONFLICT DO NOTHING;
+
 
 -- ---------- 系统管理：仅保留账号/权限/配置类；主数据归基础字典 ----------
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES

@@ -237,6 +237,31 @@ COMMENT ON COLUMN sys_entity_change_log.operator_id IS '操作人ID';
 COMMENT ON COLUMN sys_entity_change_log.operator_name IS '操作人姓名';
 COMMENT ON COLUMN sys_entity_change_log.remark IS '备注';
 
+-- 1.8 单据变更/事件流水（附录 OPS.6）
+CREATE TABLE sys_doc_change_log (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    module VARCHAR(30) NOT NULL,
+    doc_type VARCHAR(40) NOT NULL,
+    doc_id UUID NOT NULL,
+    doc_no VARCHAR(50),
+    event_type VARCHAR(40) NOT NULL,
+    entity_type VARCHAR(40),
+    entity_id UUID,
+    field_name VARCHAR(100),
+    old_value TEXT,
+    new_value TEXT,
+    client VARCHAR(20),
+    operator_id UUID,
+    operator_name VARCHAR(100),
+    remark TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE sys_doc_change_log IS '业务单据事件与明细字段变更流水';
+COMMENT ON COLUMN sys_doc_change_log.module IS 'maintain/inspect/pm';
+COMMENT ON COLUMN sys_doc_change_log.doc_type IS 'execution/plan 等';
+COMMENT ON COLUMN sys_doc_change_log.event_type IS '事件或 field_change';
+
+
 -- ================================================================================
 -- 2. 医疗器械分类与供应商
 -- ================================================================================
@@ -1876,7 +1901,7 @@ CREATE TABLE maintenance_plan (
     cycle_type VARCHAR(20) NOT NULL,
     cycle_value INTEGER,
     cycle_days INTEGER,
-    next_due_date DATE NOT NULL,
+    next_due_date DATE,
     reminder_days_before INTEGER DEFAULT 7,
     assigned_engineer_id UUID REFERENCES engineer(id),
     status VARCHAR(20) DEFAULT 'active',
@@ -1888,6 +1913,13 @@ CREATE TABLE maintenance_plan (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     plan_code VARCHAR(30),
+    plan_no VARCHAR(30),
+    template_name VARCHAR(200),
+    maintenance_level_id UUID REFERENCES maintenance_level(id),
+    assigned_user_id UUID REFERENCES sys_user(id),
+    assigned_user_name VARCHAR(100),
+    approved_by_name VARCHAR(100),
+    campus_id UUID,
     last_maintained_at DATE,
     dept_id UUID REFERENCES department(id)
 );
@@ -1909,6 +1941,35 @@ COMMENT ON COLUMN maintenance_plan.updated_at IS '更新时间';
 COMMENT ON COLUMN maintenance_plan.plan_code IS '订阅计划编码';
 COMMENT ON COLUMN maintenance_plan.last_maintained_at IS '上次保养日期';
 COMMENT ON COLUMN maintenance_plan.dept_id IS '所属科室';
+
+-- 6.2.1 保养计划明细（按设备，权威到期日）
+CREATE TABLE maintenance_plan_item (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    plan_id UUID NOT NULL REFERENCES maintenance_plan(id) ON DELETE CASCADE,
+    plan_no VARCHAR(30),
+    device_id UUID NOT NULL REFERENCES medical_device(id),
+    device_code VARCHAR(20),
+    device_name VARCHAR(200),
+    dept_id UUID REFERENCES department(id),
+    last_done_date DATE,
+    next_due_date DATE,
+    assigned_user_id UUID REFERENCES sys_user(id),
+    assigned_user_name VARCHAR(100),
+    item_status VARCHAR(20) DEFAULT 'active',
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMPTZ,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100)
+);
+COMMENT ON TABLE maintenance_plan_item IS '保养计划明细（按设备）';
+
 
 -- 6.3 保养执行记录表
 CREATE TABLE maintenance_record (
@@ -1968,14 +2029,28 @@ CREATE TABLE maintenance_execution (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     execution_no VARCHAR(30) UNIQUE NOT NULL,
     plan_id UUID REFERENCES maintenance_plan(id),
+    plan_no VARCHAR(30),
+    source_type VARCHAR(20) DEFAULT 'from_plan',
     template_id UUID REFERENCES maintenance_template(id),
+    template_name VARCHAR(200),
     maintenance_level_id UUID REFERENCES maintenance_level(id),
+    maintenance_level VARCHAR(20),
     planned_date DATE,
     assigned_engineer_id UUID REFERENCES engineer(id),
-    executor_id UUID REFERENCES engineer(id),
+    assigned_user_id UUID REFERENCES sys_user(id),
+    assigned_user_name VARCHAR(100),
+    executor_id UUID REFERENCES sys_user(id),
+    executor_name VARCHAR(100),
     execute_start_time TIMESTAMP WITH TIME ZONE,
     execute_end_time TIMESTAMP WITH TIME ZONE,
-    status VARCHAR(20) DEFAULT 'pending',
+    status VARCHAR(20) DEFAULT 'draft',
+    submitter_id UUID REFERENCES sys_user(id),
+    submitter_name VARCHAR(100),
+    submitted_at TIMESTAMP WITH TIME ZONE,
+    auditor_id UUID REFERENCES sys_user(id),
+    auditor_name VARCHAR(100),
+    audited_at TIMESTAMP WITH TIME ZONE,
+    audit_comment TEXT,
     created_by UUID REFERENCES sys_user(id),
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -1986,13 +2061,23 @@ COMMENT ON TABLE maintenance_execution IS '保养执行单';
 CREATE TABLE maintenance_execution_item (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     execution_id UUID NOT NULL REFERENCES maintenance_execution(id) ON DELETE CASCADE,
+    execution_no VARCHAR(30),
     device_id UUID REFERENCES medical_device(id),
     device_code VARCHAR(20),
     device_name VARCHAR(200),
     dept_id UUID REFERENCES department(id),
     plan_id UUID REFERENCES maintenance_plan(id),
+    plan_item_id UUID,
+    executor_id UUID REFERENCES sys_user(id),
+    executor_name VARCHAR(100),
+    start_time TIMESTAMP WITH TIME ZONE,
+    end_time TIMESTAMP WITH TIME ZONE,
     status VARCHAR(20) DEFAULT 'pending',
     overall_result VARCHAR(20),
+    issues_found TEXT,
+    photos JSONB,
+    signature_url VARCHAR(500),
+    row_version INTEGER NOT NULL DEFAULT 1,
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -2005,8 +2090,14 @@ CREATE TABLE maintenance_execution_result (
     template_item_id UUID REFERENCES maintenance_template_item(id),
     item_name VARCHAR(200) NOT NULL,
     item_content TEXT,
+    standard_value VARCHAR(200),
+    check_method VARCHAR(200),
+    sort_order INTEGER DEFAULT 0,
+    is_required BOOLEAN DEFAULT TRUE,
     result_value VARCHAR(500),
     result_status VARCHAR(20) DEFAULT 'pending',
+    photos JSONB,
+    row_version INTEGER NOT NULL DEFAULT 1,
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -2768,7 +2859,9 @@ COMMENT ON TABLE pm_template_item IS '预防性维护模板内容项';
 CREATE TABLE pm_plan (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     plan_code VARCHAR(30),
+    plan_no VARCHAR(30),
     plan_name VARCHAR(200),
+    template_name VARCHAR(200),
     device_id UUID REFERENCES medical_device(id),
     template_id UUID REFERENCES pm_template(id),
     pm_type VARCHAR(30),
@@ -2776,7 +2869,7 @@ CREATE TABLE pm_plan (
     cycle_type VARCHAR(20) NOT NULL DEFAULT 'month',
     cycle_value INTEGER,
     cycle_days INTEGER,
-    next_due_date DATE NOT NULL,
+    next_due_date DATE,
     last_maintained_at DATE,
     reminder_days_before INTEGER DEFAULT 7,
     assigned_engineer_id UUID REFERENCES engineer(id),
@@ -2792,18 +2885,59 @@ CREATE TABLE pm_plan (
 );
 COMMENT ON TABLE pm_plan IS '预防性维护计划表';
 
+CREATE TABLE pm_plan_item (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    plan_id UUID NOT NULL REFERENCES pm_plan(id) ON DELETE CASCADE,
+    plan_no VARCHAR(30),
+    device_id UUID NOT NULL REFERENCES medical_device(id),
+    device_code VARCHAR(20),
+    device_name VARCHAR(200),
+    dept_id UUID REFERENCES department(id),
+    last_done_date DATE,
+    next_due_date DATE,
+    assigned_user_id UUID REFERENCES sys_user(id),
+    assigned_user_name VARCHAR(100),
+    item_status VARCHAR(20) DEFAULT 'active',
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMPTZ,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100)
+);
+COMMENT ON TABLE pm_plan_item IS '预防性维护计划明细（按设备）';
+
+
 CREATE TABLE pm_execution (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     execution_no VARCHAR(30) UNIQUE NOT NULL,
     plan_id UUID REFERENCES pm_plan(id),
+    plan_no VARCHAR(30),
+    source_type VARCHAR(20) DEFAULT 'from_plan',
+    template_name VARCHAR(200),
     template_id UUID REFERENCES pm_template(id),
     pm_type_id UUID REFERENCES pm_type(id),
     planned_date DATE,
     assigned_engineer_id UUID REFERENCES engineer(id),
-    executor_id UUID REFERENCES engineer(id),
+    executor_id UUID REFERENCES sys_user(id),
+    executor_name VARCHAR(100),
+    assigned_user_id UUID REFERENCES sys_user(id),
+    assigned_user_name VARCHAR(100),
     execute_start_time TIMESTAMP WITH TIME ZONE,
     execute_end_time TIMESTAMP WITH TIME ZONE,
-    status VARCHAR(20) DEFAULT 'pending',
+    status VARCHAR(20) DEFAULT 'draft',
+    submitter_id UUID REFERENCES sys_user(id),
+    submitter_name VARCHAR(100),
+    submitted_at TIMESTAMP WITH TIME ZONE,
+    auditor_id UUID REFERENCES sys_user(id),
+    auditor_name VARCHAR(100),
+    audited_at TIMESTAMP WITH TIME ZONE,
+    audit_comment TEXT,
     created_by UUID REFERENCES sys_user(id),
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -2819,8 +2953,18 @@ CREATE TABLE pm_execution_item (
     device_name VARCHAR(200),
     dept_id UUID REFERENCES department(id),
     plan_id UUID REFERENCES pm_plan(id),
+    plan_item_id UUID,
+    execution_no VARCHAR(30),
+    executor_id UUID REFERENCES sys_user(id),
+    executor_name VARCHAR(100),
+    start_time TIMESTAMP WITH TIME ZONE,
+    end_time TIMESTAMP WITH TIME ZONE,
     status VARCHAR(20) DEFAULT 'pending',
     overall_result VARCHAR(20),
+    issues_found TEXT,
+    photos JSONB,
+    signature_url VARCHAR(500),
+    row_version INTEGER NOT NULL DEFAULT 1,
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -2833,7 +2977,13 @@ CREATE TABLE pm_execution_result (
     template_item_id UUID REFERENCES pm_template_item(id),
     item_name VARCHAR(200) NOT NULL,
     item_content TEXT,
+    standard_value VARCHAR(200),
+    check_method VARCHAR(200),
+    sort_order INTEGER DEFAULT 0,
+    is_required BOOLEAN DEFAULT TRUE,
     result_value VARCHAR(500),
+    photos JSONB,
+    row_version INTEGER NOT NULL DEFAULT 1,
     result_status VARCHAR(20) DEFAULT 'pending',
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -3449,6 +3599,8 @@ CREATE TABLE IF NOT EXISTS inspection_plan (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     plan_name VARCHAR(200) NOT NULL,
     plan_code VARCHAR(30),
+    plan_no VARCHAR(30),
+    template_name VARCHAR(200),
     device_id UUID REFERENCES medical_device(id),
     template_id UUID REFERENCES inspection_template(id),
     inspection_type_id UUID REFERENCES inspection_type(id),
@@ -3484,6 +3636,34 @@ COMMENT ON COLUMN inspection_plan.dept_id IS '所属科室';
 COMMENT ON COLUMN inspection_plan.start_date IS '开始日期';
 COMMENT ON COLUMN inspection_plan.end_date IS '结束日期';
 COMMENT ON COLUMN inspection_plan.frequency IS '执行频率';
+
+CREATE TABLE IF NOT EXISTS inspection_plan_item (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    plan_id UUID NOT NULL REFERENCES inspection_plan(id) ON DELETE CASCADE,
+    plan_no VARCHAR(30),
+    device_id UUID NOT NULL REFERENCES medical_device(id),
+    device_code VARCHAR(20),
+    device_name VARCHAR(200),
+    dept_id UUID REFERENCES department(id),
+    last_done_date DATE,
+    next_due_date DATE,
+    assigned_user_id UUID REFERENCES sys_user(id),
+    assigned_user_name VARCHAR(100),
+    item_status VARCHAR(20) DEFAULT 'active',
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMPTZ,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100)
+);
+COMMENT ON TABLE inspection_plan_item IS '巡检计划明细（按设备）';
+
 
 CREATE TABLE IF NOT EXISTS inspection_record (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -3529,14 +3709,25 @@ CREATE TABLE IF NOT EXISTS inspection_execution (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     execution_no VARCHAR(30) UNIQUE NOT NULL,
     plan_id UUID REFERENCES inspection_plan(id),
+    plan_no VARCHAR(30),
+    source_type VARCHAR(20) DEFAULT 'from_plan',
+    template_name VARCHAR(200),
     template_id UUID REFERENCES inspection_template(id),
     inspection_type_id UUID REFERENCES inspection_type(id),
     planned_date DATE,
     assigned_inspector_id UUID REFERENCES sys_user(id),
     executor_id UUID REFERENCES sys_user(id),
+    executor_name VARCHAR(100),
     execute_start_time TIMESTAMP WITH TIME ZONE,
     execute_end_time TIMESTAMP WITH TIME ZONE,
-    status VARCHAR(20) DEFAULT 'pending',
+    status VARCHAR(20) DEFAULT 'draft',
+    submitter_id UUID REFERENCES sys_user(id),
+    submitter_name VARCHAR(100),
+    submitted_at TIMESTAMP WITH TIME ZONE,
+    auditor_id UUID REFERENCES sys_user(id),
+    auditor_name VARCHAR(100),
+    audited_at TIMESTAMP WITH TIME ZONE,
+    audit_comment TEXT,
     created_by UUID REFERENCES sys_user(id),
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -3552,8 +3743,18 @@ CREATE TABLE IF NOT EXISTS inspection_execution_item (
     device_name VARCHAR(200),
     dept_id UUID REFERENCES department(id),
     plan_id UUID REFERENCES inspection_plan(id),
+    plan_item_id UUID,
+    execution_no VARCHAR(30),
+    executor_id UUID REFERENCES sys_user(id),
+    executor_name VARCHAR(100),
+    start_time TIMESTAMP WITH TIME ZONE,
+    end_time TIMESTAMP WITH TIME ZONE,
     status VARCHAR(20) DEFAULT 'pending',
     overall_result VARCHAR(20),
+    issues_found TEXT,
+    photos JSONB,
+    signature_url VARCHAR(500),
+    row_version INTEGER NOT NULL DEFAULT 1,
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -3566,7 +3767,13 @@ CREATE TABLE IF NOT EXISTS inspection_execution_result (
     template_item_id UUID REFERENCES inspection_template_item(id),
     item_name VARCHAR(200) NOT NULL,
     item_content TEXT,
+    standard_value VARCHAR(200),
+    check_method VARCHAR(200),
+    sort_order INTEGER DEFAULT 0,
+    is_required BOOLEAN DEFAULT TRUE,
     result_value VARCHAR(500),
+    photos JSONB,
+    row_version INTEGER NOT NULL DEFAULT 1,
     result_status VARCHAR(20) DEFAULT 'pending',
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,

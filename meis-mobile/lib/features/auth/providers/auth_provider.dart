@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/models/auth_user.dart';
 import '../../../core/storage/app_prefs.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/services/local_sync_service.dart';
 import '../../setup/providers/setup_provider.dart';
 
 class AuthState {
@@ -68,6 +69,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         password: password,
       );
       await _prefs.saveAuth(user);
+      try {
+        await _ref.read(localSyncServiceProvider).onLogin(user);
+      } catch (_) {}
       state = state.copyWith(loading: false, user: user);
       return true;
     } on ApiException catch (e) {

@@ -9,7 +9,7 @@ export interface ApiResult<T = unknown> {
 
 interface RequestOptions {
   url: string
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
   data?: Record<string, unknown> | unknown
   params?: Record<string, string | number | boolean | undefined | null>
   auth?: boolean
@@ -49,6 +49,13 @@ export function request<T = unknown>(options: RequestOptions): Promise<T> {
       if (user.schemaName) headers['X-Tenant-Schema'] = user.schemaName
       if (user.userId) headers['X-User-Id'] = user.userId
       if (user.username) headers['X-Username'] = user.username
+      if (user.permissions) {
+        try {
+          headers['X-Permissions'] = JSON.stringify(user.permissions)
+        } catch {
+          /* ignore */
+        }
+      }
     }
   }
   const fullUrl = `${API_BASE}${url}${buildQuery(params)}`
@@ -99,5 +106,7 @@ export const http = {
   post: <T = unknown>(url: string, data?: RequestOptions['data'], auth = true) =>
     request<T>({ url, method: 'POST', data, auth }),
   put: <T = unknown>(url: string, data?: RequestOptions['data'], auth = true) =>
-    request<T>({ url, method: 'PUT', data, auth })
+    request<T>({ url, method: 'PUT', data, auth }),
+  patch: <T = unknown>(url: string, data?: RequestOptions['data'], auth = true) =>
+    request<T>({ url, method: 'PATCH', data, auth })
 }

@@ -11,6 +11,7 @@ export interface UserInfo {
   tenantCode: string
   schemaName: string
   roles?: string[]
+  permissions?: Record<string, unknown>
   userType?: string
 }
 
@@ -47,6 +48,30 @@ export const useAuthStore = defineStore('auth', {
       this.user = data
       uni.setStorageSync(STORAGE_TOKEN, data.token)
       uni.setStorageSync(STORAGE_USER, JSON.stringify(data))
+      // 绑定微信 openid（未配置 appId 时后端返回 configured=false，忽略）
+      try {
+        await this.bindWxOpenid()
+      } catch {
+        /* optional */
+      }
+    },
+    async bindWxOpenid() {
+      await new Promise<void>((resolve) => {
+        uni.login({
+          provider: 'weixin',
+          success: async (res) => {
+            try {
+              if (res.code) {
+                await http.post('/notification/wx/bind', { code: res.code })
+              }
+            } catch {
+              /* ignore */
+            }
+            resolve()
+          },
+          fail: () => resolve()
+        })
+      })
     },
     logout() {
       this.user = null

@@ -204,7 +204,7 @@ public class InventoryCheckController {
     @Transactional
     @OperationLog(module = "asset", description = "扫码盘点")
     public Result<Map<String, Object>> scan(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
-        assertExists(id);
+        assertMutable(id);
         Object deviceId = blankToNull(body.get("device_id"));
         String deviceCode = body.get("device_code") != null ? body.get("device_code").toString().trim() : "";
         String deviceName = body.get("device_name") != null ? body.get("device_name").toString() : null;
@@ -244,11 +244,15 @@ public class InventoryCheckController {
     @OperationLog(module = "asset", description = "更新盘点明细")
     public Result<Map<String, Object>> patchItem(@PathVariable UUID id, @PathVariable UUID itemId,
             @RequestBody Map<String, Object> body) {
-        assertExists(id);
+        assertMutable(id);
         var rows = jdbc.queryForList(
-                "SELECT id FROM inventory_check_item WHERE id = ?::uuid AND check_id = ?::uuid"
+                "SELECT * FROM inventory_check_item WHERE id = ?::uuid AND check_id = ?::uuid"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check_item", null), itemId, id);
         if (rows.isEmpty()) throw new BizException(404, "明细不存在");
+        Map<String, Object> old = rows.get(0);
+        int expected = body.containsKey("row_version")
+                ? ((Number) body.get("row_version")).intValue()
+                : ((Number) old.getOrDefault("row_version", 1)).intValue();
 
         List<String> sets = new ArrayList<>();
         List<Object> args = new ArrayList<>();
@@ -268,12 +272,49 @@ public class InventoryCheckController {
             args.add(body.get("actual_location"));
         }
         if (sets.isEmpty()) throw new BizException(400, "无更新字段");
+        sets.add("row_version = COALESCE(row_version,1) + 1");
+        sets.add("updated_at = NOW()");
         args.add(itemId);
         args.add(id);
-        jdbc.update("UPDATE inventory_check_item SET " + String.join(", ", sets)
-                + " WHERE id = ?::uuid AND check_id = ?::uuid", args.toArray());
+        args.add(expected);
+        int n = jdbc.update("UPDATE inventory_check_item SET " + String.join(", ", sets)
+                + " WHERE id = ?::uuid AND check_id = ?::uuid AND COALESCE(row_version,1)=?", args.toArray());
+        if (n == 0) throw new BizException(409, "明细已被他人修改，请刷新后重试");
         refreshCheckedCount(id);
         return get(id);
+    }
+
+    /** App 离线回传：批量 upsert 明细；已审核拒绝。 */
+    @PostMapping("/{id:" + UUID_PATH + "}/offline-sync")
+    @Transactional
+    @OperationLog(module = "asset", description = "离线盘点回传")
+    public Result<Map<String, Object>> offlineSync(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
+        assertMutable(id);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> items = body.get("items") instanceof List<?> list
+                ? (List<Map<String, Object>>) list : List.of();
+        int ok = 0;
+        List<Map<String, Object>> conflicts = new ArrayList<>();
+        for (Map<String, Object> item : items) {
+            if (item.get("id") == null) continue;
+            UUID itemId = UUID.fromString(item.get("id").toString());
+            try {
+                Map<String, Object> patch = new LinkedHashMap<>();
+                if (item.containsKey("is_found")) patch.put("is_found", item.get("is_found"));
+                if (item.containsKey("need_reprint_label")) patch.put("need_reprint_label", item.get("need_reprint_label"));
+                if (item.containsKey("actual_location")) patch.put("actual_location", item.get("actual_location"));
+                if (item.containsKey("row_version")) patch.put("row_version", item.get("row_version"));
+                if (patch.isEmpty()) continue;
+                patchItem(id, itemId, patch);
+                ok++;
+            } catch (BizException ex) {
+                conflicts.add(Map.of("id", itemId.toString(), "message", ex.getMessage() != null ? ex.getMessage() : "冲突"));
+            }
+        }
+        Map<String, Object> result = new LinkedHashMap<>(Objects.requireNonNull(get(id).getData()));
+        result.put("synced", ok);
+        result.put("conflicts", conflicts);
+        return Result.ok(result);
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/label/print")

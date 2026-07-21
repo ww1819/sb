@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -46,6 +48,9 @@ class ApiService {
             options.headers['X-Tenant-Id'] = user.tenantId;
             options.headers['X-Tenant-Schema'] = user.schemaName;
             options.headers['X-User-Id'] = user.userId;
+            if (user.permissions != null) {
+              options.headers['X-Permissions'] = jsonEncode(user.permissions);
+            }
           }
           handler.next(options);
         },

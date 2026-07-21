@@ -16,6 +16,12 @@
       }
     },
     {
+      "path": "pages/asset/scan",
+      "style": {
+        "navigationBarTitleText": "扫码查询"
+      }
+    },
+    {
       "path": "pages/asset/list",
       "style": {
         "navigationBarTitleText": "资产查询"
@@ -31,6 +37,42 @@
       "path": "pages/repair/scan",
       "style": {
         "navigationBarTitleText": "扫码报修"
+      }
+    },
+    {
+      "path": "pages/repair/mine",
+      "style": {
+        "navigationBarTitleText": "我的报修"
+      }
+    },
+    {
+      "path": "pages/repair/detail",
+      "style": {
+        "navigationBarTitleText": "工单详情"
+      }
+    },
+    {
+      "path": "pages/ops/hub",
+      "style": {
+        "navigationBarTitleText": "运维执行"
+      }
+    },
+    {
+      "path": "pages/ops/detail",
+      "style": {
+        "navigationBarTitleText": "执行明细"
+      }
+    },
+    {
+      "path": "pages/ops/signature",
+      "style": {
+        "navigationBarTitleText": "手写签名"
+      }
+    },
+    {
+      "path": "pages/qc/adverse",
+      "style": {
+        "navigationBarTitleText": "不良事件上报"
       }
     }
   ],

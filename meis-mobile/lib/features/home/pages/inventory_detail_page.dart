@@ -2,12 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/services/api_service.dart';
+import '../../../shared/services/local_sync_service.dart';
 import 'repair_scan_page.dart';
 
 class InventoryDetailPage extends ConsumerStatefulWidget {
-  const InventoryDetailPage({super.key, required this.checkId});
+  const InventoryDetailPage({
+    super.key,
+    required this.checkId,
+    this.preferLocal = false,
+  });
 
   final String checkId;
+  final bool preferLocal;
 
   @override
   ConsumerState<InventoryDetailPage> createState() => _InventoryDetailPageState();
@@ -18,13 +24,15 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
   Map<String, dynamic>? master;
   List<Map<String, dynamic>> items = [];
   var loading = true;
+  var localMode = false;
   late final TabController tabs;
 
   static const statusLabel = {
     'planning': '计划中',
     'in_progress': '进行中',
     'completed': '已完成',
-    'audited': '已审核',
+    'pending': '未审核',
+    'approved': '已审核',
   };
 
   @override
@@ -42,26 +50,76 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
 
   Future<void> load() async {
     setState(() => loading = true);
+    final sync = ref.read(localSyncServiceProvider);
     try {
-      final data = await ref.read(apiServiceProvider).getData('/asset/inventory/${widget.checkId}');
-      if (data is Map) {
-        final map = Map<String, dynamic>.from(data);
-        final raw = map['items'];
-        final list = raw is List
-            ? raw.map((e) => Map<String, dynamic>.from(e as Map)).toList()
-            : <Map<String, dynamic>>[];
-        setState(() {
-          master = map;
-          items = list;
-        });
+      if (widget.preferLocal) {
+        await _loadLocal(sync);
+      } else {
+        final data = await ref.read(apiServiceProvider).getData('/asset/inventory/${widget.checkId}');
+        if (data is Map) {
+          final map = Map<String, dynamic>.from(data);
+          final raw = map['items'];
+          final list = raw is List
+              ? raw.map((e) => Map<String, dynamic>.from(e as Map)).toList()
+              : <Map<String, dynamic>>[];
+          setState(() {
+            master = map;
+            items = list;
+            localMode = false;
+          });
+          // 后台刷新本地缓存（不覆盖 dirty）
+          try {
+            await sync.saveCheckLocal(map);
+          } catch (_) {}
+        }
       }
-    } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-      }
+    } on ApiException catch (_) {
+      await _loadLocal(sync);
+    } catch (_) {
+      await _loadLocal(sync);
     } finally {
       if (mounted) setState(() => loading = false);
     }
+  }
+
+  Future<void> _loadLocal(LocalSyncService sync) async {
+    final check = await sync.getLocalCheck(widget.checkId);
+    final localItems = await sync.listLocalItems(widget.checkId);
+    if (check == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('本地无此盘点单')));
+      }
+      setState(() {
+        master = null;
+        items = [];
+        localMode = true;
+      });
+      return;
+    }
+    setState(() {
+      master = {
+        'id': check['id'],
+        'check_no': check['check_no'],
+        'check_name': check['check_name'],
+        'status': check['status'],
+        'audit_status': check['audit_status'],
+      };
+      items = localItems
+          .map((e) => {
+                'id': e['id'],
+                'device_id': e['device_id'],
+                'device_code': e['device_code'],
+                'device_name': e['device_name'],
+                'is_found': e['is_found'] == 1,
+                'need_reprint_label': e['need_reprint_label'] == 1,
+                'actual_location': e['actual_location'],
+                'row_version': e['row_version'],
+                'dirty': e['dirty'] == 1,
+                'expected_location': null,
+              })
+          .toList();
+      localMode = true;
+    });
   }
 
   bool _isFound(Map<String, dynamic> row) {
@@ -89,10 +147,18 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
   Future<void> patchItem(Map<String, dynamic> row, Map<String, dynamic> body) async {
     final itemId = row['id']?.toString();
     if (itemId == null) return;
+    final sync = ref.read(localSyncServiceProvider);
+    if (localMode) {
+      await sync.patchLocalItem(itemId, body);
+      await load();
+      return;
+    }
     try {
+      final payload = Map<String, dynamic>.from(body);
+      if (row['row_version'] != null) payload['row_version'] = row['row_version'];
       await ref.read(apiServiceProvider).patchData(
             '/asset/inventory/${widget.checkId}/items/$itemId',
-            body,
+            payload,
           );
       await load();
     } on ApiException catch (e) {
@@ -108,6 +174,24 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
       MaterialPageRoute(builder: (_) => const RepairScanPage()),
     );
     if (code == null || code.isEmpty) return;
+    if (localMode) {
+      final match = items.where((e) => e['device_code']?.toString() == code.trim()).toList();
+      if (match.isEmpty) {
+        // 尝试本地台账确认编码存在
+        final dev = await ref.read(localSyncServiceProvider).findLocalDeviceByCode(code);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(dev == null ? '本地清单无此设备：$code' : '该设备不在本盘点单明细中'),
+          ));
+        }
+        return;
+      }
+      await patchItem(match.first, {'is_found': true});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('已盘到（本地）：$code')));
+      }
+      return;
+    }
     try {
       await ref.read(apiServiceProvider).postData(
         '/asset/inventory/${widget.checkId}/scan',
@@ -124,7 +208,27 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
     }
   }
 
+  Future<void> upload() async {
+    try {
+      final r = await ref.read(localSyncServiceProvider).uploadDirty(widget.checkId);
+      final synced = r['synced'] ?? 0;
+      final conflicts = r['conflicts'] is List ? (r['conflicts'] as List).length : 0;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('已回传 $synced 条${conflicts > 0 ? '，冲突 $conflicts 条' : ''}')),
+        );
+      }
+      setState(() => localMode = false);
+      await load();
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
+
   Widget buildItemCard(Map<String, dynamic> row) {
+    final dirty = row['dirty'] == true || row['dirty'] == 1;
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
@@ -132,7 +236,15 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_text(row, 'device_code'), style: const TextStyle(fontWeight: FontWeight.w600)),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(_text(row, 'device_code'), style: const TextStyle(fontWeight: FontWeight.w600)),
+                ),
+                if (dirty)
+                  const Text('未同步', style: TextStyle(fontSize: 12, color: Colors.orange)),
+              ],
+            ),
             const SizedBox(height: 4),
             Text('名称：${_text(row, 'device_name')}'),
             Text('账面位置：${_text(row, 'expected_location')}'),
@@ -160,10 +272,11 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
   Widget build(BuildContext context) {
     final title = master?['check_name']?.toString() ?? '盘点明细';
     final status = master?['status']?.toString() ?? '';
-    final statusText = statusLabel[status] ?? status;
+    final audit = master?['audit_status']?.toString() ?? '';
+    final statusText = '${statusLabel[status] ?? status} / ${statusLabel[audit] ?? audit}';
     return Scaffold(
       appBar: AppBar(
-        title: Text(title),
+        title: Text(localMode ? '$title（离线）' : title),
         bottom: TabBar(
           controller: tabs,
           tabs: [
@@ -173,6 +286,8 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
           ],
         ),
         actions: [
+          if (localMode)
+            TextButton(onPressed: upload, child: const Text('回传')),
           IconButton(
             tooltip: '扫码盘点',
             onPressed: scanAndMark,
@@ -184,14 +299,13 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                if (statusText.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text('状态：$statusText · 单号：${_text(master, 'check_no')}'),
-                    ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('状态：$statusText · 单号：${_text(master, 'check_no')}'),
                   ),
+                ),
                 Expanded(
                   child: TabBarView(
                     controller: tabs,

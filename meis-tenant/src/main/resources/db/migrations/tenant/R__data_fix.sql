@@ -639,3 +639,33 @@ WHERE d.id = x.device_id
   AND d.warehouse_id IS NULL
   AND d.device_status = 'in_use'
   AND COALESCE(d.is_deleted, 0) = 0;
+
+-- ---------- 附录 OPS：存量计划拆明细 + plan_no 回填（2026-07-21） ----------
+UPDATE maintenance_plan SET plan_no = COALESCE(NULLIF(TRIM(plan_no), ''), plan_code) WHERE plan_no IS NULL AND plan_code IS NOT NULL;
+UPDATE pm_plan SET plan_no = COALESCE(NULLIF(TRIM(plan_no), ''), plan_code) WHERE plan_no IS NULL AND plan_code IS NOT NULL;
+UPDATE inspection_plan SET plan_no = COALESCE(NULLIF(TRIM(plan_no), ''), plan_code) WHERE plan_no IS NULL AND plan_code IS NOT NULL;
+
+INSERT INTO maintenance_plan_item (id, plan_id, plan_no, device_id, device_code, device_name, dept_id, last_done_date, next_due_date, item_status)
+SELECT gen_random_uuid(), p.id, COALESCE(p.plan_no, p.plan_code), p.device_id, d.device_code, d.device_name, COALESCE(p.dept_id, d.dept_id),
+       p.last_maintained_at, p.next_due_date, 'active'
+FROM maintenance_plan p
+LEFT JOIN medical_device d ON d.id = p.device_id
+WHERE p.device_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM maintenance_plan_item i WHERE i.plan_id = p.id AND i.device_id = p.device_id AND COALESCE(i.is_deleted, 0) = 0);
+
+INSERT INTO pm_plan_item (id, plan_id, plan_no, device_id, device_code, device_name, dept_id, last_done_date, next_due_date, item_status)
+SELECT gen_random_uuid(), p.id, COALESCE(p.plan_no, p.plan_code), p.device_id, d.device_code, d.device_name, COALESCE(p.dept_id, d.dept_id),
+       p.last_maintained_at, p.next_due_date, 'active'
+FROM pm_plan p
+LEFT JOIN medical_device d ON d.id = p.device_id
+WHERE p.device_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM pm_plan_item i WHERE i.plan_id = p.id AND i.device_id = p.device_id AND COALESCE(i.is_deleted, 0) = 0);
+
+INSERT INTO inspection_plan_item (id, plan_id, plan_no, device_id, device_code, device_name, dept_id, last_done_date, next_due_date, item_status)
+SELECT gen_random_uuid(), p.id, COALESCE(p.plan_no, p.plan_code), p.device_id, d.device_code, d.device_name, COALESCE(p.dept_id, d.dept_id),
+       p.last_inspected_at, p.next_due_date, 'active'
+FROM inspection_plan p
+LEFT JOIN medical_device d ON d.id = p.device_id
+WHERE p.device_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM inspection_plan_item i WHERE i.plan_id = p.id AND i.device_id = p.device_id AND COALESCE(i.is_deleted, 0) = 0);
+
