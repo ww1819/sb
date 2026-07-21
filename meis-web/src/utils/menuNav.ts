@@ -100,8 +100,8 @@ export function ensureExtraMenus(modules: NavModule[]): NavModule[] {
     groups: (m.groups ?? []).map((g) => ({ ...g, items: [...g.items] }))
   }))
 
-  // 若仍挂在资产台账下，移到库房管理
-  const assetIdx = result.findIndex((m) => m.id === 'asset' || m.title === '资产台账')
+  // 若仍挂在资产管理下，移到库房管理
+  const assetIdx = result.findIndex((m) => m.id === 'asset' || m.title === '资产管理' || m.title === '资产台账')
   if (assetIdx >= 0) {
     const asset = result[assetIdx]
     const groups = asset.groups?.length ? [...asset.groups] : [{ title: '', items: [] as NavMenuItem[] }]

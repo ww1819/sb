@@ -243,10 +243,13 @@ function fieldSpan(field: FieldSchema, group: FieldGroup) {
 }
 
 const groups = computed(() => {
-  if (props.fields?.length) return buildGroups(props.fields)
+  // 显式传入 fields（含空数组）时不再回退全表，避免主从表「基本信息」为空时整表落成「其他」
+  if (props.fields != null) return buildGroups(props.fields)
   return getGroupedFields(props.table)
 })
-const flatFields = computed(() => props.fields ?? getSchema(props.table).filter((f) => !f.readonly))
+const flatFields = computed(() =>
+  props.fields != null ? props.fields : getSchema(props.table).filter((f) => !f.readonly)
+)
 </script>
 
 <style scoped>

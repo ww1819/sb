@@ -7,6 +7,13 @@
       <slot name="detail" />
       <div class="detail-table-wrap">
         <el-table :data="items" border class="detail-table" :height="tableHeight">
+          <el-table-column
+            v-if="showRowSelection"
+            type="selection"
+            width="48"
+            align="center"
+            fixed="left"
+          />
           <el-table-column v-if="showRowIndex" label="序号" width="60" align="center" fixed="left">
             <template #default="{ $index }">{{ $index + 1 }}</template>
           </el-table-column>
@@ -31,6 +38,7 @@ withDefaults(
     items: Record<string, unknown>[]
     detailTitle?: string
     showRowIndex?: boolean
+    showRowSelection?: boolean
     showAddButton?: boolean
     showOperations?: boolean
     allowDelete?: boolean
@@ -40,6 +48,7 @@ withDefaults(
   {
     detailTitle: '明细信息',
     showRowIndex: true,
+    showRowSelection: false,
     showAddButton: true,
     showOperations: true,
     allowDelete: true,
@@ -56,7 +65,6 @@ defineEmits<{ 'add-item': [] }>()
 }
 .detail-table-wrap {
   width: 100%;
-  overflow: hidden;
 }
 .detail-table {
   width: 100%;

@@ -62,9 +62,14 @@
           :model="master"
           :fields="basicFormFields"
           :group-columns="config.formGroupColumns"
-          :highlight-labels="['plan_type', 'campus_id', 'dept_id', 'total_budget']"
+          :highlight-labels="formHighlightLabels"
         />
-        <MasterDetailForm :items="items" :show-add-button="false" @add-item="addItem">
+        <MasterDetailForm
+          :items="items"
+          :show-add-button="false"
+          :show-row-selection="showDetailRowSelection"
+          @add-item="addItem"
+        >
           <template #detail-columns>
             <el-table-column
               v-for="f in detailFields"
@@ -81,14 +86,26 @@
               </template>
               <template #default="{ row }">
                 <WarehouseStockDeviceSelect
-                  v-if="isGoodsReturnStockField(f.prop)"
+                  v-if="isStockSelectField(f.prop)"
                   :model-value="String(row[f.prop] ?? '')"
-                  :warehouse-id="goodsReturnWarehouseId"
+                  :scope="isDeviceReturn ? 'dept' : 'warehouse'"
+                  :warehouse-id="stockWarehouseId"
+                  :dept-id="stockDeptId"
                   :mode="f.prop === 'device_name' ? 'name' : 'code'"
-                  :exclude-ids="goodsReturnExcludeIds"
+                  :exclude-ids="stockExcludeIds"
                   @update:model-value="(v) => (row[f.prop] = v)"
-                  @select="(device) => applyGoodsReturnStock(row, device)"
-                  @clear="() => clearGoodsReturnStock(row)"
+                  @select="(device) => applyWarehouseStock(row, device)"
+                  @clear="() => clearWarehouseStock(row)"
+                />
+                <RefDisplay
+                  v-else-if="f.readonly && f.linkTable"
+                  :link-table="f.linkTable"
+                  :value="row[f.prop]"
+                />
+                <TableCellValue
+                  v-else-if="f.readonly"
+                  :field="f"
+                  :value="row[f.prop]"
                 />
                 <FieldRenderer
                   v-else-if="f.linkTable || f.dictType || f.type === 'boolean' || f.type === 'date' || f.type === 'datetime' || f.type === 'file'"
@@ -102,11 +119,10 @@
                   v-model="row[f.prop]"
                   :min="numberMin(f)"
                   :controls="false"
-                  :disabled="f.readonly"
                   style="width:100%"
                   @change="() => onDetailFieldChange(row, f.prop)"
                 />
-                <el-input v-else v-model="row[f.prop]" :disabled="f.readonly" />
+                <el-input v-else v-model="row[f.prop]" />
               </template>
             </el-table-column>
           </template>
@@ -138,6 +154,8 @@ import { useAuthStore } from '@/stores/auth'
 import CrudPage from './CrudPage.vue'
 import MasterDetailForm from './MasterDetailForm.vue'
 import FieldRenderer from './FieldRenderer.vue'
+import TableCellValue from './table/TableCellValue.vue'
+import RefDisplay from './form/RefDisplay.vue'
 import AppModal from './AppModal.vue'
 import GroupedFormFields from './form/GroupedFormFields.vue'
 import WarehouseStockDeviceSelect from './form/WarehouseStockDeviceSelect.vue'
@@ -183,16 +201,35 @@ const canApprove = computed(
 )
 
 const isGoodsReturn = computed(() => props.config.table === 'device_goods_return')
-const goodsReturnWarehouseId = computed(() => {
+const isOutbound = computed(() => props.config.table === 'device_outbound')
+const isDeviceReturn = computed(() => props.config.table === 'device_return')
+const isWarehouseStockDoc = computed(() => isGoodsReturn.value || isOutbound.value)
+/** 出库/退货：库房库存；退库：科室在用设备 */
+const isStockSelectDoc = computed(() => isWarehouseStockDoc.value || isDeviceReturn.value)
+const showDetailRowSelection = computed(() => isOutbound.value || isDeviceReturn.value)
+const formHighlightLabels = computed(() => {
+  if (isDeviceReturn.value) {
+    return ['warehouse_id', 'dept_id', 'total_amount']
+  }
+  if (isOutbound.value || isGoodsReturn.value) {
+    return ['warehouse_id']
+  }
+  return ['plan_type', 'campus_id', 'dept_id', 'warehouse_id', 'total_budget', 'total_amount']
+})
+const stockWarehouseId = computed(() => {
   const v = master.value?.warehouse_id
   return v != null && String(v).trim() !== '' ? String(v) : ''
 })
-const goodsReturnExcludeIds = computed(() =>
+const stockDeptId = computed(() => {
+  const v = master.value?.dept_id
+  return v != null && String(v).trim() !== '' ? String(v) : ''
+})
+const stockExcludeIds = computed(() =>
   items.value.map((it) => String(it.device_id ?? '')).filter((id) => id && id !== 'undefined')
 )
 
-function isGoodsReturnStockField(prop: string) {
-  return isGoodsReturn.value && (prop === 'device_code' || prop === 'device_name')
+function isStockSelectField(prop: string) {
+  return isStockSelectDoc.value && (prop === 'device_code' || prop === 'device_name')
 }
 
 function toPrice(v: unknown): number | null {
@@ -200,8 +237,13 @@ function toPrice(v: unknown): number | null {
   return n
 }
 
-function applyGoodsReturnStock(row: Record<string, unknown>, device: Record<string, unknown>) {
-  row.device_id = device.id != null ? String(device.id) : null
+function idOrNull(v: unknown): string | null {
+  if (v == null || String(v).trim() === '') return null
+  return String(v)
+}
+
+function applyWarehouseStock(row: Record<string, unknown>, device: Record<string, unknown>) {
+  row.device_id = idOrNull(device.id)
   row.device_code = device.device_code ?? ''
   row.device_name = device.device_name ?? ''
   row.specification = device.specification ?? device.model ?? ''
@@ -211,20 +253,21 @@ function applyGoodsReturnStock(row: Record<string, unknown>, device: Record<stri
   }
   const price = toPrice(device.original_value) ?? toPrice(device.contract_price)
   if (price != null) row.unit_price = price
-  row.manufacturer_id = device.manufacturer_id ?? null
+  row.manufacturer_id = idOrNull(device.manufacturer_id)
+  row.supplier_id = idOrNull(device.supplier_id)
   row.serial_number = device.serial_number ?? ''
   row.brand = device.brand ?? ''
-  row.category_id = device.category_id ?? null
+  row.category_id = idOrNull(device.category_id)
   row.category_name = device.category_name ?? ''
-  row.asset_category_id = device.asset_category_id ?? null
+  row.asset_category_id = idOrNull(device.asset_category_id)
   row.asset_category_name = device.asset_category_name ?? ''
-  row.finance_category_id = device.finance_category_id ?? null
+  row.finance_category_id = idOrNull(device.finance_category_id)
   row.finance_category_name = device.finance_category_name ?? ''
   recalcLineAmount(row)
   syncTotalBudget()
 }
 
-function clearGoodsReturnStock(row: Record<string, unknown>) {
+function clearWarehouseStock(row: Record<string, unknown>) {
   row.device_id = null
   row.device_code = ''
   row.device_name = ''
@@ -233,6 +276,7 @@ function clearGoodsReturnStock(row: Record<string, unknown>) {
   row.unit_price = null
   row.total_price = null
   row.manufacturer_id = null
+  row.supplier_id = null
   row.serial_number = ''
   row.brand = ''
   row.category_id = null
@@ -330,7 +374,9 @@ function syncTotalBudget() {
     const line = toNumber(row.total_price)
     if (line != null) sum += line
   }
-  master.value.total_budget = Math.round(sum * 100) / 100
+  const rounded = Math.round(sum * 100) / 100
+  master.value.total_budget = rounded
+  master.value.total_amount = rounded
 }
 
 function onDetailFieldChange(row: Record<string, unknown>, prop: string) {
@@ -460,6 +506,56 @@ async function openCreate() {
     if (auth.user?.realName) defaults.created_by_name = auth.user.realName
     else if (auth.user?.username) defaults.created_by_name = auth.user.username
     try {
+      const { data } = await http.get(`${props.saveUrl}/next-no`)
+      if (data.data?.return_no) defaults.return_no = data.data.return_no
+    } catch {
+      // 编号接口失败时仍可打开表单，保存时后端会兜底生成
+    }
+    try {
+      const { data } = await http.get('/system/warehouse/list', { params: { limit: 50 } })
+      const rows = (data.data?.records ?? data.data ?? []) as Record<string, unknown>[]
+      const first = rows.find((r) => r.is_active !== false && r.id != null)
+      if (first?.id != null) defaults.warehouse_id = String(first.id)
+    } catch {
+      // 仓库列表失败时仍可打开表单
+    }
+  }
+  if (props.config.table === 'device_outbound') {
+    defaults.outbound_date = todayStr()
+    defaults.status = 'draft'
+    defaults.doc_status = 'draft'
+    defaults.approval_status = 'draft'
+    if (auth.user?.realName) defaults.created_by_name = auth.user.realName
+    else if (auth.user?.username) defaults.created_by_name = auth.user.username
+    try {
+      const { data } = await http.get(`${props.saveUrl}/next-no`)
+      if (data.data?.outbound_no) defaults.outbound_no = data.data.outbound_no
+    } catch {
+      // 编号接口失败时仍可打开表单，保存时后端会兜底生成
+    }
+    try {
+      const { data } = await http.get('/system/warehouse/list', { params: { limit: 50 } })
+      const rows = (data.data?.records ?? data.data ?? []) as Record<string, unknown>[]
+      const first = rows.find((r) => r.is_active !== false && r.id != null)
+      if (first?.id != null) defaults.warehouse_id = String(first.id)
+    } catch {
+      // 仓库列表失败时仍可打开表单
+    }
+  }
+  if (props.config.table === 'device_return') {
+    defaults.return_date = todayStr()
+    defaults.status = 'draft'
+    defaults.doc_status = 'draft'
+    defaults.approval_status = 'draft'
+    if (auth.user?.realName) defaults.created_by_name = auth.user.realName
+    else if (auth.user?.username) defaults.created_by_name = auth.user.username
+    try {
+      const { data } = await http.get(`${props.saveUrl}/next-no`)
+      if (data.data?.return_no) defaults.return_no = data.data.return_no
+    } catch {
+      // 编号接口失败时仍可打开表单，保存时后端会兜底生成
+    }
+    try {
       const { data } = await http.get('/system/warehouse/list', { params: { limit: 50 } })
       const rows = (data.data?.records ?? data.data ?? []) as Record<string, unknown>[]
       const first = rows.find((r) => r.is_active !== false && r.id != null)
@@ -475,8 +571,12 @@ async function openCreate() {
 }
 
 function addItem() {
-  if (isGoodsReturn.value && !goodsReturnWarehouseId.value) {
+  if (isWarehouseStockDoc.value && !stockWarehouseId.value) {
     ElMessage.warning('请先选择仓库')
+    return
+  }
+  if (isDeviceReturn.value && !stockDeptId.value) {
+    ElMessage.warning('请先选择科室')
     return
   }
   items.value.push(defaultItem())
@@ -511,7 +611,7 @@ async function saveMaster() {
   applyCurrentUserDefaults(master.value)
   const missing = basicFormFields.value.filter((f) => {
     if (!f.required) return false
-    if (f.prop === 'total_budget') return false // 由明细自动汇总
+    if (f.prop === 'total_budget' || f.prop === 'total_amount') return false // 由明细自动汇总
     const v = master.value![f.prop]
     return v === null || v === undefined || v === ''
   })
@@ -526,10 +626,17 @@ async function saveMaster() {
       return
     }
   }
-  if (isGoodsReturn.value) {
+  if (isGoodsReturn.value || isOutbound.value || isDeviceReturn.value) {
     const wh = master.value.warehouse_id
     if (wh == null || String(wh).trim() === '') {
       ElMessage.warning('请选择仓库')
+      return
+    }
+  }
+  if (isDeviceReturn.value) {
+    const dept = master.value.dept_id
+    if (dept == null || String(dept).trim() === '') {
+      ElMessage.warning('请选择科室')
       return
     }
   }
@@ -541,10 +648,17 @@ async function saveMaster() {
     ElMessage.warning('请填写明细资产名称，或删除空白明细行')
     return
   }
-  if (isGoodsReturn.value) {
+  if (isWarehouseStockDoc.value) {
     const missingDevice = payloadItems.find((it) => !it.device_id)
     if (missingDevice) {
       ElMessage.warning('请从库存中选择资产（输入资产编码或名称后点选）')
+      return
+    }
+  }
+  if (isDeviceReturn.value) {
+    const missingDevice = payloadItems.find((it) => !it.device_id)
+    if (missingDevice) {
+      ElMessage.warning('请从科室在用设备中选择资产（输入资产编码或名称后点选）')
       return
     }
   }

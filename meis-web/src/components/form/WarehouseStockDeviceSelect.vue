@@ -3,8 +3,8 @@
     :model-value="modelValue ?? ''"
     :fetch-suggestions="querySearch"
     :placeholder="placeholderText"
-    :disabled="disabled || !warehouseId"
-    :trigger-on-focus="!!warehouseId"
+    :disabled="disabled || !scopeReady"
+    :trigger-on-focus="scopeReady"
     clearable
     value-key="value"
     style="width: 100%"
@@ -36,13 +36,16 @@ type StockOption = Record<string, unknown> & {
 const props = withDefaults(
   defineProps<{
     modelValue?: string | null
+    /** warehouse：库房库存；dept：科室在用（不在库） */
+    scope?: 'warehouse' | 'dept'
     warehouseId?: string | null
+    deptId?: string | null
     mode?: 'code' | 'name'
     placeholder?: string
     disabled?: boolean
     excludeIds?: string[]
   }>(),
-  { mode: 'code', disabled: false, excludeIds: () => [] }
+  { scope: 'warehouse', mode: 'code', disabled: false, excludeIds: () => [] }
 )
 
 const emit = defineEmits<{
@@ -51,8 +54,17 @@ const emit = defineEmits<{
   clear: []
 }>()
 
+const scopeReady = computed(() => {
+  if (props.scope === 'dept') {
+    return props.deptId != null && String(props.deptId).trim() !== ''
+  }
+  return props.warehouseId != null && String(props.warehouseId).trim() !== ''
+})
+
 const placeholderText = computed(() => {
-  if (!props.warehouseId) return '请先选择仓库'
+  if (!scopeReady.value) {
+    return props.scope === 'dept' ? '请先选择科室' : '请先选择仓库'
+  }
   return props.placeholder || (props.mode === 'name' ? '输入资产名称检索' : '输入资产编码检索')
 })
 
@@ -66,13 +78,12 @@ function onClear() {
 }
 
 function onFocus() {
-  if (!props.warehouseId) {
-    ElMessage.warning('请先选择仓库')
-  }
+  if (scopeReady.value) return
+  ElMessage.warning(props.scope === 'dept' ? '请先选择科室' : '请先选择仓库')
 }
 
 async function querySearch(queryString: string, cb: (rows: StockOption[]) => void) {
-  if (!props.warehouseId) {
+  if (!scopeReady.value) {
     cb([])
     return
   }
@@ -80,8 +91,14 @@ async function querySearch(queryString: string, cb: (rows: StockOption[]) => voi
   try {
     const params: Record<string, string | number> = {
       page: 1,
-      size: 30,
-      warehouse_id: String(props.warehouseId)
+      size: 30
+    }
+    if (props.scope === 'dept') {
+      params.stock_scope = 'dept'
+      params.dept_id = String(props.deptId)
+    } else {
+      params.stock_scope = 'warehouse'
+      params.warehouse_id = String(props.warehouseId)
     }
     if (q) {
       if (props.mode === 'name') params.device_name = q

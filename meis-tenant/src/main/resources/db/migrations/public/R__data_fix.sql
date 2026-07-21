@@ -17,7 +17,7 @@ INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_o
 ('purchase_plan', 'mod_purchase', '采购计划', 'menu', '/purchase/plan', 1),
 ('purchase_project', 'mod_purchase', '设备采购计划表', 'menu', '/purchase/project', 2),
 ('purchase_contract', 'mod_purchase', '采购合同', 'menu', '/purchase/contract', 3),
-('mod_asset', NULL, '资产台账', 'module', NULL, 4),
+('mod_asset', NULL, '资产管理', 'module', NULL, 4),
 ('asset_device', 'mod_asset', '资产登记', 'menu', '/asset/device', 1),
 ('asset_entry', 'mod_asset', '设备入库', 'menu', '/asset/entry', 2),
 ('asset_outbound', 'mod_asset', '设备出库', 'menu', '/asset/outbound', 3),
@@ -128,8 +128,8 @@ WHERE m.menu_code IN (
 ON CONFLICT DO NOTHING;
 
 -- ---------- from V6__asset_ledger_menus.sql ----------
--- 模块2：资产台账 — 菜单（登记 / 综合查询 / 导入）；终态排序见文末「资产台账菜单顺序」块
-UPDATE sys_menu SET menu_name = '资产台账' WHERE menu_code = 'mod_asset';
+-- 模块2：资产管理 — 菜单（登记 / 综合查询 / 导入）；终态分组见文末 AST-UI-05
+UPDATE sys_menu SET menu_name = '资产管理' WHERE menu_code = 'mod_asset';
 
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
 ('asset_query', 'mod_asset', '资产综合查询', 'menu', '/asset/query', 2),
@@ -780,16 +780,52 @@ ON CONFLICT (menu_code) DO UPDATE SET
     sort_order = EXCLUDED.sort_order,
     is_active = TRUE;
 
--- AST-UI-03：资产台账启用菜单终态顺序（登记 → 综合查询 → 导入）
-UPDATE sys_menu SET menu_name = '资产登记', sort_order = 1, is_active = TRUE WHERE menu_code = 'asset_device';
-UPDATE sys_menu SET sort_order = 2, is_active = TRUE WHERE menu_code = 'asset_query';
-UPDATE sys_menu SET sort_order = 3, is_active = TRUE WHERE menu_code = 'asset_import';
--- 设备入库/出库等与库房管理重复：保持停用，入口统一在 mod_warehouse
-UPDATE sys_menu SET sort_order = 4, is_active = FALSE WHERE menu_code = 'asset_entry';
-UPDATE sys_menu SET sort_order = 5, is_active = FALSE WHERE menu_code = 'asset_outbound';
-UPDATE sys_menu SET sort_order = 6, is_active = FALSE WHERE menu_code = 'asset_transfer';
-UPDATE sys_menu SET sort_order = 7, is_active = FALSE WHERE menu_code = 'asset_inventory';
-UPDATE sys_menu SET sort_order = 8, is_active = FALSE WHERE menu_code = 'asset_scrap';
+-- AST-UI-03→05：资产管理二级分组终态（资产增减 / 资产查询）
+UPDATE sys_menu SET menu_name = '资产管理', is_active = TRUE WHERE menu_code = 'mod_asset';
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('asset_change', 'mod_asset', '资产增减', 'group', NULL, 1),
+('asset_query_group', 'mod_asset', '资产查询', 'group', NULL, 2)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    menu_type = EXCLUDED.menu_type,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+UPDATE sys_menu SET parent_code = 'asset_change', menu_name = '资产登记', path = '/asset/device',
+    sort_order = 1, is_active = TRUE
+WHERE menu_code = 'asset_device';
+UPDATE sys_menu SET parent_code = 'asset_change', menu_name = '资产导入', path = '/asset/import',
+    sort_order = 2, is_active = TRUE
+WHERE menu_code = 'asset_import';
+UPDATE sys_menu SET parent_code = 'asset_change', menu_name = '库房调拨', path = '/warehouse/transfer',
+    sort_order = 3, is_active = TRUE
+WHERE menu_code = 'warehouse_transfer';
+UPDATE sys_menu SET parent_code = 'asset_query_group', menu_name = '资产综合查询', path = '/asset/query',
+    sort_order = 1, is_active = TRUE
+WHERE menu_code = 'asset_query';
+-- 设备入库/出库等与库房管理重复：保持停用（调拨在 asset_change；报废见 AST-UI-07）
+UPDATE sys_menu SET parent_code = 'mod_asset', sort_order = 4, is_active = FALSE WHERE menu_code = 'asset_entry';
+UPDATE sys_menu SET parent_code = 'mod_asset', sort_order = 5, is_active = FALSE WHERE menu_code = 'asset_outbound';
+UPDATE sys_menu SET parent_code = 'mod_asset', sort_order = 6, is_active = FALSE WHERE menu_code = 'asset_transfer';
+UPDATE sys_menu SET parent_code = 'mod_asset', sort_order = 7, is_active = FALSE WHERE menu_code = 'asset_inventory';
+UPDATE sys_menu SET parent_code = 'mod_asset', sort_order = 8, is_active = FALSE WHERE menu_code = 'asset_scrap';
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('asset_change', 'asset_query_group')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('asset_change', 'asset_query_group')
+ON CONFLICT DO NOTHING;
 
 -- AST-UI-04 / SHR-UI-01→02：调配中心更名；库存查询迁库房（入库后）
 UPDATE sys_menu SET menu_name = '调配中心' WHERE menu_code = 'mod_shared';
@@ -799,9 +835,8 @@ WHERE menu_code = 'asset_stock_query';
 UPDATE sys_menu SET sort_order = 2, is_active = TRUE WHERE menu_code = 'warehouse_entry';
 UPDATE sys_menu SET sort_order = 5, is_active = TRUE WHERE menu_code = 'warehouse_outbound';
 UPDATE sys_menu SET menu_name = '设备退库', sort_order = 6, is_active = TRUE WHERE menu_code = 'warehouse_return';
-UPDATE sys_menu SET sort_order = 7, is_active = TRUE WHERE menu_code = 'warehouse_transfer';
-UPDATE sys_menu SET sort_order = 8, is_active = TRUE WHERE menu_code = 'warehouse_inventory';
-UPDATE sys_menu SET sort_order = 9, is_active = TRUE WHERE menu_code = 'warehouse_scrap';
+UPDATE sys_menu SET sort_order = 7, is_active = TRUE WHERE menu_code = 'warehouse_inventory';
+-- warehouse_transfer / warehouse_scrap 终态挂资产增减，见 AST-UI-05/06（勿在此写回 mod_warehouse）
 -- 系统管理侧「仓库维护」：保留菜单定义但不启用（与基础字典 /dict/warehouse 重复）
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order, is_active) VALUES
 ('system_warehouse', 'mod_system', '仓库维护', 'menu', '/system/warehouse', 2, FALSE)
@@ -1007,11 +1042,12 @@ CROSS JOIN sys_menu m
 WHERE m.menu_code = 'ops_repair'
 ON CONFLICT DO NOTHING;
 
--- ---------- NAV-UI-01：一级模块顺序 — 库房管理在资产台账之上 ----------
+-- ---------- NAV-UI-01：一级模块顺序 — 库房管理在资产管理之上 ----------
 UPDATE sys_menu SET sort_order = 4 WHERE menu_code = 'mod_warehouse';
 UPDATE sys_menu SET sort_order = 5 WHERE menu_code = 'mod_asset';
 
--- ---------- WH-UI-01：库房子菜单 — 入库→退货→库存查询→出库→退库→调拨→盘点→报废 ----------
+-- ---------- WH-UI-01 / AST-UI-06：库房子菜单 — 入库→退货→库存查询→出库→退库→盘点 ----------
+-- 调拨/报废已迁至资产管理→资产增减（见下文 AST-UI-06 终态再确认）
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
 ('warehouse_goods_return', 'mod_warehouse', '设备退货', 'menu', '/warehouse/goods-return', 3)
 ON CONFLICT (menu_code) DO UPDATE SET
@@ -1030,20 +1066,270 @@ WHERE menu_code = 'asset_stock_query';
 UPDATE sys_menu SET sort_order = 5, is_active = TRUE WHERE menu_code = 'warehouse_outbound';
 UPDATE sys_menu SET menu_name = '设备退库', path = '/warehouse/return', sort_order = 6, is_active = TRUE
 WHERE menu_code = 'warehouse_return';
-UPDATE sys_menu SET sort_order = 7, is_active = TRUE WHERE menu_code = 'warehouse_transfer';
-UPDATE sys_menu SET sort_order = 8, is_active = TRUE WHERE menu_code = 'warehouse_inventory';
-UPDATE sys_menu SET sort_order = 9, is_active = TRUE WHERE menu_code = 'warehouse_scrap';
+UPDATE sys_menu SET parent_code = 'mod_warehouse', menu_name = '库存盘点', path = '/warehouse/inventory',
+    sort_order = 7, is_active = TRUE
+WHERE menu_code = 'warehouse_inventory';
+
+-- ---------- AST-UI-06：库房调拨迁入资产管理→资产增减（报废见 AST-UI-07） ----------
+UPDATE sys_menu SET parent_code = 'asset_change', menu_name = '库房调拨', path = '/warehouse/transfer',
+    sort_order = 3, is_active = TRUE
+WHERE menu_code = 'warehouse_transfer';
+
+-- ---------- AST-UI-07：报废管理挂资产查询下；科室盘点二级分组 ----------
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('asset_scrap_mgmt', 'asset_query_group', '报废管理', 'group', NULL, 3),
+('asset_dept_inventory', 'mod_asset', '科室盘点', 'group', NULL, 3),
+('asset_dept_inventory_apply', 'asset_dept_inventory', '科室盘点申请', 'menu', '/asset/dept-inventory-apply', 1),
+('asset_dept_inventory_report', 'asset_dept_inventory', '设备盘点报表', 'menu', '/asset/dept-inventory-report', 2)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    menu_type = EXCLUDED.menu_type,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+UPDATE sys_menu SET parent_code = 'asset_scrap_mgmt', menu_name = '报废申请', path = '/warehouse/scrap',
+    sort_order = 1, is_active = TRUE
+WHERE menu_code = 'warehouse_scrap';
+UPDATE sys_menu SET parent_code = 'asset_query_group', menu_name = '资产综合查询', path = '/asset/query',
+    sort_order = 1, is_active = TRUE
+WHERE menu_code = 'asset_query';
+UPDATE sys_menu SET sort_order = 1, is_active = TRUE WHERE menu_code = 'asset_change';
+UPDATE sys_menu SET sort_order = 2, is_active = TRUE WHERE menu_code = 'asset_query_group';
+UPDATE sys_menu SET sort_order = 3, is_active = TRUE WHERE menu_code = 'asset_dept_inventory';
 
 INSERT INTO sys_package_menu (package_code, menu_code)
 SELECT pkg, m.menu_code
 FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
 CROSS JOIN sys_menu m
-WHERE m.menu_code = 'warehouse_goods_return'
+WHERE m.menu_code IN (
+    'asset_scrap_mgmt', 'asset_dept_inventory',
+    'asset_dept_inventory_apply', 'asset_dept_inventory_report',
+    'warehouse_goods_return'
+)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO sys_tenant_menu (tenant_id, menu_code)
 SELECT t.id, m.menu_code
 FROM sys_tenant t
 CROSS JOIN sys_menu m
-WHERE m.menu_code = 'warehouse_goods_return'
+WHERE m.menu_code IN (
+    'asset_scrap_mgmt', 'asset_dept_inventory',
+    'asset_dept_inventory_apply', 'asset_dept_inventory_report',
+    'warehouse_goods_return'
+)
+ON CONFLICT DO NOTHING;
+
+-- ---------- AST-UI-08：资产查询下增加「资产动态统计」 ----------
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('asset_dynamic_stats', 'asset_query_group', '资产动态统计', 'menu', '/asset/dynamic-stats', 2)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    menu_type = EXCLUDED.menu_type,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+UPDATE sys_menu SET parent_code = 'asset_query_group', menu_name = '资产综合查询', path = '/asset/query',
+    sort_order = 1, is_active = TRUE
+WHERE menu_code = 'asset_query';
+UPDATE sys_menu SET parent_code = 'asset_query_group', sort_order = 3, is_active = TRUE
+WHERE menu_code = 'asset_scrap_mgmt';
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code = 'asset_dynamic_stats'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code = 'asset_dynamic_stats'
+ON CONFLICT DO NOTHING;
+
+-- ---------- QC-UI-02 / AST-UI-09 / ANA-UI-01：质控不良事件分组、资产维保管理、PM 分组、数据决策效益/效率 ----------
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('qc_adverse_group', 'mod_quality', '不良事件', 'group', NULL, 2),
+('qc_pm_group', 'mod_quality', '预防性维护', 'group', NULL, 3),
+('asset_maint_mgmt', 'mod_asset', '维保管理', 'group', NULL, 4),
+('analytics_benefit_group', 'mod_analytics', '效益分析', 'group', NULL, 1),
+('analytics_efficiency', 'mod_analytics', '效率分析', 'menu', '/analytics/efficiency', 2)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    menu_type = EXCLUDED.menu_type,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+-- 质控：风险评估 / 不良事件上报 / 查询 → 不良事件分组
+UPDATE sys_menu SET parent_code = 'qc_adverse_group', menu_name = '风险评估', path = '/qc/risk',
+    sort_order = 1, is_active = TRUE
+WHERE menu_code = 'qc_risk';
+UPDATE sys_menu SET parent_code = 'qc_adverse_group', menu_name = '不良事件上报', path = '/qc/adverse/report',
+    sort_order = 2, is_active = TRUE
+WHERE menu_code = 'qc_adverse_report';
+UPDATE sys_menu SET parent_code = 'qc_adverse_group', menu_name = '不良事件查询', path = '/qc/adverse/query',
+    sort_order = 3, is_active = TRUE
+WHERE menu_code = 'qc_adverse_query';
+UPDATE sys_menu SET is_active = FALSE WHERE menu_code = 'qc_adverse';
+
+-- 质控：预防性维护计划/执行/记录 → 预防性维护分组（参数一并收纳，避免散落）
+UPDATE sys_menu SET parent_code = 'qc_pm_group', menu_name = '预防性维护参数', path = '/pm/param',
+    sort_order = 1, is_active = TRUE
+WHERE menu_code = 'pm_param';
+UPDATE sys_menu SET parent_code = 'qc_pm_group', menu_name = '预防性维护计划', path = '/pm/plan',
+    sort_order = 2, is_active = TRUE
+WHERE menu_code = 'pm_plan';
+UPDATE sys_menu SET parent_code = 'qc_pm_group', menu_name = '预防性维护执行', path = '/pm/execution',
+    sort_order = 3, is_active = TRUE
+WHERE menu_code = 'pm_execution';
+UPDATE sys_menu SET parent_code = 'qc_pm_group', menu_name = '预防性维护记录', path = '/pm/query',
+    sort_order = 4, is_active = TRUE
+WHERE menu_code = 'pm_query';
+
+-- 质控剩余直挂项排序
+UPDATE sys_menu SET sort_order = 1, is_active = TRUE WHERE menu_code = 'qc_adverse_group';
+UPDATE sys_menu SET sort_order = 2, is_active = TRUE WHERE menu_code = 'qc_pm_group';
+
+-- 资产管理：维保合同 / 履约记录 / 性能检测 → 维保管理
+UPDATE sys_menu SET parent_code = 'asset_maint_mgmt', menu_name = '维保合同', path = '/maintenance-contract/list',
+    sort_order = 1, is_active = TRUE
+WHERE menu_code = 'mcontract_list';
+UPDATE sys_menu SET parent_code = 'asset_maint_mgmt', menu_name = '履约记录', path = '/maintenance-contract/fulfillment',
+    sort_order = 2, is_active = TRUE
+WHERE menu_code = 'mcontract_fulfillment';
+UPDATE sys_menu SET parent_code = 'asset_maint_mgmt', menu_name = '性能检测', path = '/qc/performance',
+    sort_order = 3, is_active = TRUE
+WHERE menu_code = 'qc_performance';
+UPDATE sys_menu SET sort_order = 4, is_active = TRUE WHERE menu_code = 'asset_maint_mgmt';
+
+-- 数据决策：既有效益相关页收入「效益分析」；新增「效率分析」占位
+UPDATE sys_menu SET parent_code = 'analytics_benefit_group', menu_name = '对照管理', path = '/analytics/mapping',
+    sort_order = 1, is_active = TRUE
+WHERE menu_code = 'analytics_mapping';
+UPDATE sys_menu SET parent_code = 'analytics_benefit_group', menu_name = '数据抓取', path = '/analytics/sync',
+    sort_order = 2, is_active = TRUE
+WHERE menu_code = 'analytics_sync';
+UPDATE sys_menu SET parent_code = 'analytics_benefit_group', menu_name = '效益分析汇总', path = '/analytics/summary',
+    sort_order = 3, is_active = TRUE
+WHERE menu_code = 'analytics_summary';
+UPDATE sys_menu SET parent_code = 'analytics_benefit_group', menu_name = '成本上报', path = '/analytics/cost',
+    sort_order = 4, is_active = TRUE
+WHERE menu_code = 'analytics_cost';
+UPDATE sys_menu SET parent_code = 'analytics_benefit_group', menu_name = '单机效益分析', path = '/analytics/device',
+    sort_order = 5, is_active = TRUE
+WHERE menu_code = 'analytics_device';
+UPDATE sys_menu SET is_active = FALSE WHERE menu_code = 'analytics_benefit';
+UPDATE sys_menu SET parent_code = 'mod_analytics', menu_name = '统计报表', path = '/analytics/reports',
+    sort_order = 3, is_active = TRUE
+WHERE menu_code = 'analytics_reports';
+UPDATE sys_menu SET sort_order = 1, is_active = TRUE WHERE menu_code = 'analytics_benefit_group';
+UPDATE sys_menu SET sort_order = 2, is_active = TRUE WHERE menu_code = 'analytics_efficiency';
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN (
+    'qc_adverse_group', 'qc_pm_group', 'asset_maint_mgmt',
+    'analytics_benefit_group', 'analytics_efficiency'
+)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN (
+    'qc_adverse_group', 'qc_pm_group', 'asset_maint_mgmt',
+    'analytics_benefit_group', 'analytics_efficiency'
+)
+ON CONFLICT DO NOTHING;
+
+-- ---------- ANA-UI-02：效益分析子菜单更名/增查询；效率分析改为分组 ----------
+UPDATE sys_menu SET parent_code = 'analytics_benefit_group', menu_name = '效益分析对照', path = '/analytics/mapping',
+    sort_order = 1, is_active = TRUE
+WHERE menu_code = 'analytics_mapping';
+UPDATE sys_menu SET parent_code = 'analytics_benefit_group', menu_name = '效益分析提取', path = '/analytics/sync',
+    sort_order = 2, is_active = TRUE
+WHERE menu_code = 'analytics_sync';
+UPDATE sys_menu SET parent_code = 'analytics_benefit_group', menu_name = '效益分析报表', path = '/analytics/summary',
+    sort_order = 3, is_active = TRUE
+WHERE menu_code = 'analytics_summary';
+UPDATE sys_menu SET parent_code = 'analytics_benefit_group', menu_name = '效益分析上报', path = '/analytics/cost',
+    sort_order = 4, is_active = TRUE
+WHERE menu_code = 'analytics_cost';
+UPDATE sys_menu SET parent_code = 'analytics_benefit_group', menu_name = '单机效益分析', path = '/analytics/device',
+    sort_order = 6, is_active = TRUE
+WHERE menu_code = 'analytics_device';
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('analytics_benefit_query', 'analytics_benefit_group', '效益分析查询', 'menu', '/analytics/benefit-query', 5),
+('analytics_efficiency_view', 'analytics_efficiency', '效率分析', 'menu', '/analytics/efficiency', 1),
+('analytics_charge_audit', 'analytics_efficiency', '收费项目审核', 'menu', '/analytics/charge-audit', 2)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    menu_type = EXCLUDED.menu_type,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+-- 效率分析：由叶子菜单改为分组
+UPDATE sys_menu SET parent_code = 'mod_analytics', menu_name = '效率分析', menu_type = 'group', path = NULL,
+    sort_order = 2, is_active = TRUE
+WHERE menu_code = 'analytics_efficiency';
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN (
+    'analytics_benefit_query', 'analytics_efficiency_view', 'analytics_charge_audit'
+)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN (
+    'analytics_benefit_query', 'analytics_efficiency_view', 'analytics_charge_audit'
+)
+ON CONFLICT DO NOTHING;
+
+-- ---------- AST-UI-10：报废管理 — 报废申请/审核/查询 ----------
+UPDATE sys_menu SET parent_code = 'asset_scrap_mgmt', menu_name = '报废申请', path = '/warehouse/scrap',
+    sort_order = 1, is_active = TRUE
+WHERE menu_code = 'warehouse_scrap';
+
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('warehouse_scrap_review', 'asset_scrap_mgmt', '报废审核', 'menu', '/warehouse/scrap-review', 2),
+('warehouse_scrap_query', 'asset_scrap_mgmt', '报废查询', 'menu', '/warehouse/scrap-query', 3)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    menu_type = EXCLUDED.menu_type,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('warehouse_scrap_review', 'warehouse_scrap_query')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN ('warehouse_scrap_review', 'warehouse_scrap_query')
 ON CONFLICT DO NOTHING;

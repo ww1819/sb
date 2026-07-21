@@ -43,10 +43,12 @@ const props = withDefaults(
     valueKey?: string
     /** 强制只显示名称，不拼编码 */
     hideCode?: boolean
+    /** 当前值不在选项中时的回显文案（如详情带回的 *_name） */
+    fallbackLabel?: string
     /** 不出现在选项中的值（如编辑时排除自身及子孙，避免成环） */
     excludeValues?: string[]
   }>(),
-  { multiple: false, excludeValues: () => [], hideCode: false }
+  { multiple: false, excludeValues: () => [], hideCode: false, fallbackLabel: '' }
 )
 const emit = defineEmits<{ 'update:modelValue': [v: unknown] }>()
 
@@ -56,12 +58,22 @@ const loaded = ref(false)
 
 const options = computed(() => {
   const ban = new Set((props.excludeValues ?? []).map(String).filter(Boolean))
-  if (!ban.size) return allOptions.value
-  return allOptions.value.filter((o) => !ban.has(o.value))
+  let list = allOptions.value
+  if (ban.size) list = list.filter((o) => !ban.has(o.value))
+  const cur = props.modelValue == null || props.modelValue === '' ? '' : String(props.modelValue)
+  const label = (props.fallbackLabel ?? '').trim()
+  if (cur && label && !list.some((o) => o.value === cur)) {
+    return [{ value: cur, label }, ...list]
+  }
+  return list
 })
 
 const model = computed({
-  get: () => props.modelValue,
+  get: () => {
+    if (props.modelValue == null || props.modelValue === '') return props.multiple ? [] : null
+    if (props.multiple && Array.isArray(props.modelValue)) return props.modelValue.map(String)
+    return String(props.modelValue)
+  },
   // 清空时统一为 null，便于后端 UUID 列落库为一级（无上级）
   set: (v) => emit('update:modelValue', v === undefined || v === '' ? null : v)
 })

@@ -45,9 +45,11 @@ public class AssetDeviceController {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d"));
         List<Object> args = new ArrayList<>();
-        // 库房库存查询：仅仓库在库 + 已出库（WH-UI-05）
+        // 库房库存：仅仓库在库（WH-UI-19）；科室在用：不在库（WH-UI-24 退库选资产）
         if ("warehouse".equalsIgnoreCase(stock_scope)) {
-            where.append(" AND (d.warehouse_id IS NOT NULL OR d.device_status = 'in_use') ");
+            where.append(" AND d.warehouse_id IS NOT NULL ");
+        } else if ("dept".equalsIgnoreCase(stock_scope)) {
+            where.append(" AND d.warehouse_id IS NULL ");
         }
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
             String kw = "%" + query.getKeyword().trim() + "%";
@@ -111,7 +113,8 @@ public class AssetDeviceController {
                        mdc.category_name AS category_name,
                        ac.category_name AS asset_category_name,
                        fc.finance_name AS finance_category_name,
-                       u.unit_name AS unit_name
+                       u.unit_name AS unit_name,
+                       CASE WHEN d.warehouse_id IS NOT NULL THEN 1 ELSE 0 END AS stock_quantity
                 """ + from + where + buildOrderBy(query) + " LIMIT ? OFFSET ?", args.toArray());
         MedicalDeviceDeleteGuard.enrichCanDelete(jdbc, rows);
         return Result.ok(new PageResult<>(rows, total, query.getPage(), query.getSize()));

@@ -34,6 +34,8 @@ import { openFilePreview } from '@/composables/useFilePreview'
 const props = defineProps<{
   field: FieldSchema
   value: unknown
+  /** 行上联表/快照名称，外键缓存未命中时优先展示 */
+  labelHint?: string
 }>()
 
 const { loadDict, resolveDictLabel } = useDict()
@@ -87,6 +89,8 @@ const displayText = computed(() => {
   if (props.field.linkTable) {
     const label = resolveRefLabel(props.field.linkTable, props.value)
     if (label && label !== String(props.value)) return label
+    const hint = (props.labelHint ?? '').trim()
+    if (hint) return hint
     if (label) return label
   }
   if (props.field.type === 'date' || props.field.type === 'datetime') {
