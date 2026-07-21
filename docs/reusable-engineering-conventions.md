@@ -4,7 +4,7 @@
 > **来源**：`docs/meis-requirements.md` 附录 Q / C / D / E / F / G / H / I / R / S / T 等。  
 > **用法**：新系统可整份复制后，按「落地映射」改路径与模块名；MEIS 专属细节见文末附录。
 
-**版本**：1.9（2026-07-17）
+**版本**：1.10（2026-07-21）
 
 ---
 
@@ -359,6 +359,15 @@
 | NF-06 | 编码 | 业务唯一编码创建后只读（前后端双重忽略改码） |
 | NF-07 | 删除约束 | 存在关联业务数据则禁止删主数据（软删前校验） |
 
+### 8.1 移动端本地数据库（Flutter）
+
+| 项 | 约定 |
+|----|------|
+| 选型 | **SQLite**（`sqflite` / 桌面 `sqflite_common_ffi`）；Web/H5 才考虑 IndexedDB |
+| 职责 | 通用 CRUD 工具类 + 按业务 `onCreate`/`onUpgrade` 建表；小配置可用 KV 表 |
+| 边界 | 只缓存**当前任务 / 待同步队列 / 草稿**；禁止全量镜像服务端主数据 |
+| 配套 | 大批量业务仍须服务端分页与增量 API；本地库不能替代接口改造 |
+
 ---
 
 ## 9. Agent / 人机协作规则（可做成 alwaysApply）
@@ -388,6 +397,7 @@
 | 字典中文 | 附录 R | `useDict`、`TableCellValue` |
 | 报修草稿/撤回 / 故障图片 | 附录 S（含 S.6）、约定包 §6.4 / §6.5 | `RepairWorkorderController`、`fault_photos` |
 | 移动端扫码报修 | 附录 MOB | `meis-mobile` 扫码报修 |
+| 移动端本地 SQLite | 附录 MOB.7、约定包 §8.1 | `sqlite_helper.dart` / `sqlite_table_dao.dart` |
 | 统一打印流水 / 盘点补打 | 约定包 §6.6、附录 AST.INV / MOB.6 | `device_label_print_log`、`InventoryCheckController` |
 | 维修列表功能分列 | 附录 U.14.2 | `WorkorderListPage`（handle/verify 取消操作列、功能分列） |
 | 变更记录/快照 | 附录 T（含 T.5） | `EntityChangeLogService` |
