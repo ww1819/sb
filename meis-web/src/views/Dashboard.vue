@@ -13,70 +13,76 @@
       </el-col>
     </el-row>
 
-    <el-tabs v-model="activeTab" class="dashboard-tabs" @tab-change="onTabChange">
-      <el-tab-pane name="workspace">
-        <template #label>
-          <span>日常办公</span>
-          <el-badge v-if="todos.length" :value="todos.length" class="tab-badge" />
-        </template>
-        <el-row :gutter="16">
-          <el-col :xs="24" :lg="profile.showTodos ? 14 : 24">
-            <el-card shadow="never" class="panel-card">
-              <template #header>
-                <div class="panel-header">快捷入口</div>
-              </template>
-              <QuickEntryGrid :items="quickEntries" @navigate="go" />
-            </el-card>
-          </el-col>
-          <el-col v-if="profile.showTodos" :xs="24" :lg="10">
-            <el-card shadow="never" class="panel-card panel-card--fill">
-              <template #header>
-                <div class="panel-header">待办事项</div>
-              </template>
-              <FeedList :items="todos" type-field="todo_type" empty-text="暂无待办事项" :limit="12" />
-            </el-card>
-          </el-col>
-        </el-row>
-      </el-tab-pane>
-
-      <el-tab-pane v-if="activeCharts.length" name="charts" lazy>
-        <template #label>数据分析</template>
-        <el-row :gutter="16" class="charts-row">
-          <el-col
-            v-for="chart in activeCharts"
-            :key="chart.key"
-            :xs="24"
-            :lg="chart.span"
-          >
-            <ChartCard :title="chart.title" :option="chart.option" :height="chart.height" />
-          </el-col>
-        </el-row>
-      </el-tab-pane>
-
-      <el-tab-pane v-if="profile.showMessages" name="messages" lazy>
-        <template #label>
-          <span>消息中心</span>
-          <el-badge v-if="unreadCount" :value="unreadCount" class="tab-badge" />
-        </template>
-        <el-card shadow="never" class="panel-card">
-          <template #header>
-            <div class="panel-header">消息通知</div>
+    <div
+      class="dashboard-tabs-wrap"
+      @mouseenter="onTabsHover(true)"
+      @mouseleave="onTabsHover(false)"
+    >
+      <el-tabs v-model="activeTab" class="dashboard-tabs" @tab-change="onTabChange">
+        <el-tab-pane name="workspace">
+          <template #label>
+            <span>日常办公</span>
+            <el-badge v-if="todos.length" :value="todos.length" class="tab-badge" />
           </template>
-          <FeedList
-            :items="messages"
-            type-field="message_type"
-            unread-field="is_read"
-            empty-text="暂无消息"
-            :limit="20"
-          />
-        </el-card>
-      </el-tab-pane>
-    </el-tabs>
+          <el-row :gutter="16">
+            <el-col :xs="24" :lg="profile.showTodos ? 14 : 24">
+              <el-card shadow="never" class="panel-card">
+                <template #header>
+                  <div class="panel-header">快捷入口</div>
+                </template>
+                <QuickEntryGrid :items="quickEntries" @navigate="go" />
+              </el-card>
+            </el-col>
+            <el-col v-if="profile.showTodos" :xs="24" :lg="10">
+              <el-card shadow="never" class="panel-card panel-card--fill">
+                <template #header>
+                  <div class="panel-header">待办事项</div>
+                </template>
+                <FeedList :items="todos" type-field="todo_type" empty-text="暂无待办事项" :limit="12" />
+              </el-card>
+            </el-col>
+          </el-row>
+        </el-tab-pane>
+
+        <el-tab-pane v-if="activeCharts.length" name="charts" lazy>
+          <template #label>数据分析</template>
+          <el-row :gutter="16" class="charts-row">
+            <el-col
+              v-for="chart in activeCharts"
+              :key="chart.key"
+              :xs="24"
+              :lg="chart.span"
+            >
+              <ChartCard :title="chart.title" :option="chart.option" :height="chart.height" />
+            </el-col>
+          </el-row>
+        </el-tab-pane>
+
+        <el-tab-pane v-if="profile.showMessages" name="messages" lazy>
+          <template #label>
+            <span>消息中心</span>
+            <el-badge v-if="unreadCount" :value="unreadCount" class="tab-badge" />
+          </template>
+          <el-card shadow="never" class="panel-card">
+            <template #header>
+              <div class="panel-header">消息通知</div>
+            </template>
+            <FeedList
+              :items="messages"
+              type-field="message_type"
+              unread-field="is_read"
+              empty-text="暂无消息"
+              :limit="20"
+            />
+          </el-card>
+        </el-tab-pane>
+      </el-tabs>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import type { EChartsOption } from 'echarts'
 import type { TabPaneName } from 'element-plus'
@@ -100,6 +106,49 @@ const stats = ref<Record<string, unknown>>({})
 const todos = ref<Record<string, unknown>[]>([])
 const messages = ref<Record<string, unknown>[]>([])
 const activeTab = ref('workspace')
+/** 日常办公 / 数据分析 / 消息中心自动轮播；鼠标悬停在 Tab 区域时暂停（DASH-UI-01） */
+const TAB_ROTATE_MS = 5000
+const tabHoverPaused = ref(false)
+let tabRotateTimer: ReturnType<typeof setInterval> | null = null
+
+const rotatableTabs = computed(() => {
+  const names: string[] = ['workspace']
+  if (profile.value.charts.length) names.push('charts')
+  if (profile.value.showMessages) names.push('messages')
+  return names
+})
+
+function stopTabRotate() {
+  if (tabRotateTimer != null) {
+    clearInterval(tabRotateTimer)
+    tabRotateTimer = null
+  }
+}
+
+function startTabRotate() {
+  stopTabRotate()
+  if (rotatableTabs.value.length < 2) return
+  tabRotateTimer = setInterval(() => {
+    if (tabHoverPaused.value) return
+    const names = rotatableTabs.value
+    if (names.length < 2) return
+    const idx = names.indexOf(String(activeTab.value))
+    const next = names[(idx < 0 ? 0 : idx + 1) % names.length]
+    activeTab.value = next
+    onTabChange(next)
+  }, TAB_ROTATE_MS)
+}
+
+function onTabsHover(hovering: boolean) {
+  tabHoverPaused.value = hovering
+}
+
+watch(rotatableTabs, (names) => {
+  if (!names.includes(String(activeTab.value))) {
+    activeTab.value = names[0] ?? 'workspace'
+  }
+  startTabRotate()
+})
 
 const kpiSpan = computed(() => (profile.value.kpis.length === 3 ? 8 : 6))
 
@@ -208,6 +257,11 @@ onMounted(async () => {
   stats.value = dash.data.data ?? {}
   todos.value = todoRes.data.data ?? []
   messages.value = msgRes.data.data ?? []
+  startTabRotate()
+})
+
+onUnmounted(() => {
+  stopTabRotate()
 })
 
 function onTabChange(name: TabPaneName) {
@@ -236,6 +290,10 @@ function numVal(v: unknown) {
 
 .kpi-row {
   margin-bottom: 12px;
+}
+
+.dashboard-tabs-wrap {
+  min-width: 0;
 }
 
 .dashboard-tabs {
