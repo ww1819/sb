@@ -12,7 +12,17 @@ function authHeaders(): Record<string, string> {
       if (user.schemaName) headers['X-Tenant-Schema'] = user.schemaName
       if (user.userId) headers['X-User-Id'] = user.userId
       if (user.username) headers['X-Username'] = user.username
-      if (user.permissions) headers['X-Permissions'] = JSON.stringify(user.permissions)
+      if (user.permissions) {
+        const p = typeof user.permissions === 'string'
+          ? JSON.parse(user.permissions)
+          : user.permissions
+        headers['X-Permissions'] = JSON.stringify({
+          buttons: p.buttons ?? [],
+          dataScope: p.dataScope ?? 'self',
+          deptIds: p.deptIds ?? [],
+          warehouseIds: p.warehouseIds ?? []
+        })
+      }
     }
   } catch {
     /* ignore */

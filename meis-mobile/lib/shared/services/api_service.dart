@@ -49,7 +49,13 @@ class ApiService {
             options.headers['X-Tenant-Schema'] = user.schemaName;
             options.headers['X-User-Id'] = user.userId;
             if (user.permissions != null) {
-              options.headers['X-Permissions'] = jsonEncode(user.permissions);
+              final p = user.permissions!;
+              options.headers['X-Permissions'] = jsonEncode({
+                'buttons': p['buttons'] ?? [],
+                'dataScope': p['dataScope'] ?? 'self',
+                'deptIds': p['deptIds'] ?? [],
+                'warehouseIds': p['warehouseIds'] ?? [],
+              });
             }
           }
           handler.next(options);
