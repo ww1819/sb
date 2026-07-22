@@ -1,5 +1,6 @@
 package com.meis.saas.purchase.support;
 
+import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
@@ -9,6 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public final class PurchasePageQueries {
@@ -16,22 +18,22 @@ public final class PurchasePageQueries {
 
     public static PageResult<Map<String, Object>> planPage(JdbcTemplate jdbc, PageQuery q,
             String approvalStatus, Integer planYear, String planType) {
+        return planPage(jdbc, q, approvalStatus, planYear, planType, null);
+    }
+
+    public static PageResult<Map<String, Object>> planPage(JdbcTemplate jdbc, PageQuery q,
+            String approvalStatus, Integer planYear, String planType, String deptId) {
         StringBuilder where = new StringBuilder(" WHERE p.is_active IS NOT FALSE ");
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "purchase_plan", "p"));
         List<Object> args = new ArrayList<>();
         appendKeyword(where, args, q.getKeyword(), "p.plan_code", "d.dept_name", "u.real_name");
-        if (approvalStatus != null && !approvalStatus.isBlank()) {
-            where.append(" AND p.approval_status = ? ");
-            args.add(approvalStatus);
-        }
+        FilterCsvSupport.appendStrIn(where, args, "p.approval_status", approvalStatus);
         if (planYear != null) {
             where.append(" AND p.plan_year = ? ");
             args.add(planYear);
         }
-        if (planType != null && !planType.isBlank()) {
-            where.append(" AND p.plan_type = ? ");
-            args.add(planType);
-        }
+        FilterCsvSupport.appendStrIn(where, args, "p.plan_type", planType);
+        FilterCsvSupport.appendUuidIn(where, args, "p.dept_id", deptId);
         PurchaseDataScope.applyPlanFilter(where, args, jdbc);
         String from = """
             FROM purchase_plan p
@@ -73,10 +75,7 @@ public final class PurchasePageQueries {
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "purchase_project", "pj"));
         List<Object> args = new ArrayList<>();
         appendKeyword(where, args, q.getKeyword(), "pj.project_code", "pj.project_name", "pl.plan_code", "s.supplier_name");
-        if (status != null && !status.isBlank()) {
-            where.append(" AND pj.status = ? ");
-            args.add(status);
-        }
+        FilterCsvSupport.appendStrIn(where, args, "pj.status", status);
         if (planId != null && !planId.isBlank()) {
             where.append(" AND pj.plan_id = ?::uuid ");
             args.add(planId);
@@ -241,18 +240,8 @@ public final class PurchasePageQueries {
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "purchase_contract", "c"));
         List<Object> args = new ArrayList<>();
         appendKeyword(where, args, q.getKeyword(), "c.contract_code", "c.contract_name", "pj.project_name", "s.supplier_name");
-        if (approvalStatus != null && !approvalStatus.isBlank()) {
-            if ("unapproved".equalsIgnoreCase(approvalStatus.trim())) {
-                where.append(" AND (c.approval_status IS NULL OR c.approval_status <> 'approved') ");
-            } else {
-                where.append(" AND c.approval_status = ? ");
-                args.add(approvalStatus.trim());
-            }
-        }
-        if (acceptanceStatus != null && !acceptanceStatus.isBlank()) {
-            where.append(" AND c.acceptance_status = ? ");
-            args.add(acceptanceStatus);
-        }
+        appendContractApprovalFilter(where, args, approvalStatus);
+        FilterCsvSupport.appendStrIn(where, args, "c.acceptance_status", acceptanceStatus);
         String from = """
             FROM purchase_contract c
             LEFT JOIN purchase_project pj ON pj.id = c.project_id
@@ -319,14 +308,8 @@ public final class PurchasePageQueries {
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "purchase_acceptance", "a"));
         List<Object> args = new ArrayList<>();
         appendKeyword(where, args, q.getKeyword(), "a.acceptance_no", "c.contract_code", "s.supplier_name");
-        if (acceptanceStatus != null && !acceptanceStatus.isBlank()) {
-            where.append(" AND a.acceptance_status = ? ");
-            args.add(acceptanceStatus);
-        }
-        if (approvalStatus != null && !approvalStatus.isBlank()) {
-            where.append(" AND a.approval_status = ? ");
-            args.add(approvalStatus);
-        }
+        FilterCsvSupport.appendStrIn(where, args, "a.acceptance_status", acceptanceStatus);
+        FilterCsvSupport.appendStrIn(where, args, "a.approval_status", approvalStatus);
         String from = """
             FROM purchase_acceptance a
             LEFT JOIN purchase_contract c ON c.id = a.contract_id
@@ -337,6 +320,36 @@ public final class PurchasePageQueries {
             """ + SoftDeleteSupport.notDeletedClause(jdbc, "device_entry", "de");
         return page(jdbc, from, where, args, q, "a.created_at DESC NULLS LAST",
                 "a.*, c.contract_code, c.contract_name, s.supplier_name, de.entry_no, de.status AS entry_status");
+    }
+
+    /** 合同审批筛：兼容历史「未审批」伪码 unapproved；多选含 unapproved+approved 则不过滤 */
+    private static void appendContractApprovalFilter(StringBuilder where, List<Object> args, String approvalStatus) {
+        if (approvalStatus == null || approvalStatus.isBlank()) return;
+        List<String> parts = FilterCsvSupport.split(approvalStatus);
+        boolean wantUnapproved = parts.stream().anyMatch(p -> "unapproved".equalsIgnoreCase(p));
+        List<String> real = parts.stream()
+                .filter(p -> !"unapproved".equalsIgnoreCase(p))
+                .map(p -> p.toLowerCase(Locale.ROOT))
+                .distinct()
+                .toList();
+        if (wantUnapproved && real.stream().anyMatch("approved"::equals)) {
+            return;
+        }
+        if (wantUnapproved && real.isEmpty()) {
+            where.append(" AND (c.approval_status IS NULL OR c.approval_status <> 'approved') ");
+            return;
+        }
+        if (wantUnapproved) {
+            where.append(" AND ((c.approval_status IS NULL OR c.approval_status <> 'approved') OR c.approval_status IN (");
+            for (int i = 0; i < real.size(); i++) {
+                if (i > 0) where.append(',');
+                where.append('?');
+                args.add(real.get(i));
+            }
+            where.append(")) ");
+            return;
+        }
+        FilterCsvSupport.appendStrIn(where, args, "c.approval_status", String.join(",", real));
     }
 
     private static void appendKeyword(StringBuilder where, List<Object> args, String keyword, String... cols) {

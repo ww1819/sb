@@ -1,5 +1,6 @@
 package com.meis.saas.special.controller;
 
+import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
@@ -53,10 +54,7 @@ public class SharedRecordController {
             args.add(kw);
             args.add(kw);
         }
-        if (status != null && !status.isBlank()) {
-            where.append(" AND l.status = ? ");
-            args.add(status);
-        }
+        FilterCsvSupport.appendStrIn(where, args, "l.status", status);
         if (deviceId != null) {
             where.append(" AND l.device_id = ?::uuid ");
             args.add(deviceId);

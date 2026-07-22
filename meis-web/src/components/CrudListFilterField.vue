@@ -46,6 +46,9 @@
     v-else-if="filter.options?.length"
     :model-value="modelValue"
     :placeholder="filter.label"
+    :multiple="filter.multiple"
+    collapse-tags
+    collapse-tags-tooltip
     clearable
     class="filter-item"
     @update:model-value="onChange"

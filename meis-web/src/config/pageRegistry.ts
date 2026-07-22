@@ -123,8 +123,9 @@ export const pageRegistry: Record<string, PageConfig> = {
       'dept_argument_url'
     ],
     listFilters: [
-      { key: 'approval_status', label: '审批状态', dictType: 'approval_status' },
-      { key: 'plan_type', label: '计划类型', dictType: 'plan_type' }
+      { key: 'approval_status', label: '审批状态', dictType: 'approval_status', multiple: true },
+      { key: 'plan_type', label: '计划类型', dictType: 'plan_type', multiple: true },
+      { key: 'dept_id', label: '科室', linkTable: 'department', multiple: true }
     ],
     formGroupColumns: { basic: 6 }
   },
@@ -155,8 +156,9 @@ export const pageRegistry: Record<string, PageConfig> = {
       'dept_argument_url'
     ],
     listFilters: [
-      { key: 'approval_status', label: '审批状态', dictType: 'approval_status' },
-      { key: 'plan_type', label: '计划类型', dictType: 'plan_type' }
+      { key: 'approval_status', label: '审批状态', dictType: 'approval_status', multiple: true },
+      { key: 'plan_type', label: '计划类型', dictType: 'plan_type', multiple: true },
+      { key: 'dept_id', label: '科室', linkTable: 'department', multiple: true }
     ],
     formGroupColumns: { basic: 6 }
   },
@@ -198,12 +200,13 @@ export const pageRegistry: Record<string, PageConfig> = {
       {
         key: 'approval_status',
         label: '审批状态',
+        multiple: true,
         options: [
           { value: 'unapproved', label: '未审批' },
           { value: 'approved', label: '已审批' }
         ]
       },
-      { key: 'acceptance_status', label: '验收状态', dictType: 'acceptance_status' }
+      { key: 'acceptance_status', label: '验收状态', dictType: 'acceptance_status', multiple: true }
     ]
   },
   '/purchase/acceptance': {
@@ -222,7 +225,7 @@ export const pageRegistry: Record<string, PageConfig> = {
       edit: '编辑(设备验收)',
       view: '查看(设备验收)'
     },
-    listFilters: [{ key: 'approval_status', label: '审批状态', dictType: 'acceptance_review_status' }]
+    listFilters: [{ key: 'approval_status', label: '审批状态', dictType: 'acceptance_review_status', multiple: true }]
   },
   '/purchase/supplier': {
     title: '供应商管理',
@@ -829,8 +832,8 @@ export const pageRegistry: Record<string, PageConfig> = {
     saveUrl: '/qc/adverse',
     listParams: { openOnly: true },
     listFilters: [
-      { key: 'status', label: '状态', dictType: 'adverse_status' },
-      { key: 'severityLevel', label: '严重等级', dictType: 'adverse_severity' }
+      { key: 'status', label: '状态', dictType: 'adverse_status', multiple: true },
+      { key: 'severityLevel', label: '严重等级', dictType: 'adverse_severity', multiple: true }
     ]
   },
   '/qc/adverse/query': {
@@ -839,9 +842,9 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'adverse_event',
     listPageUrl: '/qc/adverse/page',
     listFilters: [
-      { key: 'status', label: '状态', dictType: 'adverse_status' },
-      { key: 'severityLevel', label: '严重等级', dictType: 'adverse_severity' },
-      { key: 'eventType', label: '事件类型', dictType: 'adverse_event_type' }
+      { key: 'status', label: '状态', dictType: 'adverse_status', multiple: true },
+      { key: 'severityLevel', label: '严重等级', dictType: 'adverse_severity', multiple: true },
+      { key: 'eventType', label: '事件类型', dictType: 'adverse_event_type', multiple: true }
     ]
   },
   '/qc/metrology': { title: '计量管理', apiBase: '/qc', table: 'metrology_record' },
@@ -876,7 +879,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/special',
     table: 'leased_device',
     listPageUrl: '/special/leased/page',
-    listFilters: [{ key: 'status', label: '状态', dictType: 'lease_status' }]
+    listFilters: [{ key: 'status', label: '状态', dictType: 'lease_status', multiple: true }]
   },
   '/special/alerts': { title: '证照到期提醒', apiBase: '/special', table: 'special_device' },
   '/shared/device': {
@@ -891,7 +894,8 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/shared',
     table: 'shared_device_loan',
     listPageUrl: '/shared/loan/page',
-    saveUrl: '/shared/loan'
+    saveUrl: '/shared/loan',
+    listFilters: [{ key: 'status', label: '状态', dictType: 'loan_status', multiple: true }]
   },
   '/shared/loan-approve': {
     title: '借调审批',
@@ -905,7 +909,8 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/shared',
     table: 'shared_device_return',
     listPageUrl: '/shared/return/page',
-    saveUrl: '/shared/return'
+    saveUrl: '/shared/return',
+    listFilters: [{ key: 'status', label: '状态', dictType: 'loan_status', multiple: true }]
   },
   '/shared/return-approve': {
     title: '归还审批',
@@ -920,14 +925,14 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'shared_device_fee',
     listPageUrl: '/shared/fee/page',
     saveUrl: '/shared/fee',
-    listFilters: [{ key: 'paidStatus', label: '收费状态', dictType: 'paid_status' }]
+    listFilters: [{ key: 'paidStatus', label: '收费状态', dictType: 'paid_status', multiple: true }]
   },
   '/shared/record': {
     title: '借调记录查询',
     apiBase: '/shared',
     table: 'shared_device_loan',
     listPageUrl: '/shared/record/page',
-    listFilters: [{ key: 'status', label: '状态', dictType: 'loan_status' }]
+    listFilters: [{ key: 'status', label: '状态', dictType: 'loan_status', multiple: true }]
   },
   '/pm/param': { title: '预防性维护参数', apiBase: '/pm', table: 'pm_type' },
   '/pm/plan': {

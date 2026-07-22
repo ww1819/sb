@@ -28,8 +28,9 @@ public class PurchasePlanController {
     public Result<PageResult<Map<String, Object>>> page(PageQuery query,
             @RequestParam(required = false) String approval_status,
             @RequestParam(required = false) Integer plan_year,
-            @RequestParam(required = false) String plan_type) {
-        return Result.ok(PurchasePageQueries.planPage(jdbc, query, approval_status, plan_year, plan_type));
+            @RequestParam(required = false) String plan_type,
+            @RequestParam(required = false) String dept_id) {
+        return Result.ok(PurchasePageQueries.planPage(jdbc, query, approval_status, plan_year, plan_type, dept_id));
     }
 
     @GetMapping("/{id}")

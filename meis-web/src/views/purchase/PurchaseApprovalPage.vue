@@ -11,7 +11,16 @@
               <el-option label="安装验收" value="purchase_acceptance" />
               <el-option label="合同付款" value="contract_payment" />
             </el-select>
-            <el-select v-model="status" placeholder="状态" clearable class="filter-item" @change="onSearch">
+            <el-select
+              v-model="status"
+              placeholder="状态"
+              clearable
+              multiple
+              collapse-tags
+              collapse-tags-tooltip
+              class="filter-item"
+              @change="onSearch"
+            >
               <el-option label="待审批" value="pending" />
               <el-option label="已通过" value="approved" />
               <el-option label="已驳回" value="rejected" />
@@ -210,7 +219,7 @@ const size = ref(20)
 const total = ref(0)
 const keyword = ref('')
 const businessType = ref('purchase_plan')
-const status = ref('')
+const status = ref<string[]>([])
 const visible = ref(false)
 const tableRef = ref()
 
@@ -315,7 +324,7 @@ async function load() {
         size: size.value,
         keyword: keyword.value || undefined,
         businessType: businessType.value || undefined,
-        status: status.value || undefined
+        status: status.value.length ? status.value.join(',') : undefined
       }
     })
     rows.value = data.data?.records ?? []
@@ -335,7 +344,7 @@ function onSearch() {
 function onReset() {
   keyword.value = ''
   businessType.value = 'purchase_plan'
-  status.value = ''
+  status.value = []
   onSearch()
 }
 
@@ -412,7 +421,7 @@ async function fetchExportRows() {
       size: 5000,
       keyword: keyword.value || undefined,
       businessType: businessType.value || undefined,
-      status: status.value || undefined
+      status: status.value.length ? status.value.join(',') : undefined
     }
   })
   return (data.data?.records ?? []) as Record<string, unknown>[]

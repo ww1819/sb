@@ -1,6 +1,7 @@
 package com.meis.saas.special.controller;
 
 import com.meis.saas.common.audit.OperationLog;
+import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.result.Result;
@@ -29,10 +30,7 @@ public class LeasedDeviceController {
             args.add(kw);
             args.add(kw);
         }
-        if (status != null && !status.isBlank()) {
-            where.append(" AND l.status = ? ");
-            args.add(status);
-        }
+        FilterCsvSupport.appendStrIn(where, args, "l.status", status);
         if (Boolean.TRUE.equals(expiringOnly)) {
             where.append(" AND l.lease_end_date IS NOT NULL AND l.lease_end_date <= CURRENT_DATE + INTERVAL '30 days' ");
         }

@@ -2,6 +2,7 @@ package com.meis.saas.qc.controller;
 
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
@@ -45,18 +46,9 @@ public class AdverseEventController {
             args.add(kw);
             args.add(kw);
         }
-        if (status != null && !status.isBlank()) {
-            where.append(" AND a.status = ? ");
-            args.add(status);
-        }
-        if (severityLevel != null && !severityLevel.isBlank()) {
-            where.append(" AND a.severity_level = ? ");
-            args.add(severityLevel);
-        }
-        if (eventType != null && !eventType.isBlank()) {
-            where.append(" AND a.event_type = ? ");
-            args.add(eventType);
-        }
+        FilterCsvSupport.appendStrIn(where, args, "a.status", status);
+        FilterCsvSupport.appendStrIn(where, args, "a.severity_level", severityLevel);
+        FilterCsvSupport.appendStrIn(where, args, "a.event_type", eventType);
         if (deviceId != null && !deviceId.isBlank()) {
             where.append(" AND a.device_id = ?::uuid ");
             args.add(deviceId);

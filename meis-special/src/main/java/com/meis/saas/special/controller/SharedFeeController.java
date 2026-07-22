@@ -1,6 +1,7 @@
 package com.meis.saas.special.controller;
 
 import com.meis.saas.common.audit.OperationLog;
+import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.result.Result;
@@ -31,10 +32,7 @@ public class SharedFeeController {
             args.add(kw);
             args.add(kw);
         }
-        if (paidStatus != null && !paidStatus.isBlank()) {
-            where.append(" AND f.paid_status = ? ");
-            args.add(paidStatus);
-        }
+        FilterCsvSupport.appendStrIn(where, args, "f.paid_status", paidStatus);
         if (deviceId != null) {
             where.append(" AND f.device_id = ?::uuid ");
             args.add(deviceId);

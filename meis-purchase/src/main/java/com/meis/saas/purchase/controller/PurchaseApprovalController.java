@@ -1,5 +1,6 @@
 package com.meis.saas.purchase.controller;
 
+import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
@@ -35,14 +36,8 @@ public class PurchaseApprovalController {
         }
         instWhere.append(") ");
         instWhere.append(SoftDeleteSupport.notDeletedClause(jdbc, "sys_approval_instance", "i0"));
-        if (status != null && !status.isBlank()) {
-            instWhere.append(" AND i0.status = ? ");
-            args.add(status);
-        }
-        if (businessType != null && !businessType.isBlank()) {
-            instWhere.append(" AND i0.business_type = ? ");
-            args.add(businessType);
-        }
+        FilterCsvSupport.appendStrIn(instWhere, args, "i0.status", status);
+        FilterCsvSupport.appendStrIn(instWhere, args, "i0.business_type", businessType);
 
         StringBuilder outerWhere = new StringBuilder(" WHERE 1=1 ");
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {

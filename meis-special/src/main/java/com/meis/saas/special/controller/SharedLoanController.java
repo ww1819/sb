@@ -2,6 +2,7 @@ package com.meis.saas.special.controller;
 
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.result.Result;
@@ -142,11 +143,9 @@ public class SharedLoanController {
             args.add(kw);
             args.add(kw);
         }
-        if (status != null && !status.isBlank()) {
-            where.append(" AND l.status = ? ");
-            args.add(status);
-        }
-        if (Boolean.TRUE.equals(pendingOnly)) {
+        if (!Boolean.TRUE.equals(pendingOnly)) {
+            FilterCsvSupport.appendStrIn(where, args, "l.status", status);
+        } else {
             where.append(" AND l.status = 'pending' ");
         }
         if (deviceId != null) {
