@@ -12,8 +12,10 @@
     <slot />
     <template #footer>
       <div class="form-drawer-footer">
+        <slot name="footer-before" />
         <el-button @click="$emit('update:modelValue', false)">{{ showSave ? '取消' : '关闭' }}</el-button>
         <el-button v-if="showSave" type="primary" @click="$emit('save')">保存</el-button>
+        <slot name="footer-after" />
       </div>
     </template>
   </AppModal>

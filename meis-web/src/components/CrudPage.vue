@@ -209,9 +209,9 @@
       <template #header-actions>
         <slot name="form-header-actions" :form="form" :mode="formMode" />
       </template>
-      <div v-if="formMode === 'view' && form.id && changeLogEnabled" class="change-log-bar">
+      <template v-if="formMode === 'view' && form.id && changeLogEnabled" #footer-before>
         <el-button @click="openChangeLog">变更记录</el-button>
-      </div>
+      </template>
       <slot name="form" :form="form" :fields="formFields" :mode="formMode">
         <el-form label-width="120px" :disabled="formMode === 'view'">
           <GroupedFormFields

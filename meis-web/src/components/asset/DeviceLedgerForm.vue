@@ -165,7 +165,7 @@ const basicFormRows = [
   ['specification', 'model', 'serial_number', 'unit_id', 'category_id'],
   ['asset_category_id', 'finance_category_id', 'standby_current_max_ma', 'standby_current_min_ma'],
   ['country_of_origin', 'use_dept_head', 'dept_id', 'manage_dept_head', 'manage_dept_id'],
-  ['registration_no']
+  ['registration_no', 'production_date']
 ]
 
 const basicFormPanel = {
@@ -315,7 +315,7 @@ defineExpose({ prepareBeforeSave })
 const basicFields = computed(() => {
   const source = props.fields?.length ? props.fields : getSchema('medical_device')
   return source
-    .filter((f) => basicGroupKeys.has(f.group ?? 'other'))
+    .filter((f) => basicGroupKeys.has(f.group ?? 'other') && f.form !== false)
     .map((f) => {
       const lockedCode = f.prop === 'device_code' && !isCreate.value
       return {

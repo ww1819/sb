@@ -78,7 +78,9 @@ public class EntityChangeLogService {
 
     private static final Set<String> SKIP_COMPARE = Set.of(
             "updated_at", "updated_by", "created_at", "created_by",
-            "deleted_at", "deleted_by", "is_deleted"
+            "deleted_at", "deleted_by", "is_deleted",
+            "extension_data", "manual_files", "certificate_files",
+            "qr_code_url", "row_version", "permissions"
     );
 
     private final JdbcTemplate jdbc;
