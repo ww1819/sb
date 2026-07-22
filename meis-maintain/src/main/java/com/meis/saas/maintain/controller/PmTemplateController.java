@@ -40,40 +40,60 @@ public class PmTemplateController {
     @Transactional
     @OperationLog(module = "pm", description = "保存预防性维护模板")
     public Result<Map<String, Object>> save(@RequestBody Map<String, Object> body) throws Exception {
-        UUID id = body.containsKey("id") ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
+        UUID id = resolveUuid(body.get("id"));
+        if (id == null) id = UUID.randomUUID();
         boolean exists = !jdbc.queryForList(
                 "SELECT 1 FROM pm_template WHERE id = ?::uuid "
                         + SoftDeleteSupport.notDeletedClause(jdbc, "pm_template", null), id).isEmpty();
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> items = (List<Map<String, Object>>) body.getOrDefault("items", List.of());
-        String itemsJson = mapper.writeValueAsString(items);
+        String itemsJson = mapper.writeValueAsString(items == null ? List.of() : items);
+        String pmType = resolvePmType(body);
         if (!exists) {
             jdbc.update("""
                 INSERT INTO pm_template (id, template_code, template_name, pm_type, pm_type_id,
                     category_id, items, description, estimated_duration, is_active)
                 VALUES (?::uuid,?,?,?,?::uuid,?::uuid,?::jsonb,?,?,?)
                 """, id, body.get("template_code"), body.get("template_name"),
-                    body.getOrDefault("pm_type", "L1"), body.get("pm_type_id"),
-                    body.get("category_id"), itemsJson, body.get("description"),
+                    pmType, blankToNull(body.get("pm_type_id")),
+                    blankToNull(body.get("category_id")), itemsJson, body.get("description"),
                     body.get("estimated_duration"), body.getOrDefault("is_active", true));
         } else {
             jdbc.update("""
                 UPDATE pm_template SET template_code=?, template_name=?, pm_type=?, pm_type_id=?::uuid,
                     category_id=?::uuid, items=?::jsonb, description=?, estimated_duration=?, is_active=?, updated_at=NOW()
                 WHERE id=?::uuid
-                """, body.get("template_code"), body.get("template_name"), body.get("pm_type"),
-                    body.get("pm_type_id"), body.get("category_id"), itemsJson, body.get("description"),
+                """, body.get("template_code"), body.get("template_name"), pmType,
+                    blankToNull(body.get("pm_type_id")), blankToNull(body.get("category_id")),
+                    itemsJson, body.get("description"),
                     body.get("estimated_duration"), body.get("is_active"), id);
         }
-        saveItems(id, items);
+        saveItems(id, items == null ? List.of() : items);
         return get(id);
+    }
+
+    private String resolvePmType(Map<String, Object> body) {
+        Object raw = body.get("pm_type");
+        if (raw != null && !raw.toString().isBlank()) return raw.toString().trim();
+        Object typeId = blankToNull(body.get("pm_type_id"));
+        if (typeId != null) {
+            var rows = jdbc.queryForList(
+                    "SELECT type_code FROM pm_type WHERE id = ?::uuid "
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "pm_type", null),
+                    typeId);
+            if (!rows.isEmpty() && rows.get(0).get("type_code") != null) {
+                return rows.get(0).get("type_code").toString();
+            }
+        }
+        return "L1";
     }
 
     private void saveItems(UUID templateId, List<Map<String, Object>> items) {
         jdbc.update("DELETE FROM pm_template_item WHERE template_id = ?::uuid", templateId);
         int sort = 0;
         for (Map<String, Object> item : items) {
-            UUID itemId = item.containsKey("id") ? UUID.fromString(item.get("id").toString()) : UUID.randomUUID();
+            UUID itemId = resolveUuid(item.get("id"));
+            if (itemId == null) itemId = UUID.randomUUID();
             jdbc.update("""
                     INSERT INTO pm_template_item (id, template_id, item_code, item_name, item_content,
                         standard_value, check_method, sort_order, is_required, remark)
@@ -82,5 +102,18 @@ public class PmTemplateController {
                     item.get("standard_value"), item.get("check_method"),
                     item.getOrDefault("sort_order", sort++), item.getOrDefault("is_required", true), item.get("remark"));
         }
+    }
+
+    private static UUID resolveUuid(Object raw) {
+        if (raw == null) return null;
+        String s = raw.toString().trim();
+        if (s.isEmpty() || "null".equalsIgnoreCase(s)) return null;
+        return UUID.fromString(s);
+    }
+
+    private static Object blankToNull(Object raw) {
+        if (raw == null) return null;
+        String s = raw.toString().trim();
+        return s.isEmpty() || "null".equalsIgnoreCase(s) ? null : s;
     }
 }
