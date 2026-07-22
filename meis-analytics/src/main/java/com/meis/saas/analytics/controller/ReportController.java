@@ -38,10 +38,14 @@ public class ReportController {
         data.put("deptValue", deptValue);
         data.put("deviceStatus", jdbc.queryForList("SELECT device_status, COUNT(*) AS count FROM medical_device GROUP BY device_status"));
         data.put("deviceCategory", jdbc.queryForList(
-                "SELECT COALESCE(c.category_name, '未分类') AS category_name, COUNT(*) AS count "
+                "SELECT COALESCE(root.category_name, '未分类') AS category_name, COUNT(*) AS count "
                         + "FROM medical_device m "
-                        + "LEFT JOIN medical_device_category c ON c.id = m.category_id "
-                        + "GROUP BY COALESCE(c.category_name, '未分类') "
+                        + "LEFT JOIN medical_device_category leaf ON leaf.id = m.category_id "
+                        + "LEFT JOIN medical_device_category root "
+                        + "  ON root.category_code = LEFT(leaf.category_code, 4) "
+                        + " AND COALESCE(root.level, 1) = 1 "
+                        + " AND COALESCE(root.is_deleted, 0) = 0 "
+                        + "GROUP BY COALESCE(root.category_name, '未分类') "
                         + "ORDER BY count DESC LIMIT 8"));
         data.put("usageRate", jdbc.queryForList("SELECT device_status, ROUND(COUNT(*)::numeric / NULLIF((SELECT COUNT(*) FROM medical_device),0) * 100, 2) AS rate FROM medical_device GROUP BY device_status"));
         data.put("importDomestic", jdbc.queryForList("SELECT COALESCE(country_of_origin,'未知') AS country, COUNT(*) AS count FROM medical_device GROUP BY country_of_origin"));

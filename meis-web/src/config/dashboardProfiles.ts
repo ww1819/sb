@@ -90,7 +90,7 @@ export const DASHBOARD_PROFILES: Record<DashboardProfile, DashboardProfileConfig
     subtitle: '全院设备运营概览',
     kpis: kpi('deviceCount', 'openWorkorders', 'activeMaintenancePlans', 'pendingApprovals'),
     quickPaths: ['/repair/workorder', '/asset/outbound', '/asset/inventory', '/purchase/plan'],
-    charts: ['trend', 'brand', 'status', 'category', 'origin', 'newDevice', 'kpiGauge'],
+    charts: ['status', 'category', 'origin', 'trend', 'brand', 'newDevice', 'kpiGauge'],
     showTodos: true,
     showMessages: true
   },

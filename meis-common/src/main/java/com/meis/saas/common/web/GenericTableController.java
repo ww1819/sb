@@ -122,7 +122,7 @@ public abstract class GenericTableController {
     }
 
     /**
-     * 按设备/资产名称模糊匹配 68 分类；无命中回落未识别分类（6890 / 未识别分类 / 未知分类）。
+     * 按设备/资产名称模糊匹配 68 分类：先三级、再二级、再一级；均无命中回落未识别分类。
      * AST-UI-11
      */
     @GetMapping("/{table}/match-by-device-name")
@@ -133,29 +133,14 @@ public abstract class GenericTableController {
         if (!"medical_device_category".equals(table)) {
             throw new BizException(400, "match-by-device-name only supports medical_device_category");
         }
-        String keyword = name == null ? "" : name.trim();
         String notDeleted = SoftDeleteSupport.notDeletedClause(jdbc(), table, null);
         Map<String, Object> matched = null;
-        if (!keyword.isEmpty()) {
-            List<Map<String, Object>> rows = jdbc().queryForList(
-                    """
-                    SELECT id, category_code, category_name, level
-                    FROM medical_device_category
-                    WHERE 1=1
-                    """ + notDeleted + """
-                      AND category_name ILIKE ?
-                      AND COALESCE(category_code, '') <> '6890'
-                      AND COALESCE(category_name, '') NOT IN ('未识别分类', '未知分类')
-                    ORDER BY
-                      CASE WHEN category_name = ? THEN 0 ELSE 1 END,
-                      char_length(COALESCE(category_name, '')) DESC,
-                      COALESCE(level, 0) DESC,
-                      category_code ASC
-                    LIMIT 1
-                    """,
-                    "%" + keyword + "%",
-                    keyword);
-            if (!rows.isEmpty()) matched = rows.get(0);
+        List<String> keys = buildCategoryMatchKeys(name);
+        if (!keys.isEmpty()) {
+            // 自最低级（三级）逐级向上匹配
+            for (int level = 3; level >= 1 && matched == null; level--) {
+                matched = matchCategoryAtLevel(notDeleted, level, keys);
+            }
         }
         if (matched == null) {
             List<Map<String, Object>> fallback = jdbc().queryForList(
@@ -188,6 +173,100 @@ public abstract class GenericTableController {
         String cname = matched.get("category_name") == null ? "" : String.valueOf(matched.get("category_name"));
         matched.put("label", (code + " " + cname).trim());
         return Result.ok(matched);
+    }
+
+    /** 去掉括号备注，并生成同义/截断关键词（长词优先） */
+    private static List<String> buildCategoryMatchKeys(String raw) {
+        if (raw == null) return List.of();
+        String n = raw.trim()
+                .replaceAll("[（(][^）)]*[）)]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+        if (n.isEmpty()) return List.of();
+        LinkedHashSet<String> set = new LinkedHashSet<>();
+        addMatchKey(set, n);
+        addMatchKey(set, n.replace("仪", "设备"));
+        addMatchKey(set, n.replace("仪", "机"));
+        addMatchKey(set, n.replace("机", "设备"));
+        addMatchKey(set, n.replace("设备", "仪"));
+        for (String suffix : List.of("仪", "机", "器", "设备", "系统", "装置", "床")) {
+            if (n.endsWith(suffix) && n.length() > suffix.length() + 1) {
+                addMatchKey(set, n.substring(0, n.length() - suffix.length()));
+            }
+        }
+        // 「病人监护」这类去掉尾缀后的核心词再试
+        String core = n.replaceAll("(仪|机|器|设备|系统|装置)$", "");
+        addMatchKey(set, core);
+        List<String> keys = new ArrayList<>(set);
+        keys.sort((a, b) -> Integer.compare(b.length(), a.length()));
+        return keys;
+    }
+
+    private static void addMatchKey(Set<String> set, String key) {
+        if (key == null) return;
+        String k = key.trim();
+        if (k.length() >= 2) set.add(k);
+    }
+
+    private Map<String, Object> matchCategoryAtLevel(String notDeleted, int level, List<String> keys) {
+        if (keys.isEmpty()) return null;
+        StringBuilder sql = new StringBuilder(
+                """
+                SELECT id, category_code, category_name, level
+                FROM medical_device_category
+                WHERE 1=1
+                """);
+        sql.append(notDeleted);
+        sql.append(" AND COALESCE(level, 0) = ? ");
+        sql.append(" AND COALESCE(category_code, '') <> '6890' ");
+        sql.append(" AND COALESCE(category_name, '') NOT IN ('未识别分类', '未知分类') ");
+        sql.append(" AND (");
+        List<Object> args = new ArrayList<>();
+        args.add(level);
+        for (int i = 0; i < keys.size(); i++) {
+            if (i > 0) sql.append(" OR ");
+            sql.append(" category_name ILIKE ? ");
+            args.add("%" + keys.get(i) + "%");
+        }
+        sql.append(") ");
+        List<Map<String, Object>> rows = jdbc().queryForList(sql.toString(), args.toArray());
+        if (rows.isEmpty()) return null;
+        Map<String, Object> best = null;
+        int bestScore = Integer.MIN_VALUE;
+        for (Map<String, Object> row : rows) {
+            int score = scoreCategoryMatch(String.valueOf(row.get("category_name")), keys);
+            if (score > bestScore) {
+                bestScore = score;
+                best = row;
+            }
+        }
+        return bestScore > 0 ? best : null;
+    }
+
+    /** 评分：精确/末段命中 > 包含长词 > 包含短词 */
+    private static int scoreCategoryMatch(String categoryName, List<String> keys) {
+        if (categoryName == null || categoryName.isBlank()) return 0;
+        String full = categoryName.trim();
+        String leaf = full;
+        int dash = Math.max(full.lastIndexOf('-'), full.lastIndexOf('—'));
+        if (dash >= 0 && dash + 1 < full.length()) {
+            leaf = full.substring(dash + 1).trim();
+        }
+        int best = 0;
+        for (String key : keys) {
+            if (key == null || key.isBlank()) continue;
+            int base = key.length() * 10;
+            if (full.equals(key) || leaf.equals(key)) {
+                best = Math.max(best, 10000 + base);
+            } else if (leaf.endsWith(key) || full.endsWith(key)) {
+                best = Math.max(best, 8000 + base);
+            } else if (leaf.contains(key)) {
+                best = Math.max(best, 6000 + base);
+            } else if (full.contains(key)) {
+                best = Math.max(best, 4000 + base);
+            }
+        }
+        return best;
     }
 
     private static String[] lookupColumns(String table) {
