@@ -648,7 +648,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'is_active', label: '启用', type: 'boolean', list: true }
   ],
   inspection_plan: [
-    { prop: 'plan_no', label: '计划单号', list: true },
+    { prop: 'plan_no', label: '计划单号', list: true, readonly: true },
     { prop: 'plan_name', label: '计划名称', list: true, required: true },
     { prop: 'template_id', label: '巡检模板', linkTable: 'inspection_template', list: true },
     { prop: 'inspection_type_id', label: '巡检类别', linkTable: 'inspection_type', list: true },
@@ -734,7 +734,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'is_active', label: '启用', type: 'boolean', list: true }
   ],
   metrology_plan: [
-    { prop: 'plan_code', label: '计划编号', list: true },
+    { prop: 'plan_code', label: '计划编号', list: true, readonly: true },
     { prop: 'plan_name', label: '计划名称', list: true, required: true },
     { prop: 'template_id', label: '计量模板', linkTable: 'metrology_template', list: true },
     { prop: 'device_id', label: '设备', linkTable: 'medical_device', list: true },
@@ -858,7 +858,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'is_active', label: '启用', type: 'boolean', list: true }
   ],
   maintenance_plan: [
-    { prop: 'plan_no', label: '计划单号', list: true },
+    { prop: 'plan_no', label: '计划单号', list: true, readonly: true },
     { prop: 'plan_name', label: '计划名称', list: true, required: true },
     { prop: 'template_id', label: '保养模板', linkTable: 'maintenance_template', list: true },
     { prop: 'maintenance_level', label: '保养级别', list: true },
@@ -883,25 +883,55 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'remark', label: '备注', type: 'textarea' }
   ],
   ops_maintain_device: [
-    { prop: 'device_code', label: '设备编码', list: true, readonly: true },
-    { prop: 'device_name', label: '设备名称', list: true, readonly: true },
-    { prop: 'dept_name', label: '科室', list: true, readonly: true },
-    { prop: 'plan_count', label: '计划数', list: true, readonly: true },
-    { prop: 'execution_item_count', label: '执行明细数', list: true, readonly: true }
+    { prop: 'device_code', label: '设备编码', list: true, readonly: true, width: 140 },
+    { prop: 'device_name', label: '设备名称', list: true, readonly: true, width: 160 },
+    { prop: 'brand', label: '品牌', list: true, readonly: true, width: 100 },
+    { prop: 'specification', label: '规格', list: true, readonly: true, width: 120 },
+    { prop: 'model', label: '型号', list: true, readonly: true, width: 120 },
+    { prop: 'serial_number', label: '序列号(SN)', list: true, readonly: true, width: 140 },
+    { prop: 'category_name', label: '设备分类', list: true, readonly: true, width: 120 },
+    { prop: 'dept_name', label: '科室', list: true, readonly: true, width: 120 },
+    { prop: 'manage_dept_name', label: '管理科室', list: true, readonly: true, width: 120 },
+    { prop: 'device_status', label: '设备状态', dictType: 'device_status', list: true, readonly: true, width: 100 },
+    { prop: 'risk_level', label: '风险等级', dictType: 'risk_level', list: true, readonly: true, width: 90 },
+    { prop: 'enable_date', label: '启用日期', type: 'date', list: true, readonly: true, width: 110 },
+    { prop: 'next_due_date', label: '最近到期', type: 'date', list: true, readonly: true, width: 110 },
+    { prop: 'plan_count', label: '计划数', list: true, readonly: true, width: 80 },
+    { prop: 'execution_item_count', label: '执行明细数', list: true, readonly: true, width: 100 }
   ],
   ops_inspect_device: [
-    { prop: 'device_code', label: '设备编码', list: true, readonly: true },
-    { prop: 'device_name', label: '设备名称', list: true, readonly: true },
-    { prop: 'dept_name', label: '科室', list: true, readonly: true },
-    { prop: 'plan_count', label: '计划数', list: true, readonly: true },
-    { prop: 'execution_item_count', label: '执行明细数', list: true, readonly: true }
+    { prop: 'device_code', label: '设备编码', list: true, readonly: true, width: 140 },
+    { prop: 'device_name', label: '设备名称', list: true, readonly: true, width: 160 },
+    { prop: 'brand', label: '品牌', list: true, readonly: true, width: 100 },
+    { prop: 'specification', label: '规格', list: true, readonly: true, width: 120 },
+    { prop: 'model', label: '型号', list: true, readonly: true, width: 120 },
+    { prop: 'serial_number', label: '序列号(SN)', list: true, readonly: true, width: 140 },
+    { prop: 'category_name', label: '设备分类', list: true, readonly: true, width: 120 },
+    { prop: 'dept_name', label: '科室', list: true, readonly: true, width: 120 },
+    { prop: 'manage_dept_name', label: '管理科室', list: true, readonly: true, width: 120 },
+    { prop: 'device_status', label: '设备状态', dictType: 'device_status', list: true, readonly: true, width: 100 },
+    { prop: 'risk_level', label: '风险等级', dictType: 'risk_level', list: true, readonly: true, width: 90 },
+    { prop: 'enable_date', label: '启用日期', type: 'date', list: true, readonly: true, width: 110 },
+    { prop: 'next_due_date', label: '最近到期', type: 'date', list: true, readonly: true, width: 110 },
+    { prop: 'plan_count', label: '计划数', list: true, readonly: true, width: 80 },
+    { prop: 'execution_item_count', label: '执行明细数', list: true, readonly: true, width: 100 }
   ],
   ops_pm_device: [
-    { prop: 'device_code', label: '设备编码', list: true, readonly: true },
-    { prop: 'device_name', label: '设备名称', list: true, readonly: true },
-    { prop: 'dept_name', label: '科室', list: true, readonly: true },
-    { prop: 'plan_count', label: '计划数', list: true, readonly: true },
-    { prop: 'execution_item_count', label: '执行明细数', list: true, readonly: true }
+    { prop: 'device_code', label: '设备编码', list: true, readonly: true, width: 140 },
+    { prop: 'device_name', label: '设备名称', list: true, readonly: true, width: 160 },
+    { prop: 'brand', label: '品牌', list: true, readonly: true, width: 100 },
+    { prop: 'specification', label: '规格', list: true, readonly: true, width: 120 },
+    { prop: 'model', label: '型号', list: true, readonly: true, width: 120 },
+    { prop: 'serial_number', label: '序列号(SN)', list: true, readonly: true, width: 140 },
+    { prop: 'category_name', label: '设备分类', list: true, readonly: true, width: 120 },
+    { prop: 'dept_name', label: '科室', list: true, readonly: true, width: 120 },
+    { prop: 'manage_dept_name', label: '管理科室', list: true, readonly: true, width: 120 },
+    { prop: 'device_status', label: '设备状态', dictType: 'device_status', list: true, readonly: true, width: 100 },
+    { prop: 'risk_level', label: '风险等级', dictType: 'risk_level', list: true, readonly: true, width: 90 },
+    { prop: 'enable_date', label: '启用日期', type: 'date', list: true, readonly: true, width: 110 },
+    { prop: 'next_due_date', label: '最近到期', type: 'date', list: true, readonly: true, width: 110 },
+    { prop: 'plan_count', label: '计划数', list: true, readonly: true, width: 80 },
+    { prop: 'execution_item_count', label: '执行明细数', list: true, readonly: true, width: 100 }
   ],
   maintenance_execution_item: [
     { prop: 'device_code', label: '设备编码', list: true, readonly: true },
@@ -1074,7 +1104,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'is_active', label: '启用', type: 'boolean', list: true }
   ],
   pm_plan: [
-    { prop: 'plan_no', label: '计划单号', list: true },
+    { prop: 'plan_no', label: '计划单号', list: true, readonly: true },
     { prop: 'plan_name', label: '计划名称', list: true, required: true },
     { prop: 'template_id', label: 'PM模板', linkTable: 'pm_template', list: true },
     { prop: 'pm_type_id', label: 'PM类别', linkTable: 'pm_type', list: true },

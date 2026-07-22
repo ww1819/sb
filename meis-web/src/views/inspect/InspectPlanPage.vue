@@ -81,10 +81,6 @@ async function genExec(form: Record<string, unknown>, reload?: () => void) {
   reload?.()
 }
 
-  await http.post(`/inspect/plan/${form.id}/activate`)
-  reload?.()
-}
-
 async function loadDue() {
   const { data } = await http.get('/inspect/plan/due')
   dueList.value = data.data ?? []

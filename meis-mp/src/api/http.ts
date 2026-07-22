@@ -51,7 +51,15 @@ export function request<T = unknown>(options: RequestOptions): Promise<T> {
       if (user.username) headers['X-Username'] = user.username
       if (user.permissions) {
         try {
-          headers['X-Permissions'] = JSON.stringify(user.permissions)
+          const p = typeof user.permissions === 'string'
+            ? JSON.parse(user.permissions)
+            : user.permissions
+          headers['X-Permissions'] = JSON.stringify({
+            buttons: p.buttons ?? [],
+            dataScope: p.dataScope ?? 'self',
+            deptIds: p.deptIds ?? [],
+            warehouseIds: p.warehouseIds ?? []
+          })
         } catch {
           /* ignore */
         }

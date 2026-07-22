@@ -1,5 +1,6 @@
 package com.meis.saas.qc.metrology;
 
+import com.meis.saas.common.code.DailyBizNoSupport;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -36,7 +37,8 @@ public class MetrologyExecutionGenerator {
             return Map.of("planId", planId, "error", "plan not approved");
         }
         UUID execId = UUID.randomUUID();
-        String execNo = "ME" + System.currentTimeMillis();
+        // OPS.14：计量执行单号系统生成（前缀 JX-，避免与保养 ME- 冲突）
+        String execNo = DailyBizNoSupport.next(jdbc, "metrology_execution", "execution_no", "JX-");
         jdbc.update("""
                 INSERT INTO metrology_execution (id, execution_no, plan_id, template_id, category_id, org_id,
                     planned_date, assigned_inspector_id, status, created_by)

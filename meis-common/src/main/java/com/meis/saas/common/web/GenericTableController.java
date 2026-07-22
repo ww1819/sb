@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.meis.saas.common.asset.MedicalDeviceDeleteGuard;
 import com.meis.saas.common.asset.SparePartDeleteGuard;
 import com.meis.saas.common.audit.EntityChangeLogService;
+import com.meis.saas.common.code.DailyBizNoSupport;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.persistence.TableColumnCache;
@@ -295,6 +296,7 @@ public abstract class GenericTableController {
             MedicalDeviceFieldHelper.applyDerivedFields(body);
         }
         prepareInsertDefaults(table, body);
+        applyOpsSystemDocNosOnCreate(table, body);
         normalizeUuidFields(body);
         normalizeTemporalFields(body);
         normalizeJsonbFields(body);
@@ -332,6 +334,7 @@ public abstract class GenericTableController {
         denyRepairWorkorderBypass(table);
         guardInventoryCheckMutable(table, id);
         SoftDeleteSupport.stripClientUpdateFields(body);
+        stripImmutableDocNos(body);
         if ("medical_device".equals(table)) {
             MedicalDeviceFieldHelper.applyDerivedFields(body);
             // 附录 P：设备编码创建后禁止修改
@@ -478,6 +481,47 @@ public abstract class GenericTableController {
             }
             default -> { }
         }
+    }
+
+    /** OPS.14：运维计划/执行单号系统生成，忽略客户端传入。 */
+    private void applyOpsSystemDocNosOnCreate(String table, Map<String, Object> body) {
+        switch (table) {
+            case "maintenance_plan" -> {
+                String no = DailyBizNoSupport.next(jdbc(), table, "plan_no", "MP-");
+                body.put("plan_no", no);
+                body.put("plan_code", no);
+            }
+            case "inspection_plan" -> {
+                String no = DailyBizNoSupport.next(jdbc(), table, "plan_no", "IP-");
+                body.put("plan_no", no);
+                body.put("plan_code", no);
+            }
+            case "pm_plan" -> {
+                String no = DailyBizNoSupport.next(jdbc(), table, "plan_no", "PP-");
+                body.put("plan_no", no);
+                body.put("plan_code", no);
+            }
+            case "maintenance_execution" ->
+                    body.put("execution_no", DailyBizNoSupport.next(jdbc(), table, "execution_no", "ME-"));
+            case "inspection_execution" ->
+                    body.put("execution_no", DailyBizNoSupport.next(jdbc(), table, "execution_no", "IE-"));
+            case "pm_execution" ->
+                    body.put("execution_no", DailyBizNoSupport.next(jdbc(), table, "execution_no", "PX-"));
+            case "metrology_plan" -> {
+                String no = DailyBizNoSupport.next(jdbc(), table, "plan_code", "JL-");
+                body.put("plan_code", no);
+            }
+            case "metrology_execution" ->
+                    body.put("execution_no", DailyBizNoSupport.next(jdbc(), table, "execution_no", "JX-"));
+            default -> { }
+        }
+    }
+
+    /** 计划单号 / 执行单号创建后禁止通过通用 CRUD 修改。 */
+    private static void stripImmutableDocNos(Map<String, Object> body) {
+        body.remove("plan_no");
+        body.remove("plan_code");
+        body.remove("execution_no");
     }
 
     /** UUID 列空串转 null，避免 PostgreSQL 类型错误。 */

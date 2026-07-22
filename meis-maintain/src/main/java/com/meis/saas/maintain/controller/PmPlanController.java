@@ -2,6 +2,7 @@ package com.meis.saas.maintain.controller;
 
 import com.meis.saas.common.audit.DocChangeLogService;
 import com.meis.saas.common.audit.OperationLog;
+import com.meis.saas.common.code.DailyBizNoSupport;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
@@ -59,9 +60,17 @@ public class PmPlanController {
                 "SELECT 1 FROM pm_plan WHERE id = ?::uuid "
                         + SoftDeleteSupport.notDeletedClause(jdbc, "pm_plan", null), id).isEmpty();
 
-        String planNo = firstNonBlank(body.get("plan_no"), body.get("plan_code"));
-        if (planNo == null || planNo.isBlank()) {
-            planNo = "PP" + System.currentTimeMillis();
+        // OPS.14：计划单号系统生成；更新时保留原号，忽略客户端传入
+        String planNo;
+        if (exists) {
+            var old = jdbc.queryForList(
+                    "SELECT plan_no, plan_code FROM pm_plan WHERE id = ?::uuid", id);
+            planNo = old.isEmpty() ? null : firstNonBlank(old.get(0).get("plan_no"), old.get(0).get("plan_code"));
+            if (planNo == null || planNo.isBlank()) {
+                planNo = DailyBizNoSupport.next(jdbc, "pm_plan", "plan_no", "PP-");
+            }
+        } else {
+            planNo = DailyBizNoSupport.next(jdbc, "pm_plan", "plan_no", "PP-");
         }
         String templateName = body.get("template_name") != null ? body.get("template_name").toString() : null;
         if ((templateName == null || templateName.isBlank()) && body.get("template_id") != null) {
@@ -167,7 +176,7 @@ public class PmPlanController {
         if (deviceIds.isEmpty()) throw new BizException(400, "请选择设备");
 
         UUID id = UUID.randomUUID();
-        String planNo = "PP" + System.currentTimeMillis();
+        String planNo = DailyBizNoSupport.next(jdbc, "pm_plan", "plan_no", "PP-");
         Map<String, Object> t = template.get(0);
         String userId = TenantContext.getUserId();
         LocalDate nextDue = body.get("next_due_date") != null

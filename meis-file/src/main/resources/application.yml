@@ -1,4 +1,5 @@
 server:
+  max-http-request-header-size: 64KB
   port: 8092
 spring:
   application:

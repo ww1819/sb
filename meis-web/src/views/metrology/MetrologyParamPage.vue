@@ -11,10 +11,10 @@
         <CrudPage :config="orgConfig" />
       </el-tab-pane>
       <el-tab-pane label="计量模板" name="template">
-        <CrudPage :config="templateConfig" detail-mode @detail="openTemplate" />
+        <CrudPage :config="templateConfig" detail-mode @add="openNewTemplate" @detail="openTemplate" />
       </el-tab-pane>
     </el-tabs>
-    <AppModal v-model="templateVisible" title="计量模板详情" size="xl">
+    <AppModal v-model="templateVisible" :title="templateModalTitle" size="xl">
       <template v-if="templateForm">
         <GroupedFormFields table="metrology_template" :model="templateForm" />
         <FormSection title="检定内容项" class="items-section">
@@ -47,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/api/http'
 import CrudPage from '@/components/CrudPage.vue'
@@ -73,6 +73,13 @@ const templateConfig: PageConfig = { title: '计量模板', apiBase: '/metrology
 const templateVisible = ref(false)
 const templateForm = ref<Record<string, unknown> | null>(null)
 const templateItems = ref<Record<string, unknown>[]>([])
+const templateModalTitle = computed(() => (templateForm.value?.id ? '编辑计量模板' : '新增计量模板'))
+
+function openNewTemplate() {
+  templateForm.value = { is_active: true, template_code: '', template_name: '' }
+  templateItems.value = []
+  templateVisible.value = true
+}
 
 async function openTemplate(row: Record<string, unknown>) {
   const { data } = await http.get(`/metrology/template/${row.id}`)
@@ -91,7 +98,13 @@ function removeItem(index: number) {
 
 async function saveTemplate() {
   if (!templateForm.value) return
-  await http.post('/metrology/template', { ...templateForm.value, items: templateItems.value })
+  if (!String(templateForm.value.template_name ?? '').trim()) {
+    ElMessage.warning('请填写模板名称')
+    return
+  }
+  const payload = { ...templateForm.value, items: templateItems.value }
+  if (!payload.id) delete payload.id
+  await http.post('/metrology/template', payload)
   ElMessage.success('保存成功')
   templateVisible.value = false
 }

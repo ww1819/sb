@@ -20,8 +20,16 @@ http.interceptors.request.use((config) => {
     }
     config.headers['X-User-Id'] = user.userId
     config.headers['X-Username'] = user.username
+    // 勿把完整 menus 塞进请求头：菜单树大时会超过 Tomcat 默认 8KB → 400 Request header is too large
+    // 侧栏走 /menus/effective；头里只带数据权限相关字段
     if (user.permissions) {
-      config.headers['X-Permissions'] = JSON.stringify(user.permissions)
+      const p = user.permissions as Record<string, unknown>
+      config.headers['X-Permissions'] = JSON.stringify({
+        buttons: p.buttons ?? [],
+        dataScope: p.dataScope ?? 'self',
+        deptIds: p.deptIds ?? [],
+        warehouseIds: p.warehouseIds ?? []
+      })
     }
   }
   return config
