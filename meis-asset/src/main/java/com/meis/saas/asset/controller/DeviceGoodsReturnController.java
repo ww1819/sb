@@ -2,6 +2,7 @@ package com.meis.saas.asset.controller;
 
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
@@ -44,11 +45,14 @@ public class DeviceGoodsReturnController {
             args.add(kw);
         }
         if (approval_status != null && !approval_status.isBlank()) {
-            where.append(" AND COALESCE(r.approval_status, 'draft') = ? ");
-            args.add(approval_status);
+            if (approval_status.contains(",")) {
+                FilterCsvSupport.appendStrIn(where, args, "COALESCE(r.approval_status, 'draft')", approval_status);
+            } else {
+                where.append(" AND COALESCE(r.approval_status, 'draft') = ? ");
+                args.add(approval_status);
+            }
         } else if (doc_status != null && !doc_status.isBlank()) {
-            where.append(" AND r.doc_status = ? ");
-            args.add(doc_status);
+            FilterCsvSupport.appendStrIn(where, args, "r.doc_status", doc_status);
         }
         String from = " FROM device_goods_return r "
                 + " LEFT JOIN supplier s ON s.id = r.supplier_id"
@@ -132,8 +136,9 @@ public class DeviceGoodsReturnController {
             actorId = UUID.fromString(ctx.getUserId());
             actorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, actorId);
         }
+        String returnNo;
         if (!exists) {
-            String returnNo = blankToNull(body.get("return_no"));
+            returnNo = blankToNull(body.get("return_no"));
             if (returnNo == null) returnNo = nextReturnNo();
             jdbc.update("""
                 INSERT INTO device_goods_return (
@@ -148,6 +153,8 @@ public class DeviceGoodsReturnController {
                     blankToNull(body.get("remark")),
                     actorId, actorName, actorId, actorName);
         } else {
+            var nos = jdbc.queryForList("SELECT return_no FROM device_goods_return WHERE id = ?", id);
+            returnNo = nos.isEmpty() ? null : blankToNull(nos.get(0).get("return_no"));
             jdbc.update("""
                 UPDATE device_goods_return
                 SET warehouse_id = ?, supplier_id = ?, entry_id = ?, return_date = ?::date, reason = ?, remark = ?,
@@ -169,14 +176,14 @@ public class DeviceGoodsReturnController {
         for (Map<String, Object> item : items) {
             jdbc.update("""
                 INSERT INTO device_goods_return_item (
-                    id, return_id, device_id, device_code, device_name, specification, unit,
+                    id, return_id, return_no, device_id, device_code, device_name, specification, unit,
                     quantity, unit_price, total_price, manufacturer_id, serial_number,
                     brand, category_id, category_name, asset_category_id, asset_category_name,
                     finance_category_id, finance_category_name,
                     created_at, updated_at, created_by, created_by_name, updated_by, updated_by_name, is_deleted
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?, ?, ?, ?, 0)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?, ?, ?, ?, 0)
                 """,
-                    UUID.randomUUID(), id, parseUuid(item.get("device_id")),
+                    UUID.randomUUID(), id, returnNo, parseUuid(item.get("device_id")),
                     blankToNull(item.get("device_code")), blankToNull(item.get("device_name")),
                     blankToNull(item.get("specification")), blankToNull(item.get("unit")),
                     item.getOrDefault("quantity", 1),

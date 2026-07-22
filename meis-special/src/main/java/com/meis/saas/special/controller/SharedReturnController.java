@@ -162,10 +162,12 @@ public class SharedReturnController {
                 billingStart,
                 billingEnd);
         jdbc.update("""
-            INSERT INTO shared_device_fee (id, fee_no, loan_id, fee_amount, fee_date, paid_status, remark)
-            VALUES (?::uuid,?,?::uuid,?,?,?,?)
-            """, UUID.randomUUID(), "SF" + System.currentTimeMillis(), loan.get("id"), amount,
-                LocalDate.now(), "unpaid", "归还审批自动生成");
+            INSERT INTO shared_device_fee (id, fee_no, loan_id, loan_no, device_id, device_code, device_name,
+                fee_amount, fee_date, paid_status, remark)
+            VALUES (?::uuid,?,?::uuid,?,?::uuid,?,?,?,?,?,?)
+            """, UUID.randomUUID(), "SF" + System.currentTimeMillis(), loan.get("id"),
+                loan.get("loan_no"), loan.get("device_id"), loan.get("device_code"), loan.get("device_name"),
+                amount, LocalDate.now(), "unpaid", "归还审批自动生成");
     }
 
     private static Instant toInstant(Object value) {

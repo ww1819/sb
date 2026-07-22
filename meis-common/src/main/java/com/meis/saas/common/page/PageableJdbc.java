@@ -43,6 +43,15 @@ public final class PageableJdbc {
                 return;
             }
             boolean uuidCol = "id".equals(k) || k.endsWith("_id") || k.endsWith("_by");
+            // PLT-UI-02：逗号分隔多选 → IN；单值仍走 =
+            if (v.contains(",")) {
+                if (uuidCol) {
+                    FilterCsvSupport.appendUuidIn(where, args, k, v);
+                } else {
+                    FilterCsvSupport.appendStrIn(where, args, k, v);
+                }
+                return;
+            }
             where.append(" AND ").append(k).append(uuidCol ? " = ?::uuid " : " = ? ");
             args.add(v);
         });

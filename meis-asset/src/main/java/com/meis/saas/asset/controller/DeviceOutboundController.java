@@ -2,6 +2,7 @@ package com.meis.saas.asset.controller;
 
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
@@ -32,7 +33,8 @@ public class DeviceOutboundController {
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(PageQuery query,
             @RequestParam(required = false) String approval_status,
-            @RequestParam(required = false) String doc_status) {
+            @RequestParam(required = false) String doc_status,
+            @RequestParam(required = false) String dept_id) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "device_outbound", "o"));
         List<Object> args = new ArrayList<>();
@@ -43,12 +45,16 @@ public class DeviceOutboundController {
             args.add(kw);
         }
         if (approval_status != null && !approval_status.isBlank()) {
-            where.append(" AND COALESCE(o.approval_status, 'draft') = ? ");
-            args.add(approval_status);
+            if (approval_status.contains(",")) {
+                FilterCsvSupport.appendStrIn(where, args, "COALESCE(o.approval_status, 'draft')", approval_status);
+            } else {
+                where.append(" AND COALESCE(o.approval_status, 'draft') = ? ");
+                args.add(approval_status);
+            }
         } else if (doc_status != null && !doc_status.isBlank()) {
-            where.append(" AND o.doc_status = ? ");
-            args.add(doc_status);
+            FilterCsvSupport.appendStrIn(where, args, "o.doc_status", doc_status);
         }
+        FilterCsvSupport.appendUuidIn(where, args, "o.dept_id", dept_id);
         String from = " FROM device_outbound o "
                 + " LEFT JOIN department d ON d.id = o.dept_id"
                 + SoftDeleteSupport.notDeletedClause(jdbc, "department", "d")
@@ -130,8 +136,9 @@ public class DeviceOutboundController {
             actorId = UUID.fromString(ctx.getUserId());
             actorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, actorId);
         }
+        String outboundNo;
         if (!exists) {
-            String outboundNo = blankToNull(body.get("outbound_no"));
+            outboundNo = blankToNull(body.get("outbound_no"));
             if (outboundNo == null) outboundNo = nextOutboundNo();
             jdbc.update("""
                 INSERT INTO device_outbound (
@@ -145,6 +152,8 @@ public class DeviceOutboundController {
                     toDateParam(body.get("outbound_date")), blankToNull(body.get("purpose")), blankToNull(body.get("remark")),
                     actorId, actorName, actorId, actorName);
         } else {
+            var nos = jdbc.queryForList("SELECT outbound_no FROM device_outbound WHERE id = ?", id);
+            outboundNo = nos.isEmpty() ? null : blankToNull(nos.get(0).get("outbound_no"));
             jdbc.update("""
                 UPDATE device_outbound
                 SET dept_id = ?, receiver_id = ?, warehouse_id = ?, outbound_date = ?::date,
@@ -167,14 +176,14 @@ public class DeviceOutboundController {
         for (Map<String, Object> item : items) {
             jdbc.update("""
                 INSERT INTO device_outbound_item (
-                    id, outbound_id, device_id, device_code, device_name, specification, unit,
+                    id, outbound_id, outbound_no, device_id, device_code, device_name, specification, unit,
                     quantity, unit_price, total_price, manufacturer_id, supplier_id, serial_number,
                     brand, category_id, category_name, asset_category_id, asset_category_name,
                     finance_category_id, finance_category_name,
                     created_at, updated_at, created_by, created_by_name, updated_by, updated_by_name, is_deleted
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?, ?, ?, ?, 0)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?, ?, ?, ?, 0)
                 """,
-                    UUID.randomUUID(), id, parseUuid(item.get("device_id")),
+                    UUID.randomUUID(), id, outboundNo, parseUuid(item.get("device_id")),
                     blankToNull(item.get("device_code")), blankToNull(item.get("device_name")),
                     blankToNull(item.get("specification")), blankToNull(item.get("unit")),
                     item.getOrDefault("quantity", 1),

@@ -2,6 +2,7 @@ package com.meis.saas.qc.controller;
 
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
@@ -25,10 +26,7 @@ public class MetrologyExecutionController {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "metrology_execution", "e"));
         List<Object> args = new ArrayList<>();
-        if (status != null && !status.isBlank()) {
-            where.append(" AND e.status = ? ");
-            args.add(status);
-        }
+        FilterCsvSupport.appendStrIn(where, args, "e.status", status);
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
             String kw = "%" + query.getKeyword().trim() + "%";
             where.append(" AND (e.execution_no ILIKE ? OR e.remark ILIKE ?) ");
@@ -63,7 +61,7 @@ public class MetrologyExecutionController {
         if (rows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> result = new LinkedHashMap<>(rows.get(0));
         var items = jdbc.queryForList("""
-                SELECT ei.*, d.dept_name
+                SELECT ei.*, COALESCE(ei.dept_name, d.dept_name) AS dept_name
                 FROM metrology_execution_item ei
                 LEFT JOIN department d ON d.id = ei.dept_id
                 WHERE ei.execution_id = ?::uuid

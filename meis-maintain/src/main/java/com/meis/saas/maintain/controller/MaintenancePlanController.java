@@ -42,7 +42,7 @@ public class MaintenancePlanController {
             result.put("template_name", result.get("join_template_name"));
         }
         result.put("items", jdbc.queryForList("""
-                SELECT i.*, dept.dept_name
+                SELECT i.*, COALESCE(i.dept_name, dept.dept_name) AS dept_name
                 FROM maintenance_plan_item i
                 LEFT JOIN department dept ON dept.id = i.dept_id
                 WHERE i.plan_id = ?::uuid
@@ -247,6 +247,8 @@ public class MaintenancePlanController {
                 if (name == null) name = Objects.toString(d.get(0).get("device_name"), null);
                 if (deptId == null) deptId = d.get(0).get("dept_id");
             }
+            String deptName = blankToNull(item.get("dept_name")) != null
+                    ? item.get("dept_name").toString() : resolveDeptName(deptId);
             boolean exists = !jdbc.queryForList(
                     "SELECT 1 FROM maintenance_plan_item WHERE id = ?::uuid AND plan_id = ?::uuid",
                     itemId, planId).isEmpty();
@@ -258,18 +260,18 @@ public class MaintenancePlanController {
             if (exists) {
                 jdbc.update("""
                         UPDATE maintenance_plan_item SET plan_no=?, device_id=?::uuid, device_code=?, device_name=?,
-                        dept_id=?::uuid, last_done_date=?, next_due_date=?, assigned_user_id=?::uuid,
+                        dept_id=?::uuid, dept_name=?, last_done_date=?, next_due_date=?, assigned_user_id=?::uuid,
                         assigned_user_name=?, item_status=?, remark=?, updated_at=NOW()
                         WHERE id=?::uuid AND plan_id=?::uuid
-                        """, planNo, deviceId, code, name, deptId,
+                        """, planNo, deviceId, code, name, deptId, deptName,
                         item.get("last_done_date"), item.get("next_due_date"), assignedId, assignedName,
                         item.getOrDefault("item_status", "active"), item.get("remark"), itemId, planId);
             } else {
                 jdbc.update("""
                         INSERT INTO maintenance_plan_item (id, plan_id, plan_no, device_id, device_code, device_name,
-                        dept_id, last_done_date, next_due_date, assigned_user_id, assigned_user_name, item_status, remark)
-                        VALUES (?::uuid,?::uuid,?,?::uuid,?,?,?::uuid,?,?,?::uuid,?,?,?)
-                        """, itemId, planId, planNo, deviceId, code, name, deptId,
+                        dept_id, dept_name, last_done_date, next_due_date, assigned_user_id, assigned_user_name, item_status, remark)
+                        VALUES (?::uuid,?::uuid,?,?::uuid,?,?,?::uuid,?,?,?,?::uuid,?,?,?)
+                        """, itemId, planId, planNo, deviceId, code, name, deptId, deptName,
                         item.get("last_done_date"), item.get("next_due_date"), assignedId, assignedName,
                         item.getOrDefault("item_status", "active"), item.get("remark"));
             }
@@ -297,6 +299,14 @@ public class MaintenancePlanController {
                   updated_at = NOW()
                 WHERE id = ?::uuid
                 """, planId, planId, planId);
+    }
+
+    private String resolveDeptName(Object deptId) {
+        if (deptId == null || String.valueOf(deptId).isBlank()) return null;
+        var rows = jdbc.queryForList(
+                "SELECT dept_name FROM department WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "department", null), deptId);
+        return rows.isEmpty() ? null : Objects.toString(rows.get(0).get("dept_name"), null);
     }
 
     private static String clientOf(Map<String, Object> body) {

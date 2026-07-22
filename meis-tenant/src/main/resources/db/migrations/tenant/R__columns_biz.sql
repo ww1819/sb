@@ -834,3 +834,76 @@ ALTER TABLE inspection_execution_result ADD COLUMN IF NOT EXISTS row_version INT
 ALTER TABLE sys_user ADD COLUMN IF NOT EXISTS wx_openid VARCHAR(64);
 COMMENT ON COLUMN sys_user.wx_openid IS 'WeChat mini-program openid for subscribe message';
 CREATE UNIQUE INDEX IF NOT EXISTS uk_sys_user_wx_openid ON sys_user (wx_openid) WHERE wx_openid IS NOT NULL AND wx_openid <> '';
+
+-- ---------- 附录 W.6 / BACKLOG-PLT-W03：明细业务单号与主数据冗余（2026-07-22） ----------
+ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS entry_no VARCHAR(30);
+ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS device_code VARCHAR(50);
+COMMENT ON COLUMN device_entry_item.entry_no IS '入库单号快照（W.6）';
+COMMENT ON COLUMN device_entry_item.device_code IS '设备编码快照（W.6；审核生成台账后回写）';
+
+ALTER TABLE device_outbound_item ADD COLUMN IF NOT EXISTS outbound_no VARCHAR(30);
+COMMENT ON COLUMN device_outbound_item.outbound_no IS '出库单号快照（W.6）';
+
+ALTER TABLE device_return_item ADD COLUMN IF NOT EXISTS return_no VARCHAR(30);
+COMMENT ON COLUMN device_return_item.return_no IS '退库单号快照（W.6）';
+
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS return_no VARCHAR(30);
+COMMENT ON COLUMN device_goods_return_item.return_no IS '退货单号快照（W.6）';
+
+ALTER TABLE inventory_check_item ADD COLUMN IF NOT EXISTS check_no VARCHAR(30);
+COMMENT ON COLUMN inventory_check_item.check_no IS '盘点单号快照（W.6）';
+
+ALTER TABLE repair_workorder_event ADD COLUMN IF NOT EXISTS wo_no VARCHAR(30);
+ALTER TABLE repair_workorder_process ADD COLUMN IF NOT EXISTS wo_no VARCHAR(30);
+ALTER TABLE repair_workorder_segment ADD COLUMN IF NOT EXISTS wo_no VARCHAR(30);
+ALTER TABLE repair_workorder_segment_part ADD COLUMN IF NOT EXISTS wo_no VARCHAR(30);
+ALTER TABLE spare_part_usage ADD COLUMN IF NOT EXISTS wo_no VARCHAR(30);
+COMMENT ON COLUMN repair_workorder_event.wo_no IS '工单号快照（W.6）';
+COMMENT ON COLUMN repair_workorder_process.wo_no IS '工单号快照（W.6）';
+COMMENT ON COLUMN repair_workorder_segment.wo_no IS '工单号快照（W.6）';
+COMMENT ON COLUMN repair_workorder_segment_part.wo_no IS '工单号快照（W.6）';
+COMMENT ON COLUMN spare_part_usage.wo_no IS '工单号快照（W.6）';
+
+ALTER TABLE metrology_execution_item ADD COLUMN IF NOT EXISTS execution_no VARCHAR(30);
+COMMENT ON COLUMN metrology_execution_item.execution_no IS '计量执行单号快照（W.6）';
+
+ALTER TABLE shared_device_fee ADD COLUMN IF NOT EXISTS loan_no VARCHAR(30);
+ALTER TABLE shared_device_fee ADD COLUMN IF NOT EXISTS device_id UUID;
+ALTER TABLE shared_device_fee ADD COLUMN IF NOT EXISTS device_code VARCHAR(50);
+ALTER TABLE shared_device_fee ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
+COMMENT ON COLUMN shared_device_fee.loan_no IS '借调单号快照（W.6）';
+COMMENT ON COLUMN shared_device_fee.device_id IS '设备ID冗余（W.6 / AST-W01）';
+COMMENT ON COLUMN shared_device_fee.device_code IS '设备编码快照';
+COMMENT ON COLUMN shared_device_fee.device_name IS '设备名称快照';
+
+ALTER TABLE maintenance_plan_item ADD COLUMN IF NOT EXISTS dept_name VARCHAR(100);
+ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS dept_name VARCHAR(100);
+ALTER TABLE inspection_plan_item ADD COLUMN IF NOT EXISTS dept_name VARCHAR(100);
+ALTER TABLE inspection_execution_item ADD COLUMN IF NOT EXISTS dept_name VARCHAR(100);
+ALTER TABLE pm_plan_item ADD COLUMN IF NOT EXISTS dept_name VARCHAR(100);
+ALTER TABLE pm_execution_item ADD COLUMN IF NOT EXISTS dept_name VARCHAR(100);
+ALTER TABLE metrology_execution_item ADD COLUMN IF NOT EXISTS dept_name VARCHAR(100);
+
+-- ---------- 附录 W.6 / BACKLOG-PLT-W03 P2（2026-07-22） ----------
+ALTER TABLE purchase_contract_item ADD COLUMN IF NOT EXISTS contract_code VARCHAR(50);
+COMMENT ON COLUMN purchase_contract_item.contract_code IS '合同编号快照（W.6）';
+
+ALTER TABLE purchase_acceptance_item ADD COLUMN IF NOT EXISTS acceptance_no VARCHAR(30);
+COMMENT ON COLUMN purchase_acceptance_item.acceptance_no IS '验收单号快照（W.6）';
+
+ALTER TABLE maintenance_execution_result ADD COLUMN IF NOT EXISTS execution_no VARCHAR(30);
+ALTER TABLE pm_execution_result ADD COLUMN IF NOT EXISTS execution_no VARCHAR(30);
+ALTER TABLE inspection_execution_result ADD COLUMN IF NOT EXISTS execution_no VARCHAR(30);
+ALTER TABLE metrology_execution_result ADD COLUMN IF NOT EXISTS execution_no VARCHAR(30);
+COMMENT ON COLUMN maintenance_execution_result.execution_no IS '执行单号快照（W.6）';
+COMMENT ON COLUMN pm_execution_result.execution_no IS '执行单号快照（W.6）';
+COMMENT ON COLUMN inspection_execution_result.execution_no IS '执行单号快照（W.6）';
+COMMENT ON COLUMN metrology_execution_result.execution_no IS '执行单号快照（W.6）';
+
+ALTER TABLE repair_workorder_segment_user ADD COLUMN IF NOT EXISTS wo_no VARCHAR(30);
+COMMENT ON COLUMN repair_workorder_segment_user.wo_no IS '工单号快照（W.6）';
+
+ALTER TABLE inspection_record ADD COLUMN IF NOT EXISTS device_code VARCHAR(50);
+ALTER TABLE inspection_record ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
+COMMENT ON COLUMN inspection_record.device_code IS '设备编码快照（W.6）';
+COMMENT ON COLUMN inspection_record.device_name IS '设备名称快照（W.6）';

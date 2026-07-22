@@ -1,5 +1,6 @@
 package com.meis.saas.common.ops;
 
+import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
@@ -37,6 +38,31 @@ public final class OpsDevicePageSupport {
             String model,
             String brand,
             Integer dueWithinDays) {
+        return page(jdbc, mod, query, deviceStatus, deptId, manageDeptId,
+                deviceCode, deviceName, serialNumber, specification, model, brand, dueWithinDays,
+                null, null, null, null, null, null);
+    }
+
+    public static PageResult<Map<String, Object>> page(
+            JdbcTemplate jdbc,
+            ModuleTables mod,
+            PageQuery query,
+            String deviceStatus,
+            String deptId,
+            String manageDeptId,
+            String deviceCode,
+            String deviceName,
+            String serialNumber,
+            String specification,
+            String model,
+            String brand,
+            Integer dueWithinDays,
+            String categoryId,
+            String assetCategoryId,
+            String financeCategoryId,
+            String categoryKw,
+            String assetCategoryKw,
+            String financeCategoryKw) {
 
         String md = SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d");
         String pi = SoftDeleteSupport.notDeletedClause(jdbc, mod.planItem(), "pi");
@@ -60,14 +86,20 @@ public final class OpsDevicePageSupport {
             for (int i = 0; i < 7; i++) args.add(kw);
         }
         appendLike(where, args, "d.device_code", deviceCode);
-        appendLike(where, args, "d.device_name", deviceName);
+        FilterCsvSupport.appendCodeNamePinyin(where, args, null, "d.device_name", "d.pinyin_code", deviceName);
         appendLike(where, args, "d.serial_number", serialNumber);
         appendLike(where, args, "d.specification", specification);
         appendLike(where, args, "d.model", model);
         appendLike(where, args, "d.brand", brand);
-        appendUuidEq(where, args, "d.dept_id", deptId);
-        appendUuidEq(where, args, "d.manage_dept_id", manageDeptId);
-        appendStatusIn(where, args, "d.device_status", deviceStatus);
+        FilterCsvSupport.appendUuidIn(where, args, "d.dept_id", deptId);
+        FilterCsvSupport.appendUuidIn(where, args, "d.manage_dept_id", manageDeptId);
+        FilterCsvSupport.appendStrIn(where, args, "d.device_status", deviceStatus);
+        FilterCsvSupport.appendUuidIn(where, args, "d.category_id", categoryId);
+        FilterCsvSupport.appendUuidIn(where, args, "d.asset_category_id", assetCategoryId);
+        FilterCsvSupport.appendUuidIn(where, args, "d.finance_category_id", financeCategoryId);
+        FilterCsvSupport.appendCodeNamePinyin(where, args, "cat.category_code", "cat.category_name", null, categoryKw);
+        FilterCsvSupport.appendCodeNamePinyin(where, args, "ac.category_code", "ac.category_name", null, assetCategoryKw);
+        FilterCsvSupport.appendCodeNamePinyin(where, args, "fc.finance_code", "fc.finance_name", null, financeCategoryKw);
 
         if (dueWithinDays != null && dueWithinDays > 0) {
             where.append(" AND EXISTS (SELECT 1 FROM ").append(mod.planItem()).append(" pi")
@@ -77,8 +109,16 @@ public final class OpsDevicePageSupport {
             args.add(dueWithinDays);
         }
 
+        String fromJoins = """
+                LEFT JOIN department dept ON dept.id = d.dept_id
+                LEFT JOIN department mgr ON mgr.id = d.manage_dept_id
+                LEFT JOIN medical_device_category cat ON cat.id = d.category_id
+                LEFT JOIN asset_category ac ON ac.id = d.asset_category_id
+                LEFT JOIN finance_category fc ON fc.id = d.finance_category_id
+                """;
+
         Long total = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM medical_device d " + where, Long.class, args.toArray());
+                "SELECT COUNT(*) FROM medical_device d " + fromJoins + where, Long.class, args.toArray());
         int offset = (query.getPage() - 1) * query.getSize();
         List<Object> pageArgs = new ArrayList<>(args);
         pageArgs.add(query.getSize());
@@ -90,13 +130,13 @@ public final class OpsDevicePageSupport {
                        d.dept_id, d.manage_dept_id, d.%s AS module_flag,
                        dept.dept_name, mgr.dept_name AS manage_dept_name,
                        cat.category_name,
+                       ac.category_name AS asset_category_name,
+                       fc.finance_name AS finance_category_name,
                        (SELECT COUNT(*) FROM %s pi WHERE pi.device_id = d.id %s) AS plan_count,
                        (SELECT COUNT(*) FROM %s ei WHERE ei.device_id = d.id %s) AS execution_item_count,
                        (SELECT MIN(pi.next_due_date) FROM %s pi WHERE pi.device_id = d.id %s) AS next_due_date
                 FROM medical_device d
-                LEFT JOIN department dept ON dept.id = d.dept_id
-                LEFT JOIN department mgr ON mgr.id = d.manage_dept_id
-                LEFT JOIN medical_device_category cat ON cat.id = d.category_id
+                %s
                 %s
                 ORDER BY next_due_date NULLS LAST, d.device_code
                 LIMIT ? OFFSET ?
@@ -105,6 +145,7 @@ public final class OpsDevicePageSupport {
                 mod.planItem(), pi,
                 mod.executionItem(), ei,
                 mod.planItem(), pi,
+                fromJoins,
                 where);
 
         var rows = jdbc.queryForList(sql, pageArgs.toArray());
@@ -115,25 +156,5 @@ public final class OpsDevicePageSupport {
         if (!StringUtils.hasText(value)) return;
         where.append(" AND ").append(col).append(" ILIKE ? ");
         args.add("%" + value.trim() + "%");
-    }
-
-    private static void appendUuidEq(StringBuilder where, List<Object> args, String col, String value) {
-        if (!StringUtils.hasText(value)) return;
-        where.append(" AND ").append(col).append(" = ?::uuid ");
-        args.add(value.trim());
-    }
-
-    private static void appendStatusIn(StringBuilder where, List<Object> args, String col, String csv) {
-        if (!StringUtils.hasText(csv)) return;
-        List<String> parts = Arrays.stream(csv.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .distinct()
-                .toList();
-        if (parts.isEmpty()) return;
-        where.append(" AND ").append(col).append(" IN (")
-                .append(String.join(",", Collections.nCopies(parts.size(), "?")))
-                .append(") ");
-        args.addAll(parts);
     }
 }

@@ -167,6 +167,11 @@ public class PurchaseContractController {
                     updated_at = NOW(), updated_by = ?, updated_by_name = ?
                 WHERE contract_id = ? AND is_deleted = 0
                 """, actorId, actorName, actorId, actorName, contractId);
+        String contractCode = blankToNull(body.get("contract_code"));
+        if (contractCode == null) {
+            var nos = jdbc.queryForList("SELECT contract_code FROM purchase_contract WHERE id = ?", contractId);
+            contractCode = nos.isEmpty() ? null : blankToNull(nos.get(0).get("contract_code"));
+        }
         int order = 1;
         for (Object o : list) {
             if (!(o instanceof Map<?, ?> m)) continue;
@@ -197,16 +202,16 @@ public class PurchaseContractController {
             }
             jdbc.update("""
                     INSERT INTO purchase_contract_item (
-                        id, contract_id, device_name, specification, brand, quantity, unit_price, amount,
+                        id, contract_id, contract_code, device_name, specification, brand, quantity, unit_price, amount,
                         manufacturer_id, manufacturer_name, sort_order,
                         created_at, updated_at, created_by, created_by_name, updated_by, updated_by_name, is_deleted
                     ) VALUES (
-                        ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?,
                         ?, ?, ?,
                         NOW(), NOW(), ?, ?, ?, ?, 0
                     )
                     """,
-                    UUID.randomUUID(), contractId, deviceName,
+                    UUID.randomUUID(), contractId, contractCode, deviceName,
                     blankToNull(row.get("specification")),
                     blankToNull(row.get("brand")),
                     qty, price, amount,

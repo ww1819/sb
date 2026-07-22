@@ -20,6 +20,7 @@
         v-if="fieldMeta(key)?.linkTable"
         :model-value="modelValue[key] ?? ''"
         :link-table="fieldMeta(key)!.linkTable!"
+        :multiple="!!fieldMeta(key)?.multiple"
         :placeholder="fieldMeta(key)?.placeholder ?? `请输入${fieldMeta(key)?.label ?? ''}`"
         @update:model-value="onFieldChange(key, $event)"
         @update:label="onLabelChange(key, $event)"

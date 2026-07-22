@@ -17,6 +17,7 @@
       :model-value="modelValue"
       :link-table="filter.linkTable"
       :placeholder="filter.label"
+      :multiple="!!filter.multiple"
       @update:model-value="onChange"
     />
   </div>

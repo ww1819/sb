@@ -35,12 +35,13 @@ public final class AcceptanceChecklistService {
             seedDefaultMembers(jdbc, acceptanceId);
             return;
         }
+        String acceptanceNo = loadAcceptanceNo(jdbc, acceptanceId);
         int order = 1;
         for (String[] item : DEFAULT_ITEMS) {
             jdbc.update("""
-                INSERT INTO purchase_acceptance_item (id, acceptance_id, item_name, check_standard, check_result, sort_order)
-                VALUES (?::uuid, ?::uuid, ?, ?, 'pending', ?)
-                """, UUID.randomUUID(), acceptanceId, item[0], item[1], order++);
+                INSERT INTO purchase_acceptance_item (id, acceptance_id, acceptance_no, item_name, check_standard, check_result, sort_order)
+                VALUES (?::uuid, ?::uuid, ?, ?, ?, 'pending', ?)
+                """, UUID.randomUUID(), acceptanceId, acceptanceNo, item[0], item[1], order++);
         }
         seedDefaultMembers(jdbc, acceptanceId);
     }
@@ -62,15 +63,16 @@ public final class AcceptanceChecklistService {
 
     public static void saveItems(JdbcTemplate jdbc, UUID acceptanceId, List<Map<String, Object>> items) {
         jdbc.update("DELETE FROM purchase_acceptance_item WHERE acceptance_id = ?::uuid", acceptanceId);
+        String acceptanceNo = loadAcceptanceNo(jdbc, acceptanceId);
         int order = 1;
         for (Map<String, Object> item : items) {
             jdbc.update("""
-                INSERT INTO purchase_acceptance_item (id, acceptance_id, item_name, check_standard,
+                INSERT INTO purchase_acceptance_item (id, acceptance_id, acceptance_no, item_name, check_standard,
                 check_result, is_passed, checker_id, remark, sort_order)
-                VALUES (?,?,?,?,?,?,?,?,?)
+                VALUES (?,?,?,?,?,?,?,?,?,?)
                 """,
                     parseUuid(item.get("id")) != null ? parseUuid(item.get("id")) : UUID.randomUUID(),
-                    acceptanceId, item.get("item_name"), item.get("check_standard"),
+                    acceptanceId, acceptanceNo, item.get("item_name"), item.get("check_standard"),
                     item.getOrDefault("check_result", "pending"), item.get("is_passed"),
                     parseUuid(item.get("checker_id")), item.get("remark"),
                     item.getOrDefault("sort_order", order++));
@@ -179,6 +181,11 @@ public final class AcceptanceChecklistService {
             WHERE acceptance_id = ?::uuid AND (is_passed IS NOT TRUE OR check_result = 'failed')
             """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_acceptance_item", null), acceptanceId);
         return failed.isEmpty();
+    }
+
+    private static String loadAcceptanceNo(JdbcTemplate jdbc, UUID acceptanceId) {
+        var rows = jdbc.queryForList("SELECT acceptance_no FROM purchase_acceptance WHERE id = ?::uuid", acceptanceId);
+        return rows.isEmpty() ? null : blankToNull(rows.get(0).get("acceptance_no"));
     }
 
     private static UUID parseUuid(Object v) {

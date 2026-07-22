@@ -37,7 +37,7 @@ public class RepairWorkorderProcessService {
         UUID id = UUID.randomUUID();
         String userId = TenantContext.getUserId();
         Map<String, Object> wo = jdbc.queryForList(
-                "SELECT device_id, device_code, device_name FROM repair_workorder WHERE id = ?::uuid"
+                "SELECT wo_no, device_id, device_code, device_name FROM repair_workorder WHERE id = ?::uuid"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null), workorderId)
                 .stream().findFirst().orElse(Map.of());
         boolean hasDevice = TableColumnCache.hasColumn(jdbc, "repair_workorder_process", "device_id");
@@ -47,17 +47,18 @@ public class RepairWorkorderProcessService {
         String fromUserName = SoftDeleteSupport.resolveUserDisplayName(jdbc, record.fromUserId());
         String toUserName = SoftDeleteSupport.resolveUserDisplayName(jdbc, record.toUserId());
         String creatorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, userId);
+        Object woNo = blankToNull(wo.get("wo_no"));
         if (hasDevice && hasNames) {
             jdbc.update("""
                     INSERT INTO repair_workorder_process
-                    (id, workorder_id, action_type, from_status, to_status, from_sub_status, to_sub_status,
+                    (id, workorder_id, wo_no, action_type, from_status, to_status, from_sub_status, to_sub_status,
                      user_id, from_user_id, to_user_id, operator_id,
                      user_name, from_user_name, to_user_name, operator_name,
                      solution_description, labor_cost, parts_cost, total_cost,
                      verify_result, verify_comment, satisfaction_rating, satisfaction_comment,
                      skip_verify, remark, extra_json, device_id, device_code, device_name,
                      created_by, updated_by, created_by_name, updated_by_name)
-                    VALUES (?::uuid,?::uuid,?,?,?,?,?,
+                    VALUES (?::uuid,?::uuid,?,?,?,?,?,?,
                             ?::uuid,?::uuid,?::uuid,?::uuid,
                             ?,?,?,?,
                             ?,?,?,?,
@@ -65,7 +66,7 @@ public class RepairWorkorderProcessService {
                             ?,?,CAST(? AS jsonb),?::uuid,?,?,
                             ?::uuid,?::uuid,?,?)
                     """,
-                    id, workorderId, record.actionType(),
+                    id, workorderId, woNo, record.actionType(),
                     blankToNull(record.fromStatus()), blankToNull(record.toStatus()),
                     blankToNull(record.fromSubStatus()), blankToNull(record.toSubStatus()),
                     blankToNull(record.userId()), blankToNull(record.fromUserId()),
@@ -80,18 +81,18 @@ public class RepairWorkorderProcessService {
         } else if (hasDevice) {
             jdbc.update("""
                     INSERT INTO repair_workorder_process
-                    (id, workorder_id, action_type, from_status, to_status, from_sub_status, to_sub_status,
+                    (id, workorder_id, wo_no, action_type, from_status, to_status, from_sub_status, to_sub_status,
                      user_id, from_user_id, to_user_id, operator_id,
                      solution_description, labor_cost, parts_cost, total_cost,
                      verify_result, verify_comment, satisfaction_rating, satisfaction_comment,
                      skip_verify, remark, extra_json, device_id, device_code, device_name, created_by, updated_by)
-                    VALUES (?::uuid,?::uuid,?,?,?,?,?,
+                    VALUES (?::uuid,?::uuid,?,?,?,?,?,?,
                             ?::uuid,?::uuid,?::uuid,?::uuid,
                             ?,?,?,?,
                             ?,?,?,?,
                             ?,?,CAST(? AS jsonb),?::uuid,?,?,?::uuid,?::uuid)
                     """,
-                    id, workorderId, record.actionType(),
+                    id, workorderId, woNo, record.actionType(),
                     blankToNull(record.fromStatus()), blankToNull(record.toStatus()),
                     blankToNull(record.fromSubStatus()), blankToNull(record.toSubStatus()),
                     blankToNull(record.userId()), blankToNull(record.fromUserId()),
@@ -105,20 +106,20 @@ public class RepairWorkorderProcessService {
         } else if (hasNames) {
             jdbc.update("""
                     INSERT INTO repair_workorder_process
-                    (id, workorder_id, action_type, from_status, to_status, from_sub_status, to_sub_status,
+                    (id, workorder_id, wo_no, action_type, from_status, to_status, from_sub_status, to_sub_status,
                      user_id, from_user_id, to_user_id, operator_id,
                      user_name, from_user_name, to_user_name, operator_name,
                      solution_description, labor_cost, parts_cost, total_cost,
                      verify_result, verify_comment, satisfaction_rating, satisfaction_comment,
                      skip_verify, remark, extra_json, created_by, updated_by, created_by_name, updated_by_name)
-                    VALUES (?::uuid,?::uuid,?,?,?,?,?,
+                    VALUES (?::uuid,?::uuid,?,?,?,?,?,?,
                             ?::uuid,?::uuid,?::uuid,?::uuid,
                             ?,?,?,?,
                             ?,?,?,?,
                             ?,?,?,?,
                             ?,?,CAST(? AS jsonb),?::uuid,?::uuid,?,?)
                     """,
-                    id, workorderId, record.actionType(),
+                    id, workorderId, woNo, record.actionType(),
                     blankToNull(record.fromStatus()), blankToNull(record.toStatus()),
                     blankToNull(record.fromSubStatus()), blankToNull(record.toSubStatus()),
                     blankToNull(record.userId()), blankToNull(record.fromUserId()),
@@ -132,18 +133,18 @@ public class RepairWorkorderProcessService {
         } else {
             jdbc.update("""
                     INSERT INTO repair_workorder_process
-                    (id, workorder_id, action_type, from_status, to_status, from_sub_status, to_sub_status,
+                    (id, workorder_id, wo_no, action_type, from_status, to_status, from_sub_status, to_sub_status,
                      user_id, from_user_id, to_user_id, operator_id,
                      solution_description, labor_cost, parts_cost, total_cost,
                      verify_result, verify_comment, satisfaction_rating, satisfaction_comment,
                      skip_verify, remark, extra_json, created_by, updated_by)
-                    VALUES (?::uuid,?::uuid,?,?,?,?,?,
+                    VALUES (?::uuid,?::uuid,?,?,?,?,?,?,
                             ?::uuid,?::uuid,?::uuid,?::uuid,
                             ?,?,?,?,
                             ?,?,?,?,
                             ?,?,CAST(? AS jsonb),?::uuid,?::uuid)
                     """,
-                    id, workorderId, record.actionType(),
+                    id, workorderId, woNo, record.actionType(),
                     blankToNull(record.fromStatus()), blankToNull(record.toStatus()),
                     blankToNull(record.fromSubStatus()), blankToNull(record.toSubStatus()),
                     blankToNull(record.userId()), blankToNull(record.fromUserId()),

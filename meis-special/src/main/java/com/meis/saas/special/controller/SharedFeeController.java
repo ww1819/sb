@@ -24,8 +24,9 @@ public class SharedFeeController {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         List<Object> args = new ArrayList<>();
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
-            where.append(" AND (f.fee_no ILIKE ? OR l.loan_no ILIKE ? OR l.device_name ILIKE ?) ");
+            where.append(" AND (f.fee_no ILIKE ? OR f.loan_no ILIKE ? OR f.device_name ILIKE ? OR f.device_code ILIKE ?) ");
             String kw = "%" + query.getKeyword().trim() + "%";
+            args.add(kw);
             args.add(kw);
             args.add(kw);
             args.add(kw);
@@ -35,7 +36,7 @@ public class SharedFeeController {
             args.add(paidStatus);
         }
         if (deviceId != null) {
-            where.append(" AND l.device_id = ?::uuid ");
+            where.append(" AND f.device_id = ?::uuid ");
             args.add(deviceId);
         }
         String from = " FROM shared_device_fee f LEFT JOIN shared_device_loan l ON l.id = f.loan_id ";
@@ -44,7 +45,7 @@ public class SharedFeeController {
         pageArgs.add(query.limit());
         pageArgs.add(query.offset());
         var rows = jdbc.queryForList("""
-            SELECT f.*, l.loan_no, l.device_code, l.device_name, l.to_dept_id
+            SELECT f.*, l.to_dept_id
             """ + from + where + " ORDER BY f.fee_date DESC LIMIT ? OFFSET ?", pageArgs.toArray());
         return Result.ok(PageResult.of(rows, total, query.getPage(), query.getSize()));
     }
@@ -56,11 +57,22 @@ public class SharedFeeController {
                 ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
         boolean exists = !jdbc.queryForList("SELECT 1 FROM shared_device_fee WHERE id = ?::uuid", id).isEmpty();
         if (!exists) {
+            Object loanId = body.get("loan_id");
+            Map<String, Object> loanSnap = Map.of();
+            if (loanId != null && !String.valueOf(loanId).isBlank()) {
+                var loans = jdbc.queryForList(
+                        "SELECT loan_no, device_id, device_code, device_name FROM shared_device_loan WHERE id = ?::uuid",
+                        UUID.fromString(loanId.toString()));
+                if (!loans.isEmpty()) loanSnap = loans.get(0);
+            }
             jdbc.update("""
-                INSERT INTO shared_device_fee (id, fee_no, loan_id, fee_amount, fee_date, paid_status, remark)
-                VALUES (?::uuid,?,?::uuid,?,?,?,?)
+                INSERT INTO shared_device_fee (id, fee_no, loan_id, loan_no, device_id, device_code, device_name,
+                    fee_amount, fee_date, paid_status, remark)
+                VALUES (?::uuid,?,?::uuid,?,?::uuid,?,?,?,?,?,?)
                 """, id, body.getOrDefault("fee_no", "SF" + System.currentTimeMillis()),
-                    body.get("loan_id"), body.get("fee_amount"), body.get("fee_date"),
+                    loanId, loanSnap.get("loan_no"), loanSnap.get("device_id"),
+                    loanSnap.get("device_code"), loanSnap.get("device_name"),
+                    body.get("fee_amount"), body.get("fee_date"),
                     body.getOrDefault("paid_status", "unpaid"), body.get("remark"));
         } else {
             jdbc.update("""

@@ -181,3 +181,27 @@ COMMENT ON INDEX uk_purchase_plan_item_order_no IS '唯一：采购计划明细.
 CREATE UNIQUE INDEX IF NOT EXISTS uk_purchase_plan_item_bidding_no
     ON purchase_plan_item(bidding_no) WHERE bidding_no IS NOT NULL;
 COMMENT ON INDEX uk_purchase_plan_item_bidding_no IS '唯一：采购计划明细.招标单号';
+
+-- ---------- 附录 W.6：明细业务单号查询索引（2026-07-22） ----------
+CREATE INDEX IF NOT EXISTS idx_entry_item_entry_no ON device_entry_item(entry_no);
+CREATE INDEX IF NOT EXISTS idx_outbound_item_outbound_no ON device_outbound_item(outbound_no);
+CREATE INDEX IF NOT EXISTS idx_return_item_return_no ON device_return_item(return_no);
+CREATE INDEX IF NOT EXISTS idx_goods_return_item_return_no ON device_goods_return_item(return_no);
+CREATE INDEX IF NOT EXISTS idx_inv_check_item_check_no ON inventory_check_item(check_no);
+CREATE INDEX IF NOT EXISTS idx_wo_event_wo_no ON repair_workorder_event(wo_no);
+CREATE INDEX IF NOT EXISTS idx_wo_process_wo_no ON repair_workorder_process(wo_no);
+CREATE INDEX IF NOT EXISTS idx_wo_segment_wo_no ON repair_workorder_segment(wo_no);
+CREATE INDEX IF NOT EXISTS idx_spare_usage_wo_no ON spare_part_usage(wo_no);
+CREATE INDEX IF NOT EXISTS idx_metrology_exec_item_exec_no ON metrology_execution_item(execution_no);
+CREATE INDEX IF NOT EXISTS idx_shared_fee_loan_no ON shared_device_fee(loan_no);
+CREATE INDEX IF NOT EXISTS idx_shared_fee_device ON shared_device_fee(device_id);
+
+-- ---------- 附录 W.6 P2 索引（2026-07-22） ----------
+CREATE INDEX IF NOT EXISTS idx_contract_item_contract_code ON purchase_contract_item(contract_code);
+CREATE INDEX IF NOT EXISTS idx_acceptance_item_acceptance_no ON purchase_acceptance_item(acceptance_no);
+CREATE INDEX IF NOT EXISTS idx_maint_exec_result_exec_no ON maintenance_execution_result(execution_no);
+CREATE INDEX IF NOT EXISTS idx_pm_exec_result_exec_no ON pm_execution_result(execution_no);
+CREATE INDEX IF NOT EXISTS idx_insp_exec_result_exec_no ON inspection_execution_result(execution_no);
+CREATE INDEX IF NOT EXISTS idx_metro_exec_result_exec_no ON metrology_execution_result(execution_no);
+CREATE INDEX IF NOT EXISTS idx_wo_segment_user_wo_no ON repair_workorder_segment_user(wo_no);
+CREATE INDEX IF NOT EXISTS idx_insp_record_device_code ON inspection_record(device_code);

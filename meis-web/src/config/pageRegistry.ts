@@ -11,6 +11,8 @@ export interface MoreSearchField {
   placeholder?: string
   /** 关联表：输入时远程下拉联想，选中后以 ID 查询 */
   linkTable?: string
+  /** 外键/字典多选：值以逗号分隔提交（PLT-UI-02） */
+  multiple?: boolean
 }
 
 export interface ListFilter {
@@ -366,8 +368,14 @@ export const pageRegistry: Record<string, PageConfig> = {
       { key: 'device_name', label: '资产名称', placeholder: '资产名称/简码' },
       { key: 'specification', label: '规格', placeholder: '规格模糊' },
       { key: 'model', label: '型号', placeholder: '型号模糊' },
-      { key: 'dept_id', label: '科室', placeholder: '科室名称/编码', linkTable: 'department' },
-      { key: 'manage_dept_id', label: '管理科室', placeholder: '科室名称/编码', linkTable: 'department' },
+      { key: 'dept_id', label: '科室', placeholder: '科室名称/编码', linkTable: 'department', multiple: true },
+      { key: 'manage_dept_id', label: '管理科室', placeholder: '科室名称/编码', linkTable: 'department', multiple: true },
+      { key: 'category_id', label: '设备分类', placeholder: '多选分类', linkTable: 'medical_device_category', multiple: true },
+      { key: 'category_kw', label: '设备分类模糊', placeholder: '编码/名称' },
+      { key: 'asset_category_id', label: '资产分类', placeholder: '多选分类', linkTable: 'asset_category', multiple: true },
+      { key: 'asset_category_kw', label: '资产分类模糊', placeholder: '编码/名称' },
+      { key: 'finance_category_id', label: '财务分类', placeholder: '多选分类', linkTable: 'finance_category', multiple: true },
+      { key: 'finance_category_kw', label: '财务分类模糊', placeholder: '编码/名称' },
       { key: 'serial_number', label: '序列号(SN)', placeholder: '序列号模糊' }
     ],
     enableView: true
@@ -399,7 +407,7 @@ export const pageRegistry: Record<string, PageConfig> = {
       'approved_by_name',
       'approved_at'
     ],
-    listFilters: [{ key: 'approval_status', label: '状态', dictType: 'acceptance_review_status' }]
+    listFilters: [{ key: 'approval_status', label: '状态', dictType: 'acceptance_review_status', multiple: true }]
   },
   '/asset/stock': {
     title: '库存查询',
@@ -434,7 +442,13 @@ export const pageRegistry: Record<string, PageConfig> = {
       { key: 'device_name', label: '资产名称', placeholder: '资产名称/简码' },
       { key: 'specification', label: '规格', placeholder: '规格模糊' },
       { key: 'model', label: '型号', placeholder: '型号模糊' },
-      { key: 'manage_dept_id', label: '管理科室', placeholder: '科室名称/编码', linkTable: 'department' },
+      { key: 'manage_dept_id', label: '管理科室', placeholder: '科室名称/编码', linkTable: 'department', multiple: true },
+      { key: 'category_id', label: '设备分类', placeholder: '多选分类', linkTable: 'medical_device_category', multiple: true },
+      { key: 'category_kw', label: '设备分类模糊', placeholder: '编码/名称' },
+      { key: 'asset_category_id', label: '资产分类', placeholder: '多选分类', linkTable: 'asset_category', multiple: true },
+      { key: 'asset_category_kw', label: '资产分类模糊', placeholder: '编码/名称' },
+      { key: 'finance_category_id', label: '财务分类', placeholder: '多选分类', linkTable: 'finance_category', multiple: true },
+      { key: 'finance_category_kw', label: '财务分类模糊', placeholder: '编码/名称' },
       { key: 'serial_number', label: '序列号(SN)', placeholder: '序列号模糊' }
     ],
     enableView: true
@@ -465,9 +479,18 @@ export const pageRegistry: Record<string, PageConfig> = {
       'approval_status',
       'remark'
     ],
-    listFilters: [{ key: 'approval_status', label: '审批状态', dictType: 'acceptance_review_status' }]
+    listFilters: [
+      { key: 'approval_status', label: '审批状态', dictType: 'acceptance_review_status', multiple: true },
+      { key: 'dept_id', label: '科室', linkTable: 'department', multiple: true }
+    ]
   },
-  '/asset/transfer': { title: '资产流转', apiBase: '/asset', table: 'asset_transfer', saveUrl: '/asset/transfer' },
+  '/asset/transfer': {
+    title: '资产流转',
+    apiBase: '/asset',
+    table: 'asset_transfer',
+    saveUrl: '/asset/transfer',
+    listFilters: [{ key: 'status', label: '状态', dictType: 'transfer_status', multiple: true }]
+  },
   '/asset/inventory': {
     title: '资产盘点',
     apiBase: '/asset',
@@ -477,9 +500,18 @@ export const pageRegistry: Record<string, PageConfig> = {
     foreignKey: 'check_id',
     listPageUrl: '/asset/inventory/page',
     saveUrl: '/asset/inventory',
-    listFilters: [{ key: 'audit_status', label: '审核状态', dictType: 'audit_status' }]
+    listFilters: [
+      { key: 'audit_status', label: '审核状态', dictType: 'audit_status', multiple: true },
+      { key: 'dept_id', label: '科室', linkTable: 'department', multiple: true }
+    ]
   },
-  '/asset/scrap': { title: '设备报废', apiBase: '/asset', table: 'device_scrap', saveUrl: '/asset/scrap' },
+  '/asset/scrap': {
+    title: '设备报废',
+    apiBase: '/asset',
+    table: 'device_scrap',
+    saveUrl: '/asset/scrap',
+    listFilters: [{ key: 'status', label: '状态', dictType: 'scrap_status', multiple: true }]
+  },
   '/warehouse/setting': { title: '库房维护', apiBase: '/system', table: 'warehouse',
   enableView: true
 },
@@ -510,7 +542,7 @@ export const pageRegistry: Record<string, PageConfig> = {
       'approved_by_name',
       'approved_at'
     ],
-    listFilters: [{ key: 'approval_status', label: '状态', dictType: 'acceptance_review_status' }]
+    listFilters: [{ key: 'approval_status', label: '状态', dictType: 'acceptance_review_status', multiple: true }]
   },
   '/warehouse/outbound': {
     title: '设备出库',
@@ -538,7 +570,10 @@ export const pageRegistry: Record<string, PageConfig> = {
       'approval_status',
       'remark'
     ],
-    listFilters: [{ key: 'approval_status', label: '审批状态', dictType: 'acceptance_review_status' }]
+    listFilters: [
+      { key: 'approval_status', label: '审批状态', dictType: 'acceptance_review_status', multiple: true },
+      { key: 'dept_id', label: '科室', linkTable: 'department', multiple: true }
+    ]
   },
   '/warehouse/return': {
     title: '设备退库',
@@ -566,7 +601,10 @@ export const pageRegistry: Record<string, PageConfig> = {
       'reason',
       'remark'
     ],
-    listFilters: [{ key: 'approval_status', label: '审批状态', dictType: 'acceptance_review_status' }]
+    listFilters: [
+      { key: 'approval_status', label: '审批状态', dictType: 'acceptance_review_status', multiple: true },
+      { key: 'dept_id', label: '科室', linkTable: 'department', multiple: true }
+    ]
   },
   '/warehouse/goods-return': {
     title: '设备退货',
@@ -593,9 +631,15 @@ export const pageRegistry: Record<string, PageConfig> = {
       'approved_at',
       'reason'
     ],
-    listFilters: [{ key: 'approval_status', label: '审批状态', dictType: 'acceptance_review_status' }]
+    listFilters: [{ key: 'approval_status', label: '审批状态', dictType: 'acceptance_review_status', multiple: true }]
   },
-  '/warehouse/transfer': { title: '库房调拨', apiBase: '/asset', table: 'asset_transfer', saveUrl: '/asset/transfer' },
+  '/warehouse/transfer': {
+    title: '库房调拨',
+    apiBase: '/asset',
+    table: 'asset_transfer',
+    saveUrl: '/asset/transfer',
+    listFilters: [{ key: 'status', label: '状态', dictType: 'transfer_status', multiple: true }]
+  },
   '/warehouse/inventory': {
     title: '库存盘点',
     apiBase: '/asset',
@@ -605,11 +649,32 @@ export const pageRegistry: Record<string, PageConfig> = {
     foreignKey: 'check_id',
     listPageUrl: '/asset/inventory/page',
     saveUrl: '/asset/inventory',
-    listFilters: [{ key: 'audit_status', label: '审核状态', dictType: 'audit_status' }]
+    listFilters: [
+      { key: 'audit_status', label: '审核状态', dictType: 'audit_status', multiple: true },
+      { key: 'dept_id', label: '科室', linkTable: 'department', multiple: true }
+    ]
   },
-  '/warehouse/scrap': { title: '报废申请', apiBase: '/asset', table: 'device_scrap', saveUrl: '/asset/scrap' },
-  '/warehouse/scrap-review': { title: '报废审核', apiBase: '/asset', table: 'device_scrap', saveUrl: '/asset/scrap' },
-  '/warehouse/scrap-query': { title: '报废查询', apiBase: '/asset', table: 'device_scrap', saveUrl: '/asset/scrap' },
+  '/warehouse/scrap': {
+    title: '报废申请',
+    apiBase: '/asset',
+    table: 'device_scrap',
+    saveUrl: '/asset/scrap',
+    listFilters: [{ key: 'status', label: '状态', dictType: 'scrap_status', multiple: true }]
+  },
+  '/warehouse/scrap-review': {
+    title: '报废审核',
+    apiBase: '/asset',
+    table: 'device_scrap',
+    saveUrl: '/asset/scrap',
+    listFilters: [{ key: 'status', label: '状态', dictType: 'scrap_status', multiple: true }]
+  },
+  '/warehouse/scrap-query': {
+    title: '报废查询',
+    apiBase: '/asset',
+    table: 'device_scrap',
+    saveUrl: '/asset/scrap',
+    listFilters: [{ key: 'status', label: '状态', dictType: 'scrap_status', multiple: true }]
+  },
   '/asset/inspection': { title: '设备巡检', apiBase: '/asset', table: 'inspection_plan' },
   '/repair/apply': {
     title: '报修申请',
@@ -638,7 +703,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'repair_workorder',
     listPageUrl: '/repair/workorder/page',
     saveUrl: '/repair/workorder',
-    listFilters: [{ key: 'status', label: '状态', dictType: 'wo_status' }]
+    listFilters: [{ key: 'statuses', label: '状态', dictType: 'wo_status', multiple: true }]
   },
   '/repair/engineer': { title: '维修工程师管理', apiBase: '/repair', table: 'sys_user' },
   '/repair/spare-archive': { title: '配件档案管理', apiBase: '/repair', table: 'spare_part', pinyinCode: true },
@@ -653,19 +718,29 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'maintenance_plan',
     saveUrl: '/maintain/plan',
     showRowIndex: true,
-    showRowSelection: true
+    showRowSelection: true,
+    listFilters: [
+      { key: 'approval_status', label: '审核状态', dictType: 'maintain_approval_status', multiple: true },
+      { key: 'status', label: '计划状态', dictType: 'maintain_plan_status', multiple: true },
+      { key: 'dept_id', label: '责任科室', linkTable: 'department', multiple: true }
+    ]
   },
   '/maintain/execution': {
     title: '保养执行',
     apiBase: '/maintain',
     table: 'maintenance_execution',
-    listPageUrl: '/maintain/execution/page'
+    listPageUrl: '/maintain/execution/page',
+    listFilters: [{ key: 'status', label: '状态', dictType: 'maintain_exec_status', multiple: true }]
   },
   '/maintain/query': {
     title: '保养记录查询',
     apiBase: '/maintain',
     table: 'maintenance_execution_item',
-    listPageUrl: '/maintain/query/page'
+    listPageUrl: '/maintain/query/page',
+    listFilters: [
+      { key: 'resultStatus', label: '保养结果', dictType: 'maintain_result', multiple: true },
+      { key: 'dept_id', label: '科室', linkTable: 'department', multiple: true }
+    ]
   },
   '/maintain/template': { title: '保养模板', apiBase: '/maintain', table: 'maintenance_template', saveUrl: '/maintain/template' },
   '/maintain/record': { title: '保养记录', apiBase: '/maintain', table: 'maintenance_record', saveUrl: '/maintain/record' },
@@ -683,19 +758,29 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'inspection_plan',
     saveUrl: '/inspect/plan',
     showRowIndex: true,
-    showRowSelection: true
+    showRowSelection: true,
+    listFilters: [
+      { key: 'approval_status', label: '审核状态', dictType: 'inspect_approval_status', multiple: true },
+      { key: 'status', label: '计划状态', dictType: 'plan_status', multiple: true },
+      { key: 'dept_id', label: '责任科室', linkTable: 'department', multiple: true }
+    ]
   },
   '/inspect/execution': {
     title: '巡检执行',
     apiBase: '/inspect',
     table: 'inspection_execution',
-    listPageUrl: '/inspect/execution/page'
+    listPageUrl: '/inspect/execution/page',
+    listFilters: [{ key: 'status', label: '状态', dictType: 'inspect_exec_status', multiple: true }]
   },
   '/inspect/query': {
     title: '巡检记录查询',
     apiBase: '/inspect',
     table: 'inspection_execution_item',
-    listPageUrl: '/inspect/query/page'
+    listPageUrl: '/inspect/query/page',
+    listFilters: [
+      { key: 'resultStatus', label: '巡检结果', dictType: 'inspect_result', multiple: true },
+      { key: 'dept_id', label: '科室', linkTable: 'department', multiple: true }
+    ]
   },
   '/inspect/device': {
     title: '巡检设备管理',
@@ -711,19 +796,28 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'metrology_plan',
     saveUrl: '/metrology/plan',
     showRowIndex: true,
-    showRowSelection: true
+    showRowSelection: true,
+    listFilters: [
+      { key: 'approval_status', label: '审核状态', dictType: 'metrology_approval_status', multiple: true },
+      { key: 'status', label: '计划状态', dictType: 'plan_status', multiple: true }
+    ]
   },
   '/metrology/execution': {
     title: '计量执行',
     apiBase: '/metrology',
     table: 'metrology_execution',
-    listPageUrl: '/metrology/execution/page'
+    listPageUrl: '/metrology/execution/page',
+    listFilters: [{ key: 'status', label: '状态', dictType: 'metrology_exec_status', multiple: true }]
   },
   '/metrology/query': {
     title: '计量记录查询',
     apiBase: '/metrology',
     table: 'metrology_execution_item',
-    listPageUrl: '/metrology/query/page'
+    listPageUrl: '/metrology/query/page',
+    listFilters: [
+      { key: 'resultStatus', label: '检定结果', dictType: 'metrology_result', multiple: true },
+      { key: 'dept_id', label: '科室', linkTable: 'department', multiple: true }
+    ]
   },
   '/qc/risk': { title: '风险评估', apiBase: '/qc', table: 'risk_assessment' },
   '/qc/adverse': { title: '不良事件', apiBase: '/qc', table: 'adverse_event' },
@@ -836,14 +930,35 @@ export const pageRegistry: Record<string, PageConfig> = {
     listFilters: [{ key: 'status', label: '状态', dictType: 'loan_status' }]
   },
   '/pm/param': { title: '预防性维护参数', apiBase: '/pm', table: 'pm_type' },
-  '/pm/plan': { title: '预防性维护计划', apiBase: '/pm', table: 'pm_plan', saveUrl: '/pm/plan', loadFormDetail: true },
+  '/pm/plan': {
+    title: '预防性维护计划',
+    apiBase: '/pm',
+    table: 'pm_plan',
+    saveUrl: '/pm/plan',
+    loadFormDetail: true,
+    listFilters: [
+      { key: 'approval_status', label: '审核状态', dictType: 'maintain_approval_status', multiple: true },
+      { key: 'status', label: '计划状态', dictType: 'maintain_plan_status', multiple: true },
+      { key: 'dept_id', label: '责任科室', linkTable: 'department', multiple: true }
+    ]
+  },
   '/pm/execution': {
     title: '预防性维护执行',
     apiBase: '/pm',
     table: 'pm_execution',
-    listPageUrl: '/pm/execution/page'
+    listPageUrl: '/pm/execution/page',
+    listFilters: [{ key: 'status', label: '状态', dictType: 'maintain_exec_status', multiple: true }]
   },
-  '/pm/query': { title: '预防性维护记录', apiBase: '/pm', table: 'pm_execution_item' },
+  '/pm/query': {
+    title: '预防性维护记录',
+    apiBase: '/pm',
+    table: 'pm_execution_item',
+    listPageUrl: '/pm/query/page',
+    listFilters: [
+      { key: 'resultStatus', label: '维护结果', dictType: 'maintain_result', multiple: true },
+      { key: 'dept_id', label: '科室', linkTable: 'department', multiple: true }
+    ]
+  },
   '/pm/device': {
     title: '预防性维护设备管理',
     apiBase: '/pm',

@@ -1,5 +1,6 @@
 package com.meis.saas.qc.controller;
 
+import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
@@ -20,7 +21,8 @@ public class InspectionQueryController {
     public Result<PageResult<Map<String, Object>>> page(
             PageQuery query,
             @RequestParam(required = false) String deviceCode,
-            @RequestParam(required = false) String resultStatus) {
+            @RequestParam(required = false) String resultStatus,
+            @RequestParam(required = false) String dept_id) {
         StringBuilder where = new StringBuilder(" WHERE ei.status = 'completed' ");
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "inspection_execution_item", "ei"));
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "inspection_execution", "e"));
@@ -29,10 +31,8 @@ public class InspectionQueryController {
             where.append(" AND ei.device_code ILIKE ? ");
             args.add("%" + deviceCode.trim() + "%");
         }
-        if (resultStatus != null && !resultStatus.isBlank()) {
-            where.append(" AND ei.overall_result = ? ");
-            args.add(resultStatus);
-        }
+        FilterCsvSupport.appendStrIn(where, args, "ei.overall_result", resultStatus);
+        FilterCsvSupport.appendUuidIn(where, args, "ei.dept_id", dept_id);
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
             String kw = "%" + query.getKeyword().trim() + "%";
             where.append(" AND (ei.device_name ILIKE ? OR e.execution_no ILIKE ?) ");
@@ -49,7 +49,7 @@ public class InspectionQueryController {
         var rows = jdbc.queryForList("""
                 SELECT ei.id, ei.device_code, ei.device_name, ei.overall_result, ei.updated_at AS completed_at,
                        e.execution_no, e.planned_date, e.execute_start_time, e.execute_end_time,
-                       t.template_name, it.type_name AS inspection_type_name, dept.dept_name
+                       t.template_name, it.type_name AS inspection_type_name, COALESCE(ei.dept_name, dept.dept_name) AS dept_name
                 FROM inspection_execution_item ei
                 JOIN inspection_execution e ON e.id = ei.execution_id
                 LEFT JOIN inspection_template t ON t.id = e.template_id

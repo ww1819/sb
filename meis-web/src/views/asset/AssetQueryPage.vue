@@ -17,22 +17,110 @@
           @reset="onReset"
         >
           <template #filters>
-            <el-select v-model="filters.campusId" placeholder="院区" clearable filterable class="filter-item" @change="onSearch">
+            <el-select
+              v-model="filters.campusId"
+              placeholder="院区"
+              clearable
+              filterable
+              multiple
+              collapse-tags
+              collapse-tags-tooltip
+              class="filter-item filter-multi"
+              @change="onSearch"
+            >
               <el-option v-for="o in campuses" :key="o.id" :label="o.campus_name" :value="o.id" />
             </el-select>
-            <el-select v-model="filters.deptId" placeholder="使用科室" clearable filterable class="filter-item" @change="onSearch">
+            <el-select
+              v-model="filters.deptId"
+              placeholder="使用科室"
+              clearable
+              filterable
+              multiple
+              collapse-tags
+              collapse-tags-tooltip
+              class="filter-item filter-multi"
+              @change="onSearch"
+            >
               <el-option v-for="o in departments" :key="o.id" :label="o.dept_name" :value="o.id" />
             </el-select>
-            <el-select v-model="filters.categoryId" placeholder="68码分类" clearable filterable class="filter-item" @change="onSearch">
-              <el-option v-for="o in categories" :key="o.id" :label="`${o.category_code} ${o.category_name}`" :value="o.id" />
+            <el-select
+              v-model="filters.categoryId"
+              placeholder="68码分类"
+              clearable
+              filterable
+              multiple
+              collapse-tags
+              collapse-tags-tooltip
+              class="filter-item filter-multi"
+              @change="onSearch"
+            >
+              <el-option
+                v-for="o in categories"
+                :key="o.id"
+                :label="`${o.category_code} ${o.category_name}`"
+                :value="o.id"
+              />
             </el-select>
-            <el-select v-model="filters.assetCategoryId" placeholder="资产分类" clearable filterable class="filter-item" @change="onSearch">
+            <el-input
+              v-model="filters.categoryKw"
+              placeholder="分类编码/名称"
+              clearable
+              class="filter-item"
+              @keyup.enter="onSearch"
+              @clear="onSearch"
+            />
+            <el-select
+              v-model="filters.assetCategoryId"
+              placeholder="资产分类"
+              clearable
+              filterable
+              multiple
+              collapse-tags
+              collapse-tags-tooltip
+              class="filter-item filter-multi"
+              @change="onSearch"
+            >
               <el-option v-for="o in assetCategories" :key="o.id" :label="o.category_name" :value="o.id" />
             </el-select>
-            <el-select v-model="filters.financeCategoryId" placeholder="财务分类" clearable filterable class="filter-item" @change="onSearch">
+            <el-input
+              v-model="filters.assetCategoryKw"
+              placeholder="资产分类编码/名称"
+              clearable
+              class="filter-item"
+              @keyup.enter="onSearch"
+              @clear="onSearch"
+            />
+            <el-select
+              v-model="filters.financeCategoryId"
+              placeholder="财务分类"
+              clearable
+              filterable
+              multiple
+              collapse-tags
+              collapse-tags-tooltip
+              class="filter-item filter-multi"
+              @change="onSearch"
+            >
               <el-option v-for="o in financeCategories" :key="o.id" :label="o.finance_name" :value="o.id" />
             </el-select>
-            <el-select v-model="filters.deviceStatus" placeholder="设备状态" clearable class="filter-item" @change="onSearch">
+            <el-input
+              v-model="filters.financeCategoryKw"
+              placeholder="财务分类编码/名称"
+              clearable
+              class="filter-item"
+              @keyup.enter="onSearch"
+              @clear="onSearch"
+            />
+            <el-select
+              v-model="filters.deviceStatus"
+              placeholder="设备状态"
+              clearable
+              multiple
+              collapse-tags
+              collapse-tags-tooltip
+              class="filter-item filter-multi"
+              @change="onSearch"
+            >
               <el-option v-for="o in deviceStatusOptions" :key="o.value" :label="o.label" :value="o.value" />
             </el-select>
             <el-select v-model="filters.riskLevel" placeholder="风险等级" clearable class="filter-item" @change="onSearch">
@@ -103,12 +191,15 @@ const keyword = ref('')
 const tableHeight = useSystemTableHeight()
 
 const filters = reactive({
-  campusId: '',
-  deptId: '',
-  categoryId: '',
-  assetCategoryId: '',
-  financeCategoryId: '',
-  deviceStatus: '',
+  campusId: [] as string[],
+  deptId: [] as string[],
+  categoryId: [] as string[],
+  categoryKw: '',
+  assetCategoryId: [] as string[],
+  assetCategoryKw: '',
+  financeCategoryId: [] as string[],
+  financeCategoryKw: '',
+  deviceStatus: [] as string[],
   riskLevel: '',
   flagFilter: ''
 })
@@ -123,6 +214,10 @@ const riskLevelOptions = ref<{ label: string; value: string }[]>([])
 
 const detailVisible = ref(false)
 const detailDevice = ref<Record<string, unknown> | null>(null)
+
+function csv(ids: string[]) {
+  return ids.filter(Boolean).join(',')
+}
 
 async function loadLookups() {
   const [campusRes, deptRes, catRes, acRes, fcRes] = await Promise.all([
@@ -147,12 +242,21 @@ function buildParams() {
     size: size.value
   }
   if (keyword.value) params.keyword = keyword.value
-  if (filters.campusId) params.campusId = filters.campusId
-  if (filters.deptId) params.deptId = filters.deptId
-  if (filters.categoryId) params.categoryId = filters.categoryId
-  if (filters.assetCategoryId) params.assetCategoryId = filters.assetCategoryId
-  if (filters.financeCategoryId) params.financeCategoryId = filters.financeCategoryId
-  if (filters.deviceStatus) params.deviceStatus = filters.deviceStatus
+  const campus = csv(filters.campusId)
+  const dept = csv(filters.deptId)
+  const cat = csv(filters.categoryId)
+  const ac = csv(filters.assetCategoryId)
+  const fc = csv(filters.financeCategoryId)
+  const st = csv(filters.deviceStatus)
+  if (campus) params.campusId = campus
+  if (dept) params.deptId = dept
+  if (cat) params.categoryId = cat
+  if (filters.categoryKw.trim()) params.categoryKw = filters.categoryKw.trim()
+  if (ac) params.assetCategoryId = ac
+  if (filters.assetCategoryKw.trim()) params.assetCategoryKw = filters.assetCategoryKw.trim()
+  if (fc) params.financeCategoryId = fc
+  if (filters.financeCategoryKw.trim()) params.financeCategoryKw = filters.financeCategoryKw.trim()
+  if (st) params.deviceStatus = st
   if (filters.riskLevel) params.riskLevel = filters.riskLevel
   if (filters.flagFilter === 'metrology') params.isMetrology = true
   if (filters.flagFilter === 'maintain') params.isMaintainDevice = true
@@ -182,12 +286,15 @@ function onSearch() {
 
 function onReset() {
   keyword.value = ''
-  filters.campusId = ''
-  filters.deptId = ''
-  filters.categoryId = ''
-  filters.assetCategoryId = ''
-  filters.financeCategoryId = ''
-  filters.deviceStatus = ''
+  filters.campusId = []
+  filters.deptId = []
+  filters.categoryId = []
+  filters.categoryKw = ''
+  filters.assetCategoryId = []
+  filters.assetCategoryKw = ''
+  filters.financeCategoryId = []
+  filters.financeCategoryKw = ''
+  filters.deviceStatus = []
   filters.riskLevel = ''
   filters.flagFilter = ''
   onSearch()
@@ -208,13 +315,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.asset-query-page {
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.filter-item {
-  width: 150px;
+.filter-multi {
+  min-width: 160px;
 }
 </style>

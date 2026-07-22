@@ -1,9 +1,12 @@
 <template>
   <el-select
-    :model-value="modelValue || undefined"
+    :model-value="selectValue"
     filterable
     remote
     reserve-keyword
+    :multiple="multiple"
+    :collapse-tags="multiple"
+    :collapse-tags-tooltip="multiple"
     :placeholder="placeholder"
     :loading="loading"
     clearable
@@ -17,15 +20,19 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import http from '@/api/http'
 import { refSelectConfig, type RefSelectMeta } from '@/config/refSelectConfig'
 
-const props = defineProps<{
-  modelValue: string
-  linkTable: string
-  placeholder?: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    modelValue: string
+    linkTable: string
+    placeholder?: string
+    multiple?: boolean
+  }>(),
+  { multiple: false }
+)
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
@@ -35,6 +42,14 @@ const emit = defineEmits<{
 
 const loading = ref(false)
 const options = ref<{ label: string; value: string }[]>([])
+
+const selectValue = computed(() => {
+  if (props.multiple) {
+    if (!props.modelValue?.trim()) return [] as string[]
+    return props.modelValue.split(',').map((s) => s.trim()).filter(Boolean)
+  }
+  return props.modelValue || undefined
+})
 
 function resolveLookupUrl(meta: RefSelectMeta): string | null {
   if (meta.lookupUrl) return meta.lookupUrl
@@ -90,7 +105,7 @@ async function remoteSearch(keyword: string) {
   if (!meta) return
   const q = keyword.trim()
   if (!q) {
-    options.value = []
+    if (!props.multiple) options.value = []
     return
   }
   loading.value = true
@@ -99,7 +114,14 @@ async function remoteSearch(keyword: string) {
     if (!rows?.length) {
       rows = await searchByList(meta, q)
     }
-    options.value = mapRows(rows ?? [], meta)
+    const mapped = mapRows(rows ?? [], meta)
+    if (props.multiple) {
+      const keep = options.value.filter((o) => selectValue.value.includes(o.value))
+      const seen = new Set(keep.map((o) => o.value))
+      options.value = [...keep, ...mapped.filter((o) => !seen.has(o.value))]
+    } else {
+      options.value = mapped
+    }
   } catch {
     try {
       const rows = await searchByList(meta, q)
@@ -115,30 +137,54 @@ async function remoteSearch(keyword: string) {
 async function ensureSelectedOption() {
   const meta = refSelectConfig[props.linkTable]
   if (!meta || !props.modelValue) return
-  if (options.value.some((o) => o.value === props.modelValue)) return
-  const detailUrl = meta.url.endsWith('/list')
-    ? meta.url.replace(/\/list$/, `/${props.modelValue}`)
-    : null
-  if (!detailUrl) return
-  try {
-    const { data } = await http.get(detailUrl)
-    const row = data.data
-    if (!row) return
-    const label = formatLabel(row, meta)
-    options.value = [{ label, value: props.modelValue }]
-    emit('update:label', label)
-  } catch {
-    // ignore
+  const ids = props.multiple
+    ? props.modelValue.split(',').map((s) => s.trim()).filter(Boolean)
+    : [props.modelValue]
+  const missing = ids.filter((id) => !options.value.some((o) => o.value === id))
+  if (!missing.length) return
+  for (const id of missing) {
+    const detailUrl = meta.url.endsWith('/list') ? meta.url.replace(/\/list$/, `/${id}`) : null
+    if (!detailUrl) continue
+    try {
+      const { data } = await http.get(detailUrl)
+      const row = data.data
+      if (!row) continue
+      const label = formatLabel(row, meta)
+      if (!options.value.some((o) => o.value === id)) {
+        options.value = [...options.value, { label, value: id }]
+      }
+    } catch {
+      // ignore
+    }
+  }
+  if (!props.multiple) {
+    const opt = options.value.find((o) => o.value === props.modelValue)
+    if (opt) emit('update:label', opt.label)
+  } else {
+    const labels = ids
+      .map((id) => options.value.find((o) => o.value === id)?.label)
+      .filter(Boolean)
+    emit('update:label', labels.join(', '))
   }
 }
 
-function onSelect(value: string) {
-  const option = options.value.find((o) => o.value === value)
-  emit('update:modelValue', value ?? '')
-  emit('update:label', option?.label ?? '')
-  if (value) {
-    void nextTick(() => emit('search'))
+function onSelect(value: string | string[] | null | undefined) {
+  if (props.multiple) {
+    const arr = Array.isArray(value) ? value.map(String).filter(Boolean) : []
+    const csv = arr.join(',')
+    const labels = arr
+      .map((id) => options.value.find((o) => o.value === id)?.label ?? id)
+      .join(', ')
+    emit('update:modelValue', csv)
+    emit('update:label', labels)
+    if (arr.length) void nextTick(() => emit('search'))
+    return
   }
+  const v = (value as string) ?? ''
+  const option = options.value.find((o) => o.value === v)
+  emit('update:modelValue', v)
+  emit('update:label', option?.label ?? '')
+  if (v) void nextTick(() => emit('search'))
 }
 
 function onClear() {
@@ -162,5 +208,8 @@ watch(
 <style scoped>
 .more-search-ref-select {
   width: 220px;
+}
+.more-search-ref-select.el-select--multiple {
+  width: 260px;
 }
 </style>

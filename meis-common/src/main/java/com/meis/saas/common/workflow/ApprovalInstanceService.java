@@ -353,10 +353,12 @@ public class ApprovalInstanceService {
                     loan.get("fee_time_unit") != null ? String.valueOf(loan.get("fee_time_unit")) : null,
                     unitPrice, billingStart, billingEnd);
             jdbc.update("""
-                INSERT INTO shared_device_fee (id, fee_no, loan_id, fee_amount, fee_date, paid_status, remark)
-                VALUES (?::uuid,?,?::uuid,?,?,?,?)
-                """, java.util.UUID.randomUUID(), "SF" + System.currentTimeMillis(), loan.get("id"), amount,
-                    java.time.LocalDate.now(), "unpaid", "归还审批自动生成");
+                INSERT INTO shared_device_fee (id, fee_no, loan_id, loan_no, device_id, device_code, device_name,
+                    fee_amount, fee_date, paid_status, remark)
+                VALUES (?::uuid,?,?::uuid,?,?::uuid,?,?,?,?,?,?)
+                """, java.util.UUID.randomUUID(), "SF" + System.currentTimeMillis(), loan.get("id"),
+                    loan.get("loan_no"), loan.get("device_id"), loan.get("device_code"), loan.get("device_name"),
+                    amount, java.time.LocalDate.now(), "unpaid", "归还审批自动生成");
         }
     }
 

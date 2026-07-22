@@ -145,11 +145,11 @@ public class MaintenanceExecutionGenerator {
         UUID itemId = UUID.randomUUID();
         jdbc.update("""
                 INSERT INTO maintenance_execution_item
-                (id, execution_id, execution_no, device_id, device_code, device_name, dept_id,
+                (id, execution_id, execution_no, device_id, device_code, device_name, dept_id, dept_name,
                  plan_id, plan_item_id, status, row_version)
-                VALUES (?::uuid,?::uuid,?,?::uuid,?,?,?::uuid,?::uuid,?::uuid,'pending',1)
+                VALUES (?::uuid,?::uuid,?,?::uuid,?,?,?::uuid,?,?::uuid,?::uuid,'pending',1)
                 """, itemId, execId, execNo, di.get("device_id"), di.get("device_code"), di.get("device_name"),
-                di.get("dept_id"), planId, di.get("id"));
+                di.get("dept_id"), resolveDeptName(di.get("dept_id"), di.get("dept_name")), planId, di.get("id"));
 
         if (templateId == null) return;
         var templateItems = jdbc.queryForList("""
@@ -160,13 +160,22 @@ public class MaintenanceExecutionGenerator {
         for (Map<String, Object> ti : templateItems) {
             jdbc.update("""
                     INSERT INTO maintenance_execution_result
-                    (id, execution_item_id, template_item_id, item_name, item_content,
+                    (id, execution_item_id, execution_no, template_item_id, item_name, item_content,
                      standard_value, check_method, sort_order, is_required, result_status, row_version)
-                    VALUES (?::uuid,?::uuid,?::uuid,?,?,?,?,?,?, 'pending', 1)
-                    """, UUID.randomUUID(), itemId, ti.get("id"), ti.get("item_name"), ti.get("item_content"),
+                    VALUES (?::uuid,?::uuid,?,?::uuid,?,?,?,?,?,?, 'pending', 1)
+                    """, UUID.randomUUID(), itemId, execNo, ti.get("id"), ti.get("item_name"), ti.get("item_content"),
                     ti.get("standard_value"), ti.get("check_method"),
                     ti.getOrDefault("sort_order", 0), ti.getOrDefault("is_required", true));
         }
+    }
+
+    private String resolveDeptName(Object deptId, Object existing) {
+        if (existing != null && !String.valueOf(existing).isBlank()) return String.valueOf(existing);
+        if (deptId == null || String.valueOf(deptId).isBlank()) return null;
+        var rows = jdbc.queryForList(
+                "SELECT dept_name FROM department WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "department", null), deptId);
+        return rows.isEmpty() ? null : Objects.toString(rows.get(0).get("dept_name"), null);
     }
 
     private static Object blankToNull(Object value) {

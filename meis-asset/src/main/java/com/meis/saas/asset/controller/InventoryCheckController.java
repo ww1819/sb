@@ -2,6 +2,7 @@ package com.meis.saas.asset.controller;
 
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
@@ -25,7 +26,8 @@ public class InventoryCheckController {
 
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(PageQuery query,
-            @RequestParam(required = false) String audit_status) {
+            @RequestParam(required = false) String audit_status,
+            @RequestParam(required = false) String dept_id) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         List<Object> args = new ArrayList<>();
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
@@ -34,10 +36,8 @@ public class InventoryCheckController {
             args.add(kw);
             args.add(kw);
         }
-        if (audit_status != null && !audit_status.isBlank()) {
-            where.append(" AND audit_status = ? ");
-            args.add(audit_status);
-        }
+        FilterCsvSupport.appendStrIn(where, args, "audit_status", audit_status);
+        FilterCsvSupport.appendUuidIn(where, args, "dept_id", dept_id);
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check", null));
         Long total = jdbc.queryForObject("SELECT COUNT(*) FROM inventory_check" + where, Long.class, args.toArray());
         List<Object> pageArgs = new ArrayList<>(args);
@@ -156,7 +156,14 @@ public class InventoryCheckController {
                     userId != null ? UUID.fromString(userId) : null);
         }
 
-        upsertItems(id, items);
+        String checkNo = jdbc.queryForList("SELECT check_no FROM inventory_check WHERE id = ?::uuid", id)
+                .stream().findFirst().map(r -> {
+                    Object v = r.get("check_no");
+                    if (v == null) return null;
+                    String s = String.valueOf(v).trim();
+                    return s.isEmpty() ? null : s;
+                }).orElse(null);
+        upsertItems(id, checkNo, items);
         refreshCheckedCount(id);
         return get(id);
     }
@@ -401,7 +408,7 @@ public class InventoryCheckController {
         return get(id);
     }
 
-    private void upsertItems(UUID checkId, List<Map<String, Object>> items) {
+    private void upsertItems(UUID checkId, String checkNo, List<Map<String, Object>> items) {
         Set<UUID> keep = new LinkedHashSet<>();
         for (Map<String, Object> item : items) {
             UUID itemId = parseUuid(item.get("id")).orElse(UUID.randomUUID());
@@ -414,6 +421,7 @@ public class InventoryCheckController {
             if (exists) {
                 jdbc.update("""
                         UPDATE inventory_check_item SET
+                          check_no = COALESCE(?, check_no),
                           device_id = ?::uuid, device_code = ?, device_name = ?,
                           expected_location = ?, actual_location = ?,
                           is_found = ?, is_matched = ?, condition_status = ?, remark = ?,
@@ -421,7 +429,7 @@ public class InventoryCheckController {
                           check_date = COALESCE(?, check_date),
                           checker_id = COALESCE(?::uuid, checker_id)
                         WHERE id = ?::uuid AND check_id = ?::uuid
-                        """, blankToNull(item.get("device_id")), item.get("device_code"), item.get("device_name"),
+                        """, checkNo, blankToNull(item.get("device_id")), item.get("device_code"), item.get("device_name"),
                         item.get("expected_location"), item.get("actual_location"),
                         asBool(item.getOrDefault("is_found", false)),
                         asBool(item.getOrDefault("is_matched", false)),
@@ -430,11 +438,11 @@ public class InventoryCheckController {
                         itemId, checkId);
             } else {
                 jdbc.update("""
-                        INSERT INTO inventory_check_item (id, check_id, device_id, device_code, device_name,
+                        INSERT INTO inventory_check_item (id, check_id, check_no, device_id, device_code, device_name,
                         expected_location, actual_location, is_found, is_matched, need_reprint_label,
                         label_printed, label_print_count, condition_status, check_date, checker_id, remark)
-                        VALUES (?::uuid,?::uuid,?::uuid,?,?,?,?,?,?,?,FALSE,0,?,?,?::uuid,?)
-                        """, itemId, checkId, blankToNull(item.get("device_id")), item.get("device_code"),
+                        VALUES (?::uuid,?::uuid,?,?::uuid,?,?,?,?,?,?,?,FALSE,0,?,?,?::uuid,?)
+                        """, itemId, checkId, checkNo, blankToNull(item.get("device_id")), item.get("device_code"),
                         item.get("device_name"), item.get("expected_location"), item.get("actual_location"),
                         asBool(item.getOrDefault("is_found", false)),
                         asBool(item.getOrDefault("is_matched", false)),

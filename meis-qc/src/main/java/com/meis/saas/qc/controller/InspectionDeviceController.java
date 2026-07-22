@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 /**
- * 巡检设备管理：台账过滤视图（附录 O.5 / OPS.4 / OPS.13）
+ * 巡检设备管理：台账过滤视图（附录 O.5 / OPS.4 / OPS.13 / PLT-UI-02）
  */
 @RestController
 @RequestMapping("/api/inspect/device")
@@ -32,12 +32,20 @@ public class InspectionDeviceController {
             @RequestParam(required = false) String specification,
             @RequestParam(required = false) String model,
             @RequestParam(required = false) String brand,
-            @RequestParam(required = false) Integer due_within_days) {
+            @RequestParam(required = false) Integer due_within_days,
+            @RequestParam(required = false) String category_id,
+            @RequestParam(required = false) String asset_category_id,
+            @RequestParam(required = false) String finance_category_id,
+            @RequestParam(required = false) String category_kw,
+            @RequestParam(required = false) String asset_category_kw,
+            @RequestParam(required = false) String finance_category_kw) {
         return Result.ok(OpsDevicePageSupport.page(
                 jdbc, OpsDevicePageSupport.INSPECT, query,
                 device_status, dept_id, manage_dept_id,
                 device_code, device_name, serial_number, specification, model, brand,
-                due_within_days));
+                due_within_days,
+                category_id, asset_category_id, finance_category_id,
+                category_kw, asset_category_kw, finance_category_kw));
     }
 
     @GetMapping("/{deviceId}/plans")

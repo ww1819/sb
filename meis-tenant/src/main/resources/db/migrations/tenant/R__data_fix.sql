@@ -669,3 +669,101 @@ LEFT JOIN medical_device d ON d.id = p.device_id
 WHERE p.device_id IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM inspection_plan_item i WHERE i.plan_id = p.id AND i.device_id = p.device_id AND COALESCE(i.is_deleted, 0) = 0);
 
+
+-- ---------- 附录 W.6：明细业务单号/主数据历史回填（可重复，2026-07-22） ----------
+UPDATE device_entry_item i SET entry_no = e.entry_no
+FROM device_entry e WHERE i.entry_id = e.id AND (i.entry_no IS NULL OR TRIM(i.entry_no) = '');
+
+UPDATE device_entry_item i SET device_code = COALESCE(NULLIF(TRIM(i.device_code), ''), NULLIF(TRIM(i.factory_code), ''), d.device_code)
+FROM medical_device d WHERE i.device_id = d.id AND (i.device_code IS NULL OR TRIM(i.device_code) = '');
+
+UPDATE device_outbound_item i SET outbound_no = o.outbound_no
+FROM device_outbound o WHERE i.outbound_id = o.id AND (i.outbound_no IS NULL OR TRIM(i.outbound_no) = '');
+
+UPDATE device_return_item i SET return_no = r.return_no
+FROM device_return r WHERE i.return_id = r.id AND (i.return_no IS NULL OR TRIM(i.return_no) = '');
+
+UPDATE device_goods_return_item i SET return_no = r.return_no
+FROM device_goods_return r WHERE i.return_id = r.id AND (i.return_no IS NULL OR TRIM(i.return_no) = '');
+
+UPDATE inventory_check_item i SET check_no = c.check_no
+FROM inventory_check c WHERE i.check_id = c.id AND (i.check_no IS NULL OR TRIM(i.check_no) = '');
+
+UPDATE repair_workorder_event e SET wo_no = w.wo_no
+FROM repair_workorder w WHERE e.workorder_id = w.id AND (e.wo_no IS NULL OR TRIM(e.wo_no) = '');
+
+UPDATE repair_workorder_process p SET wo_no = w.wo_no
+FROM repair_workorder w WHERE p.workorder_id = w.id AND (p.wo_no IS NULL OR TRIM(p.wo_no) = '');
+
+UPDATE repair_workorder_segment s SET wo_no = w.wo_no
+FROM repair_workorder w WHERE s.workorder_id = w.id AND (s.wo_no IS NULL OR TRIM(s.wo_no) = '');
+
+UPDATE repair_workorder_segment_part p SET wo_no = s.wo_no
+FROM repair_workorder_segment s WHERE p.segment_id = s.id AND (p.wo_no IS NULL OR TRIM(p.wo_no) = '');
+
+UPDATE spare_part_usage u SET wo_no = w.wo_no
+FROM repair_workorder w WHERE u.workorder_id = w.id AND (u.wo_no IS NULL OR TRIM(u.wo_no) = '');
+
+UPDATE metrology_execution_item i SET execution_no = e.execution_no
+FROM metrology_execution e WHERE i.execution_id = e.id AND (i.execution_no IS NULL OR TRIM(i.execution_no) = '');
+
+UPDATE shared_device_fee f SET
+  loan_no = COALESCE(NULLIF(TRIM(f.loan_no), ''), l.loan_no),
+  device_id = COALESCE(f.device_id, l.device_id),
+  device_code = COALESCE(NULLIF(TRIM(f.device_code), ''), l.device_code),
+  device_name = COALESCE(NULLIF(TRIM(f.device_name), ''), l.device_name)
+FROM shared_device_loan l WHERE f.loan_id = l.id
+  AND (f.loan_no IS NULL OR f.device_id IS NULL OR f.device_code IS NULL OR f.device_name IS NULL);
+
+UPDATE maintenance_plan_item i SET dept_name = d.dept_name
+FROM department d WHERE i.dept_id = d.id AND (i.dept_name IS NULL OR TRIM(i.dept_name) = '');
+UPDATE maintenance_execution_item i SET dept_name = d.dept_name
+FROM department d WHERE i.dept_id = d.id AND (i.dept_name IS NULL OR TRIM(i.dept_name) = '');
+UPDATE inspection_plan_item i SET dept_name = d.dept_name
+FROM department d WHERE i.dept_id = d.id AND (i.dept_name IS NULL OR TRIM(i.dept_name) = '');
+UPDATE inspection_execution_item i SET dept_name = d.dept_name
+FROM department d WHERE i.dept_id = d.id AND (i.dept_name IS NULL OR TRIM(i.dept_name) = '');
+UPDATE pm_plan_item i SET dept_name = d.dept_name
+FROM department d WHERE i.dept_id = d.id AND (i.dept_name IS NULL OR TRIM(i.dept_name) = '');
+UPDATE pm_execution_item i SET dept_name = d.dept_name
+FROM department d WHERE i.dept_id = d.id AND (i.dept_name IS NULL OR TRIM(i.dept_name) = '');
+UPDATE metrology_execution_item i SET dept_name = d.dept_name
+FROM department d WHERE i.dept_id = d.id AND (i.dept_name IS NULL OR TRIM(i.dept_name) = '');
+
+-- ---------- 附录 W.6 P2 历史回填（2026-07-22） ----------
+UPDATE purchase_contract_item i SET contract_code = c.contract_code
+FROM purchase_contract c WHERE i.contract_id = c.id AND (i.contract_code IS NULL OR TRIM(i.contract_code) = '');
+
+UPDATE purchase_acceptance_item i SET acceptance_no = a.acceptance_no
+FROM purchase_acceptance a WHERE i.acceptance_id = a.id AND (i.acceptance_no IS NULL OR TRIM(i.acceptance_no) = '');
+
+UPDATE maintenance_execution_result r SET execution_no = e.execution_no
+FROM maintenance_execution_item i
+JOIN maintenance_execution e ON e.id = i.execution_id
+WHERE r.execution_item_id = i.id AND (r.execution_no IS NULL OR TRIM(r.execution_no) = '');
+
+UPDATE pm_execution_result r SET execution_no = e.execution_no
+FROM pm_execution_item i
+JOIN pm_execution e ON e.id = i.execution_id
+WHERE r.execution_item_id = i.id AND (r.execution_no IS NULL OR TRIM(r.execution_no) = '');
+
+UPDATE inspection_execution_result r SET execution_no = e.execution_no
+FROM inspection_execution_item i
+JOIN inspection_execution e ON e.id = i.execution_id
+WHERE r.execution_item_id = i.id AND (r.execution_no IS NULL OR TRIM(r.execution_no) = '');
+
+UPDATE metrology_execution_result r SET execution_no = e.execution_no
+FROM metrology_execution_item i
+JOIN metrology_execution e ON e.id = i.execution_id
+WHERE r.execution_item_id = i.id AND (r.execution_no IS NULL OR TRIM(r.execution_no) = '');
+
+UPDATE repair_workorder_segment_user u SET wo_no = COALESCE(s.wo_no, w.wo_no)
+FROM repair_workorder_segment s
+JOIN repair_workorder w ON w.id = s.workorder_id
+WHERE u.segment_id = s.id AND (u.wo_no IS NULL OR TRIM(u.wo_no) = '');
+
+UPDATE inspection_record r SET
+  device_code = COALESCE(NULLIF(TRIM(r.device_code), ''), d.device_code),
+  device_name = COALESCE(NULLIF(TRIM(r.device_name), ''), d.device_name)
+FROM medical_device d WHERE r.device_id = d.id
+  AND (r.device_code IS NULL OR r.device_name IS NULL OR TRIM(r.device_code) = '' OR TRIM(r.device_name) = '');

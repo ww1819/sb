@@ -56,9 +56,10 @@ public class MetrologyExecutionGenerator {
         String deviceName = device.isEmpty() ? null : (String) device.get(0).get("device_name");
         Object deptId = device.isEmpty() ? null : device.get(0).get("dept_id");
         jdbc.update("""
-                INSERT INTO metrology_execution_item (id, execution_id, device_id, device_code, device_name, dept_id, plan_id, status)
-                VALUES (?::uuid,?::uuid,?::uuid,?,?,?::uuid,?::uuid,'pending')
-                """, itemId, execId, p.get("device_id"), deviceCode, deviceName, deptId, planId);
+                INSERT INTO metrology_execution_item (id, execution_id, execution_no, device_id, device_code, device_name, dept_id, dept_name, plan_id, status)
+                VALUES (?::uuid,?::uuid,?,?::uuid,?,?,?::uuid,?,?::uuid,'pending')
+                """, itemId, execId, execNo, p.get("device_id"), deviceCode, deviceName, deptId,
+                resolveDeptName(deptId), planId);
 
         var templateItems = jdbc.queryForList("""
                 SELECT * FROM metrology_template_item WHERE template_id = ?::uuid
@@ -67,13 +68,21 @@ public class MetrologyExecutionGenerator {
                 """, p.get("template_id"));
         for (Map<String, Object> ti : templateItems) {
             jdbc.update("""
-                    INSERT INTO metrology_execution_result (id, execution_item_id, template_item_id, item_name, item_content, result_status)
-                    VALUES (?::uuid,?::uuid,?::uuid,?,?,?)
-                    """, UUID.randomUUID(), itemId, ti.get("id"), ti.get("item_name"), ti.get("item_content"), "pending");
+                    INSERT INTO metrology_execution_result (id, execution_item_id, execution_no, template_item_id, item_name, item_content, result_status)
+                    VALUES (?::uuid,?::uuid,?,?::uuid,?,?,?)
+                    """, UUID.randomUUID(), itemId, execNo, ti.get("id"), ti.get("item_name"), ti.get("item_content"), "pending");
         }
         return jdbc.queryForList(
                 "SELECT * FROM metrology_execution WHERE id=?::uuid"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_execution", null),
                 execId).get(0);
+    }
+
+    private String resolveDeptName(Object deptId) {
+        if (deptId == null || String.valueOf(deptId).isBlank()) return null;
+        var rows = jdbc.queryForList(
+                "SELECT dept_name FROM department WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "department", null), deptId);
+        return rows.isEmpty() ? null : Objects.toString(rows.get(0).get("dept_name"), null);
     }
 }

@@ -4,6 +4,7 @@ import com.meis.saas.common.asset.MedicalDeviceDeleteGuard;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.code.DeviceCodeGenerator;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
@@ -98,6 +99,12 @@ public class AssetDeviceController {
             @RequestParam(value = "device_code", required = false) String device_code,
             @RequestParam(value = "device_status", required = false) String device_status,
             @RequestParam(value = "warehouse_id", required = false) String warehouse_id,
+            @RequestParam(value = "category_id", required = false) String category_id,
+            @RequestParam(value = "asset_category_id", required = false) String asset_category_id,
+            @RequestParam(value = "finance_category_id", required = false) String finance_category_id,
+            @RequestParam(value = "category_kw", required = false) String category_kw,
+            @RequestParam(value = "asset_category_kw", required = false) String asset_category_kw,
+            @RequestParam(value = "finance_category_kw", required = false) String finance_category_kw,
             @RequestParam(value = "stock_scope", required = false) String stock_scope,
             @RequestParam(value = "hide_returned", required = false) Boolean hide_returned) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
@@ -127,9 +134,12 @@ public class AssetDeviceController {
         }
         appendUuidEq(where, args, "d.supplier_id", supplier_id);
         appendUuidEq(where, args, "d.manufacturer_id", manufacturer_id);
-        appendUuidEq(where, args, "d.dept_id", dept_id);
-        appendUuidEq(where, args, "d.manage_dept_id", manage_dept_id);
+        FilterCsvSupport.appendUuidIn(where, args, "d.dept_id", dept_id);
+        FilterCsvSupport.appendUuidIn(where, args, "d.manage_dept_id", manage_dept_id);
         appendUuidEq(where, args, "d.warehouse_id", warehouse_id);
+        FilterCsvSupport.appendUuidIn(where, args, "d.category_id", category_id);
+        FilterCsvSupport.appendUuidIn(where, args, "d.asset_category_id", asset_category_id);
+        FilterCsvSupport.appendUuidIn(where, args, "d.finance_category_id", finance_category_id);
         boolean needSupplier = hasText(supplier_name);
         boolean needManufacturer = hasText(manufacturer_name) && !hasText(manufacturer_id);
         // 列表须带出科室/仓库/分类名称
@@ -154,7 +164,10 @@ public class AssetDeviceController {
         }
         appendLike(where, args, "d.serial_number", serial_number);
         appendLike(where, args, "d.device_code", device_code);
-        appendStatusIn(where, args, "d.device_status", device_status);
+        FilterCsvSupport.appendStrIn(where, args, "d.device_status", device_status);
+        FilterCsvSupport.appendCodeNamePinyin(where, args, "mdc.category_code", "mdc.category_name", null, category_kw);
+        FilterCsvSupport.appendCodeNamePinyin(where, args, "ac.category_code", "ac.category_name", null, asset_category_kw);
+        FilterCsvSupport.appendCodeNamePinyin(where, args, "fc.finance_code", "fc.finance_name", null, finance_category_kw);
         if (enable_dateFrom != null && !enable_dateFrom.isBlank()) {
             where.append(" AND d.enable_date >= ?::date ");
             args.add(enable_dateFrom.trim());
@@ -194,22 +207,9 @@ public class AssetDeviceController {
         args.add("%" + value.trim() + "%");
     }
 
-    /** 设备状态多选：逗号分隔码值 → IN (...)（AST-UI-12） */
+    /** @deprecated 使用 {@link FilterCsvSupport#appendStrIn} */
     private static void appendStatusIn(StringBuilder where, List<Object> args, String column, String csv) {
-        if (!hasText(csv)) return;
-        List<String> values = Arrays.stream(csv.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .distinct()
-                .toList();
-        if (values.isEmpty()) return;
-        where.append(" AND ").append(column).append(" IN (");
-        for (int i = 0; i < values.size(); i++) {
-            if (i > 0) where.append(',');
-            where.append('?');
-            args.add(values.get(i));
-        }
-        where.append(") ");
+        FilterCsvSupport.appendStrIn(where, args, column, csv);
     }
 
     private static void appendUuidEq(StringBuilder where, List<Object> args, String column, String value) {

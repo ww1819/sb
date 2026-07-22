@@ -103,8 +103,14 @@ const config = computed<PageConfig>(() => ({
     { key: 'specification', label: '规格', placeholder: '规格模糊' },
     { key: 'model', label: '型号', placeholder: '型号模糊' },
     { key: 'serial_number', label: '序列号(SN)', placeholder: '序列号模糊' },
-    { key: 'dept_id', label: '科室', placeholder: '科室名称/编码', linkTable: 'department' },
-    { key: 'manage_dept_id', label: '管理科室', placeholder: '科室名称/编码', linkTable: 'department' }
+    { key: 'dept_id', label: '科室', placeholder: '科室名称/编码', linkTable: 'department', multiple: true },
+    { key: 'manage_dept_id', label: '管理科室', placeholder: '科室名称/编码', linkTable: 'department', multiple: true },
+    { key: 'category_id', label: '设备分类', placeholder: '多选分类', linkTable: 'medical_device_category', multiple: true },
+    { key: 'category_kw', label: '设备分类模糊', placeholder: '编码/名称' },
+    { key: 'asset_category_id', label: '资产分类', placeholder: '多选分类', linkTable: 'asset_category', multiple: true },
+    { key: 'asset_category_kw', label: '资产分类模糊', placeholder: '编码/名称' },
+    { key: 'finance_category_id', label: '财务分类', placeholder: '多选分类', linkTable: 'finance_category', multiple: true },
+    { key: 'finance_category_kw', label: '财务分类模糊', placeholder: '编码/名称' }
   ]
 }))
 

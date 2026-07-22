@@ -623,6 +623,11 @@ public class RepairWorkorderSegmentService {
             placeholders.append(",?");
             args.add(blankToNull(snap.get("device_name")));
         }
+        if (TableColumnCache.hasColumn(jdbc, "repair_workorder_segment", "wo_no")) {
+            cols.append(", wo_no");
+            placeholders.append(",?");
+            args.add(blankToNull(snap.get("wo_no")));
+        }
         if (TableColumnCache.hasColumn(jdbc, "repair_workorder_segment", "user_name")) {
             cols.append(", user_name");
             placeholders.append(",?");
@@ -720,6 +725,11 @@ public class RepairWorkorderSegmentService {
             placeholders.append(",?");
             args.add(blankToNull(deviceSnap.get("device_name")));
         }
+        if (TableColumnCache.hasColumn(jdbc, "repair_workorder_segment_part", "wo_no")) {
+            cols.append(", wo_no");
+            placeholders.append(",?");
+            args.add(blankToNull(deviceSnap.get("wo_no")));
+        }
         cols.append(", created_by, updated_by");
         placeholders.append(",?::uuid,?::uuid");
         args.add(blankToNull(operator));
@@ -734,7 +744,7 @@ public class RepairWorkorderSegmentService {
         String segClause = SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment", "s");
         String woClause = SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", "w");
         List<Map<String, Object>> rows = jdbc.queryForList("""
-                SELECT w.device_id, w.device_code, w.device_name
+                SELECT w.wo_no, w.device_id, w.device_code, w.device_name
                 FROM repair_workorder_segment s
                 JOIN repair_workorder w ON w.id = s.workorder_id""" + woClause + """
                 WHERE s.id = ?::uuid""" + segClause, segmentId);
@@ -857,6 +867,7 @@ public class RepairWorkorderSegmentService {
         boolean hasWorkContent = TableColumnCache.hasColumn(jdbc, "repair_workorder_segment_user", "work_content");
         boolean hasUserName = TableColumnCache.hasColumn(jdbc, "repair_workorder_segment_user", "user_name");
         boolean hasLaborCost = TableColumnCache.hasColumn(jdbc, "repair_workorder_segment_user", "labor_cost");
+        Object woNo = blankToNull(loadDeviceSnapBySegment(segmentId).get("wo_no"));
         String operator = TenantContext.getUserId();
         String operatorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, operator);
         boolean anyPrimary = rows.stream().anyMatch(r -> toBool(r.get("is_primary")));
@@ -871,53 +882,58 @@ public class RepairWorkorderSegmentService {
             if (hasWorkContent && hasUserName) {
                 jdbc.update("""
                         INSERT INTO repair_workorder_segment_user
-                        (id, segment_id, user_id, user_name, is_primary, work_content, created_by, updated_by, created_by_name, updated_by_name)
-                        VALUES (?::uuid,?::uuid,?::uuid,?,?,?,?::uuid,?::uuid,?,?)
+                        (id, segment_id, wo_no, user_id, user_name, is_primary, work_content, created_by, updated_by, created_by_name, updated_by_name)
+                        VALUES (?::uuid,?::uuid,?,?::uuid,?,?,?,?::uuid,?::uuid,?,?)
                         ON CONFLICT (segment_id, user_id) DO UPDATE
                         SET is_primary = EXCLUDED.is_primary,
                             work_content = EXCLUDED.work_content,
+                            wo_no = COALESCE(EXCLUDED.wo_no, repair_workorder_segment_user.wo_no),
                             user_name = COALESCE(EXCLUDED.user_name, repair_workorder_segment_user.user_name),
                             updated_at = NOW(), updated_by = EXCLUDED.updated_by,
                             updated_by_name = EXCLUDED.updated_by_name,
                             is_deleted = 0, deleted_at = NULL
                         """,
-                        UUID.randomUUID(), segmentId, uid, userName, primary, workContent,
+                        UUID.randomUUID(), segmentId, woNo, uid, userName, primary, workContent,
                         blankToNull(operator), blankToNull(operator), operatorName, operatorName);
             } else if (hasWorkContent) {
                 jdbc.update("""
                         INSERT INTO repair_workorder_segment_user
-                        (id, segment_id, user_id, is_primary, work_content, created_by, updated_by)
-                        VALUES (?::uuid,?::uuid,?::uuid,?,?,?::uuid,?::uuid)
+                        (id, segment_id, wo_no, user_id, is_primary, work_content, created_by, updated_by)
+                        VALUES (?::uuid,?::uuid,?,?::uuid,?,?,?::uuid,?::uuid)
                         ON CONFLICT (segment_id, user_id) DO UPDATE
                         SET is_primary = EXCLUDED.is_primary,
                             work_content = EXCLUDED.work_content,
+                            wo_no = COALESCE(EXCLUDED.wo_no, repair_workorder_segment_user.wo_no),
                             updated_at = NOW(), is_deleted = 0, deleted_at = NULL
                         """,
-                        UUID.randomUUID(), segmentId, uid, primary, workContent,
+                        UUID.randomUUID(), segmentId, woNo, uid, primary, workContent,
                         blankToNull(operator), blankToNull(operator));
             } else if (hasUserName) {
                 jdbc.update("""
                         INSERT INTO repair_workorder_segment_user
-                        (id, segment_id, user_id, user_name, is_primary, created_by, updated_by, created_by_name, updated_by_name)
-                        VALUES (?::uuid,?::uuid,?::uuid,?,?,?::uuid,?::uuid,?,?)
+                        (id, segment_id, wo_no, user_id, user_name, is_primary, created_by, updated_by, created_by_name, updated_by_name)
+                        VALUES (?::uuid,?::uuid,?,?::uuid,?,?,?::uuid,?::uuid,?,?)
                         ON CONFLICT (segment_id, user_id) DO UPDATE
                         SET is_primary = EXCLUDED.is_primary,
+                            wo_no = COALESCE(EXCLUDED.wo_no, repair_workorder_segment_user.wo_no),
                             user_name = COALESCE(EXCLUDED.user_name, repair_workorder_segment_user.user_name),
                             updated_at = NOW(), updated_by = EXCLUDED.updated_by,
                             updated_by_name = EXCLUDED.updated_by_name,
                             is_deleted = 0, deleted_at = NULL
                         """,
-                        UUID.randomUUID(), segmentId, uid, userName, primary,
+                        UUID.randomUUID(), segmentId, woNo, uid, userName, primary,
                         blankToNull(operator), blankToNull(operator), operatorName, operatorName);
             } else {
                 jdbc.update("""
                         INSERT INTO repair_workorder_segment_user
-                        (id, segment_id, user_id, is_primary, created_by, updated_by)
-                        VALUES (?::uuid,?::uuid,?::uuid,?,?::uuid,?::uuid)
+                        (id, segment_id, wo_no, user_id, is_primary, created_by, updated_by)
+                        VALUES (?::uuid,?::uuid,?,?::uuid,?,?::uuid,?::uuid)
                         ON CONFLICT (segment_id, user_id) DO UPDATE
-                        SET is_primary = EXCLUDED.is_primary, updated_at = NOW(), is_deleted = 0, deleted_at = NULL
+                        SET is_primary = EXCLUDED.is_primary,
+                            wo_no = COALESCE(EXCLUDED.wo_no, repair_workorder_segment_user.wo_no),
+                            updated_at = NOW(), is_deleted = 0, deleted_at = NULL
                         """,
-                        UUID.randomUUID(), segmentId, uid, primary,
+                        UUID.randomUUID(), segmentId, woNo, uid, primary,
                         blankToNull(operator), blankToNull(operator));
             }
             if (hasLaborCost) {

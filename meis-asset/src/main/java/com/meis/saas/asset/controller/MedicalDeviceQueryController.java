@@ -1,5 +1,6 @@
 package com.meis.saas.asset.controller;
 
+import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
@@ -27,6 +28,9 @@ public class MedicalDeviceQueryController {
             @RequestParam(required = false) String categoryId,
             @RequestParam(required = false) String assetCategoryId,
             @RequestParam(required = false) String financeCategoryId,
+            @RequestParam(required = false) String categoryKw,
+            @RequestParam(required = false) String assetCategoryKw,
+            @RequestParam(required = false) String financeCategoryKw,
             @RequestParam(required = false) String manufacturerId,
             @RequestParam(required = false) String supplierId,
             @RequestParam(required = false) String warehouseId,
@@ -54,21 +58,24 @@ public class MedicalDeviceQueryController {
             for (int i = 0; i < 9; i++) args.add(kw);
         }
 
-        appendEqUuid(where, args, "d.campus_id", campusId);
-        appendEqUuid(where, args, "d.dept_id", deptId);
-        appendEqUuid(where, args, "d.category_id", categoryId);
-        appendEqUuid(where, args, "d.asset_category_id", assetCategoryId);
-        appendEqUuid(where, args, "d.finance_category_id", financeCategoryId);
+        FilterCsvSupport.appendUuidIn(where, args, "d.campus_id", campusId);
+        FilterCsvSupport.appendUuidIn(where, args, "d.dept_id", deptId);
+        FilterCsvSupport.appendUuidIn(where, args, "d.category_id", categoryId);
+        FilterCsvSupport.appendUuidIn(where, args, "d.asset_category_id", assetCategoryId);
+        FilterCsvSupport.appendUuidIn(where, args, "d.finance_category_id", financeCategoryId);
         appendEqUuid(where, args, "d.manufacturer_id", manufacturerId);
         appendEqUuid(where, args, "d.supplier_id", supplierId);
         appendEqUuid(where, args, "d.warehouse_id", warehouseId);
-        appendEqStr(where, args, "d.device_status", deviceStatus);
+        FilterCsvSupport.appendStrIn(where, args, "d.device_status", deviceStatus);
         appendEqStr(where, args, "d.risk_level", riskLevel);
         appendBool(where, args, "d.is_metrology", isMetrology);
         appendBool(where, args, "d.is_maintain_device", isMaintainDevice);
         appendBool(where, args, "d.is_inspection_device", isInspectionDevice);
         appendBool(where, args, "d.is_life_support", isLifeSupport);
         appendBool(where, args, "d.is_emergency", isEmergency);
+        FilterCsvSupport.appendCodeNamePinyin(where, args, "cat.category_code", "cat.category_name", null, categoryKw);
+        FilterCsvSupport.appendCodeNamePinyin(where, args, "ac.category_code", "ac.category_name", null, assetCategoryKw);
+        FilterCsvSupport.appendCodeNamePinyin(where, args, "fc.finance_code", "fc.finance_name", null, financeCategoryKw);
 
         String from = buildFrom();
         Long total = jdbc.queryForObject("SELECT COUNT(*) " + from + where, Long.class, args.toArray());
@@ -117,9 +124,11 @@ public class MedicalDeviceQueryController {
     }
 
     private static void appendEqUuid(StringBuilder where, List<Object> args, String column, String value) {
-        if (value != null && !value.isBlank()) {
+        if (value != null && !value.isBlank() && !value.contains(",")) {
             where.append(" AND ").append(column).append(" = ?::uuid ");
             args.add(value);
+        } else if (value != null && value.contains(",")) {
+            FilterCsvSupport.appendUuidIn(where, args, column, value);
         }
     }
 

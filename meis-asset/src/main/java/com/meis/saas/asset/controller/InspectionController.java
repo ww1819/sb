@@ -25,8 +25,28 @@ public class InspectionController {
     @PostMapping("/records")
     public Result<Map<String, Object>> createRecord(@RequestBody Map<String, Object> body) {
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO inspection_record (id, plan_id, device_id, inspector_id, result, remark, status) VALUES (?,?,?,?,?,?,?)",
-                id, body.get("planId"), body.get("deviceId"), body.get("inspectorId"),
+        Object deviceId = body.get("deviceId") != null ? body.get("deviceId") : body.get("device_id");
+        String deviceCode = body.get("device_code") != null ? String.valueOf(body.get("device_code")) : null;
+        String deviceName = body.get("device_name") != null ? String.valueOf(body.get("device_name")) : null;
+        if (deviceId != null && (deviceCode == null || deviceCode.isBlank() || deviceName == null || deviceName.isBlank())) {
+            var d = jdbc.queryForList(
+                    "SELECT device_code, device_name FROM medical_device WHERE id = ?::uuid"
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", null),
+                    deviceId);
+            if (!d.isEmpty()) {
+                if (deviceCode == null || deviceCode.isBlank()) {
+                    deviceCode = d.get(0).get("device_code") != null ? String.valueOf(d.get(0).get("device_code")) : null;
+                }
+                if (deviceName == null || deviceName.isBlank()) {
+                    deviceName = d.get(0).get("device_name") != null ? String.valueOf(d.get(0).get("device_name")) : null;
+                }
+            }
+        }
+        jdbc.update("""
+                INSERT INTO inspection_record (id, plan_id, device_id, device_code, device_name, inspector_id, result, remark, status)
+                VALUES (?,?,?,?,?,?,?,?,?)
+                """,
+                id, body.get("planId"), deviceId, deviceCode, deviceName, body.get("inspectorId"),
                 body.get("result"), body.get("remark"), "completed");
         if (body.get("planId") != null) {
             jdbc.update("UPDATE inspection_plan SET status = 'completed' WHERE id = ?::uuid", body.get("planId"));

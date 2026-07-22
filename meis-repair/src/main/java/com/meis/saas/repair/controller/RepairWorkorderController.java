@@ -923,16 +923,19 @@ public class RepairWorkorderController {
             if (TableColumnCache.hasColumn(jdbc, "spare_part_usage", "operator_name")) {
                 jdbc.update("""
                         INSERT INTO spare_part_usage
-                        (id, workorder_id, part_id, quantity, unit_price, operator_id, operator_name,
+                        (id, workorder_id, wo_no, part_id, quantity, unit_price, operator_id, operator_name,
                          device_id, device_code, device_name)
-                        VALUES (?::uuid,?::uuid,?::uuid,?,?,?::uuid,?,?::uuid,?,?)
+                        VALUES (?::uuid,?::uuid,?,?::uuid,?,?,?::uuid,?,?::uuid,?,?)
                         """,
-                        UUID.randomUUID(), id, p.get("part_id"), p.get("quantity"), p.get("unit_price"),
+                        UUID.randomUUID(), id, blankToNull(wo.get("wo_no")), p.get("part_id"), p.get("quantity"), p.get("unit_price"),
                         blankToNull(opId), SoftDeleteSupport.resolveUserDisplayName(jdbc, opId),
                         blankToNull(wo.get("device_id")), blankToNull(wo.get("device_code")), blankToNull(wo.get("device_name")));
             } else {
-                jdbc.update("INSERT INTO spare_part_usage (id, workorder_id, part_id, quantity, unit_price) VALUES (?::uuid,?::uuid,?::uuid,?,?)",
-                        UUID.randomUUID(), id, p.get("part_id"), p.get("quantity"), p.get("unit_price"));
+                jdbc.update("""
+                        INSERT INTO spare_part_usage (id, workorder_id, wo_no, part_id, quantity, unit_price)
+                        VALUES (?::uuid,?::uuid,?,?::uuid,?,?)
+                        """,
+                        UUID.randomUUID(), id, blankToNull(wo.get("wo_no")), p.get("part_id"), p.get("quantity"), p.get("unit_price"));
             }
             jdbc.update("INSERT INTO spare_part_transaction (spare_part_id, txn_type, quantity, workorder_id) VALUES (?::uuid,'out',?,?::uuid)",
                     p.get("spare_part_id") != null ? p.get("spare_part_id") : p.get("part_id"), p.get("quantity"), id);
@@ -1233,18 +1236,19 @@ public class RepairWorkorderController {
         String userName = SoftDeleteSupport.resolveUserDisplayName(jdbc, userId);
         String fromUserName = SoftDeleteSupport.resolveUserDisplayName(jdbc, fromUser);
         String toUserName = SoftDeleteSupport.resolveUserDisplayName(jdbc, toUser);
+        Object woNo = blankToNull(wo.get("wo_no"));
         if (hasDevice && hasNames) {
             jdbc.update("""
                 INSERT INTO repair_workorder_event
-                (id, workorder_id, event_type, from_status, to_status, from_sub_status, to_sub_status,
+                (id, workorder_id, wo_no, event_type, from_status, to_status, from_sub_status, to_sub_status,
                  operator_id, user_id, from_user_id, to_user_id,
                  operator_name, user_name, from_user_name, to_user_name,
                  remark, extra_json, device_id, device_code, device_name)
-                VALUES (?::uuid,?::uuid,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?::uuid,
+                VALUES (?::uuid,?::uuid,?,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?::uuid,
                         ?,?,?,?,
                         ?,CAST(? AS jsonb),?::uuid,?,?)
                 """,
-                    UUID.randomUUID(), woId, type, blankToNull(fromStatus), blankToNull(toStatus),
+                    UUID.randomUUID(), woId, woNo, type, blankToNull(fromStatus), blankToNull(toStatus),
                     blankToNull(fromSub), blankToNull(toSub),
                     opId, blankToNull(userId), blankToNull(fromUser), blankToNull(toUser),
                     opName, userName, fromUserName, toUserName,
@@ -1253,13 +1257,13 @@ public class RepairWorkorderController {
         } else if (hasDevice) {
             jdbc.update("""
                 INSERT INTO repair_workorder_event
-                (id, workorder_id, event_type, from_status, to_status, from_sub_status, to_sub_status,
+                (id, workorder_id, wo_no, event_type, from_status, to_status, from_sub_status, to_sub_status,
                  operator_id, user_id, from_user_id, to_user_id, remark, extra_json,
                  device_id, device_code, device_name)
-                VALUES (?::uuid,?::uuid,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?::uuid,?,CAST(? AS jsonb),
+                VALUES (?::uuid,?::uuid,?,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?::uuid,?,CAST(? AS jsonb),
                         ?::uuid,?,?)
                 """,
-                    UUID.randomUUID(), woId, type, blankToNull(fromStatus), blankToNull(toStatus),
+                    UUID.randomUUID(), woId, woNo, type, blankToNull(fromStatus), blankToNull(toStatus),
                     blankToNull(fromSub), blankToNull(toSub),
                     opId, blankToNull(userId), blankToNull(fromUser), blankToNull(toUser),
                     blankToNull(remark), extraJson,
@@ -1267,15 +1271,15 @@ public class RepairWorkorderController {
         } else if (hasNames) {
             jdbc.update("""
                 INSERT INTO repair_workorder_event
-                (id, workorder_id, event_type, from_status, to_status, from_sub_status, to_sub_status,
+                (id, workorder_id, wo_no, event_type, from_status, to_status, from_sub_status, to_sub_status,
                  operator_id, user_id, from_user_id, to_user_id,
                  operator_name, user_name, from_user_name, to_user_name,
                  remark, extra_json)
-                VALUES (?::uuid,?::uuid,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?::uuid,
+                VALUES (?::uuid,?::uuid,?,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?::uuid,
                         ?,?,?,?,
                         ?,CAST(? AS jsonb))
                 """,
-                    UUID.randomUUID(), woId, type, blankToNull(fromStatus), blankToNull(toStatus),
+                    UUID.randomUUID(), woId, woNo, type, blankToNull(fromStatus), blankToNull(toStatus),
                     blankToNull(fromSub), blankToNull(toSub),
                     opId, blankToNull(userId), blankToNull(fromUser), blankToNull(toUser),
                     opName, userName, fromUserName, toUserName,
@@ -1283,11 +1287,11 @@ public class RepairWorkorderController {
         } else {
             jdbc.update("""
                 INSERT INTO repair_workorder_event
-                (id, workorder_id, event_type, from_status, to_status, from_sub_status, to_sub_status,
+                (id, workorder_id, wo_no, event_type, from_status, to_status, from_sub_status, to_sub_status,
                  operator_id, user_id, from_user_id, to_user_id, remark, extra_json)
-                VALUES (?::uuid,?::uuid,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?::uuid,?,CAST(? AS jsonb))
+                VALUES (?::uuid,?::uuid,?,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?::uuid,?,CAST(? AS jsonb))
                 """,
-                    UUID.randomUUID(), woId, type, blankToNull(fromStatus), blankToNull(toStatus),
+                    UUID.randomUUID(), woId, woNo, type, blankToNull(fromStatus), blankToNull(toStatus),
                     blankToNull(fromSub), blankToNull(toSub),
                     opId, blankToNull(userId), blankToNull(fromUser), blankToNull(toUser),
                     blankToNull(remark), extraJson);

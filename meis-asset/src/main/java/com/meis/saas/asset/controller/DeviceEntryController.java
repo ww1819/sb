@@ -3,6 +3,7 @@ package com.meis.saas.asset.controller;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.code.DeviceCodeGenerator;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
@@ -40,13 +41,14 @@ public class DeviceEntryController {
             args.add(kw);
             args.add(kw);
         }
-        if (status != null && !status.isBlank()) {
-            where.append(" AND e.status = ? ");
-            args.add(status);
-        }
+        FilterCsvSupport.appendStrIn(where, args, "e.status", status);
         if (approval_status != null && !approval_status.isBlank()) {
-            where.append(" AND COALESCE(e.approval_status, 'draft') = ? ");
-            args.add(approval_status);
+            if (approval_status.contains(",")) {
+                FilterCsvSupport.appendStrIn(where, args, "COALESCE(e.approval_status, 'draft')", approval_status);
+            } else {
+                where.append(" AND COALESCE(e.approval_status, 'draft') = ? ");
+                args.add(approval_status);
+            }
         }
         String from = " FROM device_entry e "
                 + " LEFT JOIN purchase_contract pc ON pc.id = e.contract_id"
@@ -114,8 +116,9 @@ public class DeviceEntryController {
                 supplierId = UUID.fromString(c.get(0).get("supplier_id").toString());
             }
         }
+        String entryNo;
         if (!exists) {
-            String entryNo = blankToNull(body.get("entry_no"));
+            entryNo = blankToNull(body.get("entry_no"));
             if (entryNo == null) entryNo = nextEntryNo();
             Map<String, Object> audit = new HashMap<>();
             SoftDeleteSupport.applyInsertAudit(jdbc, "device_entry", audit);
@@ -142,6 +145,8 @@ public class DeviceEntryController {
                     body.getOrDefault("approval_status", "draft"),
                     createdBy, createdByName);
         } else {
+            var nos = jdbc.queryForList("SELECT entry_no FROM device_entry WHERE id = ?", id);
+            entryNo = nos.isEmpty() ? null : blankToNull(nos.get(0).get("entry_no"));
             if ("completed".equals(String.valueOf(
                     jdbc.queryForList("SELECT status FROM device_entry WHERE id = ?", id).stream()
                             .findFirst().map(r -> r.get("status")).orElse("")))) {
@@ -202,22 +207,24 @@ public class DeviceEntryController {
             }
             String specification = blankToNull(item.get("specification"));
             if (specification == null) specification = blankToNull(item.get("model"));
+            String deviceCode = blankToNull(item.get("device_code"));
+            if (deviceCode == null) deviceCode = blankToNull(item.get("factory_code"));
             jdbc.update("""
                 INSERT INTO device_entry_item (
-                    id, entry_id, device_name, brand, model, specification, unit, serial_number,
+                    id, entry_id, entry_no, device_code, device_name, brand, model, specification, unit, serial_number,
                     quantity, unit_price, total_price, dept_id, manufacturer_id, manufacturer_name,
                     factory_code, financial_code, depreciation_years, production_date, warranty_period,
                     purchase_method, storage_location, category_id, finance_category_id, asset_category_id,
                     created_at
                 ) VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?,
                     NOW()
                 )
                 """,
-                    UUID.randomUUID(), id, deviceName, blankToNull(item.get("brand")),
+                    UUID.randomUUID(), id, entryNo, deviceCode, deviceName, blankToNull(item.get("brand")),
                     specification, specification, blankToNull(item.get("unit")),
                     blankToNull(item.get("serial_number")),
                     qty, price, amount, parseUuid(item.get("dept_id")), manufacturerId, manufacturerName,
@@ -269,10 +276,12 @@ public class DeviceEntryController {
         for (Map<String, Object> item : items) {
             int qty = item.get("quantity") instanceof Number n ? Math.max(1, n.intValue()) : 1;
             Object itemDept = item.get("dept_id") != null ? item.get("dept_id") : deptId;
+            String firstCode = null;
             for (int i = 0; i < qty; i++) {
                 String code = codeGenerator.generate(
                         str(body, "campusCode"), str(body, "buildingCode"), str(body, "deptCode"),
                         str(body, "countryCode"), str(body, "categoryCode"));
+                if (firstCode == null) firstCode = code;
                 UUID deviceId = UUID.randomUUID();
                 String model = blankToNull(item.get("specification"));
                 if (model == null) model = blankToNull(item.get("model"));
@@ -298,6 +307,10 @@ public class DeviceEntryController {
                         toIntOrNull(item.get("depreciation_years")), toDateOrNull(item.get("production_date")),
                         item.get("storage_location"));
                 deviceIds.add(deviceId);
+            }
+            if (firstCode != null && item.get("id") != null) {
+                jdbc.update("UPDATE device_entry_item SET device_code = COALESCE(NULLIF(TRIM(device_code), ''), ?) WHERE id = ?",
+                        firstCode, item.get("id"));
             }
         }
         var ctx = com.meis.saas.common.rbac.PermissionInterceptor.CTX.get();
