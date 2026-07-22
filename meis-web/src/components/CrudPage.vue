@@ -242,7 +242,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onActivated, onMounted, reactive, ref, useSlots, watch } from 'vue'
+import { computed, nextTick, onActivated, onMounted, provide, reactive, ref, useSlots, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { RefreshLeft, Search } from '@element-plus/icons-vue'
 import http from '@/api/http'
@@ -298,6 +298,18 @@ const emit = defineEmits<{
 }>()
 const slots = useSlots()
 const { loadDict, preloadDictTypes } = useDict()
+
+/** 子表单保存前钩子（如 AST-UI-11 分类自动匹配） */
+type BeforeSaveHook = () => void | Promise<void>
+const beforeSaveHooks = new Set<BeforeSaveHook>()
+provide('crudBeforeSave', {
+  register(fn: BeforeSaveHook) {
+    beforeSaveHooks.add(fn)
+  },
+  unregister(fn: BeforeSaveHook) {
+    beforeSaveHooks.delete(fn)
+  }
+})
 
 const loading = ref(false)
 const rows = ref<Record<string, unknown>[]>([])
@@ -568,6 +580,15 @@ function isApiOk(data: { code?: number; success?: boolean } | undefined) {
 
 async function save() {
   if (formMode.value === 'view') return
+  try {
+    for (const hook of beforeSaveHooks) {
+      await hook()
+    }
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '保存前处理失败'
+    ElMessage.error(msg)
+    return
+  }
   const missing = formFields.value.filter(
     (f) => f.required && (form.value[f.prop] === undefined || form.value[f.prop] === null || form.value[f.prop] === '')
   )
@@ -578,7 +599,7 @@ async function save() {
   try {
     const payload = normalizeSaveBody(form.value)
     const id = payload.id
-    let data: { code?: number; success?: boolean; message?: string } | undefined
+    let data: { code?: number; success?: boolean; message?: string; data?: Record<string, unknown> } | undefined
     if (props.config.saveUrl) {
       data = (await http.post(props.config.saveUrl, payload)).data
     } else if (id) {
@@ -591,7 +612,17 @@ async function save() {
       ElMessage.error(data?.message || '保存失败')
       return
     }
-    formVisible.value = false
+    const savedRow = data?.data && typeof data.data === 'object' ? data.data : null
+    if (savedRow) {
+      form.value = { ...form.value, ...savedRow }
+    }
+    if (!id && form.value.id) {
+      formMode.value = 'edit'
+      formTitle.value = props.config.formTitles?.edit ?? '编辑'
+    }
+    if (!props.config.keepFormOpenAfterSave) {
+      formVisible.value = false
+    }
     ElMessage.success('保存成功')
     emit('saved', { ...form.value })
     load()

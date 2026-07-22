@@ -91,7 +91,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, inject, nextTick, onUnmounted, ref, watch } from 'vue'
+import http from '@/api/http'
 import FormTabNav from '@/components/form/FormTabNav.vue'
 import GroupedFormFields from '@/components/form/GroupedFormFields.vue'
 import DeviceAssetCard from '@/components/asset/DeviceAssetCard.vue'
@@ -117,6 +118,12 @@ const props = withDefaults(
 const activeTab = ref('basic')
 const isView = computed(() => props.mode === 'view')
 const isCreate = computed(() => props.mode === 'create' || !props.model.id)
+
+type CrudBeforeSaveApi = {
+  register: (fn: () => void | Promise<void>) => void
+  unregister: (fn: () => void | Promise<void>) => void
+}
+const crudBeforeSave = inject<CrudBeforeSaveApi | null>('crudBeforeSave', null)
 
 const allTabs = [
   { key: 'basic', label: '基本信息' },
@@ -214,6 +221,96 @@ watch(
   },
   { immediate: true }
 )
+
+/** 用户是否手工改过分类；为 true 后名称变更/保存前都不再自动识别（AST-UI-11） */
+const categoryTouchedByUser = ref(false)
+let applyingAutoCategory = false
+let categoryMatchTimer: ReturnType<typeof setTimeout> | null = null
+let categoryMatchSeq = 0
+
+function canAutoFillCategory() {
+  return !categoryTouchedByUser.value
+}
+
+async function matchCategoryByDeviceName(deviceName: string) {
+  if (isView.value) return
+  if (!canAutoFillCategory()) return
+  const name = deviceName.trim()
+  if (!name) return
+  const seq = ++categoryMatchSeq
+  try {
+    const { data } = await http.get('/system/medical_device_category/match-by-device-name', {
+      params: { name }
+    })
+    if (seq !== categoryMatchSeq) return
+    if (!canAutoFillCategory()) return
+    const row = data?.data as
+      | { id?: string; label?: string; category_code?: string; category_name?: string }
+      | undefined
+    if (!row?.id) return
+    const id = String(row.id)
+    const label =
+      (row.label && String(row.label).trim()) ||
+      `${row.category_code ?? ''} ${row.category_name ?? ''}`.trim()
+    applyingAutoCategory = true
+    props.model.category_id = id
+    if (label) props.model.category_name = label
+    await nextTick()
+    applyingAutoCategory = false
+  } catch {
+    applyingAutoCategory = false
+    /* 匹配失败不阻断表单编辑 */
+  }
+}
+
+function scheduleCategoryMatch(deviceName: string) {
+  if (categoryMatchTimer != null) clearTimeout(categoryMatchTimer)
+  categoryMatchTimer = setTimeout(() => {
+    categoryMatchTimer = null
+    void matchCategoryByDeviceName(deviceName)
+  }, 400)
+}
+
+watch(
+  () => props.model.device_name,
+  (name, oldName) => {
+    if (isView.value) return
+    if (oldName === name) return
+    scheduleCategoryMatch(String(name ?? ''))
+  }
+)
+
+watch(
+  () => props.model.category_id,
+  (_id, oldId) => {
+    if (oldId === undefined) return
+    if (applyingAutoCategory) return
+    categoryTouchedByUser.value = true
+  }
+)
+
+watch(
+  () => [props.mode, props.model.id] as const,
+  () => {
+    categoryTouchedByUser.value = false
+    applyingAutoCategory = false
+  }
+)
+
+async function prepareBeforeSave() {
+  if (categoryMatchTimer != null) {
+    clearTimeout(categoryMatchTimer)
+    categoryMatchTimer = null
+  }
+  await matchCategoryByDeviceName(String(props.model.device_name ?? ''))
+}
+
+if (crudBeforeSave) {
+  crudBeforeSave.register(prepareBeforeSave)
+  onUnmounted(() => crudBeforeSave.unregister(prepareBeforeSave))
+}
+
+defineExpose({ prepareBeforeSave })
 
 const basicFields = computed(() => {
   const source = props.fields?.length ? props.fields : getSchema('medical_device')

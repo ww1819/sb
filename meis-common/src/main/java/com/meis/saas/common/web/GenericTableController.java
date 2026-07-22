@@ -121,6 +121,75 @@ public abstract class GenericTableController {
         return Result.ok(rows);
     }
 
+    /**
+     * 按设备/资产名称模糊匹配 68 分类；无命中回落未识别分类（6890 / 未识别分类 / 未知分类）。
+     * AST-UI-11
+     */
+    @GetMapping("/{table}/match-by-device-name")
+    public Result<Map<String, Object>> matchByDeviceName(
+            @PathVariable String table,
+            @RequestParam String name) {
+        check(table);
+        if (!"medical_device_category".equals(table)) {
+            throw new BizException(400, "match-by-device-name only supports medical_device_category");
+        }
+        String keyword = name == null ? "" : name.trim();
+        String notDeleted = SoftDeleteSupport.notDeletedClause(jdbc(), table, null);
+        Map<String, Object> matched = null;
+        if (!keyword.isEmpty()) {
+            List<Map<String, Object>> rows = jdbc().queryForList(
+                    """
+                    SELECT id, category_code, category_name, level
+                    FROM medical_device_category
+                    WHERE 1=1
+                    """ + notDeleted + """
+                      AND category_name ILIKE ?
+                      AND COALESCE(category_code, '') <> '6890'
+                      AND COALESCE(category_name, '') NOT IN ('未识别分类', '未知分类')
+                    ORDER BY
+                      CASE WHEN category_name = ? THEN 0 ELSE 1 END,
+                      char_length(COALESCE(category_name, '')) DESC,
+                      COALESCE(level, 0) DESC,
+                      category_code ASC
+                    LIMIT 1
+                    """,
+                    "%" + keyword + "%",
+                    keyword);
+            if (!rows.isEmpty()) matched = rows.get(0);
+        }
+        if (matched == null) {
+            List<Map<String, Object>> fallback = jdbc().queryForList(
+                    """
+                    SELECT id, category_code, category_name, level
+                    FROM medical_device_category
+                    WHERE 1=1
+                    """ + notDeleted + """
+                      AND (
+                        category_code = '6890'
+                        OR category_name IN ('未识别分类', '未知分类')
+                      )
+                    ORDER BY
+                      CASE
+                        WHEN category_code = '6890' THEN 0
+                        WHEN category_name = '未识别分类' THEN 1
+                        ELSE 2
+                      END
+                    LIMIT 1
+                    """);
+            if (fallback.isEmpty()) {
+                throw new BizException(404, "未配置未识别/未知分类（建议编码 6890）");
+            }
+            matched = fallback.get(0);
+            matched.put("unmatched", true);
+        } else {
+            matched.put("unmatched", false);
+        }
+        String code = matched.get("category_code") == null ? "" : String.valueOf(matched.get("category_code"));
+        String cname = matched.get("category_name") == null ? "" : String.valueOf(matched.get("category_name"));
+        matched.put("label", (code + " " + cname).trim());
+        return Result.ok(matched);
+    }
+
     private static String[] lookupColumns(String table) {
         return switch (table) {
             case "supplier" -> new String[]{"supplier_name", "supplier_code", "pinyin_code"};

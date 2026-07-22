@@ -78,6 +78,8 @@ export interface PageConfig {
   formGroupColumns?: Partial<Record<FieldGroup, number>>
   /** 表单抽屉标题（create/edit/view） */
   formTitles?: { create?: string; edit?: string; view?: string }
+  /** 保存成功后是否保持表单抽屉打开（默认关闭） */
+  keepFormOpenAfterSave?: boolean
   /** 表单抽屉尺寸（默认 lg） */
   formDrawerSize?: 'sm' | 'md' | 'lg' | 'xl'
   /**
@@ -339,6 +341,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/asset/device/page',
     showRowIndex: true,
     showRowSelection: true,
+    keepFormOpenAfterSave: true,
     sortableColumns: ['device_code', 'device_name', 'specification', 'dept_name'],
     listFilters: [
       { key: 'enable_dateFrom', label: '起', type: 'date', actionBar: true },
