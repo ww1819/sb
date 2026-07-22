@@ -1,5 +1,6 @@
 package com.meis.saas.maintain.controller;
 
+import com.meis.saas.common.ops.OpsDevicePageSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
@@ -11,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 /**
- * PM 设备管理：台账过滤视图（附录 O.5 / OPS.4）——设备须出现在计划明细或执行明细中。
+ * PM 设备管理：台账过滤视图（附录 O.5 / OPS.4 / OPS.13）
  */
 @RestController
 @RequestMapping("/api/pm/device")
@@ -20,37 +21,23 @@ public class PmDeviceController {
     private final JdbcTemplate jdbc;
 
     @GetMapping("/page")
-    public Result<PageResult<Map<String, Object>>> page(PageQuery query) {
-        String md = SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d");
-        String pi = SoftDeleteSupport.notDeletedClause(jdbc, "pm_plan_item", "pi");
-        String ei = SoftDeleteSupport.notDeletedClause(jdbc, "pm_execution_item", "ei");
-        StringBuilder where = new StringBuilder(
-                " WHERE ("
-                + " EXISTS (SELECT 1 FROM pm_plan_item pi WHERE pi.device_id = d.id " + pi + ")"
-                + " OR EXISTS (SELECT 1 FROM pm_execution_item ei WHERE ei.device_id = d.id " + ei + ")"
-                + " )");
-        where.append(md);
-        List<Object> args = new ArrayList<>();
-        if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
-            String kw = "%" + query.getKeyword().trim() + "%";
-            where.append(" AND (d.device_code ILIKE ? OR d.device_name ILIKE ?) ");
-            args.add(kw);
-            args.add(kw);
-        }
-        long total = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM medical_device d " + where, Long.class, args.toArray());
-        int offset = (query.getPage() - 1) * query.getSize();
-        args.add(query.getSize());
-        args.add(offset);
-        var rows = jdbc.queryForList(
-                "SELECT d.id, d.device_code, d.device_name, d.device_status, d.dept_id, dept.dept_name,"
-                + " d.is_pm_device,"
-                + " (SELECT COUNT(*) FROM pm_plan_item pi WHERE pi.device_id=d.id " + pi + ") AS plan_count,"
-                + " (SELECT COUNT(*) FROM pm_execution_item ei WHERE ei.device_id=d.id " + ei + ") AS execution_item_count"
-                + " FROM medical_device d"
-                + " LEFT JOIN department dept ON dept.id = d.dept_id"
-                + where + " ORDER BY d.device_code LIMIT ? OFFSET ?", args.toArray());
-        return Result.ok(new PageResult<>(rows, total, query.getPage(), query.getSize()));
+    public Result<PageResult<Map<String, Object>>> page(
+            PageQuery query,
+            @RequestParam(required = false) String device_status,
+            @RequestParam(required = false) String dept_id,
+            @RequestParam(required = false) String manage_dept_id,
+            @RequestParam(required = false) String device_code,
+            @RequestParam(required = false) String device_name,
+            @RequestParam(required = false) String serial_number,
+            @RequestParam(required = false) String specification,
+            @RequestParam(required = false) String model,
+            @RequestParam(required = false) String brand,
+            @RequestParam(required = false) Integer due_within_days) {
+        return Result.ok(OpsDevicePageSupport.page(
+                jdbc, OpsDevicePageSupport.PM, query,
+                device_status, dept_id, manage_dept_id,
+                device_code, device_name, serial_number, specification, model, brand,
+                due_within_days));
     }
 
     @GetMapping("/{deviceId}/plans")

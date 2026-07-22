@@ -1,6 +1,7 @@
 package com.meis.saas.qc.controller;
 
 import com.meis.saas.common.audit.OperationLog;
+import com.meis.saas.common.code.DailyBizNoSupport;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
@@ -45,6 +46,7 @@ public class MetrologyPlanController {
                 "SELECT 1 FROM metrology_plan WHERE id = ?::uuid "
                         + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_plan", null), id).isEmpty();
         if (exists) {
+            // OPS.14：更新不改 plan_code
             jdbc.update("""
                 UPDATE metrology_plan SET plan_name=?, template_id=?::uuid, device_id=?::uuid, category_id=?::uuid, org_id=?::uuid,
                 cycle_days=?, next_due_date=?, last_calibrated_at=?, status=?, approval_status=?, remark=?, updated_at=NOW()
@@ -54,11 +56,12 @@ public class MetrologyPlanController {
                     body.getOrDefault("status", "active"), body.getOrDefault("approval_status", "draft"),
                     body.get("remark"), id);
         } else {
+            String planCode = DailyBizNoSupport.next(jdbc, "metrology_plan", "plan_code", "JL-");
             jdbc.update("""
                 INSERT INTO metrology_plan (id, plan_code, plan_name, template_id, device_id, category_id, org_id,
                 cycle_days, next_due_date, status, approval_status, created_by, remark)
                 VALUES (?::uuid,?,?,?::uuid,?::uuid,?::uuid,?::uuid,?,?,?,?,?,?)
-                """, id, body.getOrDefault("plan_code", "MP" + System.currentTimeMillis()), body.get("plan_name"),
+                """, id, planCode, body.get("plan_name"),
                     body.get("template_id"), body.get("device_id"), body.get("category_id"), body.get("org_id"),
                     body.get("cycle_days"), body.get("next_due_date"), body.getOrDefault("status", "active"),
                     body.getOrDefault("approval_status", "draft"), body.get("created_by"), body.get("remark"));
@@ -107,11 +110,12 @@ public class MetrologyPlanController {
         List<Map<String, Object>> created = new ArrayList<>();
         for (String deviceId : deviceIds) {
             UUID id = UUID.randomUUID();
+            String planCode = DailyBizNoSupport.next(jdbc, "metrology_plan", "plan_code", "JL-");
             jdbc.update("""
                 INSERT INTO metrology_plan (id, plan_code, plan_name, template_id, device_id, category_id, org_id,
                     cycle_days, next_due_date, status, approval_status, created_by)
                 VALUES (?::uuid,?,?,?::uuid,?::uuid,?::uuid,?::uuid,?,?,?,?,?)
-                """, id, "MP" + System.nanoTime(), template.get(0).get("template_name") + "计划",
+                """, id, planCode, template.get(0).get("template_name") + "计划",
                     templateId, deviceId, template.get(0).get("category_id"), body.get("org_id"),
                     body.getOrDefault("cycle_days", 365),
                     body.getOrDefault("next_due_date", LocalDate.now().plusDays(365)),

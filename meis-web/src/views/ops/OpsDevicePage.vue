@@ -72,7 +72,40 @@ const config = computed<PageConfig>(() => ({
   apiBase: `/${props.module}`,
   table: tables[props.module],
   listPageUrl: `/${props.module}/device/page`,
-  hideAdd: true
+  hideAdd: true,
+  showRowIndex: true,
+  listFilters: [
+    {
+      key: 'device_status',
+      label: '设备状态',
+      dictType: 'device_status',
+      multiple: true,
+      actionBar: true,
+      dictValues: ['normal', 'in_use', 'maintenance', 'scrap', 'pending_verify']
+    },
+    {
+      key: 'due_within_days',
+      label: '到期窗口',
+      type: 'select',
+      actionBar: true,
+      options: [
+        { value: '7', label: '7天内' },
+        { value: '15', label: '15天内' },
+        { value: '30', label: '30天内' },
+        { value: '60', label: '60天内' }
+      ]
+    }
+  ],
+  moreSearchFields: [
+    { key: 'device_code', label: '设备编码', placeholder: '编码模糊' },
+    { key: 'device_name', label: '设备名称', placeholder: '名称/简码' },
+    { key: 'brand', label: '品牌', placeholder: '品牌模糊' },
+    { key: 'specification', label: '规格', placeholder: '规格模糊' },
+    { key: 'model', label: '型号', placeholder: '型号模糊' },
+    { key: 'serial_number', label: '序列号(SN)', placeholder: '序列号模糊' },
+    { key: 'dept_id', label: '科室', placeholder: '科室名称/编码', linkTable: 'department' },
+    { key: 'manage_dept_id', label: '管理科室', placeholder: '科室名称/编码', linkTable: 'department' }
+  ]
 }))
 
 const crudRef = ref<InstanceType<typeof CrudPage> | null>(null)

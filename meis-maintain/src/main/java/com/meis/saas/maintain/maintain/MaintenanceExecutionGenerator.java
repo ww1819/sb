@@ -1,6 +1,7 @@
 package com.meis.saas.maintain.maintain;
 
 import com.meis.saas.common.audit.DocChangeLogService;
+import com.meis.saas.common.code.DailyBizNoSupport;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.tenant.TenantContext;
@@ -50,7 +51,7 @@ public class MaintenanceExecutionGenerator {
         }
 
         UUID execId = UUID.randomUUID();
-        String execNo = "ME" + System.currentTimeMillis();
+        String execNo = DailyBizNoSupport.next(jdbc, "maintenance_execution", "execution_no", "ME-");
         String planNo = Objects.toString(p.get("plan_no") != null ? p.get("plan_no") : p.get("plan_code"), null);
         String templateName = Objects.toString(
                 p.get("template_name") != null ? p.get("template_name") : p.get("t_name"), null);
@@ -102,7 +103,7 @@ public class MaintenanceExecutionGenerator {
         if (template.isEmpty()) throw new BizException(404, "模板不存在");
 
         UUID execId = UUID.randomUUID();
-        String execNo = "ME" + System.currentTimeMillis();
+        String execNo = DailyBizNoSupport.next(jdbc, "maintenance_execution", "execution_no", "ME-");
         String userId = TenantContext.getUserId();
         String templateName = body.get("template_name") != null
                 ? body.get("template_name").toString()

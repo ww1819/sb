@@ -185,8 +185,4 @@ public class MetrologyExecutionController {
                 row.get("device_name"), orgName, row.get("planned_date"), nextDue,
                 row.get("certificate_no"), row.get("certificate_url"), row.get("overall_result"), row.get("cost"));
     }
-
-    static String nextNo() {
-        return "ME" + System.currentTimeMillis();
-    }
 }
