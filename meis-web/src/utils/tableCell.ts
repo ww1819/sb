@@ -51,7 +51,7 @@ export function statusTagType(value: unknown): StatusTagType {
   if (['pending', 'processing', 'waiting', '审批中', '处理中', '进行中', '待'].some((k) => s.includes(k))) {
     return 'warning'
   }
-  if (['disabled', 'rejected', 'cancelled', 'failed', 'closed', 'scrap', '停用', '驳回', '取消', '报废', '关闭'].some((k) => s.includes(k))) {
+  if (['disabled', 'rejected', 'cancelled', 'failed', 'closed', 'scrap', 'returned', '停用', '驳回', '取消', '报废', '关闭', '退货', '已退货'].some((k) => s.includes(k))) {
     return 'danger'
   }
   return 'info'

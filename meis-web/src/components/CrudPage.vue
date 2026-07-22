@@ -98,6 +98,7 @@
       stripe
       class="system-table"
       :height="tableHeight"
+      :row-class-name="tableRowClassName"
       @row-dblclick="onRowDblClick"
       @selection-change="onSelectionChange"
     >
@@ -106,7 +107,7 @@
         v-if="showRowIndex"
         label="序号"
         width="64"
-        fixed="left"
+        :fixed="rowIndexFixed ? 'left' : undefined"
         align="center"
         class-name="col-row-index"
       >
@@ -358,6 +359,8 @@ const operationWidth = computed(() => {
 })
 const changeLogEnabled = computed(() => props.config.enableChangeLog !== false && viewEnabled.value)
 const showRowIndex = computed(() => props.config.showRowIndex === true)
+/** 默认固定；显式 `rowIndexFixed: false` 时随表格横滚 */
+const rowIndexFixed = computed(() => props.config.rowIndexFixed !== false)
 const showRowSelection = computed(() => props.config.showRowSelection === true)
 const hasSelectionColumn = computed(() => showRowSelection.value || showPinyinCode.value)
 const useActionsRowToolbar = computed(() => props.config.toolbarLayout === 'actions-row')
@@ -402,6 +405,13 @@ function setSort(prop: string, order: 'asc' | 'desc') {
 
 function rowSerial(index: number) {
   return (page.value - 1) * size.value + index + 1
+}
+
+/** 已退货行浅红底，便于一眼辨认（AST-UI-12） */
+function tableRowClassName({ row }: { row: Record<string, unknown> }) {
+  const status = String(row.device_status ?? '').toLowerCase()
+  if (status === 'returned' || status.includes('退货')) return 'row-status-returned'
+  return ''
 }
 
 const schema = computed(() => getSchema(props.config.table))
@@ -801,6 +811,9 @@ defineExpose({ load, getSelectedRows, selectedCount, selectedIds })
 :deep(.filter-item) {
   width: 160px;
 }
+:deep(.filter-item.el-select--multiple) {
+  width: 200px;
+}
 :deep(.filter-ref) {
   width: 180px;
 }
@@ -809,5 +822,11 @@ defineExpose({ load, getSelectedRows, selectedCount, selectedIds })
 }
 :deep(.filter-date) {
   width: 140px;
+}
+:deep(.el-table .row-status-returned > td.el-table__cell) {
+  background-color: #fef2f2 !important;
+}
+:deep(.el-table .row-status-returned:hover > td.el-table__cell) {
+  background-color: #fee2e2 !important;
 }
 </style>

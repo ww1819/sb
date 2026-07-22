@@ -95,8 +95,11 @@ public class AssetDeviceController {
             @RequestParam(value = "dept_name", required = false) String dept_name,
             @RequestParam(value = "manage_dept_name", required = false) String manage_dept_name,
             @RequestParam(value = "serial_number", required = false) String serial_number,
+            @RequestParam(value = "device_code", required = false) String device_code,
+            @RequestParam(value = "device_status", required = false) String device_status,
             @RequestParam(value = "warehouse_id", required = false) String warehouse_id,
-            @RequestParam(value = "stock_scope", required = false) String stock_scope) {
+            @RequestParam(value = "stock_scope", required = false) String stock_scope,
+            @RequestParam(value = "hide_returned", required = false) Boolean hide_returned) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d"));
         List<Object> args = new ArrayList<>();
@@ -105,6 +108,10 @@ public class AssetDeviceController {
             where.append(" AND d.warehouse_id IS NOT NULL ");
         } else if ("dept".equalsIgnoreCase(stock_scope)) {
             where.append(" AND d.warehouse_id IS NULL ");
+        }
+        // 资产登记：已退货不展示（AST-UI-12）；库存/综合查询等不传此参
+        if (Boolean.TRUE.equals(hide_returned)) {
+            where.append(" AND COALESCE(d.device_status, '') <> 'returned' ");
         }
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
             String kw = "%" + query.getKeyword().trim() + "%";
@@ -146,6 +153,8 @@ public class AssetDeviceController {
             appendNameOrPinyin(where, args, "mgr_dept.dept_name", "mgr_dept.pinyin_code", manage_dept_name);
         }
         appendLike(where, args, "d.serial_number", serial_number);
+        appendLike(where, args, "d.device_code", device_code);
+        appendStatusIn(where, args, "d.device_status", device_status);
         if (enable_dateFrom != null && !enable_dateFrom.isBlank()) {
             where.append(" AND d.enable_date >= ?::date ");
             args.add(enable_dateFrom.trim());
@@ -183,6 +192,24 @@ public class AssetDeviceController {
         if (!hasText(value)) return;
         where.append(" AND ").append(column).append(" ILIKE ? ");
         args.add("%" + value.trim() + "%");
+    }
+
+    /** 设备状态多选：逗号分隔码值 → IN (...)（AST-UI-12） */
+    private static void appendStatusIn(StringBuilder where, List<Object> args, String column, String csv) {
+        if (!hasText(csv)) return;
+        List<String> values = Arrays.stream(csv.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .distinct()
+                .toList();
+        if (values.isEmpty()) return;
+        where.append(" AND ").append(column).append(" IN (");
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0) where.append(',');
+            where.append('?');
+            args.add(values.get(i));
+        }
+        where.append(") ");
     }
 
     private static void appendUuidEq(StringBuilder where, List<Object> args, String column, String value) {
