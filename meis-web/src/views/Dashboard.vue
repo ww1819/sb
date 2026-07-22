@@ -58,6 +58,7 @@
               </ProgressCircle>
             </div>
           </el-card>
+          <TrafficWayChart />
         </el-tab-pane>
 
         <el-tab-pane v-if="activeCharts.length" name="charts" lazy>
@@ -112,6 +113,7 @@ import ChartCard from '@/components/dashboard/ChartCard.vue'
 import QuickEntryGrid from '@/components/dashboard/QuickEntryGrid.vue'
 import FeedList from '@/components/dashboard/FeedList.vue'
 import ProgressCircle, { type ProgressCircleVariant } from '@/components/ProgressCircle.vue'
+import TrafficWayChart from '@/components/dashboard/TrafficWayChart.vue'
 import {
   buildBarOption,
   buildLineOption,
