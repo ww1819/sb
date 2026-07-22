@@ -946,11 +946,11 @@ CROSS JOIN sys_menu m
 WHERE m.menu_code = 'ops_maintain'
 ON CONFLICT DO NOTHING;
 
--- ---------- INS-UI-01 / MET-UI-01：巡检挂保养下（四级）；计量管理仍为运维二级 ----------
--- 终态：运维 → 保养管理 → 巡检管理 → 巡检*；运维 → 计量管理 → 计量*
+-- ---------- INS-UI-01 / MET-UI-01：巡检、计量二级分组（巡检终态见文末 INS-UI-01c：与保养同级） ----------
+-- 终态：运维 → 保养管理；运维 → 巡检管理；运维 → 计量管理 → 计量*
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
-('ops_inspect', 'ops_maintain', '巡检管理', 'group', NULL, 5),
-('ops_metrology', 'mod_ops', '计量管理', 'group', NULL, 3)
+('ops_inspect', 'mod_ops', '巡检管理', 'group', NULL, 3),
+('ops_metrology', 'mod_ops', '计量管理', 'group', NULL, 4)
 ON CONFLICT (menu_code) DO UPDATE SET
     parent_code = EXCLUDED.parent_code,
     menu_name = EXCLUDED.menu_name,
@@ -1037,11 +1037,13 @@ UPDATE sys_menu SET parent_code = 'mod_ops', menu_name = '电流监测', menu_ty
     path = NULL, sort_order = 4, is_active = TRUE
 WHERE menu_code = 'mod_power';
 
--- 运维二级分组顺序：维修 → 保养（含巡检） → 计量 → 电流监测
+-- 运维二级分组顺序：维修 → 保养 → 巡检 → 计量 → 电流监测（INS-UI-01c 巡检与保养同级）
 UPDATE sys_menu SET sort_order = 1, is_active = TRUE WHERE menu_code = 'ops_repair';
 UPDATE sys_menu SET sort_order = 2, is_active = TRUE WHERE menu_code = 'ops_maintain';
-UPDATE sys_menu SET parent_code = 'ops_maintain', sort_order = 5, is_active = TRUE WHERE menu_code = 'ops_inspect';
-UPDATE sys_menu SET sort_order = 3, is_active = TRUE WHERE menu_code = 'ops_metrology';
+UPDATE sys_menu SET parent_code = 'mod_ops', menu_name = '巡检管理', menu_type = 'group', path = NULL,
+    sort_order = 3, is_active = TRUE
+WHERE menu_code = 'ops_inspect';
+UPDATE sys_menu SET sort_order = 4, is_active = TRUE WHERE menu_code = 'ops_metrology';
 
 INSERT INTO sys_package_menu (package_code, menu_code)
 SELECT pkg, m.menu_code
@@ -1400,4 +1402,63 @@ WHERE m.menu_code IN (
     'analytics_depr_stats', 'analytics_depr_ratio', 'analytics_depr_detail',
     'analytics_asset_change', 'analytics_asset_occupy', 'analytics_asset_transfer'
 )
+ON CONFLICT DO NOTHING;
+
+-- ---------- INS-UI-01c：巡检管理改回运维二级；保养/巡检/PM 设备过滤页挂入对应分组 ----------
+-- 终态：运维 → 维修 → 保养 → 巡检 → 计量 → 电流监测
+UPDATE sys_menu SET parent_code = 'mod_ops', menu_name = '巡检管理', menu_type = 'group', path = NULL,
+    sort_order = 3, is_active = TRUE
+WHERE menu_code = 'ops_inspect';
+
+UPDATE sys_menu SET sort_order = 1, is_active = TRUE WHERE menu_code = 'ops_repair';
+UPDATE sys_menu SET sort_order = 2, is_active = TRUE WHERE menu_code = 'ops_maintain';
+UPDATE sys_menu SET sort_order = 3, is_active = TRUE WHERE menu_code = 'ops_inspect';
+UPDATE sys_menu SET sort_order = 4, is_active = TRUE WHERE menu_code = 'ops_metrology';
+UPDATE sys_menu SET parent_code = 'mod_ops', menu_name = '电流监测', menu_type = 'group',
+    path = NULL, sort_order = 5, is_active = TRUE
+WHERE menu_code = 'mod_power';
+
+-- 设备过滤页：挂入对应分组（不再直挂 mod_ops）
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('maintain_device', 'ops_maintain', '保养设备管理', 'menu', '/maintain/device', 5),
+('inspect_device', 'ops_inspect', '巡检设备管理', 'menu', '/inspect/device', 5),
+('pm_device', 'qc_pm_group', 'PM设备管理', 'menu', '/pm/device', 5)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    menu_type = EXCLUDED.menu_type,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+-- 保养/巡检叶子排序加固
+UPDATE sys_menu SET parent_code = 'ops_maintain', menu_name = '保养参数设置', path = '/maintain/param',
+    sort_order = 1, is_active = TRUE WHERE menu_code = 'maintain_param';
+UPDATE sys_menu SET parent_code = 'ops_maintain', menu_name = '保养计划', path = '/maintain/plan',
+    sort_order = 2, is_active = TRUE WHERE menu_code = 'maintain_plan';
+UPDATE sys_menu SET parent_code = 'ops_maintain', menu_name = '保养执行', path = '/maintain/execution',
+    sort_order = 3, is_active = TRUE WHERE menu_code = 'maintain_execution';
+UPDATE sys_menu SET parent_code = 'ops_maintain', menu_name = '保养记录查询', path = '/maintain/query',
+    sort_order = 4, is_active = TRUE WHERE menu_code = 'maintain_query';
+
+UPDATE sys_menu SET parent_code = 'ops_inspect', menu_name = '巡检参数设置', path = '/inspect/param',
+    sort_order = 1, is_active = TRUE WHERE menu_code = 'inspect_param';
+UPDATE sys_menu SET parent_code = 'ops_inspect', menu_name = '巡检计划', path = '/inspect/plan',
+    sort_order = 2, is_active = TRUE WHERE menu_code = 'inspect_plan';
+UPDATE sys_menu SET parent_code = 'ops_inspect', menu_name = '巡检执行', path = '/inspect/execution',
+    sort_order = 3, is_active = TRUE WHERE menu_code = 'inspect_execution';
+UPDATE sys_menu SET parent_code = 'ops_inspect', menu_name = '巡检记录查询', path = '/inspect/query',
+    sort_order = 4, is_active = TRUE WHERE menu_code = 'inspect_query';
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship'), ('professional')) AS p(pkg)
+CROSS JOIN (VALUES ('maintain_device'), ('inspect_device'), ('pm_device')) AS m(menu_code)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN (VALUES ('maintain_device'), ('inspect_device'), ('pm_device')) AS m(menu_code)
+WHERE t.status = 'active'
 ON CONFLICT DO NOTHING;
