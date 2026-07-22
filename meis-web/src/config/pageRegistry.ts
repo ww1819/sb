@@ -62,6 +62,8 @@ export interface PageConfig {
   enableChangeLog?: boolean
   /** 列表首列显示分页序号 */
   showRowIndex?: boolean
+  /** 序号列是否固定左侧（默认 true；false 时随表格横滚，AST-UI-12） */
+  rowIndexFixed?: boolean
   /** 序号列前显示多选框 */
   showRowSelection?: boolean
   /**
@@ -340,14 +342,25 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'medical_device',
     listPageUrl: '/asset/device/page',
     showRowIndex: true,
+    rowIndexFixed: false,
     showRowSelection: true,
     keepFormOpenAfterSave: true,
     sortableColumns: ['device_code', 'device_name', 'specification', 'dept_name'],
+    listParams: { hide_returned: true },
     listFilters: [
       { key: 'enable_dateFrom', label: '起', type: 'date', actionBar: true },
-      { key: 'enable_dateTo', label: '止', type: 'date', actionBar: true }
+      { key: 'enable_dateTo', label: '止', type: 'date', actionBar: true },
+      {
+        key: 'device_status',
+        label: '设备状态',
+        dictType: 'device_status',
+        multiple: true,
+        actionBar: true,
+        dictValues: ['normal', 'in_use', 'maintenance', 'scrap', 'pending_verify']
+      }
     ],
     moreSearchFields: [
+      { key: 'device_code', label: '资产编码', placeholder: '资产编码模糊' },
       { key: 'supplier_id', label: '供应商', placeholder: '供应商名称/编码', linkTable: 'supplier' },
       { key: 'manufacturer_id', label: '生产厂家', placeholder: '生产厂家名称/编码', linkTable: 'manufacturer' },
       { key: 'device_name', label: '资产名称', placeholder: '资产名称/简码' },
