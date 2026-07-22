@@ -1348,3 +1348,56 @@ FROM sys_tenant t
 CROSS JOIN sys_menu m
 WHERE m.menu_code IN ('warehouse_scrap_review', 'warehouse_scrap_query')
 ON CONFLICT DO NOTHING;
+
+-- ---------- ANA-UI-03：资产报表统计分组（迁入统计报表 + 9 个资产报表叶子） ----------
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
+('analytics_asset_report_group', 'mod_analytics', '资产报表统计', 'group', NULL, 3),
+('analytics_asset_usage', 'analytics_asset_report_group', '资产使用率统计', 'menu', '/analytics/asset-usage', 2),
+('analytics_value_structure', 'analytics_asset_report_group', '价值结构分析表', 'menu', '/analytics/value-structure', 3),
+('analytics_depr_due', 'analytics_asset_report_group', '折旧到期汇总', 'menu', '/analytics/depr-due', 4),
+('analytics_depr_stats', 'analytics_asset_report_group', '资产折旧统计', 'menu', '/analytics/depr-stats', 5),
+('analytics_depr_ratio', 'analytics_asset_report_group', '折旧明细比例', 'menu', '/analytics/depr-ratio', 6),
+('analytics_depr_detail', 'analytics_asset_report_group', '折旧详情', 'menu', '/analytics/depr-detail', 7),
+('analytics_asset_change', 'analytics_asset_report_group', '资产增减统计', 'menu', '/analytics/asset-change', 8),
+('analytics_asset_occupy', 'analytics_asset_report_group', '资产占用统计', 'menu', '/analytics/asset-occupy', 9),
+('analytics_asset_transfer', 'analytics_asset_report_group', '资产异动统计', 'menu', '/analytics/asset-transfer', 10)
+ON CONFLICT (menu_code) DO UPDATE SET
+    parent_code = EXCLUDED.parent_code,
+    menu_name = EXCLUDED.menu_name,
+    menu_type = EXCLUDED.menu_type,
+    path = EXCLUDED.path,
+    sort_order = EXCLUDED.sort_order,
+    is_active = TRUE;
+
+-- 统计报表迁入「资产报表统计」
+UPDATE sys_menu SET parent_code = 'analytics_asset_report_group', menu_name = '统计报表', path = '/analytics/reports',
+    sort_order = 1, is_active = TRUE
+WHERE menu_code = 'analytics_reports';
+
+UPDATE sys_menu SET sort_order = 1, is_active = TRUE WHERE menu_code = 'analytics_benefit_group';
+UPDATE sys_menu SET sort_order = 2, is_active = TRUE WHERE menu_code = 'analytics_efficiency';
+UPDATE sys_menu SET sort_order = 3, is_active = TRUE WHERE menu_code = 'analytics_asset_report_group';
+
+INSERT INTO sys_package_menu (package_code, menu_code)
+SELECT pkg, m.menu_code
+FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN (
+    'analytics_asset_report_group',
+    'analytics_asset_usage', 'analytics_value_structure', 'analytics_depr_due',
+    'analytics_depr_stats', 'analytics_depr_ratio', 'analytics_depr_detail',
+    'analytics_asset_change', 'analytics_asset_occupy', 'analytics_asset_transfer'
+)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO sys_tenant_menu (tenant_id, menu_code)
+SELECT t.id, m.menu_code
+FROM sys_tenant t
+CROSS JOIN sys_menu m
+WHERE m.menu_code IN (
+    'analytics_asset_report_group',
+    'analytics_asset_usage', 'analytics_value_structure', 'analytics_depr_due',
+    'analytics_depr_stats', 'analytics_depr_ratio', 'analytics_depr_detail',
+    'analytics_asset_change', 'analytics_asset_occupy', 'analytics_asset_transfer'
+)
+ON CONFLICT DO NOTHING;

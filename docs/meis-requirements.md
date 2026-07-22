@@ -1424,7 +1424,17 @@
 | **效率分析**（二级） | — | 分组 `analytics_efficiency`（ANA-UI-02） |
 | └ 效率分析 | `/analytics/efficiency` | 业务见 BACKLOG-ANA-01 |
 | └ 收费项目审核 | `/analytics/charge-audit` | ANA-UI-02 新增；业务见 BACKLOG-ANA-03 |
-| 统计报表 | `/analytics/reports` | |
+| **资产报表统计**（二级） | — | 分组 `analytics_asset_report_group`（ANA-UI-03） |
+| └ 统计报表 | `/analytics/reports` | 自数据决策直挂迁入 |
+| └ 资产使用率统计 | `/analytics/asset-usage` | 占位；业务见 BACKLOG-ANA-04 |
+| └ 价值结构分析表 | `/analytics/value-structure` | 占位；业务见 BACKLOG-ANA-05 |
+| └ 折旧到期汇总 | `/analytics/depr-due` | 占位；业务见 BACKLOG-ANA-06 |
+| └ 资产折旧统计 | `/analytics/depr-stats` | 占位；业务见 BACKLOG-ANA-07 |
+| └ 折旧明细比例 | `/analytics/depr-ratio` | 占位；业务见 BACKLOG-ANA-08 |
+| └ 折旧详情 | `/analytics/depr-detail` | 占位；业务见 BACKLOG-ANA-09 |
+| └ 资产增减统计 | `/analytics/asset-change` | 占位；业务见 BACKLOG-ANA-10 |
+| └ 资产占用统计 | `/analytics/asset-occupy` | 占位；业务见 BACKLOG-ANA-11 |
+| └ 资产异动统计 | `/analytics/asset-transfer` | 占位；业务见 BACKLOG-ANA-12 |
 
 **ANA-UI-01 定稿（2026-07-20）**
 
@@ -1441,10 +1451,21 @@
 | **新增** | 效益分析查询 `/analytics/benefit-query` |
 | **效率分析** | 改为二级分组；下挂「效率分析」「收费项目审核」 |
 
+**ANA-UI-03 定稿（2026-07-22）**
+
+| 项 | 定稿 |
+|----|------|
+| **资产报表统计** | 数据决策下新增二级分组 `analytics_asset_report_group`（sort=3，效益/效率之后） |
+| **迁入** | 现有「统计报表」`analytics_reports` 父级改为该分组，path 仍为 `/analytics/reports` |
+| **新增叶子（9）** | 资产使用率统计、价值结构分析表、折旧到期汇总、资产折旧统计、折旧明细比例、折旧详情、资产增减统计、资产占用统计、资产异动统计 |
+| **本期范围** | 仅菜单入口 + 前端占位页；业务报表另开 BACKLOG-ANA-04~12 |
+| **授权** | 写入 `sys_package_menu`（standard/flagship）与 `sys_tenant_menu` |
+
 **需求摘要（待补充）**：
 
 - [x] ANA-UI-01 效益分析分组 + 效率分析菜单
 - [x] ANA-UI-02 效益分析子菜单更名/增查询；效率分析分组（效率分析、收费项目审核）
+- [x] ANA-UI-03 资产报表统计分组：迁入统计报表 + 9 个资产报表叶子（占位）
 - [ ] ANA-B-01 效益指标定义（使用率、利润率、机时等）
 - [ ] ANA-F-01 HIS/PACS 数据对照与同步
 - [ ] ANA-F-02 成本项归集规则
@@ -1862,6 +1883,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+| 2.66 | 2026-07-22 16:05:00 | — | ANA-UI-03：数据决策下增资产报表统计分组，迁入统计报表并挂 9 个占位叶子 |
 | 2.65 | 2026-07-22 11:35:00 | — | DASH-UI-05 补：去掉深蓝底；扇区悬停放大+Tooltip |
 | 2.64 | 2026-07-22 11:30:00 | — | DASH-UI-05：日常办公状态概览下增加交通方式环形图（仅前端示意） |
 | 2.63 | 2026-07-22 11:12:00 | — | DASH-UI-02 补：三饼图置顶，维修趋势/品牌 TOP10 下移 |
@@ -2063,6 +2085,15 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | BACKLOG-ANA-01 | 效益 | 效率分析完整业务（指标、图表、导出） | ANA-UI-01/02 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-ANA-02 | 效益 | 效益分析查询完整业务 | ANA-UI-02 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-ANA-03 | 效益 | 收费项目审核完整业务 | ANA-UI-02 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
+| BACKLOG-ANA-04 | 效益 | 资产使用率统计 | ANA-UI-03 菜单已挂 | P2 | 先菜单入口；业务待排期 | 可排期 |
+| BACKLOG-ANA-05 | 效益 | 价值结构分析表 | ANA-UI-03 菜单已挂 | P2 | 先菜单入口；业务待排期 | 可排期 |
+| BACKLOG-ANA-06 | 效益 | 折旧到期汇总 | ANA-UI-03 菜单已挂 | P2 | 先菜单入口；业务待排期 | 可排期 |
+| BACKLOG-ANA-07 | 效益 | 资产折旧统计 | ANA-UI-03 菜单已挂 | P2 | 先菜单入口；业务待排期 | 可排期 |
+| BACKLOG-ANA-08 | 效益 | 折旧明细比例 | ANA-UI-03 菜单已挂 | P2 | 先菜单入口；业务待排期 | 可排期 |
+| BACKLOG-ANA-09 | 效益 | 折旧详情 | ANA-UI-03 菜单已挂 | P2 | 先菜单入口；业务待排期 | 可排期 |
+| BACKLOG-ANA-10 | 效益 | 资产增减统计 | ANA-UI-03 菜单已挂 | P2 | 先菜单入口；业务待排期 | 可排期 |
+| BACKLOG-ANA-11 | 效益 | 资产占用统计 | ANA-UI-03 菜单已挂 | P2 | 先菜单入口；业务待排期 | 可排期 |
+| BACKLOG-ANA-12 | 效益 | 资产异动统计 | ANA-UI-03 菜单已挂 | P2 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-PLT-W02 | 跨模块 | 非维修业务责任人姓名快照（出入库 operator、不良事件 reporter/handler、验收成员等） | 附录 W.5.3 | P1 | 审计三列与维修责任人先落地 | 可排期 |
 | BACKLOG-MP-01 | 小程序 | uni-app 一期：扫码查询/报修/保养/巡检/PM（在线，同后端同权限） | 附录 MP | P1 | — | 已完成 |
 | BACKLOG-MOB-08 | 移动端 | 离线盘点下载/回传 + 登录缓存权限 + 台账增量同步 | MOB.8 | P0 | — | 已完成 |
