@@ -56,12 +56,13 @@ class _OpsExecDetailPageState extends ConsumerState<OpsExecDetailPage> {
         }
       }
       if (found == null) throw ApiException('明细不存在');
-      final rawResults = found['results'] is List ? found['results'] as List : [];
+      final itemMap = found;
+      final rawResults = itemMap['results'] is List ? itemMap['results'] as List : [];
       setState(() {
         exec = map;
-        item = found;
-        itemPhotos = _asUrlList(found['photos']);
-        signatureUrl = found['signature_url']?.toString();
+        item = itemMap;
+        itemPhotos = _asUrlList(itemMap['photos']);
+        signatureUrl = itemMap['signature_url']?.toString();
         results = rawResults.map((e) {
           final m = Map<String, dynamic>.from(e as Map);
           return _ResultRow(
@@ -92,9 +93,24 @@ class _OpsExecDetailPageState extends ConsumerState<OpsExecDetailPage> {
     return [];
   }
 
-  bool get editable {
+  bool get headerEditable {
     final st = exec?['status']?.toString();
     return st == 'draft' || st == 'in_progress' || st == 'pending';
+  }
+
+  /// OPS.16.17 / 16.22：头表可编且明细未确认才可改
+  bool get editable {
+    final itemSt = item?['status']?.toString();
+    return headerEditable && itemSt != 'confirmed';
+  }
+
+  bool get canConfirmItem {
+    final itemSt = item?['status']?.toString();
+    return headerEditable && itemSt != 'confirmed';
+  }
+
+  String get completeLabel {
+    return item?['status']?.toString() == 'completed' ? '保存修改' : '完成本设备项';
   }
 
   Future<void> ensureStarted() async {
@@ -206,26 +222,32 @@ class _OpsExecDetailPageState extends ConsumerState<OpsExecDetailPage> {
     }
   }
 
-  Future<void> submit() async {
+  Future<void> confirmItem() async {
+    if (!canConfirmItem) return;
+    final st = item?['status']?.toString() ?? '';
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('提交执行单'),
-        content: const Text('提交后不可修改（可撤回）。是否继续？'),
+        title: const Text('确认明细'),
+        content: Text(
+          st == 'completed'
+              ? '确认该设备执行结果？'
+              : '结果未填完也可确认，将自动记为已完成再确认。是否继续？',
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('提交')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确认')),
         ],
       ),
     );
     if (ok != true) return;
     setState(() => saving = true);
     try {
-      await api.postData('${cfg.executionBase}/${widget.executionId}/submit', {'client': 'app'});
+      await api.postData('${cfg.executionBase}/item/${widget.itemId}/confirm', {'client': 'app'});
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已提交')));
-        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已确认')));
       }
+      await load();
     } on ApiException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -266,10 +288,6 @@ class _OpsExecDetailPageState extends ConsumerState<OpsExecDetailPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(exec?['execution_no']?.toString() ?? '执行明细'),
-        actions: [
-          if (editable)
-            TextButton(onPressed: saving ? null : submit, child: const Text('提交')),
-        ],
       ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
@@ -281,6 +299,11 @@ class _OpsExecDetailPageState extends ConsumerState<OpsExecDetailPage> {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 Text('状态：${exec?['status'] ?? ''} / 明细：${item?['status'] ?? ''}'),
+                if (item?['status']?.toString() == 'confirmed')
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text('已确认，不可再修改', style: TextStyle(color: Colors.orange)),
+                  ),
                 const SizedBox(height: 12),
                 ...results.map((r) => Card(
                       margin: const EdgeInsets.only(bottom: 8),
@@ -355,7 +378,14 @@ class _OpsExecDetailPageState extends ConsumerState<OpsExecDetailPage> {
                     onPressed: saving ? null : complete,
                     child: saving
                         ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Text('完成本设备检查'),
+                        : Text(completeLabel),
+                  ),
+                ],
+                if (canConfirmItem) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: saving ? null : confirmItem,
+                    child: const Text('确认本设备项'),
                   ),
                 ],
               ],

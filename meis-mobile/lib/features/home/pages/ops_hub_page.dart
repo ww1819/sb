@@ -209,7 +209,7 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
     } catch (_) {}
     if (!mounted) return;
     if (plans.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('暂无已审核计划可纳入')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('暂无可申请计划（已含该设备或有待确认申请）')));
       return;
     }
     final picked = await showModalBottomSheet<Map<String, dynamic>>(
@@ -217,15 +217,32 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
       isScrollControlled: true,
       builder: (ctx) => SafeArea(
         child: SizedBox(
-          height: MediaQuery.of(ctx).size.height * 0.5,
-          child: ListView(
+          height: MediaQuery.of(ctx).size.height * 0.7,
+          child: Column(
             children: [
-              const ListTile(title: Text('选择目标计划')),
-              ...plans.map(
-                (p) => ListTile(
-                  title: Text(p['plan_name']?.toString() ?? p['plan_no']?.toString() ?? ''),
-                  subtitle: Text('${p['plan_no'] ?? ''} · ${p['template_name'] ?? ''}'),
-                  onTap: () => Navigator.pop(ctx, p),
+              const ListTile(
+                title: Text('选择目标计划'),
+                subtitle: Text('仅显示明细中无该设备且无待确认申请的已审核计划'),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: plans.length,
+                  itemBuilder: (_, i) {
+                    final p = plans[i];
+                    final due = p['next_due_date']?.toString() ?? '—';
+                    final dept = p['dept_name']?.toString() ?? '';
+                    final cycle = p['cycle_days'] != null ? '${p['cycle_days']}天' : '';
+                    return ListTile(
+                      title: Text(p['plan_name']?.toString() ?? p['plan_no']?.toString() ?? ''),
+                      subtitle: Text(
+                        '${p['plan_no'] ?? ''} · ${p['template_name'] ?? ''} · ${p['type_label'] ?? ''}\n'
+                        '$dept · $cycle · 到期 $due · 明细 ${p['item_count'] ?? 0}',
+                      ),
+                      isThreeLine: true,
+                      onTap: () => Navigator.pop(ctx, p),
+                    );
+                  },
                 ),
               ),
             ],
@@ -260,12 +277,11 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
     try {
       final raw = await api.getList('${cfg.executionBase}/by-device/$deviceId', query: {'openOnly': true});
       var items = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-      if (forConfirm) {
-        items = items.where((it) {
-          final s = it['status']?.toString() ?? '';
-          return s != 'confirmed';
-        }).toList();
-      }
+      // OPS.16.17：执行入口排除已确认；确认入口排除已确认
+      items = items.where((it) {
+        final s = it['status']?.toString() ?? '';
+        return s != 'confirmed';
+      }).toList();
       if (!mounted) return;
       if (items.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -276,19 +292,22 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
       if (forConfirm) {
         final picked = await showModalBottomSheet<Map<String, dynamic>>(
           context: context,
+          isScrollControlled: true,
           builder: (ctx) => SafeArea(
-            child: ListView(
-              shrinkWrap: true,
-              children: [
-                const ListTile(title: Text('选择要确认的明细')),
-                ...items.map(
-                  (it) => ListTile(
-                    title: Text(it['execution_no']?.toString() ?? ''),
-                    subtitle: Text('${it['status'] ?? ''} · ${it['source_type'] ?? ''}'),
-                    onTap: () => Navigator.pop(ctx, it),
+            child: SizedBox(
+              height: MediaQuery.of(ctx).size.height * 0.55,
+              child: ListView(
+                children: [
+                  const ListTile(title: Text('选择要确认的明细')),
+                  ...items.map(
+                    (it) => ListTile(
+                      title: Text(it['execution_no']?.toString() ?? ''),
+                      subtitle: Text('${it['status'] ?? ''} · ${it['source_type'] ?? ''}'),
+                      onTap: () => Navigator.pop(ctx, it),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -319,24 +338,28 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
       }
       await showModalBottomSheet<void>(
         context: context,
+        isScrollControlled: true,
         builder: (ctx) => SafeArea(
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              const ListTile(title: Text('选择执行明细')),
-              ...items.map((it) {
-                final execId = it['execution_id']?.toString();
-                final itemId = it['id']?.toString();
-                return ListTile(
-                  title: Text(it['execution_no']?.toString() ?? ''),
-                  subtitle: Text('${it['execution_status'] ?? ''} · ${it['status'] ?? ''}'),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    if (execId != null && itemId != null) openDetail(execId, itemId);
-                  },
-                );
-              }),
-            ],
+          child: SizedBox(
+            height: MediaQuery.of(ctx).size.height * 0.55,
+            child: ListView(
+              children: [
+                const ListTile(title: Text('选择执行明细')),
+                ...items.map((it) {
+                  final execId = it['execution_id']?.toString();
+                  final itemId = it['id']?.toString();
+                  final st = it['status']?.toString() ?? '';
+                  return ListTile(
+                    title: Text(it['execution_no']?.toString() ?? ''),
+                    subtitle: Text('${it['execution_status'] ?? ''} · $st${st == 'completed' ? '（可修改）' : ''}'),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      if (execId != null && itemId != null) openDetail(execId, itemId);
+                    },
+                  );
+                }),
+              ],
+            ),
           ),
         ),
       );
@@ -345,6 +368,19 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
       }
     }
+  }
+
+  int? _calcCycleDays(String? type, int? value) {
+    if (type == null || value == null || value <= 0) return null;
+    const unit = {'day': 1, 'week': 7, 'month': 30, 'year': 365};
+    final u = unit[type];
+    if (u == null) return null;
+    return u * value;
+  }
+
+  String _today() {
+    final n = DateTime.now();
+    return '${n.year.toString().padLeft(4, '0')}-${n.month.toString().padLeft(2, '0')}-${n.day.toString().padLeft(2, '0')}';
   }
 
   Future<void> createAdHoc(Map<String, dynamic> device) async {
@@ -360,42 +396,108 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
       return;
     }
     Map<String, dynamic>? selected = templates.first;
-    final levelCtrl = TextEditingController();
+    final levelCtrl = TextEditingController(
+      text: selected?[cfg.levelField]?.toString() ??
+          selected?['maintenance_level']?.toString() ??
+          selected?['inspection_type']?.toString() ??
+          selected?['pm_type']?.toString() ??
+          '',
+    );
+    var cycleType = selected?['cycle_type']?.toString() ?? 'month';
+    final cycleValueCtrl = TextEditingController(text: selected?['cycle_value']?.toString() ?? '1');
+    var plannedDate = _today();
+
+    void applyTemplate(Map<String, dynamic> t, void Function(void Function()) setLocal) {
+      selected = t;
+      final lv = t[cfg.levelField]?.toString() ??
+          t['maintenance_level']?.toString() ??
+          t['inspection_type']?.toString() ??
+          t['pm_type']?.toString();
+      if (lv != null && lv.isNotEmpty) levelCtrl.text = lv;
+      if (t['cycle_type'] != null) cycleType = t['cycle_type'].toString();
+      if (t['cycle_value'] != null) cycleValueCtrl.text = t['cycle_value'].toString();
+      setLocal(() {});
+    }
+
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          title: const Text('无计划直开'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  initialValue: selected?['id']?.toString(),
-                  decoration: const InputDecoration(labelText: '模板'),
-                  items: templates
-                      .map((t) => DropdownMenuItem(
-                            value: t['id']?.toString(),
-                            child: Text(t['template_name']?.toString() ?? t['id']?.toString() ?? ''),
-                          ))
-                      .toList(),
-                  onChanged: (v) {
-                    selected = templates.firstWhere((t) => t['id']?.toString() == v, orElse: () => templates.first);
-                    setLocal(() {});
-                  },
-                ),
-                TextField(
-                  controller: levelCtrl,
-                  decoration: InputDecoration(labelText: cfg.levelLabel),
-                ),
-              ],
+        builder: (ctx, setLocal) {
+          final days = _calcCycleDays(cycleType, int.tryParse(cycleValueCtrl.text.trim()));
+          return AlertDialog(
+            title: const Text('无计划直开'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    initialValue: selected?['id']?.toString(),
+                    decoration: const InputDecoration(labelText: '模板'),
+                    items: templates
+                        .map((t) => DropdownMenuItem(
+                              value: t['id']?.toString(),
+                              child: Text(t['template_name']?.toString() ?? t['id']?.toString() ?? ''),
+                            ))
+                        .toList(),
+                    onChanged: (v) {
+                      final t = templates.firstWhere((x) => x['id']?.toString() == v, orElse: () => templates.first);
+                      applyTemplate(t, setLocal);
+                    },
+                  ),
+                  TextField(
+                    controller: levelCtrl,
+                    decoration: InputDecoration(labelText: cfg.levelLabel),
+                  ),
+                  DropdownButtonFormField<String>(
+                    initialValue: cycleType,
+                    decoration: const InputDecoration(labelText: '周期类型'),
+                    items: const [
+                      DropdownMenuItem(value: 'day', child: Text('天')),
+                      DropdownMenuItem(value: 'week', child: Text('周')),
+                      DropdownMenuItem(value: 'month', child: Text('月')),
+                      DropdownMenuItem(value: 'year', child: Text('年')),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) setLocal(() => cycleType = v);
+                    },
+                  ),
+                  TextField(
+                    controller: cycleValueCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(labelText: '周期值${days != null ? '（$days 天）' : ''}'),
+                    onChanged: (_) => setLocal(() {}),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('执行日期'),
+                    subtitle: Text(plannedDate),
+                    trailing: const Icon(Icons.calendar_today),
+                    onTap: () async {
+                      final initial = DateTime.tryParse(plannedDate) ?? DateTime.now();
+                      final picked = await showDatePicker(
+                        context: ctx,
+                        initialDate: initial,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2040),
+                      );
+                      if (picked != null) {
+                        setLocal(() {
+                          plannedDate =
+                              '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+                        });
+                      }
+                    },
+                  ),
+                  Text('起止默认 $plannedDate 00:00:00 ～ 23:59:59', style: Theme.of(ctx).textTheme.bodySmall),
+                ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('创建')),
-          ],
-        ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('创建')),
+            ],
+          );
+        },
       ),
     );
     if (ok != true || selected == null) return;
@@ -405,12 +507,26 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
       }
       return;
     }
+    final cycleValue = int.tryParse(cycleValueCtrl.text.trim());
+    final cycleDays = _calcCycleDays(cycleType, cycleValue);
+    if (cycleValue == null || cycleValue <= 0 || cycleDays == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请填写有效周期')));
+      }
+      return;
+    }
     try {
       final body = <String, dynamic>{
         'template_id': selected!['id'],
         'template_name': selected!['template_name'],
         cfg.levelField: levelCtrl.text.trim(),
         'device_id': device['id'],
+        'cycle_type': cycleType,
+        'cycle_value': cycleValue,
+        'cycle_days': cycleDays,
+        'planned_date': plannedDate,
+        'execute_start_time': '$plannedDate 00:00:00',
+        'execute_end_time': '$plannedDate 23:59:59',
         'client': 'app',
       };
       final created = await api.postData('${cfg.executionBase}/ad-hoc', body);

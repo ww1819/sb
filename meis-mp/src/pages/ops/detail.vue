@@ -5,7 +5,8 @@
       <view class="head">
         <text class="no">{{ exec?.execution_no || '执行明细' }}</text>
         <text class="meta">{{ item?.device_name }} · {{ item?.device_code }}</text>
-        <text class="status">状态：{{ exec?.status || '—' }}</text>
+        <text class="status">状态：{{ exec?.status || '—' }} / 明细：{{ item?.status || '—' }}</text>
+        <text v-if="String(item?.status) === 'confirmed'" class="locked">已确认，不可再修改</text>
       </view>
 
       <view v-for="(r, idx) in results" :key="r.id || idx" class="card">
@@ -71,9 +72,11 @@
         </view>
       </view>
 
-      <view v-if="editable" class="actions">
-        <button type="primary" :loading="saving" @click="complete">完成本设备项</button>
-        <button :loading="saving" @click="submit">提交执行单</button>
+      <view v-if="editable || canConfirmItem" class="actions">
+        <button v-if="editable" type="primary" :loading="saving" @click="complete">
+          {{ completeLabel }}
+        </button>
+        <button v-if="canConfirmItem" :loading="saving" @click="confirmItem">确认本设备项</button>
       </view>
     </template>
   </view>
@@ -119,9 +122,19 @@ const statusOpts = [
 ]
 
 const editable = computed(() => {
-  const st = String(exec.value?.status || '')
-  return st === 'draft' || st === 'in_progress' || st === 'pending'
+  const headerOk = ['draft', 'in_progress', 'pending'].includes(String(exec.value?.status || ''))
+  const itemSt = String(item.value?.status || '')
+  return headerOk && itemSt !== 'confirmed'
 })
+
+const canConfirmItem = computed(() => {
+  const headerOk = ['draft', 'in_progress', 'pending'].includes(String(exec.value?.status || ''))
+  return headerOk && String(item.value?.status || '') !== 'confirmed'
+})
+
+const completeLabel = computed(() =>
+  String(item.value?.status || '') === 'completed' ? '保存修改' : '完成本设备项'
+)
 
 onLoad((query) => {
   auth.restore()
@@ -270,22 +283,27 @@ async function complete() {
   }
 }
 
-async function submit() {
+async function confirmItem() {
+  if (!canConfirmItem.value) return
+  const st = String(item.value?.status || '')
   const ok = await new Promise<boolean>((resolve) => {
     uni.showModal({
-      title: '提交执行单',
-      content: '提交后不可修改（可撤回）。是否继续？',
+      title: '确认明细',
+      content:
+        st === 'completed'
+          ? '确认该设备执行结果？'
+          : '结果未填完也可确认，将自动记为已完成再确认。是否继续？',
       success: (res) => resolve(!!res.confirm)
     })
   })
   if (!ok) return
   saving.value = true
   try {
-    await http.post(`${cfg.value.executionBase}/${executionId.value}/submit`, { client: 'mp' })
-    uni.showToast({ title: '已提交', icon: 'success' })
-    setTimeout(() => uni.navigateBack(), 500)
+    await http.post(`${cfg.value.executionBase}/item/${itemId.value}/confirm`, { client: 'mp' })
+    uni.showToast({ title: '已确认', icon: 'success' })
+    await load()
   } catch (e: unknown) {
-    uni.showToast({ title: e instanceof Error ? e.message : '提交失败', icon: 'none' })
+    uni.showToast({ title: e instanceof Error ? e.message : '确认失败', icon: 'none' })
   } finally {
     saving.value = false
   }
@@ -320,6 +338,12 @@ async function submit() {
   margin-top: 8rpx;
   font-size: 24rpx;
   color: #667085;
+}
+.locked {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #d97706;
 }
 .card {
   background: #fff;
