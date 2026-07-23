@@ -45,14 +45,19 @@
           placeholder="备注"
         />
         <view class="photos">
-          <image
-            v-for="(u, i) in r.photos"
-            :key="u + i"
-            :src="u"
-            class="thumb"
-            mode="aspectFill"
-            @click="preview(r.photos, i)"
-          />
+          <view v-for="(u, i) in r.photos" :key="u + i" class="thumb-wrap">
+            <image
+              :src="u"
+              class="thumb"
+              mode="aspectFill"
+              @click="preview(r.photos, i)"
+            />
+            <text
+              v-if="editable"
+              class="thumb-del"
+              @click.stop="r.photos = r.photos.filter((_, j) => j !== i)"
+            >×</text>
+          </view>
           <button v-if="editable && r.photos.length < 6" size="mini" @click="addResultPhoto(r)">
             拍照
           </button>
@@ -62,14 +67,19 @@
       <view class="card">
         <text class="item-name">设备项附件</text>
         <view class="photos">
-          <image
-            v-for="(u, i) in itemPhotos"
-            :key="u + i"
-            :src="u"
-            class="thumb"
-            mode="aspectFill"
-            @click="preview(itemPhotos, i)"
-          />
+          <view v-for="(u, i) in itemPhotos" :key="u + i" class="thumb-wrap">
+            <image
+              :src="u"
+              class="thumb"
+              mode="aspectFill"
+              @click="preview(itemPhotos, i)"
+            />
+            <text
+              v-if="editable"
+              class="thumb-del"
+              @click.stop="itemPhotos = itemPhotos.filter((_, j) => j !== i)"
+            >×</text>
+          </view>
           <button v-if="editable && itemPhotos.length < 6" size="mini" @click="addItemPhoto">
             拍照
           </button>
@@ -126,8 +136,7 @@ const saving = ref(false)
 const statusOpts = [
   { value: 'pass', label: '合格' },
   { value: 'fail', label: '异常' },
-  { value: 'na', label: '不适用' },
-  { value: 'pending', label: '待检' }
+  { value: 'na', label: '不适用' }
 ]
 
 const editable = computed(() => {
@@ -424,11 +433,29 @@ async function confirmItem() {
   gap: 12rpx;
   align-items: center;
 }
+.thumb-wrap {
+  position: relative;
+  width: 120rpx;
+  height: 120rpx;
+}
 .thumb {
   width: 120rpx;
   height: 120rpx;
   border-radius: 8rpx;
   background: #eee;
+}
+.thumb-del {
+  position: absolute;
+  top: -8rpx;
+  right: -8rpx;
+  width: 36rpx;
+  height: 36rpx;
+  line-height: 32rpx;
+  text-align: center;
+  border-radius: 50%;
+  background: #d92d20;
+  color: #fff;
+  font-size: 28rpx;
 }
 .sign-row {
   margin-top: 20rpx;

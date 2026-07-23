@@ -46,7 +46,7 @@
         </view>
         <view class="tile-body">
           <text class="tile-title">扫码报修</text>
-          <text class="tile-desc">扫码或手输编码提交报修</text>
+          <text class="tile-desc">扫码填报；可存草稿后提交</text>
         </view>
         <text class="tile-arrow">›</text>
       </view>
@@ -59,7 +59,7 @@
       >
         <view class="tile-body">
           <text class="tile-title">我的报修 / 验收</text>
-          <text class="tile-desc">查看进度；待验收时可确认通过或拒绝</text>
+          <text class="tile-desc">申请单草稿·撤回；进度与验收</text>
         </view>
         <text class="tile-arrow">›</text>
       </view>

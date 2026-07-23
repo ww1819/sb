@@ -17,7 +17,7 @@
     >
       <text class="due-title">{{ row.device_name || row.device_code || '设备' }}</text>
       <text class="due-meta">
-        {{ row.plan_no || '' }} · 到期 {{ formatDate(row.next_due_date) }}
+        {{ row.device_code || '' }} · {{ row.plan_no || '' }} · 到期 {{ formatDate(row.next_due_date) }}
       </text>
     </view>
 
@@ -249,7 +249,9 @@ async function onDueTap(row: Record<string, unknown>) {
     await openDeviceTasks({
       id: row.device_id,
       device_code: row.device_code,
-      device_name: row.device_name
+      device_name: row.device_name,
+      dept_id: row.dept_id,
+      dept_name: row.dept_name
     })
   }
 }
@@ -285,8 +287,16 @@ async function applyInclude(device: Record<string, unknown>) {
       '申请纳入计划',
       plans.map((p) => ({
         key: String(p.id || ''),
-        title: String(p.plan_no || p.plan_name || p.id || ''),
-        subtitle: [p.plan_name, p.cycle_days != null ? `${p.cycle_days}天` : '']
+        title: String(p.plan_name || p.plan_no || p.id || ''),
+        subtitle: [
+          p.plan_no,
+          p.template_name,
+          p.type_label,
+          p.dept_name,
+          p.cycle_days != null ? `${p.cycle_days}天` : '',
+          p.next_due_date ? `到期 ${formatDate(p.next_due_date)}` : '',
+          p.item_count != null ? `明细 ${p.item_count}` : ''
+        ]
           .filter(Boolean)
           .join(' · '),
         raw: p
@@ -338,12 +348,17 @@ async function pickOpenItem(device: Record<string, unknown>, forConfirm: boolean
     }
     openPicker(
       forConfirm ? '确认明细' : '执行明细',
-      items.map((it) => ({
-        key: String(it.id || ''),
-        title: String(it.execution_no || it.id || ''),
-        subtitle: String(it.status || it.execution_status || ''),
-        raw: it
-      })),
+      items.map((it) => {
+        const st = String(it.status || it.execution_status || '')
+        return {
+          key: String(it.id || ''),
+          title: String(it.execution_no || it.id || ''),
+          subtitle: forConfirm
+            ? st
+            : `${st}${st === 'completed' ? '（可修改）' : ''}`,
+          raw: it
+        }
+      }),
       async (it) => {
         if (forConfirm) {
           const itemId = it.id?.toString()

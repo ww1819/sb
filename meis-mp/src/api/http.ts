@@ -115,6 +115,6 @@ export const http = {
     request<T>({ url, method: 'POST', data, auth }),
   put: <T = unknown>(url: string, data?: RequestOptions['data'], auth = true) =>
     request<T>({ url, method: 'PUT', data, auth }),
-  patch: <T = unknown>(url: string, data?: RequestOptions['data'], auth = true) =>
-    request<T>({ url, method: 'PATCH', data, auth })
+  delete: <T = unknown>(url: string, data?: RequestOptions['data'], auth = true) =>
+    request<T>({ url, method: 'DELETE', data, auth })
 }

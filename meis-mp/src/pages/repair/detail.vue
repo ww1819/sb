@@ -22,6 +22,12 @@
         <button type="primary" :loading="submitting" @click="verifyPass">验收通过</button>
         <button :loading="submitting" @click="verifyFail">拒绝验收</button>
       </view>
+      <view v-if="canWithdraw" class="actions">
+        <button :loading="submitting" @click="withdraw">撤回报修</button>
+      </view>
+      <view v-if="canEditDraft" class="actions">
+        <button type="primary" @click="editDraft">编辑草稿</button>
+      </view>
     </template>
   </view>
 </template>
@@ -60,6 +66,8 @@ function statusLabel(s: unknown) {
 }
 
 const canVerify = computed(() => wo.value?.status === 'pending_verify')
+const canEditDraft = computed(() => wo.value?.status === 'draft')
+const canWithdraw = computed(() => wo.value?.status === 'reported')
 
 onLoad((q) => {
   auth.restore()
@@ -95,17 +103,59 @@ async function verifyPass() {
     })
   })
   if (rating == null) return
+  const comment = await new Promise<string | null>((resolve) => {
+    uni.showModal({
+      title: '评价（可选）',
+      editable: true,
+      placeholderText: '可填写满意度评价',
+      success: (res) => {
+        if (!res.confirm) {
+          resolve(null)
+          return
+        }
+        resolve((res.content || '').trim())
+      },
+      fail: () => resolve('')
+    })
+  })
+  if (comment === null) return
   submitting.value = true
   try {
     await http.post(`/repair/workorder/${id.value}/verify`, {
       client: 'mp',
       verify_result: 'pass',
-      satisfaction_rating: rating
+      satisfaction_rating: rating,
+      ...(comment ? { satisfaction_comment: comment } : {})
     })
     uni.showToast({ title: '验收通过', icon: 'success' })
     await load()
   } catch (e: unknown) {
     uni.showToast({ title: e instanceof Error ? e.message : '失败', icon: 'none' })
+  } finally {
+    submitting.value = false
+  }
+}
+
+function editDraft() {
+  uni.navigateTo({ url: `/pages/repair/scan?id=${id.value}` })
+}
+
+async function withdraw() {
+  const ok = await new Promise<boolean>((resolve) => {
+    uni.showModal({
+      title: '撤回报修',
+      content: '撤回后将回到草稿，可再次修改并提交。',
+      success: (res) => resolve(!!res.confirm)
+    })
+  })
+  if (!ok) return
+  submitting.value = true
+  try {
+    await http.post(`/repair/workorder/${id.value}/withdraw`, { remark: '用户撤回', client: 'mp' })
+    uni.showToast({ title: '已撤回', icon: 'success' })
+    await load()
+  } catch (e: unknown) {
+    uni.showToast({ title: e instanceof Error ? e.message : '撤回失败', icon: 'none' })
   } finally {
     submitting.value = false
   }

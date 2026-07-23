@@ -1,18 +1,39 @@
 <template>
   <view class="page">
-    <view class="toolbar">
+    <view class="tabs">
+      <button size="mini" :type="tab === 'apply' ? 'primary' : 'default'" @click="switchTab('apply')">
+        申请单
+      </button>
+      <button size="mini" :type="tab === 'progress' ? 'primary' : 'default'" @click="switchTab('progress')">
+        进度验收
+      </button>
+      <button size="mini" @click="load">刷新</button>
+      <button v-if="tab === 'apply'" size="mini" type="primary" @click="goNew">新建报修</button>
+    </view>
+    <view v-if="tab === 'progress'" class="toolbar">
       <button size="mini" :type="pendingOnly ? 'primary' : 'default'" @click="togglePending">
         {{ pendingOnly ? '仅待验收' : '全部工单' }}
       </button>
-      <button size="mini" @click="load">刷新</button>
     </view>
+
     <view v-if="loading" class="empty">加载中…</view>
-    <view v-else-if="!rows.length" class="empty">暂无工单</view>
-    <view v-for="r in rows" :key="String(r.id)" class="card" @click="open(r)">
-      <text class="no">{{ r.wo_no }}</text>
-      <text class="meta">{{ r.device_name }} · {{ statusLabel(r.status) }}</text>
-      <text class="desc">{{ r.fault_description }}</text>
-      <text v-if="r.status === 'pending_verify'" class="badge">待验收</text>
+    <view v-else-if="!rows.length" class="empty">
+      {{ tab === 'apply' ? '暂无申请单/草稿' : '暂无工单' }}
+    </view>
+
+    <view v-for="r in rows" :key="String(r.id)" class="card">
+      <view @click="open(r)">
+        <text class="no">{{ r.wo_no || '草稿' }}</text>
+        <text class="meta">{{ r.device_name }} · {{ statusLabel(r.status) }}</text>
+        <text class="desc">{{ r.fault_description }}</text>
+        <text v-if="r.status === 'pending_verify'" class="badge">待验收</text>
+      </view>
+      <view v-if="tab === 'apply'" class="row-ops" @click.stop>
+        <button v-if="r.status === 'draft'" size="mini" type="primary" @click="submitRow(r)">提交</button>
+        <button v-if="r.status === 'draft'" size="mini" @click="editRow(r)">编辑</button>
+        <button v-if="canWithdraw(r)" size="mini" @click="withdrawRow(r)">撤回</button>
+        <button v-if="r.status === 'draft'" size="mini" @click="deleteRow(r)">删除</button>
+      </view>
     </view>
   </view>
 </template>
@@ -27,6 +48,7 @@ const auth = useAuthStore()
 const rows = ref<Record<string, unknown>[]>([])
 const loading = ref(false)
 const pendingOnly = ref(false)
+const tab = ref<'apply' | 'progress'>('apply')
 
 const STATUS: Record<string, string> = {
   draft: '草稿',
@@ -48,6 +70,10 @@ function statusLabel(s: unknown) {
   return STATUS[k] || k || '—'
 }
 
+function canWithdraw(r: Record<string, unknown>) {
+  return String(r.status || '') === 'reported'
+}
+
 onShow(() => {
   auth.restore()
   if (!auth.isLoggedIn) {
@@ -57,20 +83,50 @@ onShow(() => {
   load()
 })
 
+function switchTab(t: 'apply' | 'progress') {
+  tab.value = t
+  load()
+}
+
 function togglePending() {
   pendingOnly.value = !pendingOnly.value
   load()
 }
 
+function goNew() {
+  uni.navigateTo({ url: '/pages/repair/scan' })
+}
+
+function editRow(r: Record<string, unknown>) {
+  uni.navigateTo({ url: `/pages/repair/scan?id=${r.id}` })
+}
+
 async function load() {
   loading.value = true
   try {
-    const data = await http.get<{ records?: Record<string, unknown>[] }>('/repair/workorder/mine', {
-      page: 1,
-      size: 50,
-      ...(pendingOnly.value ? { pendingVerifyOnly: true } : {})
-    })
-    rows.value = Array.isArray(data?.records) ? data.records! : Array.isArray(data) ? (data as unknown as Record<string, unknown>[]) : []
+    if (tab.value === 'apply') {
+      const data = await http.get<{ records?: Record<string, unknown>[] }>('/repair/workorder/page', {
+        page: 1,
+        size: 50,
+        mode: 'apply'
+      })
+      rows.value = Array.isArray(data?.records)
+        ? data.records!
+        : Array.isArray(data)
+          ? (data as unknown as Record<string, unknown>[])
+          : []
+    } else {
+      const data = await http.get<{ records?: Record<string, unknown>[] }>('/repair/workorder/mine', {
+        page: 1,
+        size: 50,
+        ...(pendingOnly.value ? { pendingVerifyOnly: true } : {})
+      })
+      rows.value = Array.isArray(data?.records)
+        ? data.records!
+        : Array.isArray(data)
+          ? (data as unknown as Record<string, unknown>[])
+          : []
+    }
   } catch (e: unknown) {
     rows.value = []
     uni.showToast({ title: e instanceof Error ? e.message : '加载失败', icon: 'none' })
@@ -80,7 +136,65 @@ async function load() {
 }
 
 function open(r: Record<string, unknown>) {
+  if (tab.value === 'apply' && String(r.status) === 'draft') {
+    editRow(r)
+    return
+  }
   uni.navigateTo({ url: `/pages/repair/detail?id=${r.id}` })
+}
+
+async function submitRow(r: Record<string, unknown>) {
+  const ok = await new Promise<boolean>((resolve) => {
+    uni.showModal({
+      title: '提交报修',
+      content: '提交后将进入维修流程，是否继续？',
+      success: (res) => resolve(!!res.confirm)
+    })
+  })
+  if (!ok) return
+  try {
+    await http.post(`/repair/workorder/${r.id}/submit`)
+    uni.showToast({ title: '已提交', icon: 'success' })
+    await load()
+  } catch (e: unknown) {
+    uni.showToast({ title: e instanceof Error ? e.message : '提交失败', icon: 'none' })
+  }
+}
+
+async function withdrawRow(r: Record<string, unknown>) {
+  const ok = await new Promise<boolean>((resolve) => {
+    uni.showModal({
+      title: '撤回报修',
+      content: '撤回后将回到草稿，可再次修改并提交。',
+      success: (res) => resolve(!!res.confirm)
+    })
+  })
+  if (!ok) return
+  try {
+    await http.post(`/repair/workorder/${r.id}/withdraw`, { remark: '用户撤回', client: 'mp' })
+    uni.showToast({ title: '已撤回', icon: 'success' })
+    await load()
+  } catch (e: unknown) {
+    uni.showToast({ title: e instanceof Error ? e.message : '撤回失败', icon: 'none' })
+  }
+}
+
+async function deleteRow(r: Record<string, unknown>) {
+  const ok = await new Promise<boolean>((resolve) => {
+    uni.showModal({
+      title: '删除草稿',
+      content: '确认删除该草稿？',
+      success: (res) => resolve(!!res.confirm)
+    })
+  })
+  if (!ok) return
+  try {
+    await http.delete(`/repair/workorder/${r.id}`)
+    uni.showToast({ title: '已删除', icon: 'success' })
+    await load()
+  } catch (e: unknown) {
+    uni.showToast({ title: e instanceof Error ? e.message : '删除失败', icon: 'none' })
+  }
 }
 </script>
 
@@ -90,11 +204,14 @@ function open(r: Record<string, unknown>) {
   padding: 24rpx;
   background: #f5f7fa;
 }
+.tabs,
 .toolbar {
   display: flex;
   gap: 12rpx;
-  margin-bottom: 20rpx;
+  margin-bottom: 16rpx;
+  flex-wrap: wrap;
 }
+.tabs button,
 .toolbar button {
   margin: 0;
 }
@@ -139,5 +256,16 @@ function open(r: Record<string, unknown>) {
   background: #e8f1fb;
   padding: 4rpx 12rpx;
   border-radius: 8rpx;
+}
+.row-ops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 16rpx;
+  padding-top: 12rpx;
+  border-top: 1px solid #f0f2f5;
+}
+.row-ops button {
+  margin: 0;
 }
 </style>
