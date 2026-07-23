@@ -70,7 +70,7 @@
             :key="rowIdx"
             class="form-grid"
             :class="formGridClass(g.group)"
-            :style="{ gridTemplateColumns: `repeat(${groupColumns(g.group)}, minmax(0, 1fr))` }"
+            :style="groupGridStyle(g.group)"
           >
           <el-form-item
             v-for="f in row"
@@ -90,7 +90,7 @@
           v-else-if="groupColumns(g.group)"
           class="form-grid"
           :class="formGridClass(g.group)"
-          :style="{ gridTemplateColumns: `repeat(${groupColumns(g.group)}, minmax(0, 1fr))` }"
+          :style="groupGridStyle(g.group)"
         >
           <el-form-item
             v-for="f in g.fields"
@@ -150,6 +150,8 @@ const props = defineProps<{
   groupSpan?: Partial<Record<FieldGroup, number>>
   /** 指定分组每行显示的列数（使用 CSS Grid，适用于 5 列等非 24 栅格整除布局） */
   groupColumns?: Partial<Record<FieldGroup, number>>
+  /** 流式排布：控件按内容宽度自动换行，缩窄输入框以压低头表高度 */
+  flow?: boolean
   /** 覆盖分组标题 */
   groupTitles?: Partial<Record<FieldGroup, string>>
   /** 指定分组内字段分行（每行一组 prop，配合 groupColumns 使用） */
@@ -161,7 +163,13 @@ const props = defineProps<{
 }>()
 
 function formItemClass(prop: string) {
-  return props.highlightLabels?.includes(prop) ? 'form-item--highlight-label' : undefined
+  const base = props.highlightLabels?.includes(prop) ? 'form-item--highlight-label' : undefined
+  const field = (props.fields ?? getSchema(props.table)).find((f) => f.prop === prop)
+  const full =
+    props.flow && field && (field.type === 'textarea' || (field.span != null && field.span >= 24))
+      ? 'form-item--full'
+      : undefined
+  return [base, full].filter(Boolean).join(' ') || undefined
 }
 
 function groupPanel(group: FieldGroup) {
@@ -188,6 +196,7 @@ function panelInnerFields(group: { group: FieldGroup; fields: FieldSchema[] }) {
 }
 
 function panelOuterGridStyle(group: FieldGroup) {
+  if (props.flow) return undefined
   const cols = groupColumns(group) ?? 2
   return { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }
 }
@@ -218,12 +227,26 @@ function groupColumns(group: FieldGroup) {
   return props.groupColumns?.[group]
 }
 
+function groupGridStyle(group: FieldGroup) {
+  if (props.flow) return undefined
+  const cols = groupColumns(group)
+  if (!cols) return undefined
+  return { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }
+}
+
 function formGridClass(group: FieldGroup) {
+  if (props.flow) return 'form-grid--flow'
   const cols = groupColumns(group)
   return cols && cols >= 4 ? 'form-grid--dense' : undefined
 }
 
 function gridItemStyle(field: FieldSchema, group: FieldGroup) {
+  if (props.flow) {
+    if (field.type === 'textarea' || (field.span != null && field.span >= 24)) {
+      return { flex: '1 1 100%', width: '100%', maxWidth: '100%' }
+    }
+    return undefined
+  }
   const cols = groupColumns(group)
   if (!cols) return undefined
   if (field.span && field.span >= 24) return { gridColumn: '1 / -1' }
@@ -330,6 +353,81 @@ watch(
 .form-grid :deep(.el-input),
 .form-grid :deep(.el-input-number) {
   width: 100%;
+}
+
+.form-grid--flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 10px;
+}
+
+.form-grid--flow :deep(.el-form-item) {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 2px;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.form-grid--flow :deep(.el-form-item__label) {
+  width: auto !important;
+  min-width: unset;
+  max-width: none;
+  padding: 0 4px 0 0;
+  font-size: 12px;
+  line-height: 24px;
+  height: auto !important;
+  white-space: nowrap;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.form-grid--flow :deep(.el-form-item__content) {
+  margin-left: 0 !important;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.form-grid--flow :deep(.el-select),
+.form-grid--flow :deep(.el-input),
+.form-grid--flow :deep(.el-input-number) {
+  width: 132px !important;
+}
+
+.form-grid--flow :deep(.el-date-editor.el-input),
+.form-grid--flow :deep(.el-date-editor .el-input__wrapper) {
+  width: 128px !important;
+}
+
+.form-grid--flow :deep(.el-date-editor--datetime) {
+  width: 168px !important;
+}
+
+.form-grid--flow :deep(.field-readonly-text) {
+  display: inline-block;
+  max-width: 148px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 24px;
+  vertical-align: middle;
+}
+
+.form-grid--flow :deep(.form-item--full) {
+  flex: 1 1 100%;
+  width: 100%;
+  max-width: 100%;
+}
+
+.form-grid--flow :deep(.form-item--full .el-textarea),
+.form-grid--flow :deep(.form-item--full .el-input),
+.form-grid--flow :deep(.form-item--full .el-select) {
+  width: 100% !important;
+  max-width: 100%;
 }
 
 .form-group-panel {

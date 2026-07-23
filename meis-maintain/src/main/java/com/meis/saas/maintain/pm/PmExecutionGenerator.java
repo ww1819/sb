@@ -1,6 +1,7 @@
 package com.meis.saas.maintain.pm;
 
 import com.meis.saas.common.audit.DocChangeLogService;
+import com.meis.saas.common.biz.CycleDaysSupport;
 import com.meis.saas.common.code.DailyBizNoSupport;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.ops.OpsClientChannel;
@@ -141,6 +142,15 @@ public class PmExecutionGenerator {
                         + SoftDeleteSupport.notDeletedClause(jdbc, "pm_template", null), templateId);
         if (template.isEmpty()) throw new BizException(404, "模板不存在");
 
+        if (body.get("cycle_type") == null || body.get("cycle_type").toString().isBlank()
+                || body.get("cycle_value") == null || body.get("cycle_value").toString().isBlank()) {
+            throw new BizException(400, "无计划直开须填写周期类型与周期值");
+        }
+        if (body.get("planned_date") == null || body.get("planned_date").toString().isBlank()) {
+            throw new BizException(400, "无计划直开须填写执行日期");
+        }
+        var cycle = CycleDaysSupport.resolveFromTemplate(body, template.get(0), "month", 1);
+
         UUID execId = UUID.randomUUID();
         String execNo = DailyBizNoSupport.next(jdbc, "pm_execution", "execution_no", "PX-");
         String userId = TenantContext.getUserId();
@@ -148,13 +158,18 @@ public class PmExecutionGenerator {
         String templateName = body.get("template_name") != null
                 ? body.get("template_name").toString()
                 : Objects.toString(template.get(0).get("template_name"), null);
+        Object startTime = firstNonBlank(body.get("execute_start_time"), body.get("planned_date") + " 00:00:00");
+        Object endTime = firstNonBlank(body.get("execute_end_time"), body.get("planned_date") + " 23:59:59");
 
         jdbc.update("""
                 INSERT INTO pm_execution (id, execution_no, plan_id, plan_no, source_type, template_id,
-                    template_name, pm_type_id, planned_date, status, created_by, created_by_name, remark, create_channel)
-                VALUES (?::uuid,?, NULL, NULL, 'ad_hoc', ?::uuid, ?, ?::uuid, ?, 'draft', ?::uuid, ?, ?, ?)
+                    template_name, pm_type_id, planned_date, cycle_type, cycle_value, cycle_days,
+                    execute_start_time, execute_end_time, status, created_by, created_by_name, remark, create_channel)
+                VALUES (?::uuid,?, NULL, NULL, 'ad_hoc', ?::uuid, ?, ?::uuid, ?, ?, ?, ?,
+                    CAST(? AS timestamptz), CAST(? AS timestamptz), 'draft', ?::uuid, ?, ?, ?)
                 """, execId, execNo, templateId, templateName, typeId,
-                body.get("planned_date"), userId, createdByName, body.get("remark"),
+                body.get("planned_date"), cycle.type(), cycle.value(), cycle.days(),
+                startTime, endTime, userId, createdByName, body.get("remark"),
                 OpsClientChannel.of(body));
 
         for (Map<String, Object> di : devices) {
@@ -222,5 +237,10 @@ public class PmExecutionGenerator {
         if (value == null) return null;
         if (value instanceof String s && s.isBlank()) return null;
         return value;
+    }
+
+    private static Object firstNonBlank(Object primary, Object fallback) {
+        if (primary != null && !primary.toString().isBlank()) return primary;
+        return fallback;
     }
 }

@@ -48,6 +48,7 @@
             :table="config.table"
             :model="form"
             :group-columns="config.formGroupColumns"
+            :flow="!!config.formFlowLayout"
           />
         </el-form>
         <slot name="drawer-extra" :form="form" :reload="reloadForm" :editor-mode="editorMode" />
@@ -237,14 +238,18 @@ defineExpose({
 
 <style scoped>
 .ops-doc-form :deep(.form-section) {
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 .ops-doc-form :deep(.form-section__title) {
   font-size: 13px;
-  padding-bottom: 4px;
-  margin-bottom: 6px;
+  padding-bottom: 2px;
+  margin-bottom: 4px;
 }
-.ops-doc-form :deep(.form-grid--dense .el-form-item) {
-  margin-bottom: 6px;
+.ops-doc-form :deep(.form-grid--flow .el-form-item) {
+  margin-bottom: 2px;
+}
+.ops-doc-form :deep(.el-form-item--default),
+.ops-doc-form :deep(.el-form-item--small) {
+  margin-bottom: 2px;
 }
 </style>

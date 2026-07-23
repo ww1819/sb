@@ -5,6 +5,7 @@ import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.ops.OpsAutoRepairSupport;
 import com.meis.saas.common.ops.OpsClientChannel;
+import com.meis.saas.common.ops.OpsExecutionItemSupport;
 import com.meis.saas.common.ops.OpsPhotosSupport;
 import com.meis.saas.common.ops.OpsPlanExecutionSupport;
 import com.meis.saas.common.page.FilterCsvSupport;
@@ -100,6 +101,39 @@ public class PmExecutionController {
     public Result<Map<String, Object>> adHoc(@RequestBody Map<String, Object> body) {
         var created = generator.createAdHoc(body);
         return get(UUID.fromString(created.get("id").toString()));
+    }
+
+    @PutMapping("/{id}")
+    @Transactional
+    @OperationLog(module = "pm", description = "更新预防性维护执行单头表")
+    public Result<Map<String, Object>> updateHeader(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
+        assertEditable(id);
+        var old = jdbc.queryForList(
+                "SELECT * FROM pm_execution WHERE id=?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "pm_execution", null), id);
+        if (old.isEmpty()) throw new BizException(404, "not found");
+        List<String> sets = new ArrayList<>();
+        List<Object> args = new ArrayList<>();
+        String client = clientOf(body);
+        String docNo = execNo(id);
+        track(sets, args, old.get(0), body, "remark", id, docNo, "header", id, client);
+        if (body.containsKey("execute_start_time")) {
+            sets.add("execute_start_time = CAST(? AS timestamptz)");
+            args.add(body.get("execute_start_time"));
+            docLog.fieldChange("pm", "execution", id, docNo, "header", id,
+                    "execute_start_time", old.get(0).get("execute_start_time"), body.get("execute_start_time"), client);
+        }
+        if (body.containsKey("execute_end_time")) {
+            sets.add("execute_end_time = CAST(? AS timestamptz)");
+            args.add(body.get("execute_end_time"));
+            docLog.fieldChange("pm", "execution", id, docNo, "header", id,
+                    "execute_end_time", old.get(0).get("execute_end_time"), body.get("execute_end_time"), client);
+        }
+        if (sets.isEmpty()) return get(id);
+        sets.add("updated_at=NOW()");
+        args.add(id);
+        jdbc.update("UPDATE pm_execution SET " + String.join(", ", sets) + " WHERE id=?::uuid", args.toArray());
+        return get(id);
     }
 
     @GetMapping("/by-device/{deviceId}")
@@ -280,23 +314,27 @@ public class PmExecutionController {
             }
         }
         String channel = OpsClientChannel.of(body);
+        String userId = TenantContext.getUserId();
+        String name = SoftDeleteSupport.resolveUserDisplayName(jdbc, userId);
         if (body.containsKey("photos") || body.containsKey("signature_url")) {
             jdbc.update("""
                     UPDATE pm_execution_item SET status='completed', overall_result=?, remark=?,
                     photos=COALESCE(CAST(? AS jsonb), photos), signature_url=COALESCE(?, signature_url),
                     execution_channel=?, end_time=COALESCE(end_time, NOW()),
+                    executor_id=COALESCE(executor_id, ?::uuid), executor_name=COALESCE(executor_name, ?),
                     row_version=COALESCE(row_version,1)+1, updated_at=NOW()
                     WHERE id=?::uuid
                     """, body.getOrDefault("overall_result", "pass"), body.get("remark"),
                     body.containsKey("photos") ? OpsPhotosSupport.toJson(body.get("photos")) : null,
-                    body.get("signature_url"), channel, itemId);
+                    body.get("signature_url"), channel, userId, name, itemId);
         } else {
             jdbc.update("""
                     UPDATE pm_execution_item SET status='completed', overall_result=?, remark=?,
                     execution_channel=?, end_time=COALESCE(end_time, NOW()),
+                    executor_id=COALESCE(executor_id, ?::uuid), executor_name=COALESCE(executor_name, ?),
                     row_version=COALESCE(row_version,1)+1, updated_at=NOW()
                     WHERE id=?::uuid
-                    """, body.getOrDefault("overall_result", "pass"), body.get("remark"), channel, itemId);
+                    """, body.getOrDefault("overall_result", "pass"), body.get("remark"), channel, userId, name, itemId);
         }
 
         docLog.event("pm", "execution", execId, execNo(execId), "complete_item", clientOf(body), itemId.toString());
@@ -311,6 +349,35 @@ public class PmExecutionController {
         return get(execId);
     }
 
+    @PostMapping("/item/{itemId}/confirm")
+    @Transactional
+    @OperationLog(module = "pm", description = "确认预防性维护执行明细")
+    public Result<Map<String, Object>> confirmItem(@PathVariable UUID itemId, @RequestBody(required = false) Map<String, Object> body) {
+        Map<String, Object> item = OpsExecutionItemSupport.loadItem(jdbc, "pm_execution_item", itemId);
+        UUID execId = (UUID) item.get("execution_id");
+        OpsExecutionItemSupport.confirmItem(jdbc, docLog, "pm",
+                "pm_execution", "pm_execution_item",
+                itemId, body != null ? body : Map.of(), execNo(execId));
+        return get(execId);
+    }
+
+    @DeleteMapping("/item/{itemId}")
+    @Transactional
+    @OperationLog(module = "pm", description = "删除预防性维护执行明细")
+    public Result<Map<String, Object>> deleteItem(
+            @PathVariable UUID itemId,
+            @RequestParam(required = false) String client,
+            @RequestBody(required = false) Map<String, Object> body) {
+        Map<String, Object> item = OpsExecutionItemSupport.loadItem(jdbc, "pm_execution_item", itemId);
+        UUID execId = (UUID) item.get("execution_id");
+        Map<String, Object> payload = body != null ? new LinkedHashMap<>(body) : new LinkedHashMap<>();
+        if (client != null && !payload.containsKey("client")) payload.put("client", client);
+        OpsExecutionItemSupport.deleteItem(jdbc, docLog, "pm",
+                "pm_execution", "pm_execution_item",
+                itemId, payload, execNo(execId));
+        return get(execId);
+    }
+
     @PostMapping("/{id}/submit")
     @Transactional
     @OperationLog(module = "pm", description = "提交预防性维护执行单")
@@ -321,13 +388,15 @@ public class PmExecutionController {
         }
         assertAllItemsCompleted(id);
         String channel = OpsClientChannel.of(body);
-        jdbc.update("""
-                UPDATE pm_execution_item SET status='confirmed', confirm_channel=?,
-                row_version=COALESCE(row_version,1)+1, updated_at=NOW()
-                WHERE execution_id=?::uuid AND COALESCE(is_deleted,0)=0 AND status='completed'
-                """, channel, id);
         String userId = TenantContext.getUserId();
         String name = SoftDeleteSupport.resolveUserDisplayName(jdbc, userId);
+        jdbc.update("""
+                UPDATE pm_execution_item SET status='confirmed', confirm_channel=?,
+                confirmed_by=COALESCE(confirmed_by, ?::uuid), confirmed_by_name=COALESCE(confirmed_by_name, ?),
+                confirmed_at=COALESCE(confirmed_at, NOW()),
+                row_version=COALESCE(row_version,1)+1, updated_at=NOW()
+                WHERE execution_id=?::uuid AND COALESCE(is_deleted,0)=0 AND status='completed'
+                """, channel, userId, name, id);
         jdbc.update("""
                 UPDATE pm_execution SET status='submitted', submitter_id=?::uuid, submitter_name=?,
                 submitted_at=NOW(), execute_end_time=COALESCE(execute_end_time, NOW()),
@@ -347,6 +416,7 @@ public class PmExecutionController {
         }
         jdbc.update("""
                 UPDATE pm_execution_item SET status='completed', confirm_channel=NULL,
+                confirmed_by=NULL, confirmed_by_name=NULL, confirmed_at=NULL,
                 row_version=COALESCE(row_version,1)+1, updated_at=NOW()
                 WHERE execution_id=?::uuid AND COALESCE(is_deleted,0)=0 AND status='confirmed'
                 """, id);
@@ -362,8 +432,9 @@ public class PmExecutionController {
     @Transactional
     @OperationLog(module = "pm", description = "审核预防性维护执行单")
     public Result<Map<String, Object>> audit(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
-        if (!"submitted".equals(statusOf(id))) {
-            throw new BizException(400, "仅已提交可审核");
+        String st = statusOf(id);
+        if ("audited".equals(st) || "cancelled".equals(st)) {
+            throw new BizException(400, "当前状态不可审核");
         }
         assertAllItemsConfirmed(id);
         String action = String.valueOf(body.getOrDefault("action", "approve"));
@@ -377,6 +448,7 @@ public class PmExecutionController {
                     """, userId, name, body.get("audit_comment"), channel, id);
             jdbc.update("""
                     UPDATE pm_execution_item SET status='completed', confirm_channel=NULL,
+                    confirmed_by=NULL, confirmed_by_name=NULL, confirmed_at=NULL,
                     row_version=COALESCE(row_version,1)+1, updated_at=NOW()
                     WHERE execution_id=?::uuid AND COALESCE(is_deleted,0)=0 AND status='confirmed'
                     """, id);

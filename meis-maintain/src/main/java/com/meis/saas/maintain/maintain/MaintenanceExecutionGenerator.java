@@ -1,6 +1,7 @@
 package com.meis.saas.maintain.maintain;
 
 import com.meis.saas.common.audit.DocChangeLogService;
+import com.meis.saas.common.biz.CycleDaysSupport;
 import com.meis.saas.common.code.DailyBizNoSupport;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.ops.OpsClientChannel;
@@ -131,6 +132,15 @@ public class MaintenanceExecutionGenerator {
                         + SoftDeleteSupport.notDeletedClause(jdbc, "maintenance_template", null), templateId);
         if (template.isEmpty()) throw new BizException(404, "模板不存在");
 
+        if (body.get("cycle_type") == null || body.get("cycle_type").toString().isBlank()
+                || body.get("cycle_value") == null || body.get("cycle_value").toString().isBlank()) {
+            throw new BizException(400, "无计划直开须填写周期类型与周期值");
+        }
+        if (body.get("planned_date") == null || body.get("planned_date").toString().isBlank()) {
+            throw new BizException(400, "无计划直开须填写执行日期");
+        }
+        var cycle = CycleDaysSupport.resolveFromTemplate(body, template.get(0), "month", 1);
+
         UUID execId = UUID.randomUUID();
         String execNo = DailyBizNoSupport.next(jdbc, "maintenance_execution", "execution_no", "ME-");
         String userId = TenantContext.getUserId();
@@ -138,15 +148,20 @@ public class MaintenanceExecutionGenerator {
         String templateName = body.get("template_name") != null
                 ? body.get("template_name").toString()
                 : Objects.toString(template.get(0).get("template_name"), null);
+        Object startTime = firstNonBlank(body.get("execute_start_time"), body.get("planned_date") + " 00:00:00");
+        Object endTime = firstNonBlank(body.get("execute_end_time"), body.get("planned_date") + " 23:59:59");
 
         jdbc.update("""
                 INSERT INTO maintenance_execution (id, execution_no, plan_id, plan_no, source_type, template_id,
-                    template_name, maintenance_level_id, maintenance_level, planned_date, status,
+                    template_name, maintenance_level_id, maintenance_level, planned_date,
+                    cycle_type, cycle_value, cycle_days, execute_start_time, execute_end_time, status,
                     created_by, created_by_name, remark, create_channel)
-                VALUES (?::uuid,?, NULL, NULL, 'ad_hoc', ?::uuid, ?, ?::uuid, ?, ?, 'draft', ?::uuid, ?, ?, ?)
+                VALUES (?::uuid,?, NULL, NULL, 'ad_hoc', ?::uuid, ?, ?::uuid, ?, ?,
+                    ?, ?, ?, CAST(? AS timestamptz), CAST(? AS timestamptz), 'draft', ?::uuid, ?, ?, ?)
                 """, execId, execNo, templateId, templateName,
                 blankToNull(body.get("maintenance_level_id")), body.get("maintenance_level"),
-                body.get("planned_date"), userId, createdByName, body.get("remark"),
+                body.get("planned_date"), cycle.type(), cycle.value(), cycle.days(),
+                startTime, endTime, userId, createdByName, body.get("remark"),
                 OpsClientChannel.of(body));
 
         for (Map<String, Object> di : devices) {
@@ -214,5 +229,10 @@ public class MaintenanceExecutionGenerator {
         if (value == null) return null;
         if (value instanceof String s && s.isBlank()) return null;
         return value;
+    }
+
+    private static Object firstNonBlank(Object primary, Object fallback) {
+        if (primary != null && !primary.toString().isBlank()) return primary;
+        return fallback;
     }
 }

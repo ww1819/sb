@@ -1037,6 +1037,46 @@ COMMENT ON COLUMN inspection_execution.delete_channel IS '删除途径 web/app/m
 COMMENT ON COLUMN inspection_execution_item.execution_channel IS '执行途径 web/app/mp（OPS.16.10）';
 COMMENT ON COLUMN inspection_execution_item.confirm_channel IS '确认途径 web/app/mp（OPS.16.10）';
 
+-- OPS.16.14 明细确认人/时间
+ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS confirmed_by UUID;
+ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS confirmed_by_name VARCHAR(100);
+ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE pm_execution_item ADD COLUMN IF NOT EXISTS confirmed_by UUID;
+ALTER TABLE pm_execution_item ADD COLUMN IF NOT EXISTS confirmed_by_name VARCHAR(100);
+ALTER TABLE pm_execution_item ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE inspection_execution_item ADD COLUMN IF NOT EXISTS confirmed_by UUID;
+ALTER TABLE inspection_execution_item ADD COLUMN IF NOT EXISTS confirmed_by_name VARCHAR(100);
+ALTER TABLE inspection_execution_item ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMP WITH TIME ZONE;
+COMMENT ON COLUMN maintenance_execution_item.confirmed_by IS '确认人（OPS.16.14）';
+COMMENT ON COLUMN maintenance_execution_item.confirmed_by_name IS '确认人姓名快照（OPS.16.14）';
+COMMENT ON COLUMN maintenance_execution_item.confirmed_at IS '确认时间（OPS.16.14）';
+COMMENT ON COLUMN pm_execution_item.confirmed_by IS '确认人（OPS.16.14）';
+COMMENT ON COLUMN pm_execution_item.confirmed_by_name IS '确认人姓名快照（OPS.16.14）';
+COMMENT ON COLUMN pm_execution_item.confirmed_at IS '确认时间（OPS.16.14）';
+COMMENT ON COLUMN inspection_execution_item.confirmed_by IS '确认人（OPS.16.14）';
+COMMENT ON COLUMN inspection_execution_item.confirmed_by_name IS '确认人姓名快照（OPS.16.14）';
+COMMENT ON COLUMN inspection_execution_item.confirmed_at IS '确认时间（OPS.16.14）';
+
+-- OPS.16.15 执行单头表周期（直开/展示；编辑锁定）
+ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS cycle_type VARCHAR(20);
+ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS cycle_value INTEGER;
+ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS cycle_days INTEGER;
+ALTER TABLE pm_execution ADD COLUMN IF NOT EXISTS cycle_type VARCHAR(20);
+ALTER TABLE pm_execution ADD COLUMN IF NOT EXISTS cycle_value INTEGER;
+ALTER TABLE pm_execution ADD COLUMN IF NOT EXISTS cycle_days INTEGER;
+ALTER TABLE inspection_execution ADD COLUMN IF NOT EXISTS cycle_type VARCHAR(20);
+ALTER TABLE inspection_execution ADD COLUMN IF NOT EXISTS cycle_value INTEGER;
+ALTER TABLE inspection_execution ADD COLUMN IF NOT EXISTS cycle_days INTEGER;
+COMMENT ON COLUMN maintenance_execution.cycle_type IS '周期类型（OPS.16.15 直开快照）';
+COMMENT ON COLUMN maintenance_execution.cycle_value IS '周期值（OPS.16.15）';
+COMMENT ON COLUMN maintenance_execution.cycle_days IS '周期天数（OPS.16.15）';
+COMMENT ON COLUMN pm_execution.cycle_type IS '周期类型（OPS.16.15）';
+COMMENT ON COLUMN pm_execution.cycle_value IS '周期值（OPS.16.15）';
+COMMENT ON COLUMN pm_execution.cycle_days IS '周期天数（OPS.16.15）';
+COMMENT ON COLUMN inspection_execution.cycle_type IS '周期类型（OPS.16.15）';
+COMMENT ON COLUMN inspection_execution.cycle_value IS '周期值（OPS.16.15）';
+COMMENT ON COLUMN inspection_execution.cycle_days IS '周期天数（OPS.16.15）';
+
 -- OPS.16.12 执行类型：到期执行 / 执行补录
 ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS execution_kind VARCHAR(20) DEFAULT 'due';
 ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS backfill_next_due_date DATE;

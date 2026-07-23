@@ -2089,6 +2089,9 @@ CREATE TABLE maintenance_execution (
     delete_channel VARCHAR(20),
     execution_kind VARCHAR(20) DEFAULT 'due',
     backfill_next_due_date DATE,
+    cycle_type VARCHAR(20),
+    cycle_value INTEGER,
+    cycle_days INTEGER,
     created_by UUID REFERENCES sys_user(id),
     created_by_name VARCHAR(100),
     remark TEXT,
@@ -2104,6 +2107,9 @@ COMMENT ON COLUMN maintenance_execution.audit_channel IS '审核途径 web/app/m
 COMMENT ON COLUMN maintenance_execution.delete_channel IS '删除途径 web/app/mp（OPS.16.10）';
 COMMENT ON COLUMN maintenance_execution.execution_kind IS 'due=到期执行 backfill=执行补录（OPS.16.12）';
 COMMENT ON COLUMN maintenance_execution.backfill_next_due_date IS '补录可选下次到期（OPS.16.12）';
+COMMENT ON COLUMN maintenance_execution.cycle_type IS '周期类型（OPS.16.15 直开快照）';
+COMMENT ON COLUMN maintenance_execution.cycle_value IS '周期值（OPS.16.15）';
+COMMENT ON COLUMN maintenance_execution.cycle_days IS '周期天数（OPS.16.15）';
 
 CREATE TABLE maintenance_execution_item (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -2126,6 +2132,9 @@ CREATE TABLE maintenance_execution_item (
     signature_url VARCHAR(500),
     execution_channel VARCHAR(20),
     confirm_channel VARCHAR(20),
+    confirmed_by UUID,
+    confirmed_by_name VARCHAR(100),
+    confirmed_at TIMESTAMP WITH TIME ZONE,
     row_version INTEGER NOT NULL DEFAULT 1,
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -2134,6 +2143,9 @@ CREATE TABLE maintenance_execution_item (
 COMMENT ON TABLE maintenance_execution_item IS '保养执行明细（按设备）';
 COMMENT ON COLUMN maintenance_execution_item.execution_channel IS '执行途径 web/app/mp（OPS.16.10）';
 COMMENT ON COLUMN maintenance_execution_item.confirm_channel IS '确认途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN maintenance_execution_item.confirmed_by IS '确认人（OPS.16.14）';
+COMMENT ON COLUMN maintenance_execution_item.confirmed_by_name IS '确认人姓名快照（OPS.16.14）';
+COMMENT ON COLUMN maintenance_execution_item.confirmed_at IS '确认时间（OPS.16.14）';
 CREATE TABLE maintenance_execution_result (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     execution_item_id UUID NOT NULL REFERENCES maintenance_execution_item(id) ON DELETE CASCADE,
@@ -3030,6 +3042,9 @@ CREATE TABLE pm_execution (
     delete_channel VARCHAR(20),
     execution_kind VARCHAR(20) DEFAULT 'due',
     backfill_next_due_date DATE,
+    cycle_type VARCHAR(20),
+    cycle_value INTEGER,
+    cycle_days INTEGER,
     created_by UUID REFERENCES sys_user(id),
     created_by_name VARCHAR(100),
     remark TEXT,
@@ -3045,6 +3060,9 @@ COMMENT ON COLUMN pm_execution.audit_channel IS '审核途径 web/app/mp（OPS.1
 COMMENT ON COLUMN pm_execution.delete_channel IS '删除途径 web/app/mp（OPS.16.10）';
 COMMENT ON COLUMN pm_execution.execution_kind IS 'due=到期执行 backfill=执行补录（OPS.16.12）';
 COMMENT ON COLUMN pm_execution.backfill_next_due_date IS '补录可选下次到期（OPS.16.12）';
+COMMENT ON COLUMN pm_execution.cycle_type IS '周期类型（OPS.16.15）';
+COMMENT ON COLUMN pm_execution.cycle_value IS '周期值（OPS.16.15）';
+COMMENT ON COLUMN pm_execution.cycle_days IS '周期天数（OPS.16.15）';
 
 CREATE TABLE pm_execution_item (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -3067,6 +3085,9 @@ CREATE TABLE pm_execution_item (
     signature_url VARCHAR(500),
     execution_channel VARCHAR(20),
     confirm_channel VARCHAR(20),
+    confirmed_by UUID,
+    confirmed_by_name VARCHAR(100),
+    confirmed_at TIMESTAMP WITH TIME ZONE,
     row_version INTEGER NOT NULL DEFAULT 1,
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -3075,6 +3096,9 @@ CREATE TABLE pm_execution_item (
 COMMENT ON TABLE pm_execution_item IS '预防性维护执行明细';
 COMMENT ON COLUMN pm_execution_item.execution_channel IS '执行途径 web/app/mp（OPS.16.10）';
 COMMENT ON COLUMN pm_execution_item.confirm_channel IS '确认途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN pm_execution_item.confirmed_by IS '确认人（OPS.16.14）';
+COMMENT ON COLUMN pm_execution_item.confirmed_by_name IS '确认人姓名快照（OPS.16.14）';
+COMMENT ON COLUMN pm_execution_item.confirmed_at IS '确认时间（OPS.16.14）';
 
 CREATE TABLE pm_execution_result (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -3884,6 +3908,9 @@ CREATE TABLE IF NOT EXISTS inspection_execution (
     delete_channel VARCHAR(20),
     execution_kind VARCHAR(20) DEFAULT 'due',
     backfill_next_due_date DATE,
+    cycle_type VARCHAR(20),
+    cycle_value INTEGER,
+    cycle_days INTEGER,
     created_by UUID REFERENCES sys_user(id),
     created_by_name VARCHAR(100),
     remark TEXT,
@@ -3899,6 +3926,9 @@ COMMENT ON COLUMN inspection_execution.audit_channel IS '审核途径 web/app/mp
 COMMENT ON COLUMN inspection_execution.delete_channel IS '删除途径 web/app/mp（OPS.16.10）';
 COMMENT ON COLUMN inspection_execution.execution_kind IS 'due=到期执行 backfill=执行补录（OPS.16.12）';
 COMMENT ON COLUMN inspection_execution.backfill_next_due_date IS '补录可选下次到期（OPS.16.12）';
+COMMENT ON COLUMN inspection_execution.cycle_type IS '周期类型（OPS.16.15）';
+COMMENT ON COLUMN inspection_execution.cycle_value IS '周期值（OPS.16.15）';
+COMMENT ON COLUMN inspection_execution.cycle_days IS '周期天数（OPS.16.15）';
 
 CREATE TABLE IF NOT EXISTS inspection_execution_item (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -3921,6 +3951,9 @@ CREATE TABLE IF NOT EXISTS inspection_execution_item (
     signature_url VARCHAR(500),
     execution_channel VARCHAR(20),
     confirm_channel VARCHAR(20),
+    confirmed_by UUID,
+    confirmed_by_name VARCHAR(100),
+    confirmed_at TIMESTAMP WITH TIME ZONE,
     row_version INTEGER NOT NULL DEFAULT 1,
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -3929,6 +3962,9 @@ CREATE TABLE IF NOT EXISTS inspection_execution_item (
 COMMENT ON TABLE inspection_execution_item IS '巡检执行明细（按设备）';
 COMMENT ON COLUMN inspection_execution_item.execution_channel IS '执行途径 web/app/mp（OPS.16.10）';
 COMMENT ON COLUMN inspection_execution_item.confirm_channel IS '确认途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN inspection_execution_item.confirmed_by IS '确认人（OPS.16.14）';
+COMMENT ON COLUMN inspection_execution_item.confirmed_by_name IS '确认人姓名快照（OPS.16.14）';
+COMMENT ON COLUMN inspection_execution_item.confirmed_at IS '确认时间（OPS.16.14）';
 
 CREATE TABLE IF NOT EXISTS inspection_execution_result (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

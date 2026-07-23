@@ -119,8 +119,44 @@
         <el-form-item :label="typeLabel" required>
           <el-input v-model="adHoc.typeValue" :placeholder="`填写${typeLabel}`" />
         </el-form-item>
-        <el-form-item label="计划日期">
-          <el-date-picker v-model="adHoc.planned_date" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
+        <el-form-item label="周期类型" required>
+          <el-select v-model="adHoc.cycle_type" style="width: 100%" @change="syncAdHocCycleDays">
+            <el-option label="天" value="day" />
+            <el-option label="周" value="week" />
+            <el-option label="月" value="month" />
+            <el-option label="年" value="year" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="周期值" required>
+          <el-input-number v-model="adHoc.cycle_value" :min="1" style="width: 100%" @change="syncAdHocCycleDays" />
+        </el-form-item>
+        <el-form-item label="周期(天)">
+          <el-input :model-value="adHoc.cycle_days ?? ''" disabled />
+        </el-form-item>
+        <el-form-item label="执行日期" required>
+          <el-date-picker
+            v-model="adHoc.planned_date"
+            type="date"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+            @change="onAdHocDateChange"
+          />
+        </el-form-item>
+        <el-form-item label="开始时间" required>
+          <el-date-picker
+            v-model="adHoc.execute_start_time"
+            type="datetime"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="结束时间" required>
+          <el-date-picker
+            v-model="adHoc.execute_end_time"
+            type="datetime"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            style="width: 100%"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -140,6 +176,7 @@ import AppModal from '@/components/AppModal.vue'
 import FormSection from '@/components/form/FormSection.vue'
 import type { PageConfig } from '@/config/pageRegistry'
 import { promptListActionScope, assertScopeSelection } from '@/composables/useListActionScope'
+import { calcCycleDays } from '@/utils/cycleDays'
 
 const props = defineProps<{
   module: 'maintain' | 'inspect' | 'pm'
@@ -254,8 +291,30 @@ const templates = ref<Record<string, unknown>[]>([])
 const adHoc = ref<Record<string, unknown>>({
   template_id: null,
   typeValue: '',
-  planned_date: null
+  cycle_type: 'month',
+  cycle_value: 1,
+  cycle_days: 30,
+  planned_date: null,
+  execute_start_time: null,
+  execute_end_time: null
 })
+
+function syncAdHocCycleDays() {
+  adHoc.value.cycle_days = calcCycleDays(adHoc.value.cycle_type, adHoc.value.cycle_value)
+}
+
+function onAdHocDateChange(date: string | null) {
+  if (!date) return
+  adHoc.value.execute_start_time = `${date} 00:00:00`
+  adHoc.value.execute_end_time = `${date} 23:59:59`
+}
+
+function todayStr() {
+  const d = new Date()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${day}`
+}
 
 async function openPlans(row: Record<string, unknown>) {
   device.value = row
@@ -343,7 +402,17 @@ async function openAdHoc(deviceIds: string[]) {
         : 'pm_template'
   const { data } = await http.get(`/${props.module}/${table}/list`)
   templates.value = data.data ?? []
-  adHoc.value = { template_id: null, typeValue: '', planned_date: null }
+  const date = todayStr()
+  adHoc.value = {
+    template_id: null,
+    typeValue: '',
+    cycle_type: 'month',
+    cycle_value: 1,
+    cycle_days: 30,
+    planned_date: date,
+    execute_start_time: `${date} 00:00:00`,
+    execute_end_time: `${date} 23:59:59`
+  }
   adHocVisible.value = true
 }
 
@@ -353,6 +422,9 @@ function onTemplateChange() {
   if (props.module === 'maintain') adHoc.value.typeValue = t.maintenance_level ?? ''
   if (props.module === 'inspect') adHoc.value.typeValue = t.inspection_type ?? t.type_name ?? ''
   if (props.module === 'pm') adHoc.value.typeValue = t.pm_type ?? t.type_name ?? ''
+  if (t.cycle_type) adHoc.value.cycle_type = t.cycle_type
+  if (t.cycle_value != null) adHoc.value.cycle_value = Number(t.cycle_value) || 1
+  syncAdHocCycleDays()
 }
 
 async function submitAdHoc() {
@@ -365,9 +437,25 @@ async function submitAdHoc() {
     ElMessage.warning(`请填写${typeLabel.value}`)
     return
   }
+  if (!adHoc.value.cycle_type || !adHoc.value.cycle_value) {
+    ElMessage.warning('请填写周期类型与周期值')
+    return
+  }
+  if (!adHoc.value.planned_date) {
+    ElMessage.warning('请填写执行日期')
+    return
+  }
+  if (!adHoc.value.execute_start_time || !adHoc.value.execute_end_time) {
+    ElMessage.warning('请填写开始/结束时间')
+    return
+  }
   const body: Record<string, unknown> = {
     template_id: adHoc.value.template_id,
     planned_date: adHoc.value.planned_date,
+    cycle_type: adHoc.value.cycle_type,
+    cycle_value: adHoc.value.cycle_value,
+    execute_start_time: adHoc.value.execute_start_time,
+    execute_end_time: adHoc.value.execute_end_time,
     client: 'web',
     items: adHocDeviceIds.value.map((device_id) => ({ device_id }))
   }
