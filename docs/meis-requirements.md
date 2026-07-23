@@ -1924,6 +1924,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+| 2.99 | 2026-07-23 14:20:00 | — | OPS.15.4.1：巡检计划 blankToNull→String 编译失败导致打包后端 reactor 中断、meis-qc JAR 缺失 |
 | 2.98 | 2026-07-23 12:40:00 | — | OPS.16.7：计划列表增加「生成执行」列（仅已审核） |
 | 2.97 | 2026-07-23 12:30:00 | — | OPS.16.6：明细自动算下次到期；已审核禁头表编删；列表拆审核/设备明细/编辑/删除；软删明细可恢复 |
 | 2.96 | 2026-07-23 12:10:00 | — | OPS.16.5：计划明细 last_done_date/next_due_date 绑 ?::date，修复 varchar→date 报错 |
@@ -4716,6 +4717,16 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 | **修复** | 保养/PM 计划 Controller 增加 `asBlankToNull`→`String`；`meis-maintain` 已编译通过 |
 | **连带** | PM 计划同类写法一并修 |
 
+#### OPS.15.4.1 打包后端部分服务失败 / meis-qc JAR 缺失（2026-07-23）
+
+> 现象：开发面板「打包后端」后部分服务（如 meis-qc）显示 classes 就绪、JAR 缺失。
+
+| 项 | 定稿 / 修补 |
+|----|-------------|
+| **原因** | reactor 在 `meis-qc` 编译失败处中断：`InspectionPlanController` 将 `blankToNull`（`Object`）赋给 `String assignedName`（同 15.4） |
+| **为何「部分」** | Maven 按模块顺序打包，失败点之前的服务已有 JAR，之后的模块未再 package |
+| **修复** | 巡检计划改用 `asBlankToNull`；全量 `mvn package -DskipTests` 已通过 |
+
 #### OPS.15.5 计划保存 next_due_date 非空（2026-07-23）
 
 > 现象：新增保养计划（可无设备明细）报 `null value in column "next_due_date" ... violates not-null constraint`。
@@ -4726,7 +4737,7 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 | **修复** | `COALESCE(MIN明细, 原 next_due_date, CURRENT_DATE + cycle_days)`；保养/PM 计划与执行回写同改 |
 | **INSERT** | 新增时按 `cycle_days` 计算 `next_due_date`（不再写死 +30） |
 
-**状态**：已定稿并落地（2026-07-23；含 15.1–15.5）。
+**状态**：已定稿并落地（2026-07-23；含 15.1–15.5 / 15.4.1）。
 
 ### OPS.16 计划/执行交互缺口审计（修改记录·审核·明细）（2026-07-23）
 

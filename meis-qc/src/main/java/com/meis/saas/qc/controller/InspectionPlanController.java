@@ -99,8 +99,8 @@ public class InspectionPlanController {
         String createdByName = SoftDeleteSupport.resolveUserDisplayName(jdbc, userId);
         Object assignedId = blankToNull(body.get("assigned_inspector_id"));
         if (assignedId == null) assignedId = blankToNull(body.get("assigned_user_id"));
-        String assignedName = blankToNull(body.get("assigned_inspector_name"));
-        if (assignedName == null) assignedName = blankToNull(body.get("assigned_user_name"));
+        String assignedName = asBlankToNull(body.get("assigned_inspector_name"));
+        if (assignedName == null) assignedName = asBlankToNull(body.get("assigned_user_name"));
         if (assignedId != null && assignedName == null) {
             assignedName = SoftDeleteSupport.resolveUserDisplayName(jdbc, assignedId);
         }
@@ -444,6 +444,11 @@ public class InspectionPlanController {
         if (value == null) return null;
         if (value instanceof String s && s.isBlank()) return null;
         return value;
+    }
+
+    private static String asBlankToNull(Object value) {
+        Object v = blankToNull(value);
+        return v == null ? null : v.toString().trim();
     }
 
     private static String toDateParam(Object value) {
