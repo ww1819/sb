@@ -210,6 +210,7 @@ function openBackfill(form: Record<string, unknown>, reload?: () => void) {
   backfillRef.value?.open({
     module: 'maintain',
     planId: String(form.id),
+    plan: form,
     onDone: () => {
       reload?.()
       pageRef.value?.load()
@@ -264,6 +265,7 @@ function backfillSelected(form: Record<string, unknown>, reload?: () => void) {
   backfillRef.value?.open({
     module: 'maintain',
     planId: String(form.id),
+    plan: form,
     planItemIds: ids,
     onDone: () => reload?.()
   })
@@ -277,6 +279,7 @@ function backfillOneItem(form: Record<string, unknown>, row: Record<string, unkn
   backfillRef.value?.open({
     module: 'maintain',
     planId: String(form.id),
+    plan: form,
     planItemIds: [String(row.id)],
     onDone: () => reload?.()
   })
