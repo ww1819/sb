@@ -59,6 +59,12 @@
             flow
           />
         </el-form>
+        <div v-if="exec" class="header-channels">
+          制单途径 {{ channelLabel(exec.create_channel) }}
+          · 审核途径 {{ channelLabel(exec.audit_channel) }}
+          · 审核人 {{ blankDash(exec.auditor_name) }}
+          · 审核时间 {{ blankDash(exec.audited_at) }}
+        </div>
         <FormSection title="设备明细" class="items-section">
           <el-table :data="execItems" border size="small">
             <el-table-column prop="device_code" label="设备编码" width="110" />
@@ -73,6 +79,12 @@
             </el-table-column>
             <el-table-column prop="confirmed_by_name" label="确认人" width="90" />
             <el-table-column prop="confirmed_at" label="确认时间" width="160" />
+            <el-table-column label="执行途径" width="90">
+              <template #default="{ row }">{{ channelLabel(row.execution_channel) }}</template>
+            </el-table-column>
+            <el-table-column label="确认途径" width="90">
+              <template #default="{ row }">{{ channelLabel(row.confirm_channel) }}</template>
+            </el-table-column>
             <el-table-column label="操作" width="200" fixed="right">
               <template #default="{ row }">
                 <el-button
@@ -115,7 +127,13 @@
 
     <AppModal v-model="itemVisible" :title="itemViewOnly ? '查看设备巡检' : '设备巡检执行'" size="lg">
       <template v-if="currentItem">
-        <div class="item-header">{{ currentItem.device_code }} · {{ currentItem.device_name }}</div>
+        <div class="item-header">
+          {{ currentItem.device_code }} · {{ currentItem.device_name }}
+          <span class="item-channels">
+            执行途径 {{ channelLabel(currentItem.execution_channel) }}
+            · 确认途径 {{ channelLabel(currentItem.confirm_channel) }}
+          </span>
+        </div>
         <el-table :data="itemResults" border size="small">
           <el-table-column prop="item_name" label="巡检项目" min-width="140" />
           <el-table-column prop="item_content" label="巡检内容" min-width="160" show-overflow-tooltip />
@@ -146,7 +164,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import CrudPage from '@/components/CrudPage.vue'
@@ -155,8 +173,23 @@ import FormSection from '@/components/form/FormSection.vue'
 import AppModal from '@/components/AppModal.vue'
 import DocChangeHistoryDrawer from '@/components/DocChangeHistoryDrawer.vue'
 import type { PageConfig } from '@/config/pageRegistry'
+import { useDict } from '@/composables/useDict'
 
 const CLIENT = { client: 'web' }
+const { loadDict, resolveDictLabel } = useDict()
+
+function channelLabel(v: unknown) {
+  return resolveDictLabel('execution_channel', v) || (v != null && String(v) !== '' ? String(v) : '—')
+}
+
+function blankDash(v: unknown) {
+  if (v == null || String(v).trim() === '') return '—'
+  return String(v)
+}
+
+onMounted(() => {
+  void loadDict('execution_channel')
+})
 
 const config: PageConfig = {
   title: '巡检执行',
@@ -386,7 +419,13 @@ async function completeItem() {
 
 <style scoped>
 .items-section { margin-top: 12px; }
+.header-channels {
+  margin: 8px 0 4px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
 .item-header { margin-bottom: 12px; font-weight: 600; }
+.item-channels { margin-left: 12px; font-weight: 400; color: var(--el-text-color-secondary); font-size: 13px; }
 .op-muted { color: var(--el-text-color-placeholder); }
 .ops-doc-form :deep(.form-section) {
   margin-bottom: 6px;

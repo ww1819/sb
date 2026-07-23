@@ -299,6 +299,18 @@ class _OpsExecDetailPageState extends ConsumerState<OpsExecDetailPage> {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 Text('状态：${exec?['status'] ?? ''} / 明细：${item?['status'] ?? ''}'),
+                Text(
+                  '制单途径：${_channelLabel(exec?['create_channel'])} · 审核途径：${_channelLabel(exec?['audit_channel'])}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                Text(
+                  '审核人：${_blankDash(exec?['auditor_name'])} · 审核时间：${_blankDash(exec?['audited_at'])}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                Text(
+                  '执行途径：${_channelLabel(item?['execution_channel'])} · 确认途径：${_channelLabel(item?['confirm_channel'])}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
                 if (item?['status']?.toString() == 'confirmed')
                   const Padding(
                     padding: EdgeInsets.only(top: 8),
@@ -391,6 +403,18 @@ class _OpsExecDetailPageState extends ConsumerState<OpsExecDetailPage> {
               ],
             ),
     );
+  }
+
+  String _channelLabel(Object? raw) {
+    final v = raw?.toString().trim() ?? '';
+    if (v.isEmpty) return '—';
+    const map = {'web': 'Web', 'app': 'App', 'mp': '小程序'};
+    return map[v] ?? v;
+  }
+
+  String _blankDash(Object? raw) {
+    final v = raw?.toString().trim() ?? '';
+    return v.isEmpty ? '—' : v;
   }
 }
 

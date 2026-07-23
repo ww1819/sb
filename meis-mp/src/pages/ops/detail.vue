@@ -6,6 +6,15 @@
         <text class="no">{{ exec?.execution_no || '执行明细' }}</text>
         <text class="meta">{{ item?.device_name }} · {{ item?.device_code }}</text>
         <text class="status">状态：{{ exec?.status || '—' }} / 明细：{{ item?.status || '—' }}</text>
+        <text class="channels">
+          制单途径：{{ channelLabel(exec?.create_channel) }} · 审核途径：{{ channelLabel(exec?.audit_channel) }}
+        </text>
+        <text class="channels">
+          审核人：{{ blankDash(exec?.auditor_name) }} · 审核时间：{{ blankDash(exec?.audited_at) }}
+        </text>
+        <text class="channels">
+          执行途径：{{ channelLabel(item?.execution_channel) }} · 确认途径：{{ channelLabel(item?.confirm_channel) }}
+        </text>
         <text v-if="String(item?.status) === 'confirmed'" class="locked">已确认，不可再修改</text>
       </view>
 
@@ -135,6 +144,18 @@ const canConfirmItem = computed(() => {
 const completeLabel = computed(() =>
   String(item.value?.status || '') === 'completed' ? '保存修改' : '完成本设备项'
 )
+
+function channelLabel(raw: unknown) {
+  const v = String(raw ?? '').trim()
+  if (!v) return '—'
+  const map: Record<string, string> = { web: 'Web', app: 'App', mp: '小程序' }
+  return map[v] || v
+}
+
+function blankDash(raw: unknown) {
+  const v = String(raw ?? '').trim()
+  return v || '—'
+}
 
 onLoad((query) => {
   auth.restore()
@@ -333,7 +354,8 @@ async function confirmItem() {
   font-weight: 600;
 }
 .meta,
-.status {
+.status,
+.channels {
   display: block;
   margin-top: 8rpx;
   font-size: 24rpx;

@@ -1197,6 +1197,9 @@ CREATE TABLE IF NOT EXISTS ops_plan_include_request (
     delete_channel VARCHAR(20)
 );
 COMMENT ON TABLE ops_plan_include_request IS '运维计划纳入设备申请（OPS.16.16）';
+ALTER TABLE ops_plan_include_request ADD COLUMN IF NOT EXISTS confirm_channel VARCHAR(20);
+COMMENT ON COLUMN ops_plan_include_request.create_channel IS '申请途径 web/app/mp（OPS.16.28）';
+COMMENT ON COLUMN ops_plan_include_request.confirm_channel IS '确认途径（通过/驳回）web/app/mp（OPS.16.28）';
 
 -- OPS.16.12 执行类型：到期执行 / 执行补录
 ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS execution_kind VARCHAR(20) DEFAULT 'due';

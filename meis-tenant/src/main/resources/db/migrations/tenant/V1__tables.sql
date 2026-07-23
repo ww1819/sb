@@ -2016,6 +2016,7 @@ CREATE TABLE IF NOT EXISTS ops_plan_include_request (
     remark TEXT,
     reject_reason TEXT,
     create_channel VARCHAR(20),
+    confirm_channel VARCHAR(20),
     applicant_id UUID REFERENCES sys_user(id),
     applicant_name VARCHAR(100),
     approved_by UUID REFERENCES sys_user(id),
@@ -2037,6 +2038,8 @@ CREATE TABLE IF NOT EXISTS ops_plan_include_request (
 COMMENT ON TABLE ops_plan_include_request IS '运维计划纳入设备申请（OPS.16.16）；确认后写计划明细';
 COMMENT ON COLUMN ops_plan_include_request.module IS 'maintain/inspect/pm';
 COMMENT ON COLUMN ops_plan_include_request.status IS 'pending/approved/rejected';
+COMMENT ON COLUMN ops_plan_include_request.create_channel IS '申请途径 web/app/mp（OPS.16.28）';
+COMMENT ON COLUMN ops_plan_include_request.confirm_channel IS '确认途径（通过/驳回）web/app/mp（OPS.16.28）';
 CREATE INDEX IF NOT EXISTS idx_ops_plan_include_plan ON ops_plan_include_request(module, plan_id, status);
 CREATE INDEX IF NOT EXISTS idx_ops_plan_include_device ON ops_plan_include_request(module, device_id, status);
 

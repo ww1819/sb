@@ -390,10 +390,11 @@ public final class OpsPlanIncludeSupport {
         jdbc.update("""
                 UPDATE ops_plan_include_request SET status='approved',
                   approved_by=?::uuid, approved_by_name=?, approved_at=NOW(),
+                  confirm_channel=?,
                   result_plan_item_id=?::uuid,
                   updated_by=?::uuid, updated_by_name=?, updated_at=NOW()
                 WHERE id=?::uuid
-                """, userId, userName, itemId, userId, userName, requestId);
+                """, userId, userName, OpsClientChannel.of(body), itemId, userId, userName, requestId);
 
         Map<String, Object> out = load(jdbc, requestId);
         out.put("plan_item_id", itemId);
@@ -409,19 +410,24 @@ public final class OpsPlanIncludeSupport {
         if (reason == null || reason.toString().isBlank()) {
             throw new BizException(400, "驳回须填写原因");
         }
-        markRejected(jdbc, requestId, reason.toString().trim());
+        markRejected(jdbc, requestId, reason.toString().trim(), body != null ? body : Map.of());
         return load(jdbc, requestId);
     }
 
     private static void markRejected(JdbcTemplate jdbc, UUID requestId, String reason) {
+        markRejected(jdbc, requestId, reason, Map.of());
+    }
+
+    private static void markRejected(JdbcTemplate jdbc, UUID requestId, String reason, Map<String, Object> body) {
         String userId = TenantContext.getUserId();
         String userName = SoftDeleteSupport.resolveUserDisplayName(jdbc, userId);
         jdbc.update("""
                 UPDATE ops_plan_include_request SET status='rejected', reject_reason=?,
                   approved_by=?::uuid, approved_by_name=?, approved_at=NOW(),
+                  confirm_channel=?,
                   updated_by=?::uuid, updated_by_name=?, updated_at=NOW()
                 WHERE id=?::uuid
-                """, reason, userId, userName, userId, userName, requestId);
+                """, reason, userId, userName, OpsClientChannel.of(body), userId, userName, requestId);
     }
 
     public static Map<String, Object> load(JdbcTemplate jdbc, UUID id) {

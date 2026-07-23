@@ -8,7 +8,12 @@
       <el-table-column prop="device_code" label="设备编码" width="110" />
       <el-table-column prop="device_name" label="设备名称" min-width="120" />
       <el-table-column prop="applicant_name" label="申请人" width="90" />
-      <el-table-column prop="create_channel" label="途径" width="70" />
+      <el-table-column label="申请途径" width="90">
+        <template #default="{ row }">{{ channelLabel(row.create_channel) }}</template>
+      </el-table-column>
+      <el-table-column label="确认途径" width="90">
+        <template #default="{ row }">{{ channelLabel(row.confirm_channel) }}</template>
+      </el-table-column>
       <el-table-column prop="created_at" label="申请时间" width="160" />
       <el-table-column label="状态" width="90">
         <template #default="{ row }">{{ statusLabel(row.status) }}</template>
@@ -68,6 +73,13 @@ function statusLabel(st: unknown) {
   if (st === 'approved') return '已通过'
   if (st === 'rejected') return '已驳回'
   return String(st ?? '—')
+}
+
+const CHANNEL_LABELS: Record<string, string> = { web: 'Web', app: 'App', mp: '小程序' }
+function channelLabel(v: unknown) {
+  const s = v != null ? String(v).trim() : ''
+  if (!s) return '—'
+  return CHANNEL_LABELS[s] || s
 }
 
 function openApply() {

@@ -736,13 +736,13 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'backfill_next_due_date', label: '补录下次到期', type: 'date', list: false, readonly: true, form: true, group: 'workflow' },
     { prop: 'create_channel', label: '制单途径', dictType: 'execution_channel', list: true, readonly: true, form: true, group: 'workflow', width: 90 },
     { prop: 'submit_channel', label: '提交途径', dictType: 'execution_channel', list: false, readonly: true, form: true, group: 'workflow' },
-    { prop: 'audit_channel', label: '审核途径', dictType: 'execution_channel', list: false, readonly: true, form: true, group: 'workflow' },
+    { prop: 'audit_channel', label: '审核途径', dictType: 'execution_channel', list: true, readonly: true, form: true, group: 'workflow', width: 90 },
     { prop: 'delete_channel', label: '删除途径', dictType: 'execution_channel', list: false, readonly: true, form: false },
     { prop: 'created_by_name', label: '制单人', list: true, readonly: true, form: true, group: 'approval', width: 90 },
     { prop: 'created_at', label: '制单时间', type: 'datetime', list: true, readonly: true, form: true, group: 'approval', width: 160 },
     { prop: 'submitter_name', label: '提交人', list: false, readonly: true, form: true, group: 'approval' },
     { prop: 'auditor_name', label: '审核人', list: true, readonly: true, form: true, group: 'approval', width: 90 },
-    { prop: 'audited_at', label: '审核时间', type: 'datetime', list: false, readonly: true, form: true, group: 'approval' },
+    { prop: 'audited_at', label: '审核时间', type: 'datetime', list: true, readonly: true, form: true, group: 'approval', width: 160 },
     { prop: 'remark', label: '备注', type: 'textarea', group: 'basic', rows: 2, span: 24 }
   ],
   inspection_execution_item: [
@@ -1013,13 +1013,13 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'backfill_next_due_date', label: '补录下次到期', type: 'date', list: false, readonly: true, form: true, group: 'workflow' },
     { prop: 'create_channel', label: '制单途径', dictType: 'execution_channel', list: true, readonly: true, form: true, group: 'workflow', width: 90 },
     { prop: 'submit_channel', label: '提交途径', dictType: 'execution_channel', list: false, readonly: true, form: true, group: 'workflow' },
-    { prop: 'audit_channel', label: '审核途径', dictType: 'execution_channel', list: false, readonly: true, form: true, group: 'workflow' },
+    { prop: 'audit_channel', label: '审核途径', dictType: 'execution_channel', list: true, readonly: true, form: true, group: 'workflow', width: 90 },
     { prop: 'delete_channel', label: '删除途径', dictType: 'execution_channel', list: false, readonly: true, form: false },
     { prop: 'created_by_name', label: '制单人', list: true, readonly: true, form: true, group: 'approval', width: 90 },
     { prop: 'created_at', label: '制单时间', type: 'datetime', list: true, readonly: true, form: true, group: 'approval', width: 160 },
     { prop: 'submitter_name', label: '提交人', list: false, readonly: true, form: true, group: 'approval' },
     { prop: 'auditor_name', label: '审核人', list: true, readonly: true, form: true, group: 'approval', width: 90 },
-    { prop: 'audited_at', label: '审核时间', type: 'datetime', list: false, readonly: true, form: true, group: 'approval' },
+    { prop: 'audited_at', label: '审核时间', type: 'datetime', list: true, readonly: true, form: true, group: 'approval', width: 160 },
     { prop: 'remark', label: '备注', type: 'textarea', group: 'basic', rows: 2, span: 24 }
   ],
   ops_maintain_device: [
@@ -1322,13 +1322,13 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'backfill_next_due_date', label: '补录下次到期', type: 'date', list: false, readonly: true, form: true, group: 'workflow' },
     { prop: 'create_channel', label: '制单途径', dictType: 'execution_channel', list: true, readonly: true, form: true, group: 'workflow', width: 90 },
     { prop: 'submit_channel', label: '提交途径', dictType: 'execution_channel', list: false, readonly: true, form: true, group: 'workflow' },
-    { prop: 'audit_channel', label: '审核途径', dictType: 'execution_channel', list: false, readonly: true, form: true, group: 'workflow' },
+    { prop: 'audit_channel', label: '审核途径', dictType: 'execution_channel', list: true, readonly: true, form: true, group: 'workflow', width: 90 },
     { prop: 'delete_channel', label: '删除途径', dictType: 'execution_channel', list: false, readonly: true, form: false },
     { prop: 'created_by_name', label: '制单人', list: true, readonly: true, form: true, group: 'approval', width: 90 },
     { prop: 'created_at', label: '制单时间', type: 'datetime', list: true, readonly: true, form: true, group: 'approval', width: 160 },
     { prop: 'submitter_name', label: '提交人', list: false, readonly: true, form: true, group: 'approval' },
     { prop: 'auditor_name', label: '审核人', list: true, readonly: true, form: true, group: 'approval', width: 90 },
-    { prop: 'audited_at', label: '审核时间', type: 'datetime', list: false, readonly: true, form: true, group: 'approval' },
+    { prop: 'audited_at', label: '审核时间', type: 'datetime', list: true, readonly: true, form: true, group: 'approval', width: 160 },
     { prop: 'remark', label: '备注', type: 'textarea', group: 'basic', rows: 2, span: 24 }
   ],
   pm_execution_item: [

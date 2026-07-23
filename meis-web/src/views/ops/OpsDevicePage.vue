@@ -97,7 +97,11 @@
     <AppModal v-model="docVisible" :title="docTitle" size="xl">
       <el-descriptions v-if="docHeader" :column="2" border size="small" class="doc-desc">
         <el-descriptions-item v-for="f in docHeaderFields" :key="f.key" :label="f.label">
-          {{ docHeader[f.key] ?? '—' }}
+          {{
+            f.key.endsWith('_channel')
+              ? channelLabel(docHeader[f.key])
+              : (docHeader[f.key] ?? '—')
+          }}
         </el-descriptions-item>
       </el-descriptions>
       <FormSection v-if="docItems.length" title="设备明细" class="doc-items">
@@ -107,6 +111,12 @@
           <el-table-column v-if="docKind === 'plan'" prop="next_due_date" label="下次到期" width="120" />
           <el-table-column v-if="docKind === 'execution'" prop="status" label="状态" width="100" />
           <el-table-column v-if="docKind === 'execution'" prop="overall_result" label="结果" width="100" />
+          <el-table-column v-if="docKind === 'execution'" label="执行途径" width="90">
+            <template #default="{ row }">{{ channelLabel(row.execution_channel) }}</template>
+          </el-table-column>
+          <el-table-column v-if="docKind === 'execution'" label="确认途径" width="90">
+            <template #default="{ row }">{{ channelLabel(row.confirm_channel) }}</template>
+          </el-table-column>
         </el-table>
       </FormSection>
       <template #footer>
@@ -307,6 +317,13 @@ import type { PageConfig } from '@/config/pageRegistry'
 import { promptListActionScope, assertScopeSelection } from '@/composables/useListActionScope'
 import { calcCycleDays } from '@/utils/cycleDays'
 
+const CHANNEL_LABELS: Record<string, string> = { web: 'Web', app: 'App', mp: '小程序' }
+function channelLabel(v: unknown) {
+  const s = v != null ? String(v).trim() : ''
+  if (!s) return '—'
+  return CHANNEL_LABELS[s] || s
+}
+
 const props = defineProps<{
   module: 'maintain' | 'inspect' | 'pm'
 }>()
@@ -466,7 +483,11 @@ const docHeaderFields = computed(() =>
         { key: 'plan_no', label: '计划单号' },
         { key: 'template_name', label: '模板' },
         { key: 'planned_date', label: '计划日期' },
-        { key: 'executor_name', label: '执行人' }
+        { key: 'executor_name', label: '执行人' },
+        { key: 'create_channel', label: '制单途径' },
+        { key: 'audit_channel', label: '审核途径' },
+        { key: 'auditor_name', label: '审核人' },
+        { key: 'audited_at', label: '审核时间' }
       ]
 )
 
