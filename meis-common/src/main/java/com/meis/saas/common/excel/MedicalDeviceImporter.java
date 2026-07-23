@@ -3,6 +3,7 @@ package com.meis.saas.common.excel;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
+import com.meis.saas.common.util.PinyinCodeUtil;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -130,6 +131,7 @@ public final class MedicalDeviceImporter {
                 row.put("id", id);
                 row.put("device_code", code);
                 row.put("device_name", name);
+                putValue(row, extension, dbColumns, "pinyin_code", PinyinCodeUtil.toShortCode(name));
                 putValue(row, extension, dbColumns, "brand", brand);
                 putValue(row, extension, dbColumns, "model", model);
                 putValue(row, extension, dbColumns, "specification", specification);

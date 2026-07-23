@@ -24,7 +24,7 @@ public class EntityChangeLogService {
     /** 附录 T.5：delete/submit/withdraw 精简快照字段（按实体） */
     public static final Map<String, List<String>> SNAPSHOT_FIELDS = Map.ofEntries(
             Map.entry("medical_device", List.of(
-                    "device_code", "device_name", "brand", "model", "serial_number",
+                    "device_code", "device_name", "pinyin_code", "brand", "model", "serial_number",
                     "device_status", "risk_level", "dept_id", "campus_id",
                     "original_value", "enable_date", "is_active")),
             Map.entry("manufacturer", List.of(

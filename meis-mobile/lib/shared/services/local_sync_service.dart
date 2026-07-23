@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite/sqflite.dart';
 
-import '../../shared/services/api_service.dart';
-import '../models/auth_user.dart';
-import 'sqlite_helper.dart';
+import '../../core/models/auth_user.dart';
+import '../../core/storage/sqlite_helper.dart';
+import 'api_service.dart';
 
 /// MOB.8：权限缓存 / 台账增量 / 离线盘点
 class LocalSyncService {

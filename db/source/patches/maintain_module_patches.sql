@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS maintenance_execution (
     maintenance_level_id UUID REFERENCES maintenance_level(id),
     planned_date DATE,
     assigned_engineer_id UUID REFERENCES engineer(id),
-    executor_id UUID REFERENCES engineer(id),
+    executor_id UUID REFERENCES sys_user(id),
     execute_start_time TIMESTAMP WITH TIME ZONE,
     execute_end_time TIMESTAMP WITH TIME ZONE,
     status VARCHAR(20) DEFAULT 'pending',

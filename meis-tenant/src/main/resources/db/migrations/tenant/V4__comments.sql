@@ -345,6 +345,7 @@ COMMENT ON TABLE medical_device IS '设备档案主表';
 COMMENT ON COLUMN medical_device.id IS '主键';
 COMMENT ON COLUMN medical_device.device_code IS '设备编码';
 COMMENT ON COLUMN medical_device.device_name IS '设备名称';
+COMMENT ON COLUMN medical_device.pinyin_code IS '拼音简码（设备名称首拼；检索）';
 COMMENT ON COLUMN medical_device.brand IS '品牌';
 COMMENT ON COLUMN medical_device.model IS '型号';
 COMMENT ON COLUMN medical_device.serial_number IS '出厂序列号';

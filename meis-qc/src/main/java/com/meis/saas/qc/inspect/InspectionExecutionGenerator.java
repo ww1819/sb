@@ -165,7 +165,7 @@ public class InspectionExecutionGenerator {
                 INSERT INTO inspection_execution (id, execution_no, plan_id, plan_no, source_type, template_id,
                     template_name, inspection_type_id, planned_date, cycle_type, cycle_value, cycle_days,
                     execute_start_time, execute_end_time, status, created_by, created_by_name, remark, create_channel)
-                VALUES (?::uuid,?, NULL, NULL, 'ad_hoc', ?::uuid, ?, ?::uuid, ?, ?, ?, ?,
+                VALUES (?::uuid,?, NULL, NULL, 'ad_hoc', ?::uuid, ?, ?::uuid, ?::date, ?, ?, ?,
                     CAST(? AS timestamptz), CAST(? AS timestamptz), 'draft', ?::uuid, ?, ?, ?)
                 """, execId, execNo, templateId, templateName, typeId,
                 body.get("planned_date"), cycle.type(), cycle.value(), cycle.days(),

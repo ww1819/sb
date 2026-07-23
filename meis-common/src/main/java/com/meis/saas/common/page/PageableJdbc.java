@@ -134,6 +134,7 @@ public final class PageableJdbc {
         return switch (table) {
             case "supplier" -> new String[]{"supplier_code", "supplier_name", "pinyin_code", "contact_person", "contact_phone"};
             case "manufacturer" -> new String[]{"manufacturer_code", "manufacturer_name", "pinyin_code"};
+            case "medical_device" -> new String[]{"device_code", "device_name", "pinyin_code", "specification", "serial_number", "brand"};
             case "medical_device_category" -> new String[]{"category_code", "category_name"};
             case "asset_category" -> new String[]{"category_code", "category_name"};
             case "finance_category" -> new String[]{"finance_code", "finance_name"};

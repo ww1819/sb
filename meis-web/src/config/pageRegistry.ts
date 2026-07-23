@@ -348,6 +348,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/asset',
     table: 'medical_device',
     listPageUrl: '/asset/device/page',
+    pinyinCode: true,
     showRowIndex: true,
     rowIndexFixed: false,
     showRowSelection: true,

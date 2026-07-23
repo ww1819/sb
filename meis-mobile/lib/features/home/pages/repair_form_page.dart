@@ -217,7 +217,7 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
   Future<void> lookupCode([String? raw]) async {
     final code = (raw ?? codeCtrl.text).trim();
     if (code.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请输入设备编码')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请输入设备编码、名称或首拼')));
       return;
     }
     setState(() {
@@ -226,12 +226,12 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
       device = null;
     });
     try {
-      final list = await api.getList('/repair/workorder/devices/lookup', query: {'deviceCode': code});
+      final list = await api.getList('/repair/workorder/devices/lookup', query: {'q': code});
       final rows = list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       if (rows.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('没有检索到该编码的设备')),
+            const SnackBar(content: Text('没有检索到匹配设备')),
           );
         }
         return;
@@ -397,7 +397,7 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
                         controller: codeCtrl,
                         enabled: !readonly,
                         decoration: const InputDecoration(
-                          labelText: '设备编码',
+                          labelText: '设备（编码/名称/首拼）',
                           border: OutlineInputBorder(),
                         ),
                         onSubmitted: (_) => lookupCode(),

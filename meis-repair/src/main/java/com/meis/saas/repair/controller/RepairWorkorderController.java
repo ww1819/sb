@@ -104,38 +104,48 @@ public class RepairWorkorderController {
     }
 
     /**
-     * 扫码/编码锁定台账：优先精确 device_code，否则模糊；含不可报修设备（带 can_report）。
+     * 扫码/搜索锁定台账（OPS.16.23）：参数 q（兼容 deviceCode）。
+     * 优先精确 device_code；否则按编码 / 名称 / 拼音简码模糊；含不可报修设备（带 can_report）。
      */
     @GetMapping("/devices/lookup")
-    public Result<List<Map<String, Object>>> deviceLookup(@RequestParam String deviceCode) {
-        if (deviceCode == null || deviceCode.isBlank()) {
-            throw new BizException(400, "设备编码不能为空");
+    public Result<List<Map<String, Object>>> deviceLookup(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String deviceCode) {
+        String keyword = firstNonBlank(q, deviceCode);
+        if (keyword == null) {
+            throw new BizException(400, "请输入设备编码、名称或首拼简码");
         }
-        String code = deviceCode.trim();
         String notDeleted = SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d");
-        List<Map<String, Object>> rows = jdbc.queryForList("""
-                SELECT d.id, d.device_code, d.device_name, d.specification, d.serial_number,
+        String deptNd = SoftDeleteSupport.notDeletedClause(jdbc, "department", "dept");
+        String select = """
+                SELECT d.id, d.device_code, d.device_name, d.pinyin_code, d.specification, d.serial_number,
                        d.financial_code, d.dept_id, d.device_status, d.is_active, dept.dept_name
                 FROM medical_device d
                 LEFT JOIN department dept ON dept.id = d.dept_id
-                WHERE d.device_code = ?
-                """ + notDeleted + SoftDeleteSupport.notDeletedClause(jdbc, "department", "dept")
-                + " ORDER BY d.device_code LIMIT 50", code);
+                """;
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                select + " WHERE d.device_code = ? " + notDeleted + deptNd + " ORDER BY d.device_code LIMIT 50",
+                keyword);
         if (rows.isEmpty()) {
-            rows = jdbc.queryForList("""
-                    SELECT d.id, d.device_code, d.device_name, d.specification, d.serial_number,
-                           d.financial_code, d.dept_id, d.device_status, d.is_active, dept.dept_name
-                    FROM medical_device d
-                    LEFT JOIN department dept ON dept.id = d.dept_id
-                    WHERE d.device_code ILIKE ?
-                    """ + notDeleted + SoftDeleteSupport.notDeletedClause(jdbc, "department", "dept")
-                    + " ORDER BY d.device_code LIMIT 50", "%" + code + "%");
+            String like = "%" + keyword + "%";
+            rows = jdbc.queryForList(
+                    select + """
+                             WHERE (d.device_code ILIKE ? OR d.device_name ILIKE ?
+                                    OR COALESCE(d.pinyin_code, '') ILIKE ?)
+                            """ + notDeleted + deptNd + " ORDER BY d.device_code LIMIT 50",
+                    like, like, like);
         }
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> row : rows) {
             out.add(enrichDeviceReportability(row));
         }
         return Result.ok(out);
+    }
+
+    private static String firstNonBlank(String a, String b) {
+        if (a != null && !a.isBlank()) return a.trim();
+        if (b != null && !b.isBlank()) return b.trim();
+        return null;
     }
 
     /**

@@ -4,11 +4,23 @@
       <text class="section-title">设备</text>
       <view class="row-actions">
         <button class="btn" type="primary" size="mini" @click="scan">扫一扫</button>
-        <button class="btn" size="mini" @click="lookupManual">按编码查询</button>
+        <button class="btn" size="mini" @click="lookupManual">搜索设备</button>
       </view>
       <view class="field">
-        <text class="label">设备编码</text>
-        <input v-model="deviceCode" class="input" placeholder="扫码或手输" @confirm="lookupManual" />
+        <text class="label">设备（编码/名称/首拼）</text>
+        <input v-model="deviceCode" class="input" placeholder="扫码或输入名称/首拼/编码" @confirm="lookupManual" />
+      </view>
+      <view v-if="candidates.length" class="candidates">
+        <text class="section-title">检索到 {{ candidates.length }} 台，请选择</text>
+        <view
+          v-for="(c, idx) in candidates"
+          :key="String(c.id || idx)"
+          class="candidate"
+          @click="selectDevice(c)"
+        >
+          <text class="d-name">{{ c.device_name }}</text>
+          <text class="d-meta">{{ c.device_code }} · {{ c.dept_name || '—' }} · {{ c.pinyin_code || '' }}</text>
+        </view>
       </view>
       <view v-if="device" class="device-box">
         <text class="d-name">{{ device.device_name }}</text>
@@ -60,6 +72,7 @@ interface DeviceInfo {
   id: string
   device_code?: string
   device_name?: string
+  pinyin_code?: string
   dept_id?: string
   dept_name?: string
   device_status?: string
@@ -70,6 +83,7 @@ interface DeviceInfo {
 const auth = useAuthStore()
 const deviceCode = ref('')
 const device = ref<DeviceInfo | null>(null)
+const candidates = ref<DeviceInfo[]>([])
 const faultDescription = ref('')
 const submitting = ref(false)
 const looking = ref(false)
@@ -106,30 +120,45 @@ const canSubmit = computed(() => {
     && !submitting.value
 })
 
-async function fetchByCode(code: string) {
+async function fetchByQuery(code: string) {
   const c = code.trim()
   if (!c) {
-    uni.showToast({ title: '请输入设备编码', icon: 'none' })
+    uni.showToast({ title: '请输入设备编码、名称或首拼', icon: 'none' })
     return
   }
   looking.value = true
+  candidates.value = []
+  device.value = null
   try {
-    const data = await http.get<DeviceInfo>(`/asset/device/by-code/${encodeURIComponent(c)}`)
-    device.value = data
-    deviceCode.value = String(data.device_code || c)
-    if (data.can_report === false) {
-      uni.showToast({ title: data.cannot_report_reason || '不可报修', icon: 'none' })
+    const list = await http.get<DeviceInfo[]>('/repair/workorder/devices/lookup', { q: c })
+    const rows = Array.isArray(list) ? list : []
+    if (!rows.length) {
+      uni.showToast({ title: '没有检索到匹配设备', icon: 'none' })
+      return
     }
+    if (rows.length === 1) {
+      selectDevice(rows[0])
+      return
+    }
+    candidates.value = rows
   } catch (e: unknown) {
-    device.value = null
     uni.showToast({ title: e instanceof Error ? e.message : '查找失败', icon: 'none' })
   } finally {
     looking.value = false
   }
 }
 
+function selectDevice(row: DeviceInfo) {
+  device.value = row
+  candidates.value = []
+  deviceCode.value = String(row.device_code || deviceCode.value)
+  if (row.can_report === false) {
+    uni.showToast({ title: row.cannot_report_reason || '不可报修', icon: 'none' })
+  }
+}
+
 function lookupManual() {
-  fetchByCode(deviceCode.value)
+  fetchByQuery(deviceCode.value)
 }
 
 function scan() {
@@ -142,7 +171,7 @@ function scan() {
         return
       }
       deviceCode.value = raw
-      fetchByCode(raw)
+      fetchByQuery(raw)
     },
     fail: () => {
       uni.showToast({ title: '扫码取消或失败', icon: 'none' })
@@ -182,6 +211,7 @@ async function submit() {
       success: () => {
         faultDescription.value = ''
         device.value = null
+        candidates.value = []
         deviceCode.value = ''
         uni.navigateBack({ fail: () => uni.reLaunch({ url: '/pages/home/index' }) })
       }
@@ -202,7 +232,7 @@ onLoad((query) => {
   const code = query?.code ? decodeURIComponent(String(query.code)) : ''
   if (code) {
     deviceCode.value = code
-    fetchByCode(code)
+    fetchByQuery(code)
   }
 })
 </script>
@@ -253,6 +283,16 @@ onLoad((query) => {
 .textarea {
   min-height: 180rpx;
   width: auto;
+}
+.candidates {
+  margin-top: 12rpx;
+}
+.candidate {
+  padding: 20rpx;
+  margin-bottom: 12rpx;
+  background: #f7fbff;
+  border-radius: 12rpx;
+  border: 1px solid #d6e6f8;
 }
 .device-box {
   margin-top: 8rpx;

@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS pm_execution (
     pm_type_id UUID REFERENCES pm_type(id),
     planned_date DATE,
     assigned_engineer_id UUID REFERENCES engineer(id),
-    executor_id UUID REFERENCES engineer(id),
+    executor_id UUID REFERENCES sys_user(id),
     execute_start_time TIMESTAMP WITH TIME ZONE,
     execute_end_time TIMESTAMP WITH TIME ZONE,
     status VARCHAR(20) DEFAULT 'pending',

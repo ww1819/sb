@@ -13,8 +13,12 @@ class OpsModuleConfig {
     required this.executionBase,
     required this.planDuePath,
     required this.templateListPath,
+    required this.levelListPath,
     required this.levelField,
+    required this.levelIdField,
     required this.levelLabel,
+    required this.levelOptionLabelKey,
+    required this.levelOptionCodeKey,
   });
 
   final String title;
@@ -22,9 +26,15 @@ class OpsModuleConfig {
   final String executionBase;
   final String planDuePath;
   final String templateListPath;
-  /// ad-hoc body field，如 maintenance_level / inspection_type / pm_category
+  /// 级别/类型主数据 list
+  final String levelListPath;
+  /// ad-hoc body 文本字段，如 maintenance_level / inspection_type / pm_type
   final String levelField;
+  /// ad-hoc body id 字段，如 maintenance_level_id
+  final String levelIdField;
   final String levelLabel;
+  final String levelOptionLabelKey;
+  final String levelOptionCodeKey;
 
   static const maintain = OpsModuleConfig(
     title: '移动保养',
@@ -32,8 +42,12 @@ class OpsModuleConfig {
     executionBase: '/maintain/execution',
     planDuePath: '/maintain/plan/due',
     templateListPath: '/maintain/maintenance_template/list',
+    levelListPath: '/maintain/maintenance_level/list',
     levelField: 'maintenance_level',
+    levelIdField: 'maintenance_level_id',
     levelLabel: '保养级别',
+    levelOptionLabelKey: 'level_name',
+    levelOptionCodeKey: 'level_code',
   );
 
   static const inspect = OpsModuleConfig(
@@ -42,8 +56,12 @@ class OpsModuleConfig {
     executionBase: '/inspect/execution',
     planDuePath: '/inspect/plan/due',
     templateListPath: '/inspect/inspection_template/list',
+    levelListPath: '/inspect/inspection_type/list',
     levelField: 'inspection_type',
+    levelIdField: 'inspection_type_id',
     levelLabel: '巡检类型',
+    levelOptionLabelKey: 'type_name',
+    levelOptionCodeKey: 'type_code',
   );
 
   static const pm = OpsModuleConfig(
@@ -52,8 +70,12 @@ class OpsModuleConfig {
     executionBase: '/pm/execution',
     planDuePath: '/pm/plan/due',
     templateListPath: '/maintain/pm_template/list',
+    levelListPath: '/maintain/pm_type/list',
     levelField: 'pm_type',
+    levelIdField: 'pm_type_id',
     levelLabel: 'PM 类型',
+    levelOptionLabelKey: 'type_name',
+    levelOptionCodeKey: 'type_code',
   );
 }
 
@@ -99,13 +121,40 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
       MaterialPageRoute(builder: (_) => const RepairScanPage()),
     );
     if (code == null || code.isEmpty || !mounted) return;
-    await openByCode(code);
+    await openByQuery(code);
   }
 
-  Future<void> openByCode(String code) async {
+  Future<void> searchDevice() async {
+    final ctrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('搜索设备'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: '编码 / 名称 / 首拼',
+            hintText: '如 XYB 或 血压计',
+          ),
+          onSubmitted: (_) => Navigator.pop(ctx, true),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('搜索')),
+        ],
+      ),
+    );
+    final q = ctrl.text.trim();
+    ctrl.dispose();
+    if (ok != true || q.isEmpty || !mounted) return;
+    await openByQuery(q);
+  }
+
+  Future<void> openByQuery(String query) async {
     final api = ref.read(apiServiceProvider);
     try {
-      final list = await api.getList('/repair/workorder/devices/lookup', query: {'deviceCode': code});
+      final list = await api.getList('/repair/workorder/devices/lookup', query: {'q': query});
       if (list.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('未找到设备')));
@@ -118,20 +167,25 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
       } else {
         final picked = await showModalBottomSheet<Map<String, dynamic>>(
           context: context,
+          isScrollControlled: true,
           builder: (ctx) => SafeArea(
-            child: ListView(
-              shrinkWrap: true,
-              children: [
-                const ListTile(title: Text('选择设备')),
-                ...list.map((e) {
-                  final m = Map<String, dynamic>.from(e as Map);
-                  return ListTile(
-                    title: Text(m['device_name']?.toString() ?? ''),
-                    subtitle: Text('${m['device_code'] ?? ''} · ${m['dept_name'] ?? ''}'),
-                    onTap: () => Navigator.pop(ctx, m),
-                  );
-                }),
-              ],
+            child: SizedBox(
+              height: MediaQuery.of(ctx).size.height * 0.6,
+              child: ListView(
+                children: [
+                  const ListTile(title: Text('选择设备')),
+                  ...list.map((e) {
+                    final m = Map<String, dynamic>.from(e as Map);
+                    return ListTile(
+                      title: Text(m['device_name']?.toString() ?? ''),
+                      subtitle: Text(
+                        '${m['device_code'] ?? ''} · ${m['dept_name'] ?? ''} · ${m['pinyin_code'] ?? ''}',
+                      ),
+                      onTap: () => Navigator.pop(ctx, m),
+                    );
+                  }),
+                ],
+              ),
             ),
           ),
         );
@@ -386,34 +440,64 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
   Future<void> createAdHoc(Map<String, dynamic> device) async {
     final api = ref.read(apiServiceProvider);
     List<Map<String, dynamic>> templates = [];
+    List<Map<String, dynamic>> levelOptions = [];
     try {
       final raw = await api.getList(cfg.templateListPath, query: {'limit': 50});
       templates = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (_) {}
+    try {
+      final raw = await api.getList(cfg.levelListPath, query: {'limit': 100});
+      levelOptions = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } catch (_) {}
     if (!mounted) return;
     if (templates.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('暂无可用模板，请先在 Web 配置')));
       return;
     }
+    if (levelOptions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('暂无${cfg.levelLabel}主数据，请先在 Web 配置')));
+      return;
+    }
+
+    String? levelOptionLabel(Map<String, dynamic> o) {
+      final name = o[cfg.levelOptionLabelKey]?.toString();
+      final code = o[cfg.levelOptionCodeKey]?.toString();
+      if (name != null && name.isNotEmpty && code != null && code.isNotEmpty) return '$name（$code）';
+      return name ?? code ?? o['id']?.toString();
+    }
+
+    String? matchLevelId(Map<String, dynamic>? t) {
+      if (t == null) return null;
+      final fromId = t[cfg.levelIdField]?.toString();
+      if (fromId != null && fromId.isNotEmpty) {
+        final hit = levelOptions.where((o) => o['id']?.toString() == fromId);
+        if (hit.isNotEmpty) return fromId;
+      }
+      final codeOrName = t[cfg.levelField]?.toString() ??
+          t['maintenance_level']?.toString() ??
+          t['inspection_type']?.toString() ??
+          t['inspection_type_name']?.toString() ??
+          t['pm_type']?.toString() ??
+          t['type_name']?.toString();
+      if (codeOrName == null || codeOrName.isEmpty) return null;
+      for (final o in levelOptions) {
+        if (o[cfg.levelOptionCodeKey]?.toString() == codeOrName ||
+            o[cfg.levelOptionLabelKey]?.toString() == codeOrName) {
+          return o['id']?.toString();
+        }
+      }
+      return null;
+    }
+
     Map<String, dynamic>? selected = templates.first;
-    final levelCtrl = TextEditingController(
-      text: selected?[cfg.levelField]?.toString() ??
-          selected?['maintenance_level']?.toString() ??
-          selected?['inspection_type']?.toString() ??
-          selected?['pm_type']?.toString() ??
-          '',
-    );
+    String? selectedLevelId = matchLevelId(selected) ?? levelOptions.first['id']?.toString();
     var cycleType = selected?['cycle_type']?.toString() ?? 'month';
     final cycleValueCtrl = TextEditingController(text: selected?['cycle_value']?.toString() ?? '1');
     var plannedDate = _today();
 
     void applyTemplate(Map<String, dynamic> t, void Function(void Function()) setLocal) {
       selected = t;
-      final lv = t[cfg.levelField]?.toString() ??
-          t['maintenance_level']?.toString() ??
-          t['inspection_type']?.toString() ??
-          t['pm_type']?.toString();
-      if (lv != null && lv.isNotEmpty) levelCtrl.text = lv;
+      selectedLevelId = matchLevelId(t) ?? selectedLevelId;
       if (t['cycle_type'] != null) cycleType = t['cycle_type'].toString();
       if (t['cycle_value'] != null) cycleValueCtrl.text = t['cycle_value'].toString();
       setLocal(() {});
@@ -424,6 +508,8 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) {
           final days = _calcCycleDays(cycleType, int.tryParse(cycleValueCtrl.text.trim()));
+          final levelIds = levelOptions.map((o) => o['id']?.toString()).whereType<String>().toSet();
+          final levelValue = levelIds.contains(selectedLevelId) ? selectedLevelId : null;
           return AlertDialog(
             title: const Text('无计划直开'),
             content: SingleChildScrollView(
@@ -444,9 +530,16 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
                       applyTemplate(t, setLocal);
                     },
                   ),
-                  TextField(
-                    controller: levelCtrl,
+                  DropdownButtonFormField<String>(
+                    value: levelValue,
                     decoration: InputDecoration(labelText: cfg.levelLabel),
+                    items: levelOptions
+                        .map((o) => DropdownMenuItem(
+                              value: o['id']?.toString(),
+                              child: Text(levelOptionLabel(o) ?? ''),
+                            ))
+                        .toList(),
+                    onChanged: (v) => setLocal(() => selectedLevelId = v),
                   ),
                   DropdownButtonFormField<String>(
                     initialValue: cycleType,
@@ -501,9 +594,19 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
       ),
     );
     if (ok != true || selected == null) return;
-    if (levelCtrl.text.trim().isEmpty) {
+    if (selectedLevelId == null || selectedLevelId!.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('请填写${cfg.levelLabel}')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('请选择${cfg.levelLabel}')));
+      }
+      return;
+    }
+    final levelRow = levelOptions.firstWhere(
+      (o) => o['id']?.toString() == selectedLevelId,
+      orElse: () => <String, dynamic>{},
+    );
+    if (levelRow.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('请选择${cfg.levelLabel}')));
       }
       return;
     }
@@ -516,10 +619,13 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
       return;
     }
     try {
+      final levelCode = levelRow[cfg.levelOptionCodeKey]?.toString() ?? '';
+      final levelName = levelRow[cfg.levelOptionLabelKey]?.toString() ?? levelCode;
       final body = <String, dynamic>{
         'template_id': selected!['id'],
         'template_name': selected!['template_name'],
-        cfg.levelField: levelCtrl.text.trim(),
+        cfg.levelIdField: selectedLevelId,
+        cfg.levelField: levelCode.isNotEmpty ? levelCode : levelName,
         'device_id': device['id'],
         'cycle_type': cycleType,
         'cycle_value': cycleValue,
@@ -569,13 +675,28 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
       appBar: AppBar(
         title: Text(cfg.title),
         actions: [
+          IconButton(icon: const Icon(Icons.search), tooltip: '搜索设备', onPressed: searchDevice),
           IconButton(icon: const Icon(Icons.refresh), onPressed: loadDue),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: scanAndExecute,
-        icon: const Icon(Icons.qr_code_scanner),
-        label: const Text('扫码执行'),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'ops_search',
+            onPressed: searchDevice,
+            icon: const Icon(Icons.search),
+            label: const Text('搜索设备'),
+          ),
+          const SizedBox(height: 12),
+          FloatingActionButton.extended(
+            heroTag: 'ops_scan',
+            onPressed: scanAndExecute,
+            icon: const Icon(Icons.qr_code_scanner),
+            label: const Text('扫码执行'),
+          ),
+        ],
       ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
@@ -589,7 +710,7 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
                   if (dueItems.isEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Center(child: Text('暂无到期任务，可扫码执行或直开')),
+                      child: Center(child: Text('暂无到期任务，可扫码/搜索设备后执行')),
                     )
                   else
                     ...dueItems.map((d) => Card(

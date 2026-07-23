@@ -72,6 +72,7 @@ public final class ImportFieldRegistry {
         map.put(MEDICAL_DEVICE, List.of(
                 f("device_code", "资产编码", "string", "device_code", true, 10),
                 f("device_name", "资产名称", "string", "device_name", true, 20),
+                f("pinyin_code", "拼音简码", "string", "pinyin_code", false, 25),
                 f("brand", "品牌", "string", "brand", false, 30),
                 f("model", "型号", "string", "model", false, 40),
                 f("specification", "规格", "string", "specification", false, 45),

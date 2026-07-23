@@ -123,7 +123,14 @@
           </el-select>
         </el-form-item>
         <el-form-item :label="typeLabel" required>
-          <el-input v-model="adHoc.typeValue" :placeholder="`填写${typeLabel}`" />
+          <el-select v-model="adHoc.typeId" filterable clearable style="width: 100%" placeholder="请选择">
+            <el-option
+              v-for="o in typeOptions"
+              :key="String(o.id)"
+              :label="typeOptionLabel(o)"
+              :value="String(o.id)"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="周期类型" required>
           <el-select v-model="adHoc.cycle_type" style="width: 100%" @change="syncAdHocCycleDays">
@@ -307,8 +314,64 @@ const props = defineProps<{
 const titles = { maintain: '保养设备管理', inspect: '巡检设备管理', pm: '预防性维护设备管理' }
 const tables = { maintain: 'ops_maintain_device', inspect: 'ops_inspect_device', pm: 'ops_pm_device' }
 const typeLabel = computed(() =>
-  props.module === 'maintain' ? '保养级别' : props.module === 'inspect' ? '巡检类别' : 'PM类别'
+  props.module === 'maintain' ? '保养级别' : props.module === 'inspect' ? '巡检类型' : 'PM类型'
 )
+const typeMeta = computed(() => {
+  if (props.module === 'maintain') {
+    return {
+      listUrl: '/maintain/maintenance_level/list',
+      idField: 'maintenance_level_id',
+      textField: 'maintenance_level',
+      labelKey: 'level_name',
+      codeKey: 'level_code',
+      templateIdKey: 'maintenance_level_id',
+      templateTextKeys: ['maintenance_level']
+    }
+  }
+  if (props.module === 'inspect') {
+    return {
+      listUrl: '/inspect/inspection_type/list',
+      idField: 'inspection_type_id',
+      textField: 'inspection_type',
+      labelKey: 'type_name',
+      codeKey: 'type_code',
+      templateIdKey: 'inspection_type_id',
+      templateTextKeys: ['inspection_type', 'inspection_type_name', 'type_name']
+    }
+  }
+  return {
+    listUrl: '/maintain/pm_type/list',
+    idField: 'pm_type_id',
+    textField: 'pm_type',
+    labelKey: 'type_name',
+    codeKey: 'type_code',
+    templateIdKey: 'pm_type_id',
+    templateTextKeys: ['pm_type', 'type_name']
+  }
+})
+
+function typeOptionLabel(o: Record<string, unknown>) {
+  const meta = typeMeta.value
+  const name = String(o[meta.labelKey] ?? '')
+  const code = String(o[meta.codeKey] ?? '')
+  if (name && code) return `${name}（${code}）`
+  return name || code || String(o.id ?? '')
+}
+
+function matchTypeId(t: Record<string, unknown>) {
+  const meta = typeMeta.value
+  const fromId = String(t[meta.templateIdKey] ?? '')
+  if (fromId && typeOptions.value.some((o) => String(o.id) === fromId)) return fromId
+  for (const key of meta.templateTextKeys) {
+    const v = String(t[key] ?? '')
+    if (!v) continue
+    const hit = typeOptions.value.find(
+      (o) => String(o[meta.codeKey] ?? '') === v || String(o[meta.labelKey] ?? '') === v
+    )
+    if (hit) return String(hit.id)
+  }
+  return ''
+}
 
 type CrudExpose = {
   load: () => void
@@ -410,9 +473,10 @@ const docHeaderFields = computed(() =>
 const adHocVisible = ref(false)
 const adHocDeviceIds = ref<string[]>([])
 const templates = ref<Record<string, unknown>[]>([])
+const typeOptions = ref<Record<string, unknown>[]>([])
 const adHoc = ref<Record<string, unknown>>({
   template_id: null,
-  typeValue: '',
+  typeId: '',
   cycle_type: 'month',
   cycle_value: 1,
   cycle_days: 30,
@@ -522,12 +586,16 @@ async function openAdHoc(deviceIds: string[]) {
       : props.module === 'inspect'
         ? 'inspection_template'
         : 'pm_template'
-  const { data } = await http.get(`/${props.module}/${table}/list`)
-  templates.value = data.data ?? []
+  const [{ data: tplData }, { data: typeData }] = await Promise.all([
+    http.get(`/${props.module}/${table}/list`),
+    http.get(typeMeta.value.listUrl)
+  ])
+  templates.value = tplData.data ?? []
+  typeOptions.value = typeData.data ?? []
   const date = todayStr()
   adHoc.value = {
     template_id: null,
-    typeValue: '',
+    typeId: typeOptions.value[0] ? String(typeOptions.value[0].id) : '',
     cycle_type: 'month',
     cycle_value: 1,
     cycle_days: 30,
@@ -541,9 +609,8 @@ async function openAdHoc(deviceIds: string[]) {
 function onTemplateChange() {
   const t = templates.value.find((x) => String(x.id) === String(adHoc.value.template_id))
   if (!t) return
-  if (props.module === 'maintain') adHoc.value.typeValue = t.maintenance_level ?? ''
-  if (props.module === 'inspect') adHoc.value.typeValue = t.inspection_type ?? t.type_name ?? ''
-  if (props.module === 'pm') adHoc.value.typeValue = t.pm_type ?? t.type_name ?? ''
+  const matched = matchTypeId(t)
+  if (matched) adHoc.value.typeId = matched
   if (t.cycle_type) adHoc.value.cycle_type = t.cycle_type
   if (t.cycle_value != null) adHoc.value.cycle_value = Number(t.cycle_value) || 1
   syncAdHocCycleDays()
@@ -555,8 +622,8 @@ async function submitAdHoc() {
     ElMessage.warning('请选择模板')
     return
   }
-  if (!adHoc.value.typeValue) {
-    ElMessage.warning(`请填写${typeLabel.value}`)
+  if (!adHoc.value.typeId) {
+    ElMessage.warning(`请选择${typeLabel.value}`)
     return
   }
   if (!adHoc.value.cycle_type || !adHoc.value.cycle_value) {
@@ -571,6 +638,11 @@ async function submitAdHoc() {
     ElMessage.warning('请填写开始/结束时间')
     return
   }
+  const meta = typeMeta.value
+  const typeRow = typeOptions.value.find((o) => String(o.id) === String(adHoc.value.typeId))
+  const typeText = typeRow
+    ? String(typeRow[meta.codeKey] || typeRow[meta.labelKey] || '')
+    : ''
   const body: Record<string, unknown> = {
     template_id: adHoc.value.template_id,
     planned_date: adHoc.value.planned_date,
@@ -579,11 +651,10 @@ async function submitAdHoc() {
     execute_start_time: adHoc.value.execute_start_time,
     execute_end_time: adHoc.value.execute_end_time,
     client: 'web',
+    [meta.idField]: adHoc.value.typeId,
+    [meta.textField]: typeText,
     items: adHocDeviceIds.value.map((device_id) => ({ device_id }))
   }
-  if (props.module === 'maintain') body.maintenance_level = adHoc.value.typeValue
-  if (props.module === 'inspect') body.inspection_type = adHoc.value.typeValue
-  if (props.module === 'pm') body.pm_type = adHoc.value.typeValue
   const { data } = await http.post(`/${props.module}/execution/ad-hoc`, body)
   const execNo = data.data?.execution_no
   ElMessage.success(execNo ? `已创建执行单 ${execNo}` : '已创建执行单')

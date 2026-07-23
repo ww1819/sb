@@ -1,5 +1,7 @@
 package com.meis.saas.common.excel;
 
+import com.meis.saas.common.util.PinyinCodeUtil;
+
 import java.util.Map;
 
 public final class MedicalDeviceFieldHelper {
@@ -20,6 +22,16 @@ public final class MedicalDeviceFieldHelper {
         String expiry = DeviceDateCalculator.serviceExpiryDate(acceptance, production, lifeYears);
         if (expiry != null) {
             body.put("service_expiry_date", expiry);
+        }
+
+        // AST-PINYIN-01：简码为空时按设备名称生成首拼
+        String name = asString(body.get("device_name"));
+        String existingPy = asString(body.get("pinyin_code"));
+        if (name != null && existingPy == null) {
+            String py = PinyinCodeUtil.toShortCode(name);
+            if (!py.isBlank()) {
+                body.put("pinyin_code", py);
+            }
         }
     }
 

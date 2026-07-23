@@ -117,6 +117,32 @@ public class MaintenanceExecutionGenerator {
             throw new BizException(400, "无计划直开须选择模板");
         }
         if (body.get("maintenance_level") == null || body.get("maintenance_level").toString().isBlank()) {
+            if (blankToNull(body.get("maintenance_level_id")) == null) {
+                throw new BizException(400, "无计划直开须填写保养级别");
+            }
+        }
+        Object levelId = blankToNull(body.get("maintenance_level_id"));
+        Object levelCode = body.get("maintenance_level");
+        if (levelId == null && levelCode != null && !levelCode.toString().isBlank()) {
+            var found = jdbc.queryForList(
+                    "SELECT id, level_code FROM maintenance_level WHERE level_code = ? OR level_name = ?"
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "maintenance_level", null) + " LIMIT 1",
+                    levelCode.toString(), levelCode.toString());
+            if (!found.isEmpty()) {
+                levelId = found.get(0).get("id");
+                if (levelCode == null || levelCode.toString().isBlank()) {
+                    levelCode = found.get(0).get("level_code");
+                }
+            }
+        }
+        if (levelId != null && (levelCode == null || levelCode.toString().isBlank())) {
+            var found = jdbc.queryForList(
+                    "SELECT level_code FROM maintenance_level WHERE id = ?::uuid"
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "maintenance_level", null) + " LIMIT 1",
+                    levelId);
+            if (!found.isEmpty()) levelCode = found.get(0).get("level_code");
+        }
+        if (levelCode == null || levelCode.toString().isBlank()) {
             throw new BizException(400, "无计划直开须填写保养级别");
         }
         @SuppressWarnings("unchecked")
@@ -156,10 +182,10 @@ public class MaintenanceExecutionGenerator {
                     template_name, maintenance_level_id, maintenance_level, planned_date,
                     cycle_type, cycle_value, cycle_days, execute_start_time, execute_end_time, status,
                     created_by, created_by_name, remark, create_channel)
-                VALUES (?::uuid,?, NULL, NULL, 'ad_hoc', ?::uuid, ?, ?::uuid, ?, ?,
+                VALUES (?::uuid,?, NULL, NULL, 'ad_hoc', ?::uuid, ?, ?::uuid, ?, ?::date,
                     ?, ?, ?, CAST(? AS timestamptz), CAST(? AS timestamptz), 'draft', ?::uuid, ?, ?, ?)
                 """, execId, execNo, templateId, templateName,
-                blankToNull(body.get("maintenance_level_id")), body.get("maintenance_level"),
+                levelId, levelCode,
                 body.get("planned_date"), cycle.type(), cycle.value(), cycle.days(),
                 startTime, endTime, userId, createdByName, body.get("remark"),
                 OpsClientChannel.of(body));

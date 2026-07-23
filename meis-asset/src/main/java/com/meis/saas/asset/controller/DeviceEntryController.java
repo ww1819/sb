@@ -291,20 +291,22 @@ public class DeviceEntryController {
                 UUID deviceId = UUID.randomUUID();
                 String model = blankToNull(item.get("specification"));
                 if (model == null) model = blankToNull(item.get("model"));
+                String deviceName = blankToNull(item.get("device_name"));
+                String pinyin = deviceName == null ? null : com.meis.saas.common.util.PinyinCodeUtil.toShortCode(deviceName);
                 jdbc.update("""
                     INSERT INTO medical_device (
-                        id, device_code, device_name, brand, model, specification, serial_number,
+                        id, device_code, device_name, pinyin_code, brand, model, specification, serial_number,
                         dept_id, supplier_id, manufacturer_id, category_id, finance_category_id, asset_category_id,
                         device_status, original_value, contract_price, contract_id, warehouse_id, financial_code,
                         depreciation_years, production_date, location_detail, created_at, updated_at
                     ) VALUES (
-                        ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?, ?,
                         'normal', ?, ?, ?, ?, ?,
                         ?, ?, ?, NOW(), NOW()
                     )
                     """,
-                        deviceId, code, item.get("device_name"), item.get("brand"), model, model,
+                        deviceId, code, deviceName, pinyin, item.get("brand"), model, model,
                         item.get("serial_number"),
                         itemDept, supplierId, item.get("manufacturer_id"), item.get("category_id"),
                         item.get("finance_category_id"), item.get("asset_category_id"),

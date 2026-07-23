@@ -1924,6 +1924,9 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+| 2.120 | 2026-07-23 21:55:00 | — | OPS.16.25：直开级别/类型改主数据下拉（含巡检类型列表） |
+| 2.119 | 2026-07-23 21:45:00 | — | OPS.16.24：执行单 executor_id 外键由 engineer 改为 sys_user（修 App 完成项 FK 报错） |
+| 2.118 | 2026-07-23 21:15:00 | — | AST-PINYIN-01 / OPS.16.23：设备台账首拼补齐；移动运维/报修按编码·名称·首拼搜设备 |
 | 2.117 | 2026-07-23 20:35:00 | — | OPS.16.22：App/小程序执行对齐 Web（直开字段/确认锁定/去提交/纳入列表） |
 | 2.116 | 2026-07-23 20:15:00 | — | OPS.16.21：查看态纯只读；计划/执行列表补齐查询条件 |
 | 2.115 | 2026-07-23 20:05:00 | — | OPS.16.20：纳入申请改计划列表多选；按设备过滤+查询条件；批量提交 |
@@ -3418,6 +3421,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 |---|---|---|
 | `device_code` | `VARCHAR(20)` | 设备编码 |
 | `device_name` | `VARCHAR(200)` | 设备名称 |
+| `pinyin_code` | `VARCHAR(50)` | 拼音简码（名称首拼） |
 | `brand` | `VARCHAR(100)` | 品牌 |
 | `model` | `VARCHAR(100)` | 型号 |
 | `serial_number` | `VARCHAR(100)` | 出厂序列号 |
@@ -5125,6 +5129,45 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 | **提交** | **去掉**「提交执行单」；现场路径：完成 → 确认；审核留 Web |
 | **纳入申请** | `device_ids` 过滤可申请计划；完整列表展示（突破 ActionSheet 6 条）；确认仍仅 Web |
 | **本期不做** | 移动端执行列表、审核通过、删单/删明细 |
+
+**状态**：已落地（2026-07-23）。
+
+#### OPS.16.23 / AST-PINYIN-01 设备台账首拼补齐 · 移动端按编码/名称/首拼搜设备（2026-07-23）
+
+> 来源：用户草稿 + 确认（App+小程序；运维与报修共用 lookup，方案 B）。
+
+| 项 | 定稿 |
+|----|------|
+| **台账简码** | `medical_device.pinyin_code`（列已有）：保存时若空则按 `device_name` 生成；Web 登记改名称同步简码（已有）；列表「生成简码」批处理；导入写简码；补索引/COMMENT；变更快照 T.5 含 `pinyin_code` |
+| **查找 API** | `GET /repair/workorder/devices/lookup`：参数 `q`（兼容 `deviceCode`）；优先精确编码；否则 `device_code` / `device_name` / `pinyin_code` 模糊；限 50 |
+| **移动运维** | App/小程序保养·巡检·PM：「手输」改为「搜索设备」（名称/首拼/编码） |
+| **报修** | App/小程序报修手输/查询同规则，共用上述 lookup |
+| **规则** | 仅首拼简码（与科室/供应商一致）；不含全拼 |
+
+**状态**：已落地（2026-07-23）。
+
+#### OPS.16.24 执行单 `executor_id` 外键对齐 sys_user（2026-07-23）
+
+> 来源：App「完成本设备项」报错 `maintenance_execution_executor_id_fkey`（键不在 `engineer`）。
+
+| 项 | 定稿 |
+|----|------|
+| **根因** | 完成前 `/start` 写入当前登录 `sys_user.id`；存量库头表 `executor_id` 仍 FK→`engineer`（早期 patch）；V1/OPS.10 已定为 `sys_user` |
+| **修复** | `R__columns_biz`：保养/PM/巡检执行头表与明细 `executor_id` 外键改为 `sys_user(id)`；旧 `engineer.id` 能映射则回填 `engineer.user_id`，否则置空 |
+| **范围** | `maintenance_execution` / `pm_execution` / `inspection_execution` 及对应 `_item` |
+
+**状态**：已落地（2026-07-23）。
+
+#### OPS.16.25 直开级别/类型改主数据下拉（2026-07-23）
+
+> 来源：App 巡检「无计划直开」巡检类型为手输、无列表。
+
+| 项 | 定稿 |
+|----|------|
+| **范围** | App / 小程序 / Web 运维设备直开：保养级别、巡检类型、PM 类型 |
+| **交互** | 手输改为下拉，选项来自主数据 `list`；选模板可回填对应 id |
+| **提交** | 保养：`maintenance_level_id` + `maintenance_level`（编码）；巡检：`inspection_type_id`；PM：`pm_type_id`（可附带名称/编码快照字段） |
+| **接口** | `/maintain/maintenance_level/list`、`/inspect/inspection_type/list`、`/maintain/pm_type/list`（与 Web refSelect 一致） |
 
 **状态**：已落地（2026-07-23）。
 

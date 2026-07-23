@@ -121,6 +121,8 @@ ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_metrology BOOLEAN DEFAULT
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_maintain_device BOOLEAN DEFAULT FALSE;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_inspection_device BOOLEAN DEFAULT FALSE;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS pinyin_code VARCHAR(50);
+COMMENT ON COLUMN medical_device.pinyin_code IS '拼音简码（设备名称首拼；检索）';
+CREATE INDEX IF NOT EXISTS idx_medical_device_pinyin_code ON medical_device(pinyin_code);
 -- ---------- ????????????? ----------
 ALTER TABLE spare_part ADD COLUMN IF NOT EXISTS model VARCHAR(100);
 ALTER TABLE spare_part ADD COLUMN IF NOT EXISTS unit_id UUID;
@@ -788,6 +790,90 @@ ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS issues_found TEX
 ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS photos JSONB;
 ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS signature_url VARCHAR(500);
 ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS row_version INTEGER DEFAULT 1;
+
+-- OPS.16.24：执行单/明细 executor_id 统一引用 sys_user（存量库可能仍 FK→engineer）
+DO $ops1624_executor_fk$
+DECLARE
+    tbl text;
+    con record;
+    ref_table text;
+BEGIN
+    FOREACH tbl IN ARRAY ARRAY[
+        'maintenance_execution', 'pm_execution', 'inspection_execution',
+        'maintenance_execution_item', 'pm_execution_item', 'inspection_execution_item'
+    ]
+    LOOP
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = current_schema()
+              AND table_name = tbl
+              AND column_name = 'executor_id'
+        ) THEN
+            CONTINUE;
+        END IF;
+
+        ref_table := NULL;
+        FOR con IN
+            SELECT c.conname, conf.relname AS ref_rel
+            FROM pg_constraint c
+            JOIN pg_class t ON t.oid = c.conrelid
+            JOIN pg_namespace n ON n.oid = t.relnamespace
+            JOIN pg_class conf ON conf.oid = c.confrelid
+            JOIN pg_attribute a ON a.attrelid = t.oid
+                AND a.attnum = ANY (c.conkey)
+                AND NOT a.attisdropped
+            WHERE c.contype = 'f'
+              AND n.nspname = current_schema()
+              AND t.relname = tbl
+              AND a.attname = 'executor_id'
+        LOOP
+            ref_table := con.ref_rel;
+            IF ref_table IS DISTINCT FROM 'sys_user' THEN
+                EXECUTE format('ALTER TABLE %I DROP CONSTRAINT IF EXISTS %I', tbl, con.conname);
+            END IF;
+        END LOOP;
+
+        IF ref_table IS DISTINCT FROM 'sys_user' THEN
+            -- 旧 engineer.id → engineer.user_id（若可映射）
+            IF EXISTS (
+                SELECT 1 FROM information_schema.tables
+                WHERE table_schema = current_schema() AND table_name = 'engineer'
+            ) THEN
+                EXECUTE format($q$
+                    UPDATE %I t
+                    SET executor_id = e.user_id
+                    FROM engineer e
+                    WHERE t.executor_id = e.id
+                      AND t.executor_id IS NOT NULL
+                      AND e.user_id IS NOT NULL
+                      AND NOT EXISTS (SELECT 1 FROM sys_user u WHERE u.id = t.executor_id)
+                $q$, tbl);
+            END IF;
+            EXECUTE format($q$
+                UPDATE %I t
+                SET executor_id = NULL
+                WHERE t.executor_id IS NOT NULL
+                  AND NOT EXISTS (SELECT 1 FROM sys_user u WHERE u.id = t.executor_id)
+            $q$, tbl);
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint c
+                JOIN pg_class t ON t.oid = c.conrelid
+                JOIN pg_namespace n ON n.oid = t.relnamespace
+                JOIN pg_attribute a ON a.attrelid = t.oid
+                    AND a.attnum = ANY (c.conkey)
+                    AND NOT a.attisdropped
+                WHERE c.contype = 'f'
+                  AND n.nspname = current_schema()
+                  AND t.relname = tbl
+                  AND a.attname = 'executor_id'
+            ) THEN
+                EXECUTE format(
+                    'ALTER TABLE %I ADD CONSTRAINT %I FOREIGN KEY (executor_id) REFERENCES sys_user(id)',
+                    tbl, tbl || '_executor_id_fkey');
+            END IF;
+        END IF;
+    END LOOP;
+END $ops1624_executor_fk$;
 
 ALTER TABLE pm_execution_item ADD COLUMN IF NOT EXISTS execution_no VARCHAR(30);
 ALTER TABLE pm_execution_item ADD COLUMN IF NOT EXISTS plan_item_id UUID;

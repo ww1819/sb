@@ -2,7 +2,7 @@
   <view class="hub">
     <view class="toolbar">
       <button type="primary" size="mini" @click="scanAndExecute">扫码执行</button>
-      <button size="mini" @click="manualCode">手输编码</button>
+      <button size="mini" @click="manualSearch">搜索设备</button>
       <button size="mini" @click="loadDue">刷新到期</button>
     </view>
 
@@ -49,9 +49,9 @@
           <text class="label">模板</text>
           <text class="value">{{ adhoc.templateName || '请选择' }}</text>
         </view>
-        <view class="form-row">
+        <view class="form-row" @click="pickLevel">
           <text class="label">{{ cfg.levelLabel }}</text>
-          <input v-model="adhoc.level" class="input" :placeholder="`请填写${cfg.levelLabel}`" />
+          <text class="value">{{ adhoc.levelLabel || '请选择' }}</text>
         </view>
         <view class="form-row">
           <text class="label">周期类型</text>
@@ -110,9 +110,12 @@ const adhoc = reactive({
   saving: false,
   device: null as Record<string, unknown> | null,
   templates: [] as Record<string, unknown>[],
+  levels: [] as Record<string, unknown>[],
   templateId: '',
   templateName: '',
+  levelId: '',
   level: '',
+  levelLabel: '',
   cycleType: 'month' as string,
   cycleValue: '1',
   plannedDate: todayYmd()
@@ -190,28 +193,28 @@ function scanAndExecute() {
         uni.showToast({ title: '未识别到内容', icon: 'none' })
         return
       }
-      openByCode(code)
+      openByQuery(code)
     },
     fail: () => uni.showToast({ title: '扫码取消或失败', icon: 'none' })
   })
 }
 
-function manualCode() {
+function manualSearch() {
   uni.showModal({
-    title: '设备编码',
+    title: '搜索设备',
     editable: true,
-    placeholderText: '输入设备编码',
+    placeholderText: '编码 / 名称 / 首拼',
     success: (res) => {
-      if (res.confirm && res.content) openByCode(res.content.trim())
+      if (res.confirm && res.content) openByQuery(res.content.trim())
     }
   })
 }
 
-async function openByCode(code: string) {
+async function openByQuery(code: string) {
   uni.showLoading({ title: '查找设备' })
   try {
     const list = await http.get<Record<string, unknown>[]>('/repair/workorder/devices/lookup', {
-      deviceCode: code
+      q: code
     })
     const devices = Array.isArray(list) ? list : []
     if (!devices.length) {
@@ -227,7 +230,7 @@ async function openByCode(code: string) {
       devices.map((d) => ({
         key: String(d.id || ''),
         title: String(d.device_name || d.device_code || '设备'),
-        subtitle: String(d.device_code || ''),
+        subtitle: [d.device_code, d.dept_name, d.pinyin_code].filter(Boolean).join(' · '),
         raw: d
       })),
       (d) => {
@@ -378,6 +381,39 @@ async function pickOpenItem(device: Record<string, unknown>, forConfirm: boolean
   }
 }
 
+function levelOptionLabel(o: Record<string, unknown>) {
+  const name = String(o[cfg.value.levelOptionLabelKey] || '')
+  const code = String(o[cfg.value.levelOptionCodeKey] || '')
+  if (name && code) return `${name}（${code}）`
+  return name || code || String(o.id || '')
+}
+
+function matchLevelId(t: Record<string, unknown> | null | undefined) {
+  if (!t || !adhoc.levels.length) return ''
+  const fromId = String(t[cfg.value.levelIdField] || '')
+  if (fromId && adhoc.levels.some((o) => String(o.id) === fromId)) return fromId
+  const codeOrName =
+    String(t[cfg.value.levelField] || '') ||
+    String(t.maintenance_level || '') ||
+    String(t.inspection_type || '') ||
+    String(t.inspection_type_name || '') ||
+    String(t.pm_type || '') ||
+    String(t.type_name || '')
+  if (!codeOrName) return ''
+  const hit = adhoc.levels.find(
+    (o) =>
+      String(o[cfg.value.levelOptionCodeKey] || '') === codeOrName ||
+      String(o[cfg.value.levelOptionLabelKey] || '') === codeOrName
+  )
+  return hit ? String(hit.id) : ''
+}
+
+function applyLevel(o: Record<string, unknown>) {
+  adhoc.levelId = String(o.id || '')
+  adhoc.level = String(o[cfg.value.levelOptionCodeKey] || o[cfg.value.levelOptionLabelKey] || '')
+  adhoc.levelLabel = levelOptionLabel(o)
+}
+
 function levelFromTemplate(t: Record<string, unknown>) {
   return (
     String(t[cfg.value.levelField] || '') ||
@@ -391,8 +427,11 @@ function levelFromTemplate(t: Record<string, unknown>) {
 function applyTemplate(t: Record<string, unknown>) {
   adhoc.templateId = String(t.id || '')
   adhoc.templateName = String(t.template_name || t.id || '')
-  const lv = levelFromTemplate(t)
-  if (lv) adhoc.level = lv
+  const lid = matchLevelId(t)
+  if (lid) {
+    const row = adhoc.levels.find((o) => String(o.id) === lid)
+    if (row) applyLevel(row)
+  }
   if (t.cycle_type) adhoc.cycleType = String(t.cycle_type)
   if (t.cycle_value != null && t.cycle_value !== '') adhoc.cycleValue = String(t.cycle_value)
 }
@@ -407,6 +446,22 @@ function pickTemplate() {
       raw: t
     })),
     (t) => applyTemplate(t)
+  )
+}
+
+function pickLevel() {
+  if (!adhoc.levels.length) {
+    uni.showToast({ title: `暂无${cfg.value.levelLabel}`, icon: 'none' })
+    return
+  }
+  openPicker(
+    `选择${cfg.value.levelLabel}`,
+    adhoc.levels.map((o) => ({
+      key: String(o.id || ''),
+      title: levelOptionLabel(o),
+      raw: o
+    })),
+    (o) => applyLevel(o)
   )
 }
 
@@ -427,6 +482,7 @@ function closeAdhoc() {
 
 async function createAdHoc(device: Record<string, unknown>) {
   let templates: Record<string, unknown>[] = []
+  let levels: Record<string, unknown>[] = []
   try {
     const raw = await http.get<unknown>(cfg.value.templateListPath, { limit: 50 })
     const list = Array.isArray(raw) ? raw : (raw as { records?: unknown[] })?.records || []
@@ -434,17 +490,32 @@ async function createAdHoc(device: Record<string, unknown>) {
   } catch {
     templates = []
   }
+  try {
+    const raw = await http.get<unknown>(cfg.value.levelListPath, { limit: 100 })
+    const list = Array.isArray(raw) ? raw : (raw as { records?: unknown[] })?.records || []
+    levels = list.map((e) => ({ ...(e as object) })) as Record<string, unknown>[]
+  } catch {
+    levels = []
+  }
   if (!templates.length) {
     uni.showToast({ title: '暂无可用模板', icon: 'none' })
     return
   }
+  if (!levels.length) {
+    uni.showToast({ title: `暂无${cfg.value.levelLabel}主数据`, icon: 'none' })
+    return
+  }
   adhoc.device = device
   adhoc.templates = templates
+  adhoc.levels = levels
   adhoc.plannedDate = todayYmd()
   adhoc.cycleType = 'month'
   adhoc.cycleValue = '1'
+  adhoc.levelId = ''
   adhoc.level = ''
+  adhoc.levelLabel = ''
   applyTemplate(templates[0])
+  if (!adhoc.levelId && levels[0]) applyLevel(levels[0])
   adhoc.visible = true
 }
 
@@ -453,8 +524,8 @@ async function submitAdhoc() {
     uni.showToast({ title: '请选择模板', icon: 'none' })
     return
   }
-  if (!adhoc.level.trim()) {
-    uni.showToast({ title: `请填写${cfg.value.levelLabel}`, icon: 'none' })
+  if (!adhoc.levelId) {
+    uni.showToast({ title: `请选择${cfg.value.levelLabel}`, icon: 'none' })
     return
   }
   const cycleValue = Number(adhoc.cycleValue)
@@ -469,6 +540,7 @@ async function submitAdhoc() {
     const body: Record<string, unknown> = {
       template_id: adhoc.templateId,
       template_name: adhoc.templateName,
+      [cfg.value.levelIdField]: adhoc.levelId,
       [cfg.value.levelField]: adhoc.level.trim(),
       device_id: adhoc.device.id,
       cycle_type: adhoc.cycleType,

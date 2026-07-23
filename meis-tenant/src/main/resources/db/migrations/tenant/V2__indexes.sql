@@ -174,6 +174,9 @@ CREATE INDEX IF NOT EXISTS idx_wo_segment_part_device ON repair_workorder_segmen
 CREATE INDEX IF NOT EXISTS idx_spare_part_pinyin_code ON spare_part(pinyin_code);
 COMMENT ON INDEX idx_spare_part_pinyin_code IS '索引：配件档案.拼音简码';
 
+CREATE INDEX IF NOT EXISTS idx_medical_device_pinyin_code ON medical_device(pinyin_code);
+COMMENT ON INDEX idx_medical_device_pinyin_code IS '索引：设备台账.拼音简码（检索）';
+
 CREATE UNIQUE INDEX IF NOT EXISTS uk_purchase_plan_item_order_no
     ON purchase_plan_item(order_no) WHERE order_no IS NOT NULL;
 COMMENT ON INDEX uk_purchase_plan_item_order_no IS '唯一：采购计划明细.订单号';
