@@ -37,8 +37,18 @@
         </el-button>
       </template>
       <template v-if="form">
-        <el-form :disabled="headerReadonly" label-position="top">
-          <GroupedFormFields :table="config.table" :model="form" />
+        <el-form
+          class="ops-doc-form"
+          :disabled="headerReadonly"
+          label-position="left"
+          label-width="100px"
+          size="small"
+        >
+          <GroupedFormFields
+            :table="config.table"
+            :model="form"
+            :group-columns="config.formGroupColumns"
+          />
         </el-form>
         <slot name="drawer-extra" :form="form" :reload="reloadForm" :editor-mode="editorMode" />
         <ApprovalPanel
@@ -224,3 +234,17 @@ defineExpose({
   editorMode
 })
 </script>
+
+<style scoped>
+.ops-doc-form :deep(.form-section) {
+  margin-bottom: 10px;
+}
+.ops-doc-form :deep(.form-section__title) {
+  font-size: 13px;
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+}
+.ops-doc-form :deep(.form-grid--dense .el-form-item) {
+  margin-bottom: 6px;
+}
+</style>

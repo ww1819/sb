@@ -722,6 +722,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     saveUrl: '/maintain/plan',
     showRowIndex: true,
     showRowSelection: true,
+    formGroupColumns: { basic: 4, workflow: 4, approval: 4 },
     listFilters: [
       { key: 'approval_status', label: '审核状态', dictType: 'maintain_approval_status', multiple: true },
       { key: 'status', label: '计划状态', dictType: 'maintain_plan_status', multiple: true },
@@ -733,6 +734,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/maintain',
     table: 'maintenance_execution',
     listPageUrl: '/maintain/execution/page',
+    formGroupColumns: { basic: 4, workflow: 4, approval: 4 },
     listFilters: [{ key: 'status', label: '状态', dictType: 'maintain_exec_status', multiple: true }]
   },
   '/maintain/query': {
@@ -762,6 +764,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     saveUrl: '/inspect/plan',
     showRowIndex: true,
     showRowSelection: true,
+    formGroupColumns: { basic: 4, workflow: 4, approval: 4 },
     listFilters: [
       { key: 'approval_status', label: '审核状态', dictType: 'inspect_approval_status', multiple: true },
       { key: 'status', label: '计划状态', dictType: 'plan_status', multiple: true },
@@ -773,6 +776,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/inspect',
     table: 'inspection_execution',
     listPageUrl: '/inspect/execution/page',
+    formGroupColumns: { basic: 4, workflow: 4, approval: 4 },
     listFilters: [{ key: 'status', label: '状态', dictType: 'inspect_exec_status', multiple: true }]
   },
   '/inspect/query': {
@@ -941,6 +945,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     table: 'pm_plan',
     saveUrl: '/pm/plan',
     loadFormDetail: true,
+    formGroupColumns: { basic: 4, workflow: 4, approval: 4 },
     listFilters: [
       { key: 'approval_status', label: '审核状态', dictType: 'maintain_approval_status', multiple: true },
       { key: 'status', label: '计划状态', dictType: 'maintain_plan_status', multiple: true },
@@ -952,6 +957,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     apiBase: '/pm',
     table: 'pm_execution',
     listPageUrl: '/pm/execution/page',
+    formGroupColumns: { basic: 4, workflow: 4, approval: 4 },
     listFilters: [{ key: 'status', label: '状态', dictType: 'maintain_exec_status', multiple: true }]
   },
   '/pm/query': {

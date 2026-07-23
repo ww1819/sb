@@ -45,6 +45,7 @@
     :disabled="field.readonly"
     :max="field.maxCount ?? 3"
   />
+  <span v-else-if="field.readonly && field.dictType" class="field-readonly-text">{{ dictDisplay }}</span>
   <component
     v-else
     :is="inputComponent"
@@ -157,7 +158,14 @@ const imageListModel = computed({
   set: (v: string[]) => emit('update:modelValue', v)
 })
 
-const useDictSelect = computed(() => !!props.field.dictType)
+const useDictSelect = computed(() => !!props.field.dictType && !props.field.readonly)
+
+const dictDisplay = computed(() => {
+  const raw = props.modelValue
+  if (raw == null || raw === '') return '—'
+  const hit = options.value.find((o) => String(o.value) === String(raw))
+  return hit?.label ?? String(raw)
+})
 
 const useNativeReadonly = computed(() => {
   if (props.field.dictType || props.field.type === 'select') return false
@@ -194,3 +202,13 @@ onMounted(async () => {
   if (props.field.dictType) options.value = await loadDict(props.field.dictType)
 })
 </script>
+
+<style scoped>
+.field-readonly-text {
+  display: inline-block;
+  min-height: 24px;
+  line-height: 24px;
+  color: var(--el-text-color-regular);
+  word-break: break-all;
+}
+</style>

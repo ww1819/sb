@@ -145,6 +145,7 @@ export function getGroupedFields(table: string): { group: FieldGroup; fields: Fi
   const schema = getSchema(table)
   const groups = new Map<FieldGroup, FieldSchema[]>()
   for (const f of schema) {
+    if (f.form === false) continue
     const g = f.group ?? 'other'
     if (!groups.has(g)) groups.set(g, [])
     groups.get(g)!.push(f)
@@ -161,8 +162,8 @@ const groupTitleMap: Record<FieldGroup, string> = {
   time: '合同信息',
   accounting: '财务信息',
   status: '状态信息',
-  workflow: '流程信息',
-  approval: '审批信息',
+  workflow: '执行与途径',
+  approval: '制单审核',
   compliance: '合规信息',
   attachment: '附件',
   remark: '备注',

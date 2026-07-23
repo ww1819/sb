@@ -41,8 +41,18 @@
 
     <AppModal v-model="visible" title="保养执行详情" size="xl">
       <template v-if="exec">
-        <el-form :disabled="formReadonly" label-position="top">
-          <GroupedFormFields :table="config.table" :model="exec" />
+        <el-form
+          class="ops-doc-form"
+          :disabled="formReadonly"
+          label-position="left"
+          label-width="100px"
+          size="small"
+        >
+          <GroupedFormFields
+            :table="config.table"
+            :model="exec"
+            :group-columns="{ basic: 4, workflow: 4, approval: 4 }"
+          />
         </el-form>
         <FormSection title="设备明细" class="items-section">
           <el-table :data="execItems" border size="small">
@@ -268,7 +278,18 @@ async function completeItem() {
 </script>
 
 <style scoped>
-.items-section { margin-top: 16px; }
+.items-section { margin-top: 12px; }
 .item-header { margin-bottom: 12px; font-weight: 600; }
 .op-muted { color: var(--el-text-color-placeholder); }
+.ops-doc-form :deep(.form-section) {
+  margin-bottom: 10px;
+}
+.ops-doc-form :deep(.form-section__title) {
+  font-size: 13px;
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+}
+.ops-doc-form :deep(.form-grid--dense .el-form-item) {
+  margin-bottom: 6px;
+}
 </style>
