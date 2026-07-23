@@ -367,11 +367,7 @@ public class MaintenanceExecutionController {
 
     @GetMapping("/{id}/change-logs")
     public Result<List<Map<String, Object>>> changeLogs(@PathVariable UUID id) {
-        return Result.ok(jdbc.queryForList("""
-                SELECT * FROM sys_doc_change_log
-                WHERE module='maintain' AND doc_type='execution' AND doc_id=?::uuid
-                ORDER BY created_at DESC
-                """, id));
+        return Result.ok(docLog.list("maintain", "execution", id));
     }
 
     private void updatePlansAfterAudit(UUID execId) {
@@ -400,8 +396,12 @@ public class MaintenanceExecutionController {
             if (planId != null) {
                 jdbc.update("""
                         UPDATE maintenance_plan SET
-                          next_due_date = (SELECT MIN(next_due_date) FROM maintenance_plan_item
-                            WHERE plan_id=?::uuid AND COALESCE(is_deleted,0)=0 AND next_due_date IS NOT NULL),
+                          next_due_date = COALESCE(
+                            (SELECT MIN(next_due_date) FROM maintenance_plan_item
+                              WHERE plan_id=?::uuid AND COALESCE(is_deleted,0)=0 AND next_due_date IS NOT NULL),
+                            next_due_date,
+                            CURRENT_DATE + COALESCE(cycle_days, 30)
+                          ),
                           last_maintained_at = CURRENT_DATE, updated_at=NOW()
                         WHERE id=?::uuid
                         """, planId, planId);

@@ -64,15 +64,27 @@ public class PmPlanController {
 
         // OPS.14：计划单号系统生成；更新时保留原号，忽略客户端传入
         String planNo;
+        String currentApproval = null;
         if (exists) {
             var old = jdbc.queryForList(
-                    "SELECT plan_no, plan_code FROM pm_plan WHERE id = ?::uuid", id);
+                    "SELECT plan_no, plan_code, approval_status FROM pm_plan WHERE id = ?::uuid", id);
             planNo = old.isEmpty() ? null : firstNonBlank(old.get(0).get("plan_no"), old.get(0).get("plan_code"));
+            currentApproval = old.isEmpty() ? null : Objects.toString(old.get(0).get("approval_status"), null);
             if (planNo == null || planNo.isBlank()) {
                 planNo = DailyBizNoSupport.next(jdbc, "pm_plan", "plan_no", "PP-");
             }
         } else {
             planNo = DailyBizNoSupport.next(jdbc, "pm_plan", "plan_no", "PP-");
+        }
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> itemsEarly = body.get("items") instanceof List<?> list
+                ? (List<Map<String, Object>>) list : List.of();
+        if (exists && "approved".equals(currentApproval)) {
+            upsertItems(id, planNo, itemsEarly, clientOf(body));
+            refreshPlanDueCache(id);
+            docLog.event("pm", "plan", id, planNo, "update_items", clientOf(body), null);
+            return get(id);
         }
         String templateName = body.get("template_name") != null ? body.get("template_name").toString() : null;
         if ((templateName == null || templateName.isBlank()) && body.get("template_id") != null) {
@@ -84,8 +96,9 @@ public class PmPlanController {
         }
 
         String userId = TenantContext.getUserId();
-        String assignedUserId = blankToNull(body.get("assigned_user_id"));
-        String assignedUserName = blankToNull(body.get("assigned_user_name"));
+        String createdByName = SoftDeleteSupport.resolveUserDisplayName(jdbc, userId);
+        String assignedUserId = asBlankToNull(body.get("assigned_user_id"));
+        String assignedUserName = asBlankToNull(body.get("assigned_user_name"));
         if (assignedUserId != null && assignedUserName == null) {
             assignedUserName = SoftDeleteSupport.resolveUserDisplayName(jdbc, assignedUserId);
         }
@@ -108,30 +121,34 @@ public class PmPlanController {
                     assignedUserId, assignedUserName,
                     body.get("remark"), userId, id);
         } else {
+            int cycleDays = toPositiveInt(body.get("cycle_days"), 30);
+            LocalDate nextDue = LocalDate.now().plusDays(cycleDays);
             jdbc.update("""
                     INSERT INTO pm_plan (id, plan_code, plan_no, plan_name, template_id, template_name,
                     pm_type, pm_type_id, cycle_type, cycle_value, cycle_days,
                     next_due_date, reminder_days_before, status, approval_status, dept_id, campus_id,
-                    assigned_user_id, assigned_user_name, created_by, remark)
-                    VALUES (?::uuid,?,?,?,?::uuid,?,?,?::uuid,?,?,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?,?::uuid,?)
+                    assigned_user_id, assigned_user_name, created_by, created_by_name, remark)
+                    VALUES (?::uuid,?,?,?,?::uuid,?,?,?::uuid,?,?,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?,?::uuid,?,?)
                     """, id, planNo, planNo, body.get("plan_name"), body.get("template_id"), templateName,
                     body.getOrDefault("pm_type", "L1"), blankToNull(body.get("pm_type_id")),
                     body.getOrDefault("cycle_type", "month"), body.get("cycle_value"),
-                    body.get("cycle_days") != null ? body.get("cycle_days") : 30, LocalDate.now().plusDays(30),
+                    cycleDays, nextDue,
                     body.getOrDefault("reminder_days_before", 7),
                     body.getOrDefault("status", "active"), body.getOrDefault("approval_status", "draft"),
                     blankToNull(body.get("dept_id")), blankToNull(body.get("campus_id")),
                     assignedUserId, assignedUserName,
-                    userId, body.get("remark"));
+                    userId, createdByName, body.get("remark"));
         }
 
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> items = body.get("items") instanceof List<?> list
-                ? (List<Map<String, Object>>) list : List.of();
-        upsertItems(id, planNo, items);
+        upsertItems(id, planNo, itemsEarly, clientOf(body));
         refreshPlanDueCache(id);
         docLog.event("pm", "plan", id, planNo, exists ? "update" : "create", clientOf(body), null);
         return get(id);
+    }
+
+    @GetMapping("/{id}/change-logs")
+    public Result<List<Map<String, Object>>> changeLogs(@PathVariable UUID id) {
+        return Result.ok(docLog.list("pm", "plan", id));
     }
 
     @PostMapping("/{id}/approve")
@@ -186,6 +203,7 @@ public class PmPlanController {
         String planNo = DailyBizNoSupport.next(jdbc, "pm_plan", "plan_no", "PP-");
         Map<String, Object> t = template.get(0);
         String userId = TenantContext.getUserId();
+        String createdByName = SoftDeleteSupport.resolveUserDisplayName(jdbc, userId);
         CycleDaysSupport.Cycle cycle = CycleDaysSupport.resolveFromTemplate(body, t, "month", 1);
         LocalDate nextDue = body.get("next_due_date") != null
                 ? LocalDate.parse(body.get("next_due_date").toString())
@@ -194,11 +212,11 @@ public class PmPlanController {
         jdbc.update("""
                 INSERT INTO pm_plan (id, plan_code, plan_no, plan_name, template_id, template_name,
                 pm_type, pm_type_id, cycle_type, cycle_value, cycle_days, next_due_date,
-                status, approval_status, created_by)
-                VALUES (?::uuid,?,?,?,?::uuid,?,?,?::uuid,?,?,?,?,?,?,?::uuid)
+                status, approval_status, created_by, created_by_name)
+                VALUES (?::uuid,?,?,?,?::uuid,?,?,?::uuid,?,?,?,?,?,?,?::uuid,?)
                 """, id, planNo, planNo, t.get("template_name") + "计划", templateId, t.get("template_name"),
                 t.getOrDefault("pm_type", "L1"), t.get("pm_type_id"),
-                cycle.type(), cycle.value(), cycle.days(), nextDue, "active", "draft", userId);
+                cycle.type(), cycle.value(), cycle.days(), nextDue, "active", "draft", userId, createdByName);
 
         List<Map<String, Object>> items = new ArrayList<>();
         for (String deviceId : deviceIds) {
@@ -207,7 +225,7 @@ public class PmPlanController {
             item.put("next_due_date", nextDue.toString());
             items.add(item);
         }
-        upsertItems(id, planNo, items);
+        upsertItems(id, planNo, items, clientOf(body));
         refreshPlanDueCache(id);
         docLog.event("pm", "plan", id, planNo, "create", clientOf(body), "from_template");
         return get(id);
@@ -236,13 +254,57 @@ public class PmPlanController {
                 """));
     }
 
-    private void upsertItems(UUID planId, String planNo, List<Map<String, Object>> items) {
+    private void upsertItems(UUID planId, String planNo, List<Map<String, Object>> items, String client) {
+        Map<UUID, Map<String, Object>> existing = new LinkedHashMap<>();
+        Map<UUID, Map<String, Object>> deletedByDevice = new LinkedHashMap<>();
+        for (Map<String, Object> row : jdbc.queryForList(
+                "SELECT * FROM pm_plan_item WHERE plan_id=?::uuid", planId)) {
+            Object rid = row.get("id");
+            if (rid == null) continue;
+            UUID rowId = UUID.fromString(rid.toString());
+            boolean deleted = row.get("is_deleted") != null
+                    && !"0".equals(String.valueOf(row.get("is_deleted")));
+            if (!deleted) {
+                existing.put(rowId, row);
+            } else if (row.get("device_id") != null) {
+                deletedByDevice.put(UUID.fromString(row.get("device_id").toString()), row);
+            }
+        }
+        int cycleDays = planCycleDays(planId);
         Set<UUID> keep = new LinkedHashSet<>();
         for (Map<String, Object> item : items) {
-            UUID itemId = parseUuid(item.get("id")).orElse(UUID.randomUUID());
-            keep.add(itemId);
             Object deviceId = blankToNull(item.get("device_id"));
             if (deviceId == null) throw new BizException(400, "计划明细缺少设备");
+            UUID deviceUuid = UUID.fromString(deviceId.toString());
+            Optional<UUID> clientItemId = parseUuid(item.get("id"));
+            UUID itemId;
+            boolean activeExists;
+            boolean restore;
+            Map<String, Object> oldRow = null;
+            if (clientItemId.isPresent() && existing.containsKey(clientItemId.get())) {
+                itemId = clientItemId.get();
+                activeExists = true;
+                restore = false;
+                oldRow = existing.get(itemId);
+            } else {
+                UUID activeByDevice = findItemIdByDevice(existing, deviceUuid);
+                if (activeByDevice != null) {
+                    itemId = activeByDevice;
+                    activeExists = true;
+                    restore = false;
+                    oldRow = existing.get(itemId);
+                } else if (deletedByDevice.containsKey(deviceUuid)) {
+                    oldRow = deletedByDevice.get(deviceUuid);
+                    itemId = UUID.fromString(oldRow.get("id").toString());
+                    activeExists = false;
+                    restore = true;
+                } else {
+                    itemId = clientItemId.orElse(UUID.randomUUID());
+                    activeExists = false;
+                    restore = false;
+                }
+            }
+            keep.add(itemId);
             String code = item.get("device_code") != null ? item.get("device_code").toString() : null;
             String name = item.get("device_name") != null ? item.get("device_name").toString() : null;
             Object deptId = blankToNull(item.get("dept_id"));
@@ -257,31 +319,50 @@ public class PmPlanController {
             }
             String deptName = blankToNull(item.get("dept_name")) != null
                     ? item.get("dept_name").toString() : resolveDeptName(deptId);
-            boolean exists = !jdbc.queryForList(
-                    "SELECT 1 FROM pm_plan_item WHERE id = ?::uuid AND plan_id = ?::uuid",
-                    itemId, planId).isEmpty();
             String assignedId = blankToNull(item.get("assigned_user_id")) != null
                     ? item.get("assigned_user_id").toString() : null;
             String assignedName = item.get("assigned_user_name") != null
                     ? item.get("assigned_user_name").toString()
                     : SoftDeleteSupport.resolveUserDisplayName(jdbc, assignedId);
-            if (exists) {
+            String lastDone = toDateParam(item.get("last_done_date"));
+            String nextDue = resolveItemNextDue(lastDone, item.get("next_due_date"), cycleDays);
+            if (activeExists || restore) {
+                if (oldRow == null) oldRow = Map.of();
+                docLog.fieldChange("pm", "plan", planId, planNo, "item", itemId,
+                        "device_code", oldRow.get("device_code"), code, client);
+                docLog.fieldChange("pm", "plan", planId, planNo, "item", itemId,
+                        "next_due_date", oldRow.get("next_due_date"), nextDue, client);
+                docLog.fieldChange("pm", "plan", planId, planNo, "item", itemId,
+                        "last_done_date", oldRow.get("last_done_date"), lastDone, client);
+                if (restore) {
+                    docLog.fieldChange("pm", "plan", planId, planNo, "item", itemId,
+                            "is_deleted", 1, 0, client);
+                }
                 jdbc.update("""
                         UPDATE pm_plan_item SET plan_no=?, device_id=?::uuid, device_code=?, device_name=?,
-                        dept_id=?::uuid, dept_name=?, last_done_date=?, next_due_date=?, assigned_user_id=?::uuid,
-                        assigned_user_name=?, item_status=?, remark=?, updated_at=NOW()
+                        dept_id=?::uuid, dept_name=?, last_done_date=?::date, next_due_date=?::date,
+                        assigned_user_id=?::uuid, assigned_user_name=?, item_status=?, remark=?,
+                        is_deleted=0, deleted_at=NULL, deleted_by=NULL, deleted_by_name=NULL, updated_at=NOW()
                         WHERE id=?::uuid AND plan_id=?::uuid
                         """, planNo, deviceId, code, name, deptId, deptName,
-                        item.get("last_done_date"), item.get("next_due_date"), assignedId, assignedName,
+                        lastDone, nextDue, assignedId, assignedName,
                         item.getOrDefault("item_status", "active"), item.get("remark"), itemId, planId);
             } else {
                 jdbc.update("""
                         INSERT INTO pm_plan_item (id, plan_id, plan_no, device_id, device_code, device_name,
                         dept_id, dept_name, last_done_date, next_due_date, assigned_user_id, assigned_user_name, item_status, remark)
-                        VALUES (?::uuid,?::uuid,?,?::uuid,?,?,?::uuid,?,?,?,?::uuid,?,?,?)
+                        VALUES (?::uuid,?::uuid,?,?::uuid,?,?,?::uuid,?,?::date,?::date,?::uuid,?,?,?)
                         """, itemId, planId, planNo, deviceId, code, name, deptId, deptName,
-                        item.get("last_done_date"), item.get("next_due_date"), assignedId, assignedName,
+                        lastDone, nextDue, assignedId, assignedName,
                         item.getOrDefault("item_status", "active"), item.get("remark"));
+                docLog.fieldChange("pm", "plan", planId, planNo, "item", itemId,
+                        "device_code", null, code, client);
+            }
+        }
+        for (Map.Entry<UUID, Map<String, Object>> e : existing.entrySet()) {
+            if (!keep.contains(e.getKey())) {
+                docLog.fieldChange("pm", "plan", planId, planNo, "item", e.getKey(),
+                        "device_code", e.getValue().get("device_code"), null, client);
             }
         }
         if (keep.isEmpty()) {
@@ -297,11 +378,35 @@ public class PmPlanController {
         }
     }
 
+    private int planCycleDays(UUID planId) {
+        var rows = jdbc.queryForList("SELECT cycle_days FROM pm_plan WHERE id=?::uuid", planId);
+        return toPositiveInt(rows.isEmpty() ? null : rows.get(0).get("cycle_days"), 30);
+    }
+
+    private static UUID findItemIdByDevice(Map<UUID, Map<String, Object>> rows, UUID deviceId) {
+        for (Map.Entry<UUID, Map<String, Object>> e : rows.entrySet()) {
+            Object did = e.getValue().get("device_id");
+            if (did != null && deviceId.equals(UUID.fromString(did.toString()))) return e.getKey();
+        }
+        return null;
+    }
+
+    private static String resolveItemNextDue(String lastDone, Object nextDueRaw, int cycleDays) {
+        String next = toDateParam(nextDueRaw);
+        if (next != null) return next;
+        LocalDate base = lastDone != null ? LocalDate.parse(lastDone) : LocalDate.now();
+        return base.plusDays(cycleDays).toString();
+    }
+
     private void refreshPlanDueCache(UUID planId) {
         jdbc.update("""
                 UPDATE pm_plan SET
-                  next_due_date = (SELECT MIN(next_due_date) FROM pm_plan_item
-                    WHERE plan_id = ?::uuid AND COALESCE(is_deleted,0)=0 AND next_due_date IS NOT NULL),
+                  next_due_date = COALESCE(
+                    (SELECT MIN(next_due_date) FROM pm_plan_item
+                      WHERE plan_id = ?::uuid AND COALESCE(is_deleted,0)=0 AND next_due_date IS NOT NULL),
+                    next_due_date,
+                    CURRENT_DATE + COALESCE(cycle_days, 30)
+                  ),
                   last_maintained_at = (SELECT MAX(last_done_date) FROM pm_plan_item
                     WHERE plan_id = ?::uuid AND COALESCE(is_deleted,0)=0),
                   updated_at = NOW()
@@ -331,6 +436,27 @@ public class PmPlanController {
         if (value == null) return null;
         if (value instanceof String s && s.isBlank()) return null;
         return value;
+    }
+
+    private static String asBlankToNull(Object value) {
+        Object v = blankToNull(value);
+        return v == null ? null : v.toString().trim();
+    }
+
+    private static int toPositiveInt(Object raw, int defaultValue) {
+        if (raw == null) return defaultValue;
+        try {
+            int n = raw instanceof Number num ? num.intValue() : Integer.parseInt(raw.toString().trim());
+            return n > 0 ? n : defaultValue;
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+
+    private static String toDateParam(Object value) {
+        if (value == null) return null;
+        String s = value.toString().trim();
+        return s.isEmpty() ? null : s.length() >= 10 ? s.substring(0, 10) : s;
     }
 
     private static Optional<UUID> parseUuid(Object value) {

@@ -1,9 +1,11 @@
 <template>
-  <WorkflowCrudPage :config="config" save-url="/metrology/plan">
+  <WorkflowCrudPage :config="config" save-url="/metrology/plan" :enable-doc-change-log="false">
+    <template #list-toolbar-extra>
+      <el-button @click="loadDue">到期提醒(30天)</el-button>
+    </template>
     <template #toolbar-extra="{ form, reload }">
       <el-button v-if="form?.id && form.approval_status === 'draft'" type="primary" @click="approve(form, reload)">审核通过</el-button>
       <el-button v-if="form?.id && form.approval_status === 'approved'" type="success" @click="genExec(form, reload)">生成执行单</el-button>
-      <el-button @click="loadDue">到期提醒(30天)</el-button>
     </template>
     <template #drawer-extra>
       <el-alert v-if="dueList.length" :title="`近30天到期 ${dueList.length} 项`" type="warning" show-icon class="due-alert" />

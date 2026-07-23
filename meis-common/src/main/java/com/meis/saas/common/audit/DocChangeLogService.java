@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -28,6 +30,14 @@ public class DocChangeLogService {
         if (Objects.equals(stringify(oldValue), stringify(newValue))) return;
         insert(module, docType, docId, docNo, "field_change", entityType, entityId,
                 field, stringify(oldValue), stringify(newValue), client, null);
+    }
+
+    public List<Map<String, Object>> list(String module, String docType, UUID docId) {
+        return jdbc.queryForList("""
+                SELECT * FROM sys_doc_change_log
+                WHERE module=? AND doc_type=? AND doc_id=?::uuid
+                ORDER BY created_at DESC
+                """, module, docType, docId);
     }
 
     private void insert(String module, String docType, UUID docId, String docNo, String eventType,

@@ -333,6 +333,7 @@ public abstract class GenericTableController {
         check(table);
         denyRepairWorkorderBypass(table);
         guardInventoryCheckMutable(table, id);
+        guardOpsPlanApprovedImmutable(table, id);
         SoftDeleteSupport.stripClientUpdateFields(body);
         stripImmutableDocNos(body);
         if ("medical_device".equals(table)) {
@@ -424,6 +425,7 @@ public abstract class GenericTableController {
         check(table);
         denyRepairWorkorderBypass(table);
         guardInventoryCheckMutable(table, id);
+        guardOpsPlanApprovedImmutable(table, id);
         if ("medical_device".equals(table)) {
             MedicalDeviceDeleteGuard.assertDeletable(jdbc(), id);
         }
@@ -659,6 +661,16 @@ public abstract class GenericTableController {
                 "SELECT audit_status FROM inventory_check WHERE id = ?::uuid", id);
         if (!rows.isEmpty() && "approved".equals(String.valueOf(rows.get(0).get("audit_status")))) {
             throw new BizException(400, "已审核的盘点单不可修改或删除");
+        }
+    }
+
+    /** OPS.16.6：已审核运维计划禁止删除整单（明细改走专用 save） */
+    private void guardOpsPlanApprovedImmutable(String table, String id) {
+        if (!Set.of("maintenance_plan", "pm_plan", "inspection_plan").contains(table)) return;
+        List<Map<String, Object>> rows = jdbc().queryForList(
+                "SELECT approval_status FROM " + table + " WHERE id = ?::uuid AND COALESCE(is_deleted,0)=0", id);
+        if (!rows.isEmpty() && "approved".equals(String.valueOf(rows.get(0).get("approval_status")))) {
+            throw new BizException(400, "已审核计划不可删除");
         }
     }
 

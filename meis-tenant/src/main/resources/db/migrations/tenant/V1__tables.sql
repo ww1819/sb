@@ -1935,6 +1935,7 @@ CREATE TABLE maintenance_plan (
     assigned_user_id UUID REFERENCES sys_user(id),
     assigned_user_name VARCHAR(100),
     approved_by_name VARCHAR(100),
+    created_by_name VARCHAR(100),
     campus_id UUID,
     last_maintained_at DATE,
     dept_id UUID REFERENCES department(id)
@@ -1960,6 +1961,7 @@ COMMENT ON COLUMN maintenance_plan.dept_id IS '所属科室';
 COMMENT ON COLUMN maintenance_plan.cycle_days IS '周期天数（由类型×值计算；OPS.15.1）';
 COMMENT ON COLUMN maintenance_plan.approval_status IS '审批状态';
 COMMENT ON COLUMN maintenance_plan.created_by IS '创建人';
+COMMENT ON COLUMN maintenance_plan.created_by_name IS '制单人姓名快照（W.5）';
 COMMENT ON COLUMN maintenance_plan.approved_by IS '审核人';
 COMMENT ON COLUMN maintenance_plan.approved_at IS '审核时间';
 COMMENT ON COLUMN maintenance_plan.plan_no IS '计划单号（OPS.14）';
@@ -2081,11 +2083,13 @@ CREATE TABLE maintenance_execution (
     audited_at TIMESTAMP WITH TIME ZONE,
     audit_comment TEXT,
     created_by UUID REFERENCES sys_user(id),
+    created_by_name VARCHAR(100),
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 COMMENT ON TABLE maintenance_execution IS '保养执行单';
+COMMENT ON COLUMN maintenance_execution.created_by_name IS '制单人姓名快照（W.5）';
 
 CREATE TABLE maintenance_execution_item (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -2929,8 +2933,13 @@ CREATE TABLE pm_plan (
     status VARCHAR(20) DEFAULT 'active',
     approval_status VARCHAR(20) DEFAULT 'draft',
     created_by UUID REFERENCES sys_user(id),
+    created_by_name VARCHAR(100),
     approved_by UUID REFERENCES sys_user(id),
+    approved_by_name VARCHAR(100),
     approved_at TIMESTAMP WITH TIME ZONE,
+    assigned_user_id UUID REFERENCES sys_user(id),
+    assigned_user_name VARCHAR(100),
+    campus_id UUID,
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -2941,6 +2950,7 @@ COMMENT ON COLUMN pm_plan.plan_no IS '计划单号（OPS.14）';
 COMMENT ON COLUMN pm_plan.template_name IS '模板名称快照';
 COMMENT ON COLUMN pm_plan.assigned_user_name IS '责任人姓名快照（W.5）';
 COMMENT ON COLUMN pm_plan.approved_by_name IS '审核人姓名快照（W.5）';
+COMMENT ON COLUMN pm_plan.created_by_name IS '制单人姓名快照（W.5）';
 
 
 CREATE TABLE pm_plan_item (
@@ -2997,11 +3007,13 @@ CREATE TABLE pm_execution (
     audited_at TIMESTAMP WITH TIME ZONE,
     audit_comment TEXT,
     created_by UUID REFERENCES sys_user(id),
+    created_by_name VARCHAR(100),
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 COMMENT ON TABLE pm_execution IS '预防性维护执行单';
+COMMENT ON COLUMN pm_execution.created_by_name IS '制单人姓名快照（W.5）';
 
 CREATE TABLE pm_execution_item (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -3695,6 +3707,7 @@ CREATE TABLE IF NOT EXISTS inspection_plan (
     assigned_inspector_name VARCHAR(100),
     approval_status VARCHAR(20) DEFAULT 'draft',
     created_by UUID REFERENCES sys_user(id),
+    created_by_name VARCHAR(100),
     approved_by UUID REFERENCES sys_user(id),
     approved_by_name VARCHAR(100),
     approved_at TIMESTAMP WITH TIME ZONE,
@@ -3730,6 +3743,7 @@ COMMENT ON COLUMN inspection_plan.last_inspected_at IS '上次巡检时间';
 COMMENT ON COLUMN inspection_plan.assigned_inspector_id IS '责任巡检人';
 COMMENT ON COLUMN inspection_plan.approval_status IS '审批状态';
 COMMENT ON COLUMN inspection_plan.created_by IS '创建人';
+COMMENT ON COLUMN inspection_plan.created_by_name IS '制单人姓名快照（W.5）';
 COMMENT ON COLUMN inspection_plan.approved_by IS '审核人';
 COMMENT ON COLUMN inspection_plan.approved_at IS '审核时间';
 COMMENT ON COLUMN inspection_plan.remark IS '备注';
@@ -3829,11 +3843,13 @@ CREATE TABLE IF NOT EXISTS inspection_execution (
     audited_at TIMESTAMP WITH TIME ZONE,
     audit_comment TEXT,
     created_by UUID REFERENCES sys_user(id),
+    created_by_name VARCHAR(100),
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 COMMENT ON TABLE inspection_execution IS '巡检执行单';
+COMMENT ON COLUMN inspection_execution.created_by_name IS '制单人姓名快照（W.5）';
 
 CREATE TABLE IF NOT EXISTS inspection_execution_item (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

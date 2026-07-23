@@ -397,8 +397,12 @@ public class PmExecutionController {
             if (planId != null) {
                 jdbc.update("""
                         UPDATE pm_plan SET
-                          next_due_date = (SELECT MIN(next_due_date) FROM pm_plan_item
-                            WHERE plan_id=?::uuid AND COALESCE(is_deleted,0)=0 AND next_due_date IS NOT NULL),
+                          next_due_date = COALESCE(
+                            (SELECT MIN(next_due_date) FROM pm_plan_item
+                              WHERE plan_id=?::uuid AND COALESCE(is_deleted,0)=0 AND next_due_date IS NOT NULL),
+                            next_due_date,
+                            CURRENT_DATE + COALESCE(cycle_days, 30)
+                          ),
                           last_maintained_at = CURRENT_DATE, updated_at=NOW()
                         WHERE id=?::uuid
                         """, planId, planId);

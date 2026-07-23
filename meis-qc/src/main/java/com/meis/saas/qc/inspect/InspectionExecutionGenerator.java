@@ -57,15 +57,16 @@ public class InspectionExecutionGenerator {
                 p.get("template_name") != null ? p.get("template_name") : p.get("t_name"), null);
         Object typeId = p.get("inspection_type_id") != null ? p.get("inspection_type_id") : p.get("t_type_id");
         String userId = TenantContext.getUserId();
+        String createdByName = SoftDeleteSupport.resolveUserDisplayName(jdbc, userId);
 
         jdbc.update("""
                 INSERT INTO inspection_execution (id, execution_no, plan_id, plan_no, source_type, template_id,
                     template_name, inspection_type_id, planned_date,
-                    assigned_inspector_id, status, created_by)
-                VALUES (?::uuid,?,?::uuid,?, 'from_plan', ?::uuid, ?, ?::uuid, ?, ?::uuid, 'draft', ?::uuid)
+                    assigned_inspector_id, status, created_by, created_by_name)
+                VALUES (?::uuid,?,?::uuid,?, 'from_plan', ?::uuid, ?, ?::uuid, ?, ?::uuid, 'draft', ?::uuid, ?)
                 """, execId, execNo, planId, planNo, p.get("template_id"), templateName, typeId,
                 body.getOrDefault("planned_date", dueItems.get(0).get("next_due_date")),
-                p.get("assigned_inspector_id"), userId);
+                p.get("assigned_inspector_id"), userId, createdByName);
 
         for (Map<String, Object> di : dueItems) {
             insertItemWithResults(execId, execNo, planId, di, p.get("template_id"));
@@ -117,16 +118,17 @@ public class InspectionExecutionGenerator {
         UUID execId = UUID.randomUUID();
         String execNo = DailyBizNoSupport.next(jdbc, "inspection_execution", "execution_no", "IE-");
         String userId = TenantContext.getUserId();
+        String createdByName = SoftDeleteSupport.resolveUserDisplayName(jdbc, userId);
         String templateName = body.get("template_name") != null
                 ? body.get("template_name").toString()
                 : Objects.toString(template.get(0).get("template_name"), null);
 
         jdbc.update("""
                 INSERT INTO inspection_execution (id, execution_no, plan_id, plan_no, source_type, template_id,
-                    template_name, inspection_type_id, planned_date, status, created_by, remark)
-                VALUES (?::uuid,?, NULL, NULL, 'ad_hoc', ?::uuid, ?, ?::uuid, ?, 'draft', ?::uuid, ?)
+                    template_name, inspection_type_id, planned_date, status, created_by, created_by_name, remark)
+                VALUES (?::uuid,?, NULL, NULL, 'ad_hoc', ?::uuid, ?, ?::uuid, ?, 'draft', ?::uuid, ?, ?)
                 """, execId, execNo, templateId, templateName, typeId,
-                body.get("planned_date"), userId, body.get("remark"));
+                body.get("planned_date"), userId, createdByName, body.get("remark"));
 
         for (Map<String, Object> di : devices) {
             Map<String, Object> row = new LinkedHashMap<>(di);

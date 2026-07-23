@@ -809,7 +809,7 @@ function getSelectedRows() {
   return selectedRows.value
 }
 
-defineExpose({ load, getSelectedRows, selectedCount, selectedIds })
+defineExpose({ load, remove, getSelectedRows, selectedCount, selectedIds })
 </script>
 
 <style scoped>

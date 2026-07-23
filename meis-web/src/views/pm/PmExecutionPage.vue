@@ -25,6 +25,9 @@
           </el-table>
         </FormSection>
       </template>
+      <template #header-actions>
+        <el-button v-if="exec?.id" @click="changeLogVisible = true">修改记录</el-button>
+      </template>
       <template #footer>
         <el-button @click="visible = false">关闭</el-button>
         <el-button v-if="exec && ['draft','pending'].includes(String(exec.status))" type="primary" @click="startExec">开始执行</el-button>
@@ -33,6 +36,11 @@
         <el-button v-if="exec?.status === 'submitted'" type="warning" @click="auditExec">审核通过</el-button>
       </template>
     </AppModal>
+
+    <DocChangeHistoryDrawer
+      v-model="changeLogVisible"
+      :api-url="exec?.id ? `/pm/execution/${exec.id}/change-logs` : ''"
+    />
 
     <AppModal v-model="itemVisible" title="设备预防性维护执行" size="lg">
       <template v-if="currentItem">
@@ -72,6 +80,7 @@ import CrudPage from '@/components/CrudPage.vue'
 import GroupedFormFields from '@/components/form/GroupedFormFields.vue'
 import FormSection from '@/components/form/FormSection.vue'
 import AppModal from '@/components/AppModal.vue'
+import DocChangeHistoryDrawer from '@/components/DocChangeHistoryDrawer.vue'
 import type { PageConfig } from '@/config/pageRegistry'
 
 const config: PageConfig = {
@@ -83,6 +92,7 @@ const config: PageConfig = {
 
 const crudRef = ref<InstanceType<typeof CrudPage> | null>(null)
 const visible = ref(false)
+const changeLogVisible = ref(false)
 const exec = ref<Record<string, unknown> | null>(null)
 const execItems = ref<Record<string, unknown>[]>([])
 const itemVisible = ref(false)

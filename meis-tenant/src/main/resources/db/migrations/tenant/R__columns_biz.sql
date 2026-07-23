@@ -974,3 +974,17 @@ ALTER TABLE adverse_event ADD COLUMN IF NOT EXISTS reviewer_name VARCHAR(100);
 COMMENT ON COLUMN adverse_event.reporter_name IS '上报人姓名快照（W.5）';
 COMMENT ON COLUMN adverse_event.handler_name IS '处理人姓名快照（W.5）';
 COMMENT ON COLUMN adverse_event.reviewer_name IS '审核人姓名快照（W.5）';
+
+-- ---------- OPS.16：计划/执行制单人姓名快照（2026-07-23） ----------
+ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
+COMMENT ON COLUMN maintenance_plan.created_by_name IS '制单人姓名快照（W.5）';
+ALTER TABLE pm_plan ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
+COMMENT ON COLUMN pm_plan.created_by_name IS '制单人姓名快照（W.5）';
+ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
+COMMENT ON COLUMN inspection_plan.created_by_name IS '制单人姓名快照（W.5）';
+ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
+COMMENT ON COLUMN maintenance_execution.created_by_name IS '制单人姓名快照（W.5）';
+ALTER TABLE pm_execution ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
+COMMENT ON COLUMN pm_execution.created_by_name IS '制单人姓名快照（W.5）';
+ALTER TABLE inspection_execution ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
+COMMENT ON COLUMN inspection_execution.created_by_name IS '制单人姓名快照（W.5）';

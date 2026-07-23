@@ -709,7 +709,10 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'cycle_days', label: '周期(天)', type: 'number', list: true, readonly: true, form: true },
     { prop: 'next_due_date', label: '最近到期(汇总)', type: 'date', list: true, readonly: true },
     { prop: 'approval_status', label: '审核状态', dictType: 'inspect_approval_status', list: true },
-    { prop: 'approved_by_name', label: '审核人', list: true, readonly: true, form: false },
+    { prop: 'created_by_name', label: '制单人', list: true, readonly: true, form: true },
+    { prop: 'created_at', label: '制单时间', type: 'datetime', list: true, readonly: true, form: true },
+    { prop: 'approved_by_name', label: '审核人', list: true, readonly: true, form: true },
+    { prop: 'approved_at', label: '审核时间', type: 'datetime', list: true, readonly: true, form: true },
     { prop: 'status', label: '状态', dictType: 'plan_status', list: true }
   ],
   inspection_execution: [
@@ -720,8 +723,11 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'template_name', label: '模板名称', list: true, readonly: true, form: false },
     { prop: 'planned_date', label: '计划日期', type: 'date', list: true },
     { prop: 'status', label: '状态', dictType: 'inspect_exec_status', list: true },
-    { prop: 'submitter_name', label: '提交人', list: true, readonly: true },
-    { prop: 'auditor_name', label: '审核人', list: true, readonly: true },
+    { prop: 'created_by_name', label: '制单人', list: true, readonly: true, form: true },
+    { prop: 'created_at', label: '制单时间', type: 'datetime', list: true, readonly: true, form: true },
+    { prop: 'submitter_name', label: '提交人', list: true, readonly: true, form: true },
+    { prop: 'auditor_name', label: '审核人', list: true, readonly: true, form: true },
+    { prop: 'audited_at', label: '审核时间', type: 'datetime', list: true, readonly: true, form: true },
     { prop: 'remark', label: '备注', type: 'textarea' }
   ],
   inspection_execution_item: [
@@ -957,7 +963,10 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'cycle_days', label: '周期(天)', type: 'number', list: true, readonly: true, form: true },
     { prop: 'next_due_date', label: '最近到期(汇总)', type: 'date', list: true, readonly: true },
     { prop: 'approval_status', label: '审核状态', dictType: 'maintain_approval_status', list: true },
-    { prop: 'approved_by_name', label: '审核人', list: true, readonly: true, form: false },
+    { prop: 'created_by_name', label: '制单人', list: true, readonly: true, form: true },
+    { prop: 'created_at', label: '制单时间', type: 'datetime', list: true, readonly: true, form: true },
+    { prop: 'approved_by_name', label: '审核人', list: true, readonly: true, form: true },
+    { prop: 'approved_at', label: '审核时间', type: 'datetime', list: true, readonly: true, form: true },
     { prop: 'status', label: '状态', dictType: 'maintain_plan_status', list: true }
   ],
   maintenance_execution: [
@@ -969,8 +978,11 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'maintenance_level', label: '保养级别', list: true },
     { prop: 'planned_date', label: '计划日期', type: 'date', list: true },
     { prop: 'status', label: '状态', dictType: 'maintain_exec_status', list: true },
-    { prop: 'submitter_name', label: '提交人', list: true, readonly: true },
-    { prop: 'auditor_name', label: '审核人', list: true, readonly: true },
+    { prop: 'created_by_name', label: '制单人', list: true, readonly: true, form: true },
+    { prop: 'created_at', label: '制单时间', type: 'datetime', list: true, readonly: true, form: true },
+    { prop: 'submitter_name', label: '提交人', list: true, readonly: true, form: true },
+    { prop: 'auditor_name', label: '审核人', list: true, readonly: true, form: true },
+    { prop: 'audited_at', label: '审核时间', type: 'datetime', list: true, readonly: true, form: true },
     { prop: 'remark', label: '备注', type: 'textarea' }
   ],
   ops_maintain_device: [
@@ -1239,7 +1251,10 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'cycle_days', label: '周期(天)', type: 'number', list: true, readonly: true, form: true },
     { prop: 'next_due_date', label: '最近到期(汇总)', type: 'date', list: true, readonly: true },
     { prop: 'approval_status', label: '审核状态', dictType: 'maintain_approval_status', list: true },
-    { prop: 'approved_by_name', label: '审核人', list: true, readonly: true, form: false },
+    { prop: 'created_by_name', label: '制单人', list: true, readonly: true, form: true },
+    { prop: 'created_at', label: '制单时间', type: 'datetime', list: true, readonly: true, form: true },
+    { prop: 'approved_by_name', label: '审核人', list: true, readonly: true, form: true },
+    { prop: 'approved_at', label: '审核时间', type: 'datetime', list: true, readonly: true, form: true },
     { prop: 'status', label: '状态', dictType: 'maintain_plan_status', list: true }
   ],
   pm_execution: [
@@ -1250,8 +1265,11 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'template_name', label: '模板名称', list: true, readonly: true, form: false },
     { prop: 'planned_date', label: '计划日期', type: 'date', list: true },
     { prop: 'status', label: '状态', dictType: 'maintain_exec_status', list: true },
-    { prop: 'submitter_name', label: '提交人', list: true, readonly: true },
-    { prop: 'auditor_name', label: '审核人', list: true, readonly: true },
+    { prop: 'created_by_name', label: '制单人', list: true, readonly: true, form: true },
+    { prop: 'created_at', label: '制单时间', type: 'datetime', list: true, readonly: true, form: true },
+    { prop: 'submitter_name', label: '提交人', list: true, readonly: true, form: true },
+    { prop: 'auditor_name', label: '审核人', list: true, readonly: true, form: true },
+    { prop: 'audited_at', label: '审核时间', type: 'datetime', list: true, readonly: true, form: true },
     { prop: 'remark', label: '备注', type: 'textarea' }
   ],
   pm_execution_item: [

@@ -1924,6 +1924,12 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+| 2.97 | 2026-07-23 12:30:00 | — | OPS.16.6：明细自动算下次到期；已审核禁头表编删；列表拆审核/设备明细/编辑/删除；软删明细可恢复 |
+| 2.96 | 2026-07-23 12:10:00 | — | OPS.16.5：计划明细 last_done_date/next_due_date 绑 ?::date，修复 varchar→date 报错 |
+| 2.95 | 2026-07-23 12:00:00 | — | OPS.16 落地：WorkflowCrudPage detailMode；制单/审核字段；修改记录 API+UI；明细 fieldChange |
+| 2.94 | 2026-07-23 11:40:00 | — | OPS.16：计划/执行修改记录·审计字段·审核·明细能力审计；WorkflowCrudPage 架空明细/审核为根因 |
+| 2.93 | 2026-07-23 11:30:00 | — | OPS.15.5：无明细时 refreshPlanDueCache 勿把 next_due_date 刷 null；INSERT 按 cycle_days 算到期日 |
+| 2.92 | 2026-07-23 11:20:00 | — | OPS.15.4：保养/PM 计划 save 修复 Object→String 编译错误；PLT-PK-01：非 UUID/字符串主键审计（3 表 BIGSERIAL） |
 | 2.91 | 2026-07-23 11:00:00 | — | PLT-AUDIT-01.3：V1/R__ 补近期加列 COMMENT（OPS.15 周期、W.5 姓名快照、运维计划同族列） |
 | 2.90 | 2026-07-23 10:45:00 | — | PLT-AUDIT-01.2 / BACKLOG-PLT-W02：入库经办人、出库领用人、退库人、不良事件上报/处理/审核人姓名快照；验收成员补姓名 |
 | 2.89 | 2026-07-23 10:30:00 | — | PLT-AUDIT-01.1：公用借调/归还 approved_by_name；巡检计划 assigned_inspector_name；文档乱码修复 |
@@ -3185,6 +3191,8 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 运维计划/执行单号系统生成 | [OPS.14](#ops14-计划单号--执行单号系统生成2026-07-22)、约定包 §6.8 |
 | 运维模板周期 / 选模板回填 | [OPS.15](#ops15-模板周期与计划选模板回填2026-07-23)、约定包 §5.6 |
 | 全局加列 / 冗余 CRUD 通检 | [PLT-AUDIT-01](#plt-audit-01-全局加列--对象冗余--crud-通检2026-07-23) |
+| 主键类型审计（非 UUID） | [PLT-PK-01](#plt-pk-01-主键类型审计非-uuid--非字符串2026-07-23) |
+| 计划/执行交互缺口（改记录·审核·明细） | [OPS.16](#ops16-计划执行交互缺口审计修改记录审核明细2026-07-23) |
 | App 离线盘点 / 台账缓存 | [MOB.8](#mob8-离线盘点权限缓存与台账同步2026-07-21)、修订 MOB.7 |
 | 微信小程序（uni-app） | [附录 MP](#附录-mp微信小程序uni-app2026-07-21)、[MP.3](#mp3-手写签名与订阅消息2026-07-21)、第 7 章 BACKLOG-MP-01 |
 | App / 小程序后续能力建议 | [MOB.9](#mob9-移动端与小程序后续能力建议2026-07-21)、[MP.2](#mp2-小程序二期建议2026-07-21)、[MOB.10](#mob10-报修进度与验收落地2026-07-21)、[MOB.11](#mob11-工程师移动维修一期2026-07-21)、[MOB.12](#mob12-四项收尾本地草稿--计量--补打--不良事件2026-07-21) |
@@ -4697,7 +4705,114 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 | **P2 计量计划** | `created_by`/`approved_by` 默认取 `TenantContext`；UPDATE 写 `updated_by` |
 | **P2 前端** | 计划补院区/责任人；执行头补 template_name；明细补 dept_name；巡检记录补 device_code/name；巡检周期类型 list |
 
-**状态**：已定稿并落地（2026-07-23；含 15.1 / 15.2 / 15.3）。
+#### OPS.15.4 保养/PM 计划 save 编译错误（2026-07-23）
+
+> 现象：新增保养计划页提示 `Unresolved compilation problems: Type mismatch: cannot convert from Object to String`（两条）。
+
+| 项 | 定稿 / 修补 |
+|----|-------------|
+| **原因** | `blankToNull` 返回 `Object`，却赋给 `String assignedUserId/Name`（Eclipse ECJ 以错误字节码跑服务） |
+| **修复** | 保养/PM 计划 Controller 增加 `asBlankToNull`→`String`；`meis-maintain` 已编译通过 |
+| **连带** | PM 计划同类写法一并修 |
+
+#### OPS.15.5 计划保存 next_due_date 非空（2026-07-23）
+
+> 现象：新增保养计划（可无设备明细）报 `null value in column "next_due_date" ... violates not-null constraint`。
+
+| 项 | 定稿 / 修补 |
+|----|-------------|
+| **原因** | INSERT 已写到期日，随后 `refreshPlanDueCache` 用 `MIN(明细.next_due_date)`；无明细时 MIN 为 null，把头表刷空 |
+| **修复** | `COALESCE(MIN明细, 原 next_due_date, CURRENT_DATE + cycle_days)`；保养/PM 计划与执行回写同改 |
+| **INSERT** | 新增时按 `cycle_days` 计算 `next_due_date`（不再写死 +30） |
+
+**状态**：已定稿并落地（2026-07-23；含 15.1–15.5）。
+
+### OPS.16 计划/执行交互缺口审计（修改记录·审核·明细）（2026-07-23）
+
+> 来源：用户草稿（计划主/明细修改记录；制单人时/审核人时；审核；加设备；并查执行单）。
+
+#### OPS.16.1 现状矩阵
+
+| 能力 | 保养/PM/巡检**计划** | 保养/PM/巡检**执行** |
+|------|---------------------|---------------------|
+| 主表修改记录 | **半有**：`docLog.event` 写 create/update/approve；**无** `GET …/change-logs`；前端无「修改记录」 | **半有**：写日志 + **有** `GET /{id}/change-logs`；前端**未挂**入口 |
+| 明细修改记录 | **无**：`upsertItems` 不写 `fieldChange` | **半有**：item/result 有 `fieldChange`；前端无展示 |
+| 制单人/制单时间 | **缺 UI**：schema 无 `created_by_name`/`created_at`；头表多无 `created_by_name` 列 | **缺 UI**：有 submitter/auditor 部分字段；缺制单人时 |
+| 审核人/审核时间 | **半有**：有 `approved_by_name`（list）；**无** `approved_at` 展示 | 用 `auditor_name`/`audited_at`（命名不同）；schema 多未挂齐 |
+| 审核功能 | **后端有** `POST /{id}/approve`；页有「审核通过」但见 16.2 | **有** `POST /{id}/audit` + 抽屉内按钮 |
+| 添加设备明细 | **代码有**「添加设备」+ `upsertItems`；但见 16.2 **新增/编辑进不到** | **设计不支持**手工加设备（由计划生成）；明细只读/填结果 |
+
+#### OPS.16.2 根因：WorkflowCrudPage 未开 detailMode
+
+| 项 | 说明 |
+|----|------|
+| 现象 | 用户点「新增/编辑」走 `CrudPage` 自带 `FormDrawer`，只有头表字段 → **看不到设备明细**、**看不到审核按钮**（审核挂在 list `toolbar-extra` 且依赖已打开的 detail form） |
+| 代码意图 | `MaintainPlanPage` 等把明细放在 `#drawer-extra`，审核放在 `#toolbar-extra`，本应走 `WorkflowCrudPage` 的 `AppModal`（`@detail`） |
+| 缺口 | `WorkflowCrudPage` **未**传 `detail-mode`，也未监听 `@add` → 双路径分裂 |
+
+#### OPS.16.3 建议排期（待确认后开发）
+
+| 优先级 | 项 | 范围 |
+|--------|----|------|
+| **P0** | 修 `WorkflowCrudPage`：`detailMode` + `@add` 打开同一 AppModal；审核按钮进抽屉头/脚；新增可编辑明细后保存 | 保养/PM/巡检计划（顺带所有 WorkflowCrudPage 页统一行为） |
+| **P0** | 计划 schema 展示：`created_by_name`、`created_at`、`approved_by_name`、`approved_at`（只读）；头表补 `created_by_name` + 保存同写 | 三计划；执行对齐 `created_*` + `auditor_name`/`audited_at` |
+| **P1** | 单据修改记录：计划补 `GET /{id}/change-logs`；三计划/三执行抽屉挂「修改记录」读 `sys_doc_change_log` | 对齐 OPS.6 |
+| **P1** | 计划明细变更写 `fieldChange`（增删改设备行） | 三计划 `upsertItems` |
+| **不做/说明** | 执行单手工「添加设备」 | 保持从计划生成；若要 ad-hoc 另开需求 |
+| **可选** | 计划「驳回」按钮（API 已支持 `action=reject`） | 三计划 |
+
+#### OPS.16.4 落地记录（2026-07-23）
+
+| 项 | 实现 |
+|----|------|
+| **P0 Workflow** | `WorkflowCrudPage`：`detail-mode` + `@add`→AppModal；审核进弹窗头；列表工具栏用 `#list-toolbar-extra` |
+| **P0 字段** | 三计划/三执行 schema 展示制单人时、审核人时；头表/执行加 `created_by_name`（V1+R__）；保存/生成同写 |
+| **P1 修改记录** | 三计划 `GET /{id}/change-logs`；`DocChangeHistoryDrawer`；计划弹窗与三执行详情挂「修改记录」 |
+| **P1 明细日志** | 三计划 `upsertItems` 增删改写 `fieldChange` |
+| **驳回** | 三计划弹窗增加「驳回」 |
+
+#### OPS.16.5 计划明细日期绑定（2026-07-23）
+
+> 现象：保存含「上次完成」的设备明细时报 `last_done_date` 类型为 date、表达式为 varchar。
+
+| 项 | 定稿 / 修补 |
+|----|-------------|
+| **原因** | 前端传 `YYYY-MM-DD` 字符串，JDBC 未铸 `?::date` |
+| **修复** | 保养/PM/巡检计划 `upsertItems`：`last_done_date`/`next_due_date` 用 `?::date` + 空串转 null |
+
+#### OPS.16.6 明细到期自动算 + 已审核权限 + 操作列拆分（2026-07-23）
+
+> 来源：用户草稿（加明细不自动算下次日期；已审核仍可编删；已审核可调明细；软删再加应恢复；操作列拆分）。
+
+| 项 | 定稿 |
+|----|------|
+| **下次到期自动算** | 添加设备或改「上次完成」时：`next_due = (上次完成 \|\| 今天) + cycle_days`；前后端保存时若明细 next 为空同规则补齐 |
+| **已审核头表** | `approval_status=approved`：**禁止**编辑头表、**禁止**删除整单（前后端） |
+| **已审核明细** | **允许**增删改设备明细（入口「设备明细」）；保存只更新明细，不改头表业务字段 |
+| **软删恢复** | 同计划下同 `device_id` 若已软删，再添加时 **恢复**该行并 UPDATE，写 `fieldChange`（非新插） |
+| **列表操作列** | 拆为四列（右固定）：**审核** \| **设备明细** \| **编辑** \| **删除**；编辑/删除仅未审核可见；审核列仅 draft 显示通过/驳回 |
+
+**状态**：已定稿并落地（2026-07-23；含 16.5 / 16.6）。
+
+### PLT-PK-01 主键类型审计（非 UUID / 非字符串）（2026-07-23）
+
+> 来源：用户要求检查哪些表主键还不是 uuid 或字符串。
+
+| 范围 | 结论 |
+|------|------|
+| **租户 V1** | 绝大多数业务表 `id UUID`；字符串主键：`import_profile_binding.business_type`（VARCHAR） |
+| **平台 public V1** | 业务表 UUID；字符串主键：`package_code`（套餐编码作 PK，合理） |
+| **非 UUID/非字符串** | 仅下表 3 个 `BIGSERIAL`（bigint 自增） |
+
+| 表 | 主键 | 说明 | 建议 |
+|----|------|------|------|
+| `sys_operation_log` | `id BIGSERIAL` | 操作日志，高写入 | 可保留自增；若强一致再迁 UUID |
+| `device_usage_record` | `id BIGSERIAL` | 效益：HIS 采集使用记录 | 同上 |
+| `device_cost_record` | `id BIGSERIAL` | 效益：成本记录 | 同上 |
+
+**本期**：仅审计入档，**不**自动改主键（存量数据与序列迁移成本高）。是否改为 UUID 待确认。
+
+**状态**：审计完成（2026-07-23）；改造待确认。
 
 ### PLT-AUDIT-01 全局加列 / 对象冗余 / CRUD 通检（2026-07-23）
 

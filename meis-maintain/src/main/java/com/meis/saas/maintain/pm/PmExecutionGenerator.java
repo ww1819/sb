@@ -57,15 +57,16 @@ public class PmExecutionGenerator {
                 p.get("template_name") != null ? p.get("template_name") : p.get("t_name"), null);
         Object typeId = p.get("pm_type_id") != null ? p.get("pm_type_id") : p.get("t_type_id");
         String userId = TenantContext.getUserId();
+        String createdByName = SoftDeleteSupport.resolveUserDisplayName(jdbc, userId);
 
         jdbc.update("""
                 INSERT INTO pm_execution (id, execution_no, plan_id, plan_no, source_type, template_id,
                     template_name, pm_type_id, planned_date,
-                    assigned_user_id, assigned_user_name, status, created_by)
-                VALUES (?::uuid,?,?::uuid,?, 'from_plan', ?::uuid, ?, ?::uuid, ?, ?::uuid, ?, 'draft', ?::uuid)
+                    assigned_user_id, assigned_user_name, status, created_by, created_by_name)
+                VALUES (?::uuid,?,?::uuid,?, 'from_plan', ?::uuid, ?, ?::uuid, ?, ?::uuid, ?, 'draft', ?::uuid, ?)
                 """, execId, execNo, planId, planNo, p.get("template_id"), templateName, typeId,
                 body.getOrDefault("planned_date", dueItems.get(0).get("next_due_date")),
-                p.get("assigned_user_id"), p.get("assigned_user_name"), userId);
+                p.get("assigned_user_id"), p.get("assigned_user_name"), userId, createdByName);
 
         for (Map<String, Object> di : dueItems) {
             insertItemWithResults(execId, execNo, planId, di, p.get("template_id"));
@@ -117,16 +118,17 @@ public class PmExecutionGenerator {
         UUID execId = UUID.randomUUID();
         String execNo = DailyBizNoSupport.next(jdbc, "pm_execution", "execution_no", "PX-");
         String userId = TenantContext.getUserId();
+        String createdByName = SoftDeleteSupport.resolveUserDisplayName(jdbc, userId);
         String templateName = body.get("template_name") != null
                 ? body.get("template_name").toString()
                 : Objects.toString(template.get(0).get("template_name"), null);
 
         jdbc.update("""
                 INSERT INTO pm_execution (id, execution_no, plan_id, plan_no, source_type, template_id,
-                    template_name, pm_type_id, planned_date, status, created_by, remark)
-                VALUES (?::uuid,?, NULL, NULL, 'ad_hoc', ?::uuid, ?, ?::uuid, ?, 'draft', ?::uuid, ?)
+                    template_name, pm_type_id, planned_date, status, created_by, created_by_name, remark)
+                VALUES (?::uuid,?, NULL, NULL, 'ad_hoc', ?::uuid, ?, ?::uuid, ?, 'draft', ?::uuid, ?, ?)
                 """, execId, execNo, templateId, templateName, typeId,
-                body.get("planned_date"), userId, body.get("remark"));
+                body.get("planned_date"), userId, createdByName, body.get("remark"));
 
         for (Map<String, Object> di : devices) {
             Map<String, Object> row = new LinkedHashMap<>(di);
