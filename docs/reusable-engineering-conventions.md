@@ -487,7 +487,7 @@
 | 多端执行单追溯 | 约定包 §6.7、附录 OPS | 巡检/保养/PM 执行事件与明细变更 |
 | 业务单号系统生成 | 约定包 §6.8、OPS.14 | `DailyBizNoSupport`；计划/执行 Controller 与 Generator |
 | 维修列表功能分列 | 附录 U.14.2 | `WorkorderListPage`（handle/verify 取消操作列、功能分列） |
-| 运维计划操作分列 / 已审核明细 | OPS.16.6、约定包 §5.7 / §5.8 | 三计划页 + `WorkflowCrudPage`；`upsertItems` 恢复软删明细 |
+| 运维计划操作分列 / 已审核明细 | OPS.16.6–16.7、约定包 §5.7 / §5.8 | 三计划页：审核/明细/生成执行/编辑/删除；`upsertItems` 恢复软删明细 |
 | 变更记录/快照 | 附录 T（含 T.5） | `EntityChangeLogService` |
 | 主从保存 | 第 4 章 PLT-X-05 | 出入库/计划等专用保存 |
 | 业务冗余字段 | 附录 W（含 W.5 / **W.6**）、约定包 §6.2 / §6.3 | 设备/主数据 code+name；单据号下沉明细；人员姓名快照 |

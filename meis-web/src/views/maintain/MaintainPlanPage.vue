@@ -25,6 +25,12 @@
           <el-button link type="primary" @click="openItems(row)">明细</el-button>
         </template>
       </el-table-column>
+      <el-table-column label="生成执行" width="90" fixed="right" align="center" header-align="center">
+        <template #default="{ row }">
+          <el-button v-if="isApproved(row)" link type="success" @click="genExecRow(row)">生成</el-button>
+          <span v-else class="op-muted">—</span>
+        </template>
+      </el-table-column>
       <el-table-column label="编辑" width="70" fixed="right" align="center" header-align="center">
         <template #default="{ row }">
           <el-button v-if="isDraft(row)" link type="primary" @click="pageRef?.openDetail(row)">编辑</el-button>
@@ -121,6 +127,10 @@ function isDraft(row: Record<string, unknown>) {
   return row.approval_status !== 'approved'
 }
 
+function isApproved(row: Record<string, unknown>) {
+  return row.approval_status === 'approved'
+}
+
 function openItems(row: Record<string, unknown>) {
   pageRef.value?.openItemsOnly(row)
 }
@@ -131,6 +141,10 @@ async function approveRow(row: Record<string, unknown>) {
 
 async function rejectRow(row: Record<string, unknown>) {
   await reject(row, () => pageRef.value?.load())
+}
+
+async function genExecRow(row: Record<string, unknown>) {
+  await genExec(row, () => pageRef.value?.load())
 }
 
 async function approve(form: Record<string, unknown>, reload?: () => void) {
