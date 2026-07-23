@@ -7,6 +7,7 @@ import com.meis.saas.common.asset.SparePartDeleteGuard;
 import com.meis.saas.common.audit.EntityChangeLogService;
 import com.meis.saas.common.code.DailyBizNoSupport;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.ops.OpsExecutionItemSupport;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.persistence.TableColumnCache;
 import com.meis.saas.common.tenant.TenantContext;
@@ -676,7 +677,7 @@ public abstract class GenericTableController {
         }
     }
 
-    /** OPS.16.9：任一明细非 pending（已开始/已完成）则禁止删除执行单 */
+    /** OPS.16.18：任一明细有执行记录则禁止删除执行单（Domain 删与专用 DELETE 一致） */
     private void guardOpsExecutionDeletable(String table, String id) {
         String itemTable = switch (table) {
             case "maintenance_execution" -> "maintenance_execution_item";
@@ -685,12 +686,8 @@ public abstract class GenericTableController {
             default -> null;
         };
         if (itemTable == null) return;
-        Integer n = jdbc().queryForObject(
-                "SELECT COUNT(1)::int FROM " + itemTable
-                        + " WHERE execution_id=?::uuid AND COALESCE(is_deleted,0)=0 AND status <> 'pending'",
-                Integer.class, id);
-        if (n != null && n > 0) {
-            throw new BizException(400, "明细已执行，不可删除执行单");
+        if (OpsExecutionItemSupport.headerHasExecutionRecord(jdbc(), itemTable, UUID.fromString(id))) {
+            throw new BizException(400, "明细已有执行记录，不可删除执行单");
         }
     }
 

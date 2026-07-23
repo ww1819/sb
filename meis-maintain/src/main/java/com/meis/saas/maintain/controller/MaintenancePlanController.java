@@ -33,10 +33,25 @@ public class MaintenancePlanController {
         return Result.ok(OpsPlanIncludeSupport.create(jdbc, "maintain", body));
     }
 
+    @PostMapping("/include-request/batch")
+    @Transactional
+    @OperationLog(module = "maintain", description = "批量申请纳入保养计划")
+    public Result<Map<String, Object>> createIncludeRequestBatch(@RequestBody Map<String, Object> body) {
+        return Result.ok(OpsPlanIncludeSupport.createBatch(jdbc, "maintain", body));
+    }
+
     @GetMapping("/include-request/approved-plans")
     public Result<List<Map<String, Object>>> approvedPlansForInclude(
-            @RequestParam(required = false) String keyword) {
-        return Result.ok(OpsPlanIncludeSupport.listApprovedPlans(jdbc, "maintain", keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String device_ids,
+            @RequestParam(required = false) String dept_id,
+            @RequestParam(required = false) String template_id,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String next_due_from,
+            @RequestParam(required = false) String next_due_to) {
+        List<UUID> deviceIds = OpsPlanIncludeSupport.parseUuidCsv(device_ids);
+        return Result.ok(OpsPlanIncludeSupport.listEligiblePlans(
+                jdbc, "maintain", deviceIds, keyword, dept_id, template_id, status, next_due_from, next_due_to));
     }
 
     @GetMapping("/{id}/include-requests")

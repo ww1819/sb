@@ -156,7 +156,8 @@ async function applyInclude(device: Record<string, unknown>) {
   try {
     uni.showLoading({ title: '加载计划' })
     const raw = await http.get<Record<string, unknown>[]>(
-      `/${cfg.value.module}/plan/include-request/approved-plans`
+      `/${cfg.value.module}/plan/include-request/approved-plans`,
+      { device_ids: String(device.id || '') }
     )
     const plans = Array.isArray(raw) ? raw : []
     uni.hideLoading()

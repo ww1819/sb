@@ -27,12 +27,9 @@
             <span v-else class="op-muted">—</span>
           </template>
         </el-table-column>
-        <el-table-column label="审核" width="110" fixed="right" align="center" header-align="center">
+        <el-table-column label="审核" width="70" fixed="right" align="center" header-align="center">
           <template #default="{ row }">
-            <template v-if="canAuditRow(row)">
-              <el-button link type="primary" @click="auditRow(row, 'approve')">通过</el-button>
-              <el-button link @click="auditRow(row, 'reject')">驳回</el-button>
-            </template>
+            <el-button v-if="canAuditRow(row)" link type="primary" @click="auditRow(row)">通过</el-button>
             <span v-else class="op-muted">—</span>
           </template>
         </el-table-column>
@@ -83,7 +80,7 @@
                   link
                   type="primary"
                   @click="openItem(row, false)"
-                >执行</el-button>
+                >{{ executeItemLabel(row) }}</el-button>
                 <el-button
                   v-if="canConfirmItem(row)"
                   link
@@ -108,16 +105,6 @@
       <template #footer>
         <el-button @click="visible = false">关闭</el-button>
         <el-button v-if="openMode === 'edit' && editable" type="primary" @click="saveHeader">保存</el-button>
-        <el-button
-          v-if="openMode === 'execute' && exec && ['draft','pending'].includes(String(exec.status))"
-          type="primary"
-          @click="startExec"
-        >开始执行</el-button>
-        <el-button v-if="openMode === 'view' && exec?.status === 'submitted'" @click="withdrawExec">撤回</el-button>
-        <template v-if="openMode === 'view' && canAuditRow(exec || {})">
-          <el-button type="warning" @click="auditExec('approve')">审核通过</el-button>
-          <el-button @click="auditExec('reject')">驳回</el-button>
-        </template>
       </template>
     </AppModal>
 
@@ -150,7 +137,9 @@
       </template>
       <template #footer>
         <el-button @click="itemVisible = false">关闭</el-button>
-        <el-button v-if="!itemResultReadonly" type="primary" @click="completeItem">完成</el-button>
+        <el-button v-if="!itemResultReadonly" type="primary" @click="completeItem">
+          {{ String(currentItem?.status) === 'completed' ? '保存修改' : '完成' }}
+        </el-button>
       </template>
     </AppModal>
   </div>
@@ -173,7 +162,22 @@ const config: PageConfig = {
   title: '保养执行',
   apiBase: '/maintain',
   table: 'maintenance_execution',
-  listPageUrl: '/maintain/execution/page'
+  listPageUrl: '/maintain/execution/page',
+  listFilters: [
+    { key: 'status', label: '状态', dictType: 'maintain_exec_status', multiple: true },
+    {
+      key: 'source_type',
+      label: '来源',
+      multiple: true,
+      options: [
+        { value: 'from_plan', label: '计划生成' },
+        { value: 'ad_hoc', label: '直开' }
+      ]
+    },
+    { key: 'execution_kind', label: '执行类型', dictType: 'ops_execution_kind', multiple: true },
+    { key: 'create_channel', label: '制单途径', dictType: 'execution_channel', multiple: true },
+    { key: 'planned_date', label: '计划/执行日期', type: 'daterange' }
+  ]
 }
 
 const crudRef = ref<InstanceType<typeof CrudPage> | null>(null)
@@ -203,7 +207,7 @@ const modalTitle = computed(() => {
 const itemResultReadonly = computed(() => {
   if (openMode.value !== 'execute' || itemViewOnly.value) return true
   const st = String(currentItem.value?.status ?? '')
-  return st === 'completed' || st === 'confirmed' || !editable.value
+  return st === 'confirmed' || !editable.value
 })
 
 function canEditRow(row: Record<string, unknown>) {
@@ -215,8 +219,23 @@ function canExecuteRow(row: Record<string, unknown>) {
   return canEditRow(row)
 }
 
+function truthyFlag(v: unknown) {
+  return v === true || v === 1 || v === '1' || v === 't' || v === 'true'
+}
+
+/** OPS.16.18：明细已有执行痕迹 */
+function itemHasExecutionRecord(row: Record<string, unknown>) {
+  const st = String(row.status ?? '')
+  if (st === 'completed' || st === 'confirmed') return true
+  if (row.end_time != null && String(row.end_time) !== '') return true
+  if (row.executor_id != null && String(row.executor_id) !== '') return true
+  const result = row.overall_result
+  return result != null && String(result).trim() !== ''
+}
+
 function canDeleteRow(row: Record<string, unknown>) {
-  return String(row.status ?? '') === 'draft'
+  // OPS.16.18：草稿且无任何明细执行记录才可删
+  return String(row.status ?? '') === 'draft' && !truthyFlag(row.has_execution_record)
 }
 
 function canAuditRow(row: Record<string, unknown>) {
@@ -226,8 +245,12 @@ function canAuditRow(row: Record<string, unknown>) {
 
 function canExecuteItem(row: Record<string, unknown>) {
   if (openMode.value !== 'execute' || !editable.value) return false
-  const s = String(row.status ?? '')
-  return s !== 'completed' && s !== 'confirmed'
+  // OPS.16.17：未确认均可执行/修改；已确认锁定
+  return String(row.status ?? '') !== 'confirmed'
+}
+
+function executeItemLabel(row: Record<string, unknown>) {
+  return String(row.status ?? '') === 'completed' ? '修改' : '执行'
 }
 
 function canConfirmItem(row: Record<string, unknown>) {
@@ -237,7 +260,7 @@ function canConfirmItem(row: Record<string, unknown>) {
 
 function canDeleteItem(row: Record<string, unknown>) {
   if (openMode.value !== 'edit' || !editable.value) return false
-  return String(row.status ?? '') !== 'confirmed'
+  return !itemHasExecutionRecord(row)
 }
 
 async function loadExec(row: Record<string, unknown>) {
@@ -321,7 +344,7 @@ async function deleteItem(row: Record<string, unknown>) {
 async function removeRow(row: Record<string, unknown>) {
   try {
     await ElMessageBox.confirm('确认删除该执行单？', '删除', { type: 'warning' })
-    await http.delete(`/maintain/maintenance_execution/${row.id}`, { params: CLIENT })
+    await http.delete(`/maintain/execution/${row.id}`, { params: CLIENT })
     ElMessage.success('已删除')
     crudRef.value?.load()
   } catch (e: unknown) {
@@ -332,17 +355,9 @@ async function removeRow(row: Record<string, unknown>) {
   }
 }
 
-async function auditRow(row: Record<string, unknown>, action: 'approve' | 'reject') {
-  await http.post(`/maintain/execution/${row.id}/audit`, { ...CLIENT, action })
-  ElMessage.success(action === 'approve' ? '审核通过' : '已驳回')
-  crudRef.value?.load()
-}
-
-async function startExec() {
-  if (!exec.value?.id) return
-  await http.post(`/maintain/execution/${exec.value.id}/start`, CLIENT)
-  ElMessage.success('已开始执行')
-  await openExecute({ id: exec.value.id })
+async function auditRow(row: Record<string, unknown>) {
+  await http.post(`/maintain/execution/${row.id}/audit`, { ...CLIENT, action: 'approve' })
+  ElMessage.success('审核通过')
   crudRef.value?.load()
 }
 
@@ -350,14 +365,6 @@ async function withdrawExec() {
   if (!exec.value?.id) return
   await http.post(`/maintain/execution/${exec.value.id}/withdraw`, CLIENT)
   ElMessage.success('已撤回')
-  await openView({ id: exec.value.id })
-  crudRef.value?.load()
-}
-
-async function auditExec(action: 'approve' | 'reject' = 'approve') {
-  if (!exec.value?.id) return
-  await http.post(`/maintain/execution/${exec.value.id}/audit`, { ...CLIENT, action })
-  ElMessage.success(action === 'approve' ? '审核通过' : '已驳回')
   await openView({ id: exec.value.id })
   crudRef.value?.load()
 }

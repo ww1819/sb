@@ -729,7 +729,9 @@ export const pageRegistry: Record<string, PageConfig> = {
     listFilters: [
       { key: 'approval_status', label: '审核状态', dictType: 'maintain_approval_status', multiple: true },
       { key: 'status', label: '计划状态', dictType: 'maintain_plan_status', multiple: true },
-      { key: 'dept_id', label: '责任科室', linkTable: 'department', multiple: true }
+      { key: 'dept_id', label: '责任科室', linkTable: 'department', multiple: true },
+      { key: 'template_id', label: '保养模板', linkTable: 'maintenance_template' },
+      { key: 'next_due_date', label: '下次到期', type: 'daterange' }
     ]
   },
   '/maintain/execution': {
@@ -739,7 +741,21 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/maintain/execution/page',
     formGroupColumns: { basic: 4, workflow: 4, approval: 4 },
     formFlowLayout: true,
-    listFilters: [{ key: 'status', label: '状态', dictType: 'maintain_exec_status', multiple: true }]
+    listFilters: [
+      { key: 'status', label: '状态', dictType: 'maintain_exec_status', multiple: true },
+      {
+        key: 'source_type',
+        label: '来源',
+        multiple: true,
+        options: [
+          { value: 'from_plan', label: '计划生成' },
+          { value: 'ad_hoc', label: '直开' }
+        ]
+      },
+      { key: 'execution_kind', label: '执行类型', dictType: 'ops_execution_kind', multiple: true },
+      { key: 'create_channel', label: '制单途径', dictType: 'execution_channel', multiple: true },
+      { key: 'planned_date', label: '计划/执行日期', type: 'daterange' }
+    ]
   },
   '/maintain/query': {
     title: '保养记录查询',
@@ -773,7 +789,9 @@ export const pageRegistry: Record<string, PageConfig> = {
     listFilters: [
       { key: 'approval_status', label: '审核状态', dictType: 'inspect_approval_status', multiple: true },
       { key: 'status', label: '计划状态', dictType: 'plan_status', multiple: true },
-      { key: 'dept_id', label: '责任科室', linkTable: 'department', multiple: true }
+      { key: 'dept_id', label: '责任科室', linkTable: 'department', multiple: true },
+      { key: 'template_id', label: '巡检模板', linkTable: 'inspection_template' },
+      { key: 'next_due_date', label: '下次到期', type: 'daterange' }
     ]
   },
   '/inspect/execution': {
@@ -783,7 +801,21 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/inspect/execution/page',
     formGroupColumns: { basic: 4, workflow: 4, approval: 4 },
     formFlowLayout: true,
-    listFilters: [{ key: 'status', label: '状态', dictType: 'inspect_exec_status', multiple: true }]
+    listFilters: [
+      { key: 'status', label: '状态', dictType: 'inspect_exec_status', multiple: true },
+      {
+        key: 'source_type',
+        label: '来源',
+        multiple: true,
+        options: [
+          { value: 'from_plan', label: '计划生成' },
+          { value: 'ad_hoc', label: '直开' }
+        ]
+      },
+      { key: 'execution_kind', label: '执行类型', dictType: 'ops_execution_kind', multiple: true },
+      { key: 'create_channel', label: '制单途径', dictType: 'execution_channel', multiple: true },
+      { key: 'planned_date', label: '计划/执行日期', type: 'daterange' }
+    ]
   },
   '/inspect/query': {
     title: '巡检记录查询',
@@ -956,7 +988,9 @@ export const pageRegistry: Record<string, PageConfig> = {
     listFilters: [
       { key: 'approval_status', label: '审核状态', dictType: 'maintain_approval_status', multiple: true },
       { key: 'status', label: '计划状态', dictType: 'maintain_plan_status', multiple: true },
-      { key: 'dept_id', label: '责任科室', linkTable: 'department', multiple: true }
+      { key: 'dept_id', label: '责任科室', linkTable: 'department', multiple: true },
+      { key: 'template_id', label: 'PM模板', linkTable: 'pm_template' },
+      { key: 'next_due_date', label: '下次到期', type: 'daterange' }
     ]
   },
   '/pm/execution': {
@@ -966,7 +1000,21 @@ export const pageRegistry: Record<string, PageConfig> = {
     listPageUrl: '/pm/execution/page',
     formGroupColumns: { basic: 4, workflow: 4, approval: 4 },
     formFlowLayout: true,
-    listFilters: [{ key: 'status', label: '状态', dictType: 'maintain_exec_status', multiple: true }]
+    listFilters: [
+      { key: 'status', label: '状态', dictType: 'maintain_exec_status', multiple: true },
+      {
+        key: 'source_type',
+        label: '来源',
+        multiple: true,
+        options: [
+          { value: 'from_plan', label: '计划生成' },
+          { value: 'ad_hoc', label: '直开' }
+        ]
+      },
+      { key: 'execution_kind', label: '执行类型', dictType: 'ops_execution_kind', multiple: true },
+      { key: 'create_channel', label: '制单途径', dictType: 'execution_channel', multiple: true },
+      { key: 'planned_date', label: '计划/执行日期', type: 'daterange' }
+    ]
   },
   '/pm/query': {
     title: '预防性维护记录',

@@ -170,35 +170,120 @@
         <el-button type="primary" @click="submitAdHoc">创建</el-button>
       </template>
     </AppModal>
-    <AppModal v-model="includeVisible" title="申请纳入计划" size="md">
-      <p class="ad-hoc-hint">将为 {{ includeDeviceIds.length }} 台设备分别提交纳入申请（需在计划详情确认）。</p>
-      <el-form label-width="100px">
-        <el-form-item label="目标计划" required>
+    <AppModal v-model="includeVisible" title="申请纳入计划" size="xl">
+      <p class="ad-hoc-hint">
+        将为 {{ includeDeviceIds.length }} 台设备提交纳入申请（仅列出明细中尚无该设备、且无待确认申请的已审核计划；可多选计划批量申请）。
+      </p>
+      <el-form :inline="true" class="include-filters" @submit.prevent>
+        <el-form-item label="关键词">
+          <el-input
+            v-model="includeFilter.keyword"
+            clearable
+            placeholder="单号/名称/模板/科室/责任人"
+            style="width: 200px"
+            @keyup.enter="loadEligiblePlans"
+          />
+        </el-form-item>
+        <el-form-item label="责任科室">
           <el-select
-            v-model="includePlanId"
+            v-model="includeFilter.dept_id"
+            clearable
             filterable
             remote
             reserve-keyword
-            placeholder="搜索已审核计划"
-            :remote-method="searchApprovedPlans"
-            :loading="includePlanLoading"
-            style="width: 100%"
+            placeholder="搜索科室"
+            :remote-method="searchIncludeDepts"
+            :loading="includeDeptLoading"
+            style="width: 160px"
           >
             <el-option
-              v-for="p in approvedPlans"
-              :key="String(p.id)"
-              :label="`${p.plan_no || ''} · ${p.plan_name || ''}`"
-              :value="p.id"
+              v-for="d in includeDepts"
+              :key="String(d.id)"
+              :label="String(d.dept_name || '')"
+              :value="d.id"
             />
           </el-select>
         </el-form-item>
+        <el-form-item label="模板">
+          <el-select
+            v-model="includeFilter.template_id"
+            clearable
+            filterable
+            placeholder="选择模板"
+            style="width: 180px"
+          >
+            <el-option
+              v-for="t in includeTemplates"
+              :key="String(t.id)"
+              :label="String(t.template_name || '')"
+              :value="t.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="计划状态">
+          <el-select v-model="includeFilter.status" clearable placeholder="全部" style="width: 110px">
+            <el-option label="进行中" value="active" />
+            <el-option label="暂停" value="paused" />
+            <el-option label="待执行" value="pending" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="下次到期">
+          <el-date-picker
+            v-model="includeDueRange"
+            type="daterange"
+            value-format="YYYY-MM-DD"
+            start-placeholder="起"
+            end-placeholder="止"
+            style="width: 240px"
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" :loading="includePlanLoading" @click="loadEligiblePlans">查询</el-button>
+          <el-button @click="resetIncludeFilter">重置</el-button>
+        </el-form-item>
+      </el-form>
+      <el-table
+        :data="eligiblePlans"
+        border
+        size="small"
+        height="360"
+        v-loading="includePlanLoading"
+        row-key="id"
+        @selection-change="onIncludePlanSelection"
+      >
+        <el-table-column type="selection" width="45" fixed />
+        <el-table-column prop="plan_no" label="计划单号" width="140" show-overflow-tooltip />
+        <el-table-column prop="plan_name" label="计划名称" min-width="140" show-overflow-tooltip />
+        <el-table-column prop="template_name" label="模板" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="type_label" :label="typeLabel" width="100" show-overflow-tooltip />
+        <el-table-column prop="dept_name" label="责任科室" width="110" show-overflow-tooltip />
+        <el-table-column prop="assigned_user_name" label="责任人" width="90" show-overflow-tooltip />
+        <el-table-column label="周期" width="100">
+          <template #default="{ row }">
+            {{ formatPlanCycle(row) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="next_due_date" label="下次到期" width="110" />
+        <el-table-column prop="item_count" label="明细数" width="70" align="center" />
+        <el-table-column
+          v-if="includeDeviceIds.length > 1"
+          prop="eligible_device_count"
+          label="可纳台数"
+          width="80"
+          align="center"
+        />
+        <el-table-column prop="status" label="状态" width="80" />
+        <el-table-column prop="created_by_name" label="制单人" width="90" show-overflow-tooltip />
+      </el-table>
+      <p class="include-selected-hint">已选 {{ includePlanIds.length }} 个计划</p>
+      <el-form label-width="60px" style="margin-top: 8px">
         <el-form-item label="备注">
-          <el-input v-model="includeRemark" type="textarea" :rows="2" />
+          <el-input v-model="includeRemark" type="textarea" :rows="2" placeholder="可选" />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="includeVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitInclude">提交申请</el-button>
+        <el-button type="primary" :disabled="!includePlanIds.length" @click="submitInclude">提交申请</el-button>
       </template>
     </AppModal>
   </div>
@@ -508,28 +593,102 @@ async function submitAdHoc() {
 
 const includeVisible = ref(false)
 const includeDeviceIds = ref<string[]>([])
-const includePlanId = ref<string | null>(null)
+const includePlanIds = ref<string[]>([])
 const includeRemark = ref('')
-const approvedPlans = ref<Record<string, unknown>[]>([])
+const eligiblePlans = ref<Record<string, unknown>[]>([])
 const includePlanLoading = ref(false)
+const includeDepts = ref<Record<string, unknown>[]>([])
+const includeDeptLoading = ref(false)
+const includeTemplates = ref<Record<string, unknown>[]>([])
+const includeDueRange = ref<[string, string] | null>(null)
+const includeFilter = ref({
+  keyword: '',
+  dept_id: '' as string | '',
+  template_id: '' as string | '',
+  status: '' as string | ''
+})
 
-async function searchApprovedPlans(keyword: string) {
+const templateListUrl = computed(() => {
+  if (props.module === 'inspect') return '/inspect/inspection_template/list'
+  if (props.module === 'pm') return '/maintain/pm_template/list'
+  return '/maintain/maintenance_template/list'
+})
+
+function formatPlanCycle(row: Record<string, unknown>) {
+  const days = row.cycle_days
+  if (days != null && String(days) !== '') return `${days} 天`
+  const t = row.cycle_type
+  const v = row.cycle_value
+  if (t || v) return `${t ?? ''}${v != null ? `×${v}` : ''}`
+  return '—'
+}
+
+async function searchIncludeDepts(keyword: string) {
+  includeDeptLoading.value = true
+  try {
+    const { data } = await http.get('/system/departments', {
+      params: { keyword: keyword || undefined, page: 1, size: 50 }
+    })
+    includeDepts.value = data.data?.records ?? data.data?.list ?? data.data ?? []
+  } catch {
+    includeDepts.value = []
+  } finally {
+    includeDeptLoading.value = false
+  }
+}
+
+async function loadIncludeTemplates() {
+  try {
+    const { data } = await http.get(templateListUrl.value)
+    includeTemplates.value = data.data ?? []
+  } catch {
+    includeTemplates.value = []
+  }
+}
+
+async function loadEligiblePlans() {
+  if (!includeDeviceIds.value.length) {
+    eligiblePlans.value = []
+    return
+  }
   includePlanLoading.value = true
   try {
+    const [from, to] = includeDueRange.value ?? [undefined, undefined]
     const { data } = await http.get(`/${props.module}/plan/include-request/approved-plans`, {
-      params: { keyword: keyword || undefined }
+      params: {
+        device_ids: includeDeviceIds.value.join(','),
+        keyword: includeFilter.value.keyword || undefined,
+        dept_id: includeFilter.value.dept_id || undefined,
+        template_id: includeFilter.value.template_id || undefined,
+        status: includeFilter.value.status || undefined,
+        next_due_from: from || undefined,
+        next_due_to: to || undefined
+      }
     })
-    approvedPlans.value = data.data ?? []
+    eligiblePlans.value = data.data ?? []
+    includePlanIds.value = []
   } finally {
     includePlanLoading.value = false
   }
 }
 
+function resetIncludeFilter() {
+  includeFilter.value = { keyword: '', dept_id: '', template_id: '', status: '' }
+  includeDueRange.value = null
+  void loadEligiblePlans()
+}
+
+function onIncludePlanSelection(rows: Record<string, unknown>[]) {
+  includePlanIds.value = rows.map((r) => String(r.id)).filter(Boolean)
+}
+
 async function openInclude(deviceIds: string[]) {
   includeDeviceIds.value = deviceIds
-  includePlanId.value = null
+  includePlanIds.value = []
   includeRemark.value = ''
-  await searchApprovedPlans('')
+  includeFilter.value = { keyword: '', dept_id: '', template_id: '', status: '' }
+  includeDueRange.value = null
+  await Promise.all([loadIncludeTemplates(), searchIncludeDepts(''), loadEligiblePlans()])
   includeVisible.value = true
 }
 
@@ -546,28 +705,26 @@ async function onBatchInclude() {
 }
 
 async function submitInclude() {
-  if (!includePlanId.value) {
-    ElMessage.warning('请选择目标计划')
+  if (!includePlanIds.value.length) {
+    ElMessage.warning('请勾选目标计划')
     return
   }
   if (!includeDeviceIds.value.length) return
-  let ok = 0
-  let fail = 0
-  for (const deviceId of includeDeviceIds.value) {
-    try {
-      await http.post(`/${props.module}/plan/include-request`, {
-        client: 'web',
-        plan_id: includePlanId.value,
-        device_id: deviceId,
-        remark: includeRemark.value
-      })
-      ok += 1
-    } catch {
-      fail += 1
-    }
+  try {
+    const { data } = await http.post(`/${props.module}/plan/include-request/batch`, {
+      client: 'web',
+      plan_ids: includePlanIds.value,
+      device_ids: includeDeviceIds.value,
+      remark: includeRemark.value
+    })
+    const ok = Number(data.data?.ok ?? 0)
+    const skip = Number(data.data?.skip ?? 0)
+    ElMessage.success(`已提交 ${ok} 条申请${skip ? `，跳过 ${skip}` : ''}`)
+    includeVisible.value = false
+  } catch (e: unknown) {
+    const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
+    ElMessage.error(msg || '提交失败')
   }
-  ElMessage.success(`已提交 ${ok} 条申请${fail ? `，失败 ${fail}` : ''}`)
-  includeVisible.value = false
 }
 </script>
 
@@ -576,6 +733,14 @@ async function submitInclude() {
   margin: 0 0 12px;
   color: var(--el-text-color-secondary);
   font-size: 13px;
+}
+.include-filters {
+  margin-bottom: 8px;
+}
+.include-selected-hint {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 .doc-desc {
   margin-bottom: 12px;

@@ -62,16 +62,12 @@
         <el-button v-if="form?.id && form.approval_status === 'approved'" type="success" @click="genExec(form, reload)">生成执行单（到期明细）</el-button>
         <el-button v-if="form?.id && form.approval_status === 'approved'" type="warning" @click="openBackfill(form, reload)">执行补录</el-button>
       </template>
-      <template v-else-if="form?.id && form.approval_status === 'approved'">
-        <el-button type="success" @click="genExec(form, reload)">生成执行单（到期明细）</el-button>
-        <el-button type="warning" @click="openBackfill(form, reload)">执行补录</el-button>
-      </template>
     </template>
     <template #drawer-extra="{ form, editorMode, reload }">
       <FormSection title="设备明细（权威到期日）" class="items-section">
         <div class="items-toolbar">
           <el-button v-if="editorMode !== 'view'" type="primary" size="small" @click="addDevice(form)">添加设备</el-button>
-          <template v-if="form?.approval_status === 'approved'">
+          <template v-if="form?.approval_status === 'approved' && editorMode !== 'view'">
             <el-button type="success" size="small" @click="genSelected(form, reload)">生成执行（勾选）</el-button>
             <el-button type="warning" size="small" @click="backfillSelected(form, reload)">执行补录（勾选）</el-button>
           </template>
@@ -84,7 +80,11 @@
           row-key="id"
           @selection-change="onItemSelection"
         >
-          <el-table-column v-if="form?.approval_status === 'approved'" type="selection" width="48" />
+          <el-table-column
+            v-if="form?.approval_status === 'approved' && editorMode !== 'view'"
+            type="selection"
+            width="48"
+          />
           <el-table-column prop="device_code" label="设备编码" width="120" />
           <el-table-column prop="device_name" label="设备名称" min-width="140" />
           <el-table-column label="上次完成" width="140">
@@ -112,12 +112,22 @@
               />
             </template>
           </el-table-column>
-          <el-table-column v-if="form?.approval_status === 'approved'" label="生成" width="70" align="center">
+          <el-table-column
+            v-if="form?.approval_status === 'approved' && editorMode !== 'view'"
+            label="生成"
+            width="70"
+            align="center"
+          >
             <template #default="{ row }">
               <el-button link type="success" @click="genOneItem(form, row, reload)">生成</el-button>
             </template>
           </el-table-column>
-          <el-table-column v-if="form?.approval_status === 'approved'" label="补录" width="70" align="center">
+          <el-table-column
+            v-if="form?.approval_status === 'approved' && editorMode !== 'view'"
+            label="补录"
+            width="70"
+            align="center"
+          >
             <template #default="{ row }">
               <el-button link type="warning" @click="backfillOneItem(form, row, reload)">补录</el-button>
             </template>
@@ -133,8 +143,8 @@
         v-if="form?.id && form.approval_status === 'approved'"
         module="inspect"
         :plan-id="String(form.id)"
-        :can-confirm="true"
-        :can-initiate="true"
+        :can-confirm="editorMode !== 'view'"
+        :can-initiate="editorMode !== 'view'"
         @reloaded="reload?.()"
       />
       <el-alert v-if="dueList.length" :title="`近7天到期 ${dueList.length} 项`" type="warning" show-icon class="due-alert" />
@@ -176,7 +186,14 @@ const config: PageConfig = {
   saveUrl: '/inspect/plan',
   loadFormDetail: true,
   showRowIndex: true,
-  showRowSelection: true
+  showRowSelection: true,
+  listFilters: [
+    { key: 'approval_status', label: '审核状态', dictType: 'inspect_approval_status', multiple: true },
+    { key: 'status', label: '计划状态', dictType: 'plan_status', multiple: true },
+    { key: 'dept_id', label: '责任科室', linkTable: 'department', multiple: true },
+    { key: 'template_id', label: '巡检模板', linkTable: 'inspection_template' },
+    { key: 'next_due_date', label: '下次到期', type: 'daterange' }
+  ]
 }
 const dueList = ref<Record<string, unknown>[]>([])
 const pickerVisible = ref(false)

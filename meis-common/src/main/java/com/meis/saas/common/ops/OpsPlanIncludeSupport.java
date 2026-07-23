@@ -113,25 +113,215 @@ public final class OpsPlanIncludeSupport {
                 """, mod, planId);
     }
 
-    /** 可选已审核计划（发起纳入时挑选） */
-    public static List<Map<String, Object>> listApprovedPlans(JdbcTemplate jdbc, String module, String keyword) {
-        ModuleTables t = tablesOf(module);
+    /** 可选已审核计划（发起纳入时挑选；传 device_ids 时排除已含设备/待确认申请） */
+    public static List<Map<String, Object>> listApprovedPlans(
+            JdbcTemplate jdbc, String module, String keyword) {
+        return listEligiblePlans(jdbc, module, List.of(), keyword, null, null, null, null, null);
+    }
+
+    /**
+     * OPS.16.20：可申请纳入的计划列表。
+     * deviceIds 非空时：仅返回「明细无该设备 + 无 pending 申请」的计划（多设备时：至少一台可申请）。
+     */
+    public static List<Map<String, Object>> listEligiblePlans(
+            JdbcTemplate jdbc,
+            String module,
+            List<UUID> deviceIds,
+            String keyword,
+            String deptId,
+            String templateId,
+            String planStatus,
+            String nextDueFrom,
+            String nextDueTo) {
+        String mod = normalizeModule(module);
+        ModuleTables t = tablesOf(mod);
+        List<UUID> devices = deviceIds == null ? List.of() : deviceIds.stream().filter(Objects::nonNull).toList();
+        boolean filterByDevice = !devices.isEmpty();
+
+        String typeExpr = switch (mod) {
+            case "inspect" -> "p.inspection_type AS type_label";
+            case "pm" -> "COALESCE(pt.type_name, p.pm_type) AS type_label";
+            default -> "COALESCE(ml.level_name, p.maintenance_level) AS type_label";
+        };
+        String typeJoin = switch (mod) {
+            case "inspect" -> "";
+            case "pm" -> " LEFT JOIN pm_type pt ON pt.id = p.pm_type_id ";
+            default -> " LEFT JOIN maintenance_level ml ON ml.id = p.maintenance_level_id ";
+        };
+        String assigneeExpr = switch (mod) {
+            case "inspect" -> "p.assigned_inspector_name AS assigned_user_name";
+            default -> "p.assigned_user_name AS assigned_user_name";
+        };
+
+        String eligibleCountSelect = "0 AS eligible_device_count";
+        if (filterByDevice) {
+            String valueRows = String.join(",", Collections.nCopies(devices.size(), "(?::uuid)"));
+            eligibleCountSelect = """
+                    (SELECT COUNT(1)::int FROM (VALUES %s) AS cand(device_id)
+                      WHERE NOT EXISTS (
+                        SELECT 1 FROM %s i
+                        WHERE i.plan_id = p.id AND i.device_id = cand.device_id
+                          AND COALESCE(i.is_deleted,0)=0
+                      )
+                      AND NOT EXISTS (
+                        SELECT 1 FROM ops_plan_include_request r
+                        WHERE r.module = ? AND r.plan_id = p.id AND r.device_id = cand.device_id
+                          AND r.status = 'pending' AND COALESCE(r.is_deleted,0)=0
+                      )
+                    ) AS eligible_device_count
+                    """.formatted(valueRows, t.itemTable()).trim();
+        }
+
         StringBuilder sql = new StringBuilder("""
-                SELECT id, plan_no, plan_name, template_id, template_name, approval_status, status,
-                       dept_id, cycle_days, next_due_date
-                FROM %s
-                WHERE approval_status='approved' AND COALESCE(is_deleted,0)=0
-                """.formatted(t.planTable()));
+                SELECT p.id, p.plan_no, p.plan_name, p.template_id, p.template_name,
+                       p.approval_status, p.status, p.dept_id, d.dept_name,
+                       p.cycle_type, p.cycle_value, p.cycle_days, p.next_due_date,
+                       p.remark, p.created_by_name, p.created_at, p.approved_by_name, p.approved_at,
+                       %s, %s,
+                       (SELECT COUNT(1)::int FROM %s i
+                         WHERE i.plan_id = p.id AND COALESCE(i.is_deleted,0)=0) AS item_count,
+                       %s
+                FROM %s p
+                LEFT JOIN department d ON d.id = p.dept_id
+                %s
+                WHERE p.approval_status='approved' AND COALESCE(p.is_deleted,0)=0
+                """.formatted(
+                typeExpr, assigneeExpr, t.itemTable(), eligibleCountSelect, t.planTable(), typeJoin));
+
         List<Object> args = new ArrayList<>();
+        if (filterByDevice) {
+            // args for eligible_device_count subquery: device ids + module
+            for (UUID id : devices) args.add(id);
+            args.add(mod);
+            String valueRows = String.join(",", Collections.nCopies(devices.size(), "(?::uuid)"));
+            sql.append("""
+                     AND EXISTS (
+                       SELECT 1 FROM (VALUES %s) AS cand(device_id)
+                       WHERE NOT EXISTS (
+                         SELECT 1 FROM %s i
+                         WHERE i.plan_id = p.id AND i.device_id = cand.device_id
+                           AND COALESCE(i.is_deleted,0)=0
+                       )
+                       AND NOT EXISTS (
+                         SELECT 1 FROM ops_plan_include_request r
+                         WHERE r.module = ? AND r.plan_id = p.id AND r.device_id = cand.device_id
+                           AND r.status = 'pending' AND COALESCE(r.is_deleted,0)=0
+                       )
+                     )
+                    """.formatted(valueRows, t.itemTable()));
+            for (UUID id : devices) args.add(id);
+            args.add(mod);
+        }
+
         if (keyword != null && !keyword.isBlank()) {
             String kw = "%" + keyword.trim() + "%";
-            sql.append(" AND (plan_no ILIKE ? OR plan_name ILIKE ? OR COALESCE(template_name,'') ILIKE ?) ");
+            String assigneeCol = "inspect".equals(mod) ? "p.assigned_inspector_name" : "p.assigned_user_name";
+            sql.append("""
+                     AND (p.plan_no ILIKE ? OR p.plan_name ILIKE ?
+                          OR COALESCE(p.template_name,'') ILIKE ?
+                          OR COALESCE(d.dept_name,'') ILIKE ?
+                          OR COALESCE(%s, p.created_by_name, '') ILIKE ?)
+                    """.formatted(assigneeCol));
+            args.add(kw);
+            args.add(kw);
             args.add(kw);
             args.add(kw);
             args.add(kw);
         }
-        sql.append(" ORDER BY created_at DESC LIMIT 100");
+        if (deptId != null && !deptId.isBlank()) {
+            sql.append(" AND p.dept_id = ?::uuid ");
+            args.add(deptId.trim());
+        }
+        if (templateId != null && !templateId.isBlank()) {
+            sql.append(" AND p.template_id = ?::uuid ");
+            args.add(templateId.trim());
+        }
+        if (planStatus != null && !planStatus.isBlank()) {
+            sql.append(" AND p.status = ? ");
+            args.add(planStatus.trim());
+        }
+        if (nextDueFrom != null && !nextDueFrom.isBlank()) {
+            sql.append(" AND p.next_due_date >= ?::date ");
+            args.add(nextDueFrom.trim());
+        }
+        if (nextDueTo != null && !nextDueTo.isBlank()) {
+            sql.append(" AND p.next_due_date <= ?::date ");
+            args.add(nextDueTo.trim());
+        }
+        sql.append(" ORDER BY p.next_due_date NULLS LAST, p.created_at DESC LIMIT 200");
         return jdbc.queryForList(sql.toString(), args.toArray());
+    }
+
+    /** 批量发起纳入申请：plan_ids × device_ids，跳过不可申请组合 */
+    public static Map<String, Object> createBatch(
+            JdbcTemplate jdbc, String module, Map<String, Object> body) {
+        List<String> planIds = toIdList(body.get("plan_ids"));
+        if (planIds.isEmpty() && body.get("plan_id") != null) {
+            planIds = List.of(body.get("plan_id").toString());
+        }
+        List<String> deviceIds = toIdList(body.get("device_ids"));
+        if (deviceIds.isEmpty() && body.get("device_id") != null) {
+            deviceIds = List.of(body.get("device_id").toString());
+        }
+        if (planIds.isEmpty()) throw new BizException(400, "请选择目标计划");
+        if (deviceIds.isEmpty()) throw new BizException(400, "请选择设备");
+
+        int ok = 0;
+        int skip = 0;
+        List<String> errors = new ArrayList<>();
+        List<Map<String, Object>> created = new ArrayList<>();
+        for (String planId : planIds) {
+            for (String deviceId : deviceIds) {
+                try {
+                    Map<String, Object> one = new LinkedHashMap<>(body);
+                    one.put("plan_id", planId);
+                    one.put("device_id", deviceId);
+                    one.remove("plan_ids");
+                    one.remove("device_ids");
+                    created.add(create(jdbc, module, one));
+                    ok += 1;
+                } catch (BizException ex) {
+                    skip += 1;
+                    if (errors.size() < 5) {
+                        errors.add(ex.getMessage());
+                    }
+                }
+            }
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("ok", ok);
+        out.put("skip", skip);
+        out.put("errors", errors);
+        out.put("items", created);
+        if (ok == 0) {
+            throw new BizException(400, errors.isEmpty() ? "没有可提交的纳入申请" : errors.get(0));
+        }
+        return out;
+    }
+
+    private static List<String> toIdList(Object raw) {
+        if (raw == null) return List.of();
+        if (raw instanceof Collection<?> c) {
+            return c.stream().filter(Objects::nonNull).map(Object::toString).filter(s -> !s.isBlank()).toList();
+        }
+        String s = raw.toString().trim();
+        if (s.isEmpty()) return List.of();
+        return Arrays.stream(s.split(",")).map(String::trim).filter(x -> !x.isEmpty()).toList();
+    }
+
+    public static List<UUID> parseUuidCsv(String csv) {
+        if (csv == null || csv.isBlank()) return List.of();
+        List<UUID> out = new ArrayList<>();
+        for (String part : csv.split(",")) {
+            String s = part.trim();
+            if (s.isEmpty()) continue;
+            try {
+                out.add(UUID.fromString(s));
+            } catch (IllegalArgumentException ignored) {
+                // skip invalid
+            }
+        }
+        return out;
     }
 
     public static Map<String, Object> approve(JdbcTemplate jdbc, UUID requestId, Map<String, Object> body) {

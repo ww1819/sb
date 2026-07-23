@@ -202,7 +202,9 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
     final api = ref.read(apiServiceProvider);
     List<Map<String, dynamic>> plans = [];
     try {
-      final raw = await api.getList('/${cfg.module}/plan/include-request/approved-plans');
+      final raw = await api.getList('/${cfg.module}/plan/include-request/approved-plans', query: {
+        'device_ids': device['id']?.toString(),
+      });
       plans = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } catch (_) {}
     if (!mounted) return;

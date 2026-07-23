@@ -36,15 +36,36 @@ public class PmExecutionController {
     public Result<PageResult<Map<String, Object>>> page(
             PageQuery query,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String source_type) {
+            @RequestParam(required = false) String source_type,
+            @RequestParam(required = false) String execution_kind,
+            @RequestParam(required = false) String create_channel,
+            @RequestParam(required = false) String planned_dateFrom,
+            @RequestParam(required = false) String planned_dateTo) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "pm_execution", "e"));
         List<Object> args = new ArrayList<>();
         FilterCsvSupport.appendStrIn(where, args, "e.status", status);
         FilterCsvSupport.appendStrIn(where, args, "e.source_type", source_type);
+        FilterCsvSupport.appendStrIn(where, args, "e.execution_kind", execution_kind);
+        FilterCsvSupport.appendStrIn(where, args, "e.create_channel", create_channel);
+        if (planned_dateFrom != null && !planned_dateFrom.isBlank()) {
+            where.append(" AND e.planned_date >= ?::date ");
+            args.add(planned_dateFrom.trim());
+        }
+        if (planned_dateTo != null && !planned_dateTo.isBlank()) {
+            where.append(" AND e.planned_date <= ?::date ");
+            args.add(planned_dateTo.trim());
+        }
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
             String kw = "%" + query.getKeyword().trim() + "%";
-            where.append(" AND (e.execution_no ILIKE ? OR e.plan_no ILIKE ? OR e.remark ILIKE ?) ");
+            where.append("""
+                     AND (e.execution_no ILIKE ? OR e.plan_no ILIKE ? OR e.remark ILIKE ?
+                          OR COALESCE(e.template_name,'') ILIKE ? OR COALESCE(e.executor_name,'') ILIKE ?
+                          OR COALESCE(e.created_by_name,'') ILIKE ?)
+                    """);
+            args.add(kw);
+            args.add(kw);
+            args.add(kw);
             args.add(kw);
             args.add(kw);
             args.add(kw);
@@ -56,7 +77,15 @@ public class PmExecutionController {
         args.add(offset);
         var rows = jdbc.queryForList("""
                 SELECT e.*, COALESCE(e.template_name, t.template_name) AS template_name,
-                       pt.type_name AS pm_type_name
+                       pt.type_name AS pm_type_name,
+                       EXISTS (
+                         SELECT 1 FROM pm_execution_item ei
+                         WHERE ei.execution_id = e.id AND COALESCE(ei.is_deleted,0)=0
+                           AND (ei.status IN ('completed','confirmed')
+                                OR ei.end_time IS NOT NULL
+                                OR ei.executor_id IS NOT NULL
+                                OR (ei.overall_result IS NOT NULL AND TRIM(ei.overall_result) <> ''))
+                       ) AS has_execution_record
                 FROM pm_execution e
                 LEFT JOIN pm_template t ON t.id = e.template_id
                 LEFT JOIN pm_type pt ON pt.id = e.pm_type_id
@@ -438,30 +467,34 @@ public class PmExecutionController {
         }
         assertAllItemsConfirmed(id);
         String action = String.valueOf(body.getOrDefault("action", "approve"));
+        if ("reject".equals(action)) {
+            throw new BizException(400, "执行单不支持驳回");
+        }
         String userId = TenantContext.getUserId();
         String name = SoftDeleteSupport.resolveUserDisplayName(jdbc, userId);
         String channel = OpsClientChannel.of(body);
-        if ("reject".equals(action)) {
-            jdbc.update("""
-                    UPDATE pm_execution SET status='in_progress', auditor_id=?::uuid, auditor_name=?,
-                    audited_at=NOW(), audit_comment=?, audit_channel=?, updated_at=NOW() WHERE id=?::uuid
-                    """, userId, name, body.get("audit_comment"), channel, id);
-            jdbc.update("""
-                    UPDATE pm_execution_item SET status='completed', confirm_channel=NULL,
-                    confirmed_by=NULL, confirmed_by_name=NULL, confirmed_at=NULL,
-                    row_version=COALESCE(row_version,1)+1, updated_at=NOW()
-                    WHERE execution_id=?::uuid AND COALESCE(is_deleted,0)=0 AND status='confirmed'
-                    """, id);
-            docLog.event("pm", "execution", id, execNo(id), "audit_reject", clientOf(body), null);
-        } else {
-            jdbc.update("""
-                    UPDATE pm_execution SET status='audited', auditor_id=?::uuid, auditor_name=?,
-                    audited_at=NOW(), audit_comment=?, audit_channel=?, updated_at=NOW() WHERE id=?::uuid
-                    """, userId, name, body.get("audit_comment"), channel, id);
-            updatePlansAfterAudit(id);
-            docLog.event("pm", "execution", id, execNo(id), "audit_approve", clientOf(body), null);
-        }
+        jdbc.update("""
+                UPDATE pm_execution SET status='audited', auditor_id=?::uuid, auditor_name=?,
+                audited_at=NOW(), audit_comment=?, audit_channel=?, updated_at=NOW() WHERE id=?::uuid
+                """, userId, name, body.get("audit_comment"), channel, id);
+        updatePlansAfterAudit(id);
+        docLog.event("pm", "execution", id, execNo(id), "audit_approve", clientOf(body), null);
         return get(id);
+    }
+
+    @DeleteMapping("/{id}")
+    @Transactional
+    @OperationLog(module = "pm", description = "删除预防性维护执行单")
+    public Result<Void> deleteExecution(
+            @PathVariable UUID id,
+            @RequestParam(required = false) String client,
+            @RequestBody(required = false) Map<String, Object> body) {
+        Map<String, Object> payload = body != null ? new LinkedHashMap<>(body) : new LinkedHashMap<>();
+        if (client != null && !payload.containsKey("client")) payload.put("client", client);
+        OpsExecutionItemSupport.deleteExecution(jdbc, docLog, "pm",
+                "pm_execution", "pm_execution_item",
+                id, payload, execNo(id));
+        return Result.ok();
     }
 
     @GetMapping("/{id}/change-logs")

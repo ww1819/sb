@@ -87,7 +87,30 @@ public final class OpsExecutionItemSupport {
         docLog.event(module, "execution", execId, execNo, "confirm_item", channel, itemId.toString());
     }
 
-    /** 未确认明细可软删 */
+    /** 是否已有执行痕迹（完成/确认/执行人/执行时间/结果） */
+    public static boolean hasExecutionRecord(Map<String, Object> item) {
+        if (item == null) return false;
+        String st = Objects.toString(item.get("status"), "");
+        if ("completed".equals(st) || "confirmed".equals(st)) return true;
+        if (item.get("end_time") != null) return true;
+        if (item.get("executor_id") != null) return true;
+        Object result = item.get("overall_result");
+        return result != null && !result.toString().isBlank();
+    }
+
+    public static boolean headerHasExecutionRecord(JdbcTemplate jdbc, String itemTable, UUID execId) {
+        Integer n = jdbc.queryForObject("""
+                SELECT COUNT(1)::int FROM %s
+                WHERE execution_id=?::uuid AND COALESCE(is_deleted,0)=0
+                  AND (status IN ('completed','confirmed')
+                       OR end_time IS NOT NULL
+                       OR executor_id IS NOT NULL
+                       OR (overall_result IS NOT NULL AND TRIM(overall_result) <> ''))
+                """.formatted(itemTable), Integer.class, execId);
+        return n != null && n > 0;
+    }
+
+    /** 未确认且无执行记录的明细可软删 */
     public static void deleteItem(
             JdbcTemplate jdbc,
             DocChangeLogService docLog,
@@ -103,9 +126,38 @@ public final class OpsExecutionItemSupport {
         if ("confirmed".equals(Objects.toString(item.get("status"), ""))) {
             throw new BizException(400, "已确认明细不可删除");
         }
+        if (hasExecutionRecord(item)) {
+            throw new BizException(400, "明细已有执行记录，不可删除");
+        }
         String channel = OpsClientChannel.of(body);
         SoftDeleteSupport.softDelete(jdbc, itemTable, itemId.toString(), channel);
         docLog.event(module, "execution", execId, execNo, "delete_item", channel, itemId.toString());
+    }
+
+    /** 软删执行单：有任一明细执行记录则禁止 */
+    public static void deleteExecution(
+            JdbcTemplate jdbc,
+            DocChangeLogService docLog,
+            String module,
+            String execTable,
+            String itemTable,
+            UUID execId,
+            Map<String, Object> body,
+            String execNo) {
+        var rows = jdbc.queryForList(
+                "SELECT status FROM " + execTable + " WHERE id=?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, execTable, null), execId);
+        if (rows.isEmpty()) throw new BizException(404, "执行单不存在");
+        String st = Objects.toString(rows.get(0).get("status"), "");
+        if ("audited".equals(st) || "submitted".equals(st) || "cancelled".equals(st)) {
+            throw new BizException(400, "当前状态不可删除");
+        }
+        if (headerHasExecutionRecord(jdbc, itemTable, execId)) {
+            throw new BizException(400, "明细已有执行记录，不可删除执行单");
+        }
+        String channel = OpsClientChannel.of(body);
+        SoftDeleteSupport.softDelete(jdbc, execTable, execId.toString(), channel);
+        docLog.event(module, "execution", execId, execNo, "delete", channel, null);
     }
 
     public static void assertAllItemsConfirmed(JdbcTemplate jdbc, String itemTable, UUID execId) {

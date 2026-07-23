@@ -43,6 +43,18 @@ public final class PageableJdbc {
                 return;
             }
             boolean uuidCol = "id".equals(k) || k.endsWith("_id") || k.endsWith("_by");
+            // 日期区间：next_due_dateFrom / next_due_dateTo → col >= / <=
+            if (k.endsWith("From") || k.endsWith("To")) {
+                boolean isFrom = k.endsWith("From");
+                String col = k.substring(0, k.length() - (isFrom ? 4 : 2));
+                if (!col.matches("^[a-z][a-z0-9_]*$") || !TableColumnCache.hasColumn(jdbc, table, col)) {
+                    return;
+                }
+                where.append(" AND ").append(col).append(isFrom ? " >= ?::date " : " <= ?::date ");
+                args.add(v);
+                return;
+            }
+            if (!TableColumnCache.hasColumn(jdbc, table, k)) return;
             // PLT-UI-02：逗号分隔多选 → IN；单值仍走 =
             if (v.contains(",")) {
                 if (uuidCol) {
@@ -128,6 +140,8 @@ public final class PageableJdbc {
             case "unit_dict" -> new String[]{"unit_code", "unit_name"};
             case "warehouse" -> new String[]{"warehouse_code", "warehouse_name"};
             case "campus" -> new String[]{"campus_code", "campus_name"};
+            case "maintenance_plan", "pm_plan", "inspection_plan" ->
+                    new String[]{"plan_no", "plan_code", "plan_name", "template_name", "assigned_user_name", "created_by_name"};
             default -> null;
         };
     }
