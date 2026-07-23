@@ -141,36 +141,114 @@ async function onDueTap(row: Record<string, unknown>) {
 async function openDeviceTasks(device: Record<string, unknown>) {
   const deviceId = device.id?.toString()
   if (!deviceId) return
-  uni.showLoading({ title: '加载任务' })
+  uni.showActionSheet({
+    itemList: ['新增执行单', '申请纳入计划', '执行明细', '确认明细'],
+    success: async (r) => {
+      if (r.tapIndex === 0) await createAdHoc(device)
+      else if (r.tapIndex === 1) await applyInclude(device)
+      else if (r.tapIndex === 2) await pickOpenItem(device, false)
+      else if (r.tapIndex === 3) await pickOpenItem(device, true)
+    }
+  })
+}
+
+async function applyInclude(device: Record<string, unknown>) {
   try {
+    uni.showLoading({ title: '加载计划' })
+    const raw = await http.get<Record<string, unknown>[]>(
+      `/${cfg.value.module}/plan/include-request/approved-plans`
+    )
+    const plans = Array.isArray(raw) ? raw : []
+    uni.hideLoading()
+    if (!plans.length) {
+      uni.showToast({ title: '暂无已审核计划', icon: 'none' })
+      return
+    }
+    const names = plans
+      .map((p) => `${p.plan_no || ''} · ${p.plan_name || ''}`)
+      .slice(0, 6)
+    uni.showActionSheet({
+      itemList: names,
+      success: async (r) => {
+        const plan = plans[r.tapIndex]
+        try {
+          uni.showLoading({ title: '提交中' })
+          await http.post(`/${cfg.value.module}/plan/include-request`, {
+            client: 'mp',
+            plan_id: plan.id,
+            device_id: device.id,
+            device_code: device.device_code,
+            device_name: device.device_name,
+            dept_id: device.dept_id
+          })
+          uni.showToast({ title: '已提交，待 Web 确认', icon: 'success' })
+        } catch (e: unknown) {
+          uni.showToast({ title: e instanceof Error ? e.message : '提交失败', icon: 'none' })
+        } finally {
+          uni.hideLoading()
+        }
+      }
+    })
+  } catch (e: unknown) {
+    uni.hideLoading()
+    uni.showToast({ title: e instanceof Error ? e.message : '加载失败', icon: 'none' })
+  }
+}
+
+async function pickOpenItem(device: Record<string, unknown>, forConfirm: boolean) {
+  const deviceId = device.id?.toString()
+  if (!deviceId) return
+  try {
+    uni.showLoading({ title: '加载明细' })
     const raw = await http.get<Record<string, unknown>[]>(
       `${cfg.value.executionBase}/by-device/${deviceId}`,
       { openOnly: true }
     )
-    const items = Array.isArray(raw) ? raw : []
+    let items = Array.isArray(raw) ? raw : []
+    if (forConfirm) {
+      items = items.filter((it) => String(it.status || '') !== 'confirmed')
+    }
     uni.hideLoading()
     if (!items.length) {
-      uni.showModal({
-        title: '无待执行任务',
-        content: `设备 ${device.device_name || ''} 暂无未审核执行单，是否直开？`,
-        success: (res) => {
-          if (res.confirm) createAdHoc(device)
-        }
+      uni.showToast({
+        title: forConfirm ? '暂无可确认明细' : '暂无待执行明细',
+        icon: 'none'
       })
       return
     }
     const labels = items.map(
-      (it) => `${it.execution_no || ''} · ${it.execution_status || ''}`
+      (it) => `${it.execution_no || ''} · ${it.status || it.execution_status || ''}`
     )
-    const extra = '＋ 无计划直开'
     uni.showActionSheet({
-      itemList: [...labels.slice(0, 5), extra],
-      success: (r) => {
-        if (r.tapIndex === labels.slice(0, 5).length || r.tapIndex >= items.length) {
-          createAdHoc(device)
+      itemList: labels.slice(0, 6),
+      success: async (r) => {
+        const it = items[r.tapIndex]
+        if (forConfirm) {
+          const itemId = it.id?.toString()
+          if (!itemId) return
+          uni.showModal({
+            title: '确认明细',
+            content:
+              String(it.status) === 'completed'
+                ? '确认该设备执行结果？'
+                : '结果未填完也可确认，将自动完成后再确认。是否继续？',
+            success: async (m) => {
+              if (!m.confirm) return
+              try {
+                await http.post(`${cfg.value.executionBase}/item/${itemId}/confirm`, {
+                  client: 'mp'
+                })
+                uni.showToast({ title: '已确认', icon: 'success' })
+              } catch (e: unknown) {
+                uni.showToast({
+                  title: e instanceof Error ? e.message : '确认失败',
+                  icon: 'none'
+                })
+              }
+            }
+          })
           return
         }
-        const it = items[r.tapIndex]
         const execId = it.execution_id?.toString()
         const itemId = it.id?.toString()
         if (execId && itemId) openDetail(execId, itemId)

@@ -130,6 +130,14 @@
           </el-table-column>
         </el-table>
       </FormSection>
+      <OpsPlanIncludePanel
+        v-if="form?.id && form.approval_status === 'approved'"
+        module="maintain"
+        :plan-id="String(form.id)"
+        :can-confirm="true"
+        :can-initiate="true"
+        @reloaded="reload?.()"
+      />
       <el-alert v-if="dueList.length" :title="`近7天到期 ${dueList.length} 项`" type="warning" show-icon class="due-alert" />
     </template>
   </WorkflowCrudPage>
@@ -154,6 +162,7 @@ import { useAuthStore } from '@/stores/auth'
 import WorkflowCrudPage from '@/components/WorkflowCrudPage.vue'
 import FormSection from '@/components/form/FormSection.vue'
 import OpsPlanBackfillDialog from '@/views/ops/OpsPlanBackfillDialog.vue'
+import OpsPlanIncludePanel from '@/components/ops/OpsPlanIncludePanel.vue'
 import { calcItemNextDueDate } from '@/utils/cycleDays'
 import type { PageConfig } from '@/config/pageRegistry'
 

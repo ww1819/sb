@@ -1077,6 +1077,41 @@ COMMENT ON COLUMN inspection_execution.cycle_type IS '周期类型（OPS.16.15�
 COMMENT ON COLUMN inspection_execution.cycle_value IS '周期值（OPS.16.15）';
 COMMENT ON COLUMN inspection_execution.cycle_days IS '周期天数（OPS.16.15）';
 
+-- OPS.16.16 纳入申请表（存量租户）
+CREATE TABLE IF NOT EXISTS ops_plan_include_request (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    module VARCHAR(20) NOT NULL,
+    plan_id UUID NOT NULL,
+    plan_no VARCHAR(30),
+    device_id UUID NOT NULL,
+    device_code VARCHAR(20),
+    device_name VARCHAR(200),
+    dept_id UUID,
+    dept_name VARCHAR(100),
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    remark TEXT,
+    reject_reason TEXT,
+    create_channel VARCHAR(20),
+    applicant_id UUID,
+    applicant_name VARCHAR(100),
+    approved_by UUID,
+    approved_by_name VARCHAR(100),
+    approved_at TIMESTAMP WITH TIME ZONE,
+    result_plan_item_id UUID,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMPTZ,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100),
+    delete_channel VARCHAR(20)
+);
+COMMENT ON TABLE ops_plan_include_request IS '运维计划纳入设备申请（OPS.16.16）';
+
 -- OPS.16.12 执行类型：到期执行 / 执行补录
 ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS execution_kind VARCHAR(20) DEFAULT 'due';
 ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS backfill_next_due_date DATE;

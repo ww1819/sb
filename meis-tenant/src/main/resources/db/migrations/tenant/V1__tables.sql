@@ -2001,6 +2001,45 @@ CREATE TABLE maintenance_plan_item (
 );
 COMMENT ON TABLE maintenance_plan_item IS '保养计划明细（按设备）';
 
+-- OPS.16.16 运维计划纳入设备申请（共享表，module 区分保养/巡检/PM）
+CREATE TABLE IF NOT EXISTS ops_plan_include_request (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    module VARCHAR(20) NOT NULL,
+    plan_id UUID NOT NULL,
+    plan_no VARCHAR(30),
+    device_id UUID NOT NULL REFERENCES medical_device(id),
+    device_code VARCHAR(20),
+    device_name VARCHAR(200),
+    dept_id UUID REFERENCES department(id),
+    dept_name VARCHAR(100),
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    remark TEXT,
+    reject_reason TEXT,
+    create_channel VARCHAR(20),
+    applicant_id UUID REFERENCES sys_user(id),
+    applicant_name VARCHAR(100),
+    approved_by UUID REFERENCES sys_user(id),
+    approved_by_name VARCHAR(100),
+    approved_at TIMESTAMP WITH TIME ZONE,
+    result_plan_item_id UUID,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMPTZ,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100),
+    delete_channel VARCHAR(20)
+);
+COMMENT ON TABLE ops_plan_include_request IS '运维计划纳入设备申请（OPS.16.16）；确认后写计划明细';
+COMMENT ON COLUMN ops_plan_include_request.module IS 'maintain/inspect/pm';
+COMMENT ON COLUMN ops_plan_include_request.status IS 'pending/approved/rejected';
+CREATE INDEX IF NOT EXISTS idx_ops_plan_include_plan ON ops_plan_include_request(module, plan_id, status);
+CREATE INDEX IF NOT EXISTS idx_ops_plan_include_device ON ops_plan_include_request(module, device_id, status);
+
 
 -- 6.3 保养执行记录表
 CREATE TABLE maintenance_record (

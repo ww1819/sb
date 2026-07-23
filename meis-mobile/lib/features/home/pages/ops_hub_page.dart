@@ -149,61 +149,191 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
   }
 
   Future<void> openDeviceTasks(Map<String, dynamic> device) async {
+    if (!mounted) return;
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(device['device_name']?.toString() ?? '设备'),
+              subtitle: Text(device['device_code']?.toString() ?? ''),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.add_box_outlined),
+              title: const Text('新增执行单'),
+              onTap: () => Navigator.pop(ctx, 'adhoc'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.playlist_add_check),
+              title: const Text('申请纳入计划'),
+              onTap: () => Navigator.pop(ctx, 'include'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.play_circle_outline),
+              title: const Text('执行明细'),
+              onTap: () => Navigator.pop(ctx, 'execute'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.verified_outlined),
+              title: const Text('确认明细'),
+              onTap: () => Navigator.pop(ctx, 'confirm'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    if (action == 'adhoc') {
+      await createAdHoc(device);
+    } else if (action == 'include') {
+      await applyInclude(device);
+    } else if (action == 'execute') {
+      await pickOpenItem(device, forConfirm: false);
+    } else if (action == 'confirm') {
+      await pickOpenItem(device, forConfirm: true);
+    }
+  }
+
+  Future<void> applyInclude(Map<String, dynamic> device) async {
+    final api = ref.read(apiServiceProvider);
+    List<Map<String, dynamic>> plans = [];
+    try {
+      final raw = await api.getList('/${cfg.module}/plan/include-request/approved-plans');
+      plans = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (_) {}
+    if (!mounted) return;
+    if (plans.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('暂无已审核计划可纳入')));
+      return;
+    }
+    final picked = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.of(ctx).size.height * 0.5,
+          child: ListView(
+            children: [
+              const ListTile(title: Text('选择目标计划')),
+              ...plans.map(
+                (p) => ListTile(
+                  title: Text(p['plan_name']?.toString() ?? p['plan_no']?.toString() ?? ''),
+                  subtitle: Text('${p['plan_no'] ?? ''} · ${p['template_name'] ?? ''}'),
+                  onTap: () => Navigator.pop(ctx, p),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    try {
+      await api.postData('/${cfg.module}/plan/include-request', {
+        'client': 'app',
+        'plan_id': picked['id'],
+        'device_id': device['id'],
+        'device_code': device['device_code'],
+        'device_name': device['device_name'],
+        'dept_id': device['dept_id'],
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已提交纳入申请，待 Web 确认')));
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
+
+  Future<void> pickOpenItem(Map<String, dynamic> device, {required bool forConfirm}) async {
     final api = ref.read(apiServiceProvider);
     final deviceId = device['id']?.toString();
     if (deviceId == null) return;
     try {
       final raw = await api.getList('${cfg.executionBase}/by-device/$deviceId', query: {'openOnly': true});
-      final items = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      var items = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      if (forConfirm) {
+        items = items.where((it) {
+          final s = it['status']?.toString() ?? '';
+          return s != 'confirmed';
+        }).toList();
+      }
       if (!mounted) return;
       if (items.isEmpty) {
-        final adHoc = await showDialog<bool>(
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(forConfirm ? '暂无可确认明细' : '暂无待执行明细，可先新增执行单')),
+        );
+        return;
+      }
+      if (forConfirm) {
+        final picked = await showModalBottomSheet<Map<String, dynamic>>(
+          context: context,
+          builder: (ctx) => SafeArea(
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                const ListTile(title: Text('选择要确认的明细')),
+                ...items.map(
+                  (it) => ListTile(
+                    title: Text(it['execution_no']?.toString() ?? ''),
+                    subtitle: Text('${it['status'] ?? ''} · ${it['source_type'] ?? ''}'),
+                    onTap: () => Navigator.pop(ctx, it),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+        if (picked == null || !mounted) return;
+        final itemId = picked['id']?.toString();
+        if (itemId == null) return;
+        final ok = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('无待执行任务'),
-            content: Text('设备 ${device['device_name'] ?? ''} 暂无未审核执行单，是否直开？'),
+            title: const Text('确认明细'),
+            content: Text(
+              (picked['status']?.toString() == 'completed')
+                  ? '确认该设备执行结果？'
+                  : '结果未填完也可确认，将自动记为已完成再确认。是否继续？',
+            ),
             actions: [
               TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('直开')),
+              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确认')),
             ],
           ),
         );
-        if (adHoc == true) await createAdHoc(device);
+        if (ok != true) return;
+        await api.postData('${cfg.executionBase}/item/$itemId/confirm', {'client': 'app'});
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已确认')));
+        }
         return;
       }
       await showModalBottomSheet<void>(
         context: context,
-        isScrollControlled: true,
         builder: (ctx) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          child: ListView(
+            shrinkWrap: true,
             children: [
-              ListTile(
-                title: Text(device['device_name']?.toString() ?? '待执行'),
-                subtitle: Text('${items.length} 条未审核执行明细'),
-                trailing: TextButton(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    createAdHoc(device);
-                  },
-                  child: const Text('直开'),
-                ),
-              ),
+              const ListTile(title: Text('选择执行明细')),
               ...items.map((it) {
                 final execId = it['execution_id']?.toString();
                 final itemId = it['id']?.toString();
                 return ListTile(
                   title: Text(it['execution_no']?.toString() ?? ''),
-                  subtitle: Text('${it['execution_status'] ?? ''} · ${it['source_type'] ?? ''}'),
+                  subtitle: Text('${it['execution_status'] ?? ''} · ${it['status'] ?? ''}'),
                   onTap: () {
                     Navigator.pop(ctx);
-                    if (execId != null && itemId != null) {
-                      openDetail(execId, itemId);
-                    }
+                    if (execId != null && itemId != null) openDetail(execId, itemId);
                   },
                 );
               }),
-              const SizedBox(height: 12),
             ],
           ),
         ),

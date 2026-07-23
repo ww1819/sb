@@ -8,6 +8,7 @@
     >
       <template #toolbar-after-add>
         <el-button type="primary" @click="onBatchGenerate">生成执行</el-button>
+        <el-button @click="onBatchInclude">申请纳入计划</el-button>
       </template>
       <template #extra-columns>
         <el-table-column label="最近计划单" width="150" show-overflow-tooltip>
@@ -49,6 +50,11 @@
         <el-table-column label="生成执行" width="90" fixed="right" align="center" header-align="center">
           <template #default="{ row }">
             <el-button link type="success" @click="openAdHoc([String(row.id)])">生成</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="申请纳入" width="90" fixed="right" align="center" header-align="center">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="openInclude([String(row.id)])">纳入</el-button>
           </template>
         </el-table-column>
       </template>
@@ -162,6 +168,37 @@
       <template #footer>
         <el-button @click="adHocVisible = false">取消</el-button>
         <el-button type="primary" @click="submitAdHoc">创建</el-button>
+      </template>
+    </AppModal>
+    <AppModal v-model="includeVisible" title="申请纳入计划" size="md">
+      <p class="ad-hoc-hint">将为 {{ includeDeviceIds.length }} 台设备分别提交纳入申请（需在计划详情确认）。</p>
+      <el-form label-width="100px">
+        <el-form-item label="目标计划" required>
+          <el-select
+            v-model="includePlanId"
+            filterable
+            remote
+            reserve-keyword
+            placeholder="搜索已审核计划"
+            :remote-method="searchApprovedPlans"
+            :loading="includePlanLoading"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="p in approvedPlans"
+              :key="String(p.id)"
+              :label="`${p.plan_no || ''} · ${p.plan_name || ''}`"
+              :value="p.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="includeRemark" type="textarea" :rows="2" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="includeVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitInclude">提交申请</el-button>
       </template>
     </AppModal>
   </div>
@@ -467,6 +504,70 @@ async function submitAdHoc() {
   ElMessage.success(execNo ? `已创建执行单 ${execNo}` : '已创建执行单')
   adHocVisible.value = false
   crudRef.value?.load()
+}
+
+const includeVisible = ref(false)
+const includeDeviceIds = ref<string[]>([])
+const includePlanId = ref<string | null>(null)
+const includeRemark = ref('')
+const approvedPlans = ref<Record<string, unknown>[]>([])
+const includePlanLoading = ref(false)
+
+async function searchApprovedPlans(keyword: string) {
+  includePlanLoading.value = true
+  try {
+    const { data } = await http.get(`/${props.module}/plan/include-request/approved-plans`, {
+      params: { keyword: keyword || undefined }
+    })
+    approvedPlans.value = data.data ?? []
+  } finally {
+    includePlanLoading.value = false
+  }
+}
+
+async function openInclude(deviceIds: string[]) {
+  includeDeviceIds.value = deviceIds
+  includePlanId.value = null
+  includeRemark.value = ''
+  await searchApprovedPlans('')
+  includeVisible.value = true
+}
+
+async function onBatchInclude() {
+  const count = readSelectedCount(crudRef.value)
+  const scope = await promptListActionScope(count, '申请纳入')
+  if (!scope || !assertScopeSelection(scope, count)) return
+  const ids = await resolveDeviceIds(scope)
+  if (!ids.length) {
+    ElMessage.warning('没有可选设备')
+    return
+  }
+  await openInclude(ids)
+}
+
+async function submitInclude() {
+  if (!includePlanId.value) {
+    ElMessage.warning('请选择目标计划')
+    return
+  }
+  if (!includeDeviceIds.value.length) return
+  let ok = 0
+  let fail = 0
+  for (const deviceId of includeDeviceIds.value) {
+    try {
+      await http.post(`/${props.module}/plan/include-request`, {
+        client: 'web',
+        plan_id: includePlanId.value,
+        device_id: deviceId,
+        remark: includeRemark.value
+      })
+      ok += 1
+    } catch {
+      fail += 1
+    }
+  }
+  ElMessage.success(`已提交 ${ok} 条申请${fail ? `，失败 ${fail}` : ''}`)
+  includeVisible.value = false
 }
 </script>
 

@@ -5,6 +5,7 @@ import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.biz.CycleDaysSupport;
 import com.meis.saas.common.code.DailyBizNoSupport;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.ops.OpsPlanIncludeSupport;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
@@ -24,6 +25,40 @@ public class PmPlanController {
     private final JdbcTemplate jdbc;
     private final PmExecutionGenerator executionGenerator;
     private final DocChangeLogService docLog;
+
+    @PostMapping("/include-request")
+    @Transactional
+    @OperationLog(module = "pm", description = "申请纳入预防性维护计划")
+    public Result<Map<String, Object>> createIncludeRequest(@RequestBody Map<String, Object> body) {
+        return Result.ok(OpsPlanIncludeSupport.create(jdbc, "pm", body));
+    }
+
+    @GetMapping("/include-request/approved-plans")
+    public Result<List<Map<String, Object>>> approvedPlansForInclude(
+            @RequestParam(required = false) String keyword) {
+        return Result.ok(OpsPlanIncludeSupport.listApprovedPlans(jdbc, "pm", keyword));
+    }
+
+    @GetMapping("/{id}/include-requests")
+    public Result<List<Map<String, Object>>> listIncludeRequests(@PathVariable UUID id) {
+        return Result.ok(OpsPlanIncludeSupport.listByPlan(jdbc, "pm", id));
+    }
+
+    @PostMapping("/include-request/{requestId}/approve")
+    @Transactional
+    @OperationLog(module = "pm", description = "确认纳入预防性维护计划")
+    public Result<Map<String, Object>> approveInclude(
+            @PathVariable UUID requestId, @RequestBody(required = false) Map<String, Object> body) {
+        return Result.ok(OpsPlanIncludeSupport.approve(jdbc, requestId, body != null ? body : Map.of()));
+    }
+
+    @PostMapping("/include-request/{requestId}/reject")
+    @Transactional
+    @OperationLog(module = "pm", description = "驳回纳入预防性维护计划")
+    public Result<Map<String, Object>> rejectInclude(
+            @PathVariable UUID requestId, @RequestBody Map<String, Object> body) {
+        return Result.ok(OpsPlanIncludeSupport.reject(jdbc, requestId, body));
+    }
 
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
