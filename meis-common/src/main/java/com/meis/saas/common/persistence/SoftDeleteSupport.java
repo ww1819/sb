@@ -82,6 +82,11 @@ public final class SoftDeleteSupport {
     }
 
     public static int softDelete(JdbcTemplate jdbc, String table, String id) {
+        return softDelete(jdbc, table, id, null);
+    }
+
+    /** @param client 可选；表有 delete_channel 时写入（OPS.16.10） */
+    public static int softDelete(JdbcTemplate jdbc, String table, String id, String client) {
         Set<String> cols = TableColumnCache.columns(jdbc, table);
         if (!cols.contains("deleted_at") && !cols.contains("is_deleted")) {
             throw new BizException(500,
@@ -106,6 +111,10 @@ public final class SoftDeleteSupport {
         }
         if (cols.contains("is_active")) {
             sets.add("is_active = FALSE");
+        }
+        if (cols.contains("delete_channel")) {
+            sets.add("delete_channel = ?");
+            args.add(com.meis.saas.common.ops.OpsClientChannel.normalize(client));
         }
         appendUpdateAuditSets(jdbc, cols, sets, args);
         args.add(id);

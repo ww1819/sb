@@ -184,6 +184,14 @@ public class InspectionPlanController {
         return Result.ok(list.get(0));
     }
 
+    @PostMapping("/{id}/backfill-execution")
+    @Transactional
+    @OperationLog(module = "inspect", description = "计划执行补录")
+    public Result<Map<String, Object>> backfillExecution(@PathVariable UUID id,
+            @RequestBody Map<String, Object> body) {
+        return Result.ok(executionGenerator.backfillOne(id, body != null ? body : Map.of()));
+    }
+
     @PostMapping("/generate")
     @Transactional
     @OperationLog(module = "inspect", description = "从模板生成巡检计划（一单多设备）")

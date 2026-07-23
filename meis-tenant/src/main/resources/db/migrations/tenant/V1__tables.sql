@@ -2082,6 +2082,13 @@ CREATE TABLE maintenance_execution (
     auditor_name VARCHAR(100),
     audited_at TIMESTAMP WITH TIME ZONE,
     audit_comment TEXT,
+    execution_channel VARCHAR(20),
+    create_channel VARCHAR(20),
+    submit_channel VARCHAR(20),
+    audit_channel VARCHAR(20),
+    delete_channel VARCHAR(20),
+    execution_kind VARCHAR(20) DEFAULT 'due',
+    backfill_next_due_date DATE,
     created_by UUID REFERENCES sys_user(id),
     created_by_name VARCHAR(100),
     remark TEXT,
@@ -2090,6 +2097,13 @@ CREATE TABLE maintenance_execution (
 );
 COMMENT ON TABLE maintenance_execution IS '保养执行单';
 COMMENT ON COLUMN maintenance_execution.created_by_name IS '制单人姓名快照（W.5）';
+COMMENT ON COLUMN maintenance_execution.execution_channel IS '兼容保留（OPS.16.9）；业务途径见 OPS.16.10';
+COMMENT ON COLUMN maintenance_execution.create_channel IS '制单途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN maintenance_execution.submit_channel IS '提交途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN maintenance_execution.audit_channel IS '审核途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN maintenance_execution.delete_channel IS '删除途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN maintenance_execution.execution_kind IS 'due=到期执行 backfill=执行补录（OPS.16.12）';
+COMMENT ON COLUMN maintenance_execution.backfill_next_due_date IS '补录可选下次到期（OPS.16.12）';
 
 CREATE TABLE maintenance_execution_item (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -2110,13 +2124,16 @@ CREATE TABLE maintenance_execution_item (
     issues_found TEXT,
     photos JSONB,
     signature_url VARCHAR(500),
+    execution_channel VARCHAR(20),
+    confirm_channel VARCHAR(20),
     row_version INTEGER NOT NULL DEFAULT 1,
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 COMMENT ON TABLE maintenance_execution_item IS '保养执行明细（按设备）';
-
+COMMENT ON COLUMN maintenance_execution_item.execution_channel IS '执行途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN maintenance_execution_item.confirm_channel IS '确认途径 web/app/mp（OPS.16.10）';
 CREATE TABLE maintenance_execution_result (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     execution_item_id UUID NOT NULL REFERENCES maintenance_execution_item(id) ON DELETE CASCADE,
@@ -3006,6 +3023,13 @@ CREATE TABLE pm_execution (
     auditor_name VARCHAR(100),
     audited_at TIMESTAMP WITH TIME ZONE,
     audit_comment TEXT,
+    execution_channel VARCHAR(20),
+    create_channel VARCHAR(20),
+    submit_channel VARCHAR(20),
+    audit_channel VARCHAR(20),
+    delete_channel VARCHAR(20),
+    execution_kind VARCHAR(20) DEFAULT 'due',
+    backfill_next_due_date DATE,
     created_by UUID REFERENCES sys_user(id),
     created_by_name VARCHAR(100),
     remark TEXT,
@@ -3014,6 +3038,13 @@ CREATE TABLE pm_execution (
 );
 COMMENT ON TABLE pm_execution IS '预防性维护执行单';
 COMMENT ON COLUMN pm_execution.created_by_name IS '制单人姓名快照（W.5）';
+COMMENT ON COLUMN pm_execution.execution_channel IS '兼容保留（OPS.16.9）；业务途径见 OPS.16.10';
+COMMENT ON COLUMN pm_execution.create_channel IS '制单途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN pm_execution.submit_channel IS '提交途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN pm_execution.audit_channel IS '审核途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN pm_execution.delete_channel IS '删除途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN pm_execution.execution_kind IS 'due=到期执行 backfill=执行补录（OPS.16.12）';
+COMMENT ON COLUMN pm_execution.backfill_next_due_date IS '补录可选下次到期（OPS.16.12）';
 
 CREATE TABLE pm_execution_item (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -3034,12 +3065,16 @@ CREATE TABLE pm_execution_item (
     issues_found TEXT,
     photos JSONB,
     signature_url VARCHAR(500),
+    execution_channel VARCHAR(20),
+    confirm_channel VARCHAR(20),
     row_version INTEGER NOT NULL DEFAULT 1,
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 COMMENT ON TABLE pm_execution_item IS '预防性维护执行明细';
+COMMENT ON COLUMN pm_execution_item.execution_channel IS '执行途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN pm_execution_item.confirm_channel IS '确认途径 web/app/mp（OPS.16.10）';
 
 CREATE TABLE pm_execution_result (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -3842,6 +3877,13 @@ CREATE TABLE IF NOT EXISTS inspection_execution (
     auditor_name VARCHAR(100),
     audited_at TIMESTAMP WITH TIME ZONE,
     audit_comment TEXT,
+    execution_channel VARCHAR(20),
+    create_channel VARCHAR(20),
+    submit_channel VARCHAR(20),
+    audit_channel VARCHAR(20),
+    delete_channel VARCHAR(20),
+    execution_kind VARCHAR(20) DEFAULT 'due',
+    backfill_next_due_date DATE,
     created_by UUID REFERENCES sys_user(id),
     created_by_name VARCHAR(100),
     remark TEXT,
@@ -3850,6 +3892,13 @@ CREATE TABLE IF NOT EXISTS inspection_execution (
 );
 COMMENT ON TABLE inspection_execution IS '巡检执行单';
 COMMENT ON COLUMN inspection_execution.created_by_name IS '制单人姓名快照（W.5）';
+COMMENT ON COLUMN inspection_execution.execution_channel IS '兼容保留（OPS.16.9）；业务途径见 OPS.16.10';
+COMMENT ON COLUMN inspection_execution.create_channel IS '制单途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN inspection_execution.submit_channel IS '提交途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN inspection_execution.audit_channel IS '审核途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN inspection_execution.delete_channel IS '删除途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN inspection_execution.execution_kind IS 'due=到期执行 backfill=执行补录（OPS.16.12）';
+COMMENT ON COLUMN inspection_execution.backfill_next_due_date IS '补录可选下次到期（OPS.16.12）';
 
 CREATE TABLE IF NOT EXISTS inspection_execution_item (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -3870,12 +3919,16 @@ CREATE TABLE IF NOT EXISTS inspection_execution_item (
     issues_found TEXT,
     photos JSONB,
     signature_url VARCHAR(500),
+    execution_channel VARCHAR(20),
+    confirm_channel VARCHAR(20),
     row_version INTEGER NOT NULL DEFAULT 1,
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 COMMENT ON TABLE inspection_execution_item IS '巡检执行明细（按设备）';
+COMMENT ON COLUMN inspection_execution_item.execution_channel IS '执行途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN inspection_execution_item.confirm_channel IS '确认途径 web/app/mp（OPS.16.10）';
 
 CREATE TABLE IF NOT EXISTS inspection_execution_result (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -180,7 +180,7 @@
               编辑
             </el-button>
             <el-button
-              v-else-if="detailMode"
+              v-else-if="detailMode && !viewEnabled"
               link
               type="primary"
               @click="onEdit(row)"
@@ -292,6 +292,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   detail: [row: Record<string, unknown>]
+  view: [row: Record<string, unknown>]
   add: []
   deleted: [row: Record<string, unknown>]
   saved: [payload: Record<string, unknown>]
@@ -663,7 +664,8 @@ function onEdit(row: Record<string, unknown>) {
 }
 
 function onView(row: Record<string, unknown>) {
-  openForm(row, 'view')
+  if (props.detailMode) emit('view', row)
+  else openForm(row, 'view')
 }
 
 function openChangeLog() {
@@ -809,7 +811,7 @@ function getSelectedRows() {
   return selectedRows.value
 }
 
-defineExpose({ load, remove, getSelectedRows, selectedCount, selectedIds })
+defineExpose({ load, remove, getSelectedRows, selectedCount, selectedIds, getFilterQueryParams: buildFilterQueryParams })
 </script>
 
 <style scoped>

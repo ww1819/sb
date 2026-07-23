@@ -4,7 +4,9 @@ import com.meis.saas.common.audit.DocChangeLogService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.ops.OpsAutoRepairSupport;
+import com.meis.saas.common.ops.OpsClientChannel;
 import com.meis.saas.common.ops.OpsPhotosSupport;
+import com.meis.saas.common.ops.OpsPlanExecutionSupport;
 import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
@@ -17,7 +19,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
 import java.util.*;
 
 @RestController
@@ -152,6 +153,9 @@ public class PmExecutionController {
         Map<String, Object> old = rows.get(0);
         UUID execId = (UUID) old.get("execution_id");
         assertEditable(execId);
+        if ("confirmed".equals(String.valueOf(old.get("status")))) {
+            throw new BizException(400, "明细已确认，不可再修改");
+        }
         int expected = body.containsKey("row_version")
                 ? ((Number) body.get("row_version")).intValue()
                 : ((Number) old.getOrDefault("row_version", 1)).intValue();
@@ -251,6 +255,9 @@ public class PmExecutionController {
         Map<String, Object> item = itemRows.get(0);
         UUID execId = (UUID) item.get("execution_id");
         assertEditable(execId);
+        if ("confirmed".equals(String.valueOf(item.get("status")))) {
+            throw new BizException(400, "明细已确认，不可再修改");
+        }
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> results = (List<Map<String, Object>>) body.getOrDefault("results", List.of());
@@ -272,21 +279,24 @@ public class PmExecutionController {
                 }
             }
         }
+        String channel = OpsClientChannel.of(body);
         if (body.containsKey("photos") || body.containsKey("signature_url")) {
             jdbc.update("""
                     UPDATE pm_execution_item SET status='completed', overall_result=?, remark=?,
                     photos=COALESCE(CAST(? AS jsonb), photos), signature_url=COALESCE(?, signature_url),
-                    end_time=COALESCE(end_time, NOW()), row_version=COALESCE(row_version,1)+1, updated_at=NOW()
+                    execution_channel=?, end_time=COALESCE(end_time, NOW()),
+                    row_version=COALESCE(row_version,1)+1, updated_at=NOW()
                     WHERE id=?::uuid
                     """, body.getOrDefault("overall_result", "pass"), body.get("remark"),
                     body.containsKey("photos") ? OpsPhotosSupport.toJson(body.get("photos")) : null,
-                    body.get("signature_url"), itemId);
+                    body.get("signature_url"), channel, itemId);
         } else {
             jdbc.update("""
                     UPDATE pm_execution_item SET status='completed', overall_result=?, remark=?,
-                    end_time=COALESCE(end_time, NOW()), row_version=COALESCE(row_version,1)+1, updated_at=NOW()
+                    execution_channel=?, end_time=COALESCE(end_time, NOW()),
+                    row_version=COALESCE(row_version,1)+1, updated_at=NOW()
                     WHERE id=?::uuid
-                    """, body.getOrDefault("overall_result", "pass"), body.get("remark"), itemId);
+                    """, body.getOrDefault("overall_result", "pass"), body.get("remark"), channel, itemId);
         }
 
         docLog.event("pm", "execution", execId, execNo(execId), "complete_item", clientOf(body), itemId.toString());
@@ -309,13 +319,21 @@ public class PmExecutionController {
         if (!EDITABLE.contains(st) && !"in_progress".equals(st)) {
             throw new BizException(400, "当前状态不可提交");
         }
+        assertAllItemsCompleted(id);
+        String channel = OpsClientChannel.of(body);
+        jdbc.update("""
+                UPDATE pm_execution_item SET status='confirmed', confirm_channel=?,
+                row_version=COALESCE(row_version,1)+1, updated_at=NOW()
+                WHERE execution_id=?::uuid AND COALESCE(is_deleted,0)=0 AND status='completed'
+                """, channel, id);
         String userId = TenantContext.getUserId();
         String name = SoftDeleteSupport.resolveUserDisplayName(jdbc, userId);
         jdbc.update("""
                 UPDATE pm_execution SET status='submitted', submitter_id=?::uuid, submitter_name=?,
-                submitted_at=NOW(), execute_end_time=COALESCE(execute_end_time, NOW()), updated_at=NOW()
+                submitted_at=NOW(), execute_end_time=COALESCE(execute_end_time, NOW()),
+                submit_channel=?, updated_at=NOW()
                 WHERE id=?::uuid
-                """, userId, name, id);
+                """, userId, name, channel, id);
         docLog.event("pm", "execution", id, execNo(id), "submit", clientOf(body), null);
         return get(id);
     }
@@ -328,8 +346,13 @@ public class PmExecutionController {
             throw new BizException(400, "仅已提交可撤回");
         }
         jdbc.update("""
+                UPDATE pm_execution_item SET status='completed', confirm_channel=NULL,
+                row_version=COALESCE(row_version,1)+1, updated_at=NOW()
+                WHERE execution_id=?::uuid AND COALESCE(is_deleted,0)=0 AND status='confirmed'
+                """, id);
+        jdbc.update("""
                 UPDATE pm_execution SET status='in_progress', submitter_id=NULL, submitter_name=NULL,
-                submitted_at=NULL, updated_at=NOW() WHERE id=?::uuid
+                submitted_at=NULL, submit_channel=NULL, updated_at=NOW() WHERE id=?::uuid
                 """, id);
         docLog.event("pm", "execution", id, execNo(id), "withdraw", clientOf(body), null);
         return get(id);
@@ -342,20 +365,27 @@ public class PmExecutionController {
         if (!"submitted".equals(statusOf(id))) {
             throw new BizException(400, "仅已提交可审核");
         }
+        assertAllItemsConfirmed(id);
         String action = String.valueOf(body.getOrDefault("action", "approve"));
         String userId = TenantContext.getUserId();
         String name = SoftDeleteSupport.resolveUserDisplayName(jdbc, userId);
+        String channel = OpsClientChannel.of(body);
         if ("reject".equals(action)) {
             jdbc.update("""
                     UPDATE pm_execution SET status='in_progress', auditor_id=?::uuid, auditor_name=?,
-                    audited_at=NOW(), audit_comment=?, updated_at=NOW() WHERE id=?::uuid
-                    """, userId, name, body.get("audit_comment"), id);
+                    audited_at=NOW(), audit_comment=?, audit_channel=?, updated_at=NOW() WHERE id=?::uuid
+                    """, userId, name, body.get("audit_comment"), channel, id);
+            jdbc.update("""
+                    UPDATE pm_execution_item SET status='completed', confirm_channel=NULL,
+                    row_version=COALESCE(row_version,1)+1, updated_at=NOW()
+                    WHERE execution_id=?::uuid AND COALESCE(is_deleted,0)=0 AND status='confirmed'
+                    """, id);
             docLog.event("pm", "execution", id, execNo(id), "audit_reject", clientOf(body), null);
         } else {
             jdbc.update("""
                     UPDATE pm_execution SET status='audited', auditor_id=?::uuid, auditor_name=?,
-                    audited_at=NOW(), audit_comment=?, updated_at=NOW() WHERE id=?::uuid
-                    """, userId, name, body.get("audit_comment"), id);
+                    audited_at=NOW(), audit_comment=?, audit_channel=?, updated_at=NOW() WHERE id=?::uuid
+                    """, userId, name, body.get("audit_comment"), channel, id);
             updatePlansAfterAudit(id);
             docLog.event("pm", "execution", id, execNo(id), "audit_approve", clientOf(body), null);
         }
@@ -372,42 +402,9 @@ public class PmExecutionController {
     }
 
     private void updatePlansAfterAudit(UUID execId) {
-        var items = jdbc.queryForList("""
-                SELECT plan_item_id, plan_id FROM pm_execution_item
-                WHERE execution_id=?::uuid AND plan_item_id IS NOT NULL
-                """ + SoftDeleteSupport.notDeletedClause(jdbc, "pm_execution_item", null), execId);
-        for (Map<String, Object> row : items) {
-            UUID planItemId = (UUID) row.get("plan_item_id");
-            UUID planId = (UUID) row.get("plan_id");
-            Integer cycleDays = null;
-            if (planId != null) {
-                var plan = jdbc.queryForList(
-                        "SELECT cycle_days FROM pm_plan WHERE id=?::uuid"
-                                + SoftDeleteSupport.notDeletedClause(jdbc, "pm_plan", null), planId);
-                if (!plan.isEmpty() && plan.get(0).get("cycle_days") != null) {
-                    cycleDays = ((Number) plan.get(0).get("cycle_days")).intValue();
-                }
-            }
-            LocalDate next = cycleDays != null && cycleDays > 0
-                    ? LocalDate.now().plusDays(cycleDays) : LocalDate.now().plusMonths(1);
-            jdbc.update("""
-                    UPDATE pm_plan_item SET last_done_date=CURRENT_DATE, next_due_date=?, updated_at=NOW()
-                    WHERE id=?::uuid
-                    """, next, planItemId);
-            if (planId != null) {
-                jdbc.update("""
-                        UPDATE pm_plan SET
-                          next_due_date = COALESCE(
-                            (SELECT MIN(next_due_date) FROM pm_plan_item
-                              WHERE plan_id=?::uuid AND COALESCE(is_deleted,0)=0 AND next_due_date IS NOT NULL),
-                            next_due_date,
-                            CURRENT_DATE + COALESCE(cycle_days, 30)
-                          ),
-                          last_maintained_at = CURRENT_DATE, updated_at=NOW()
-                        WHERE id=?::uuid
-                        """, planId, planId);
-            }
-        }
+        OpsPlanExecutionSupport.updatePlansAfterAudit(
+                jdbc, "pm_execution", "pm_execution_item",
+                "pm_plan", "pm_plan_item", "last_maintained_at", execId);
     }
 
     private void assertEditable(UUID execId) {
@@ -441,6 +438,33 @@ public class PmExecutionController {
     }
 
     private static String clientOf(Map<String, Object> body) {
-        return body != null && body.get("client") != null ? body.get("client").toString() : "web";
+        return OpsClientChannel.of(body);
+    }
+
+    private void assertAllItemsCompleted(UUID execId) {
+        Integer pending = jdbc.queryForObject("""
+                SELECT COUNT(1)::int FROM pm_execution_item
+                WHERE execution_id=?::uuid AND COALESCE(is_deleted,0)=0 AND status <> 'completed'
+                """, Integer.class, execId);
+        if (pending != null && pending > 0) {
+            throw new BizException(400, "存在未完成明细，不可提交");
+        }
+        Integer total = jdbc.queryForObject("""
+                SELECT COUNT(1)::int FROM pm_execution_item
+                WHERE execution_id=?::uuid AND COALESCE(is_deleted,0)=0
+                """, Integer.class, execId);
+        if (total == null || total == 0) {
+            throw new BizException(400, "无设备明细，不可提交");
+        }
+    }
+
+    private void assertAllItemsConfirmed(UUID execId) {
+        Integer n = jdbc.queryForObject("""
+                SELECT COUNT(1)::int FROM pm_execution_item
+                WHERE execution_id=?::uuid AND COALESCE(is_deleted,0)=0 AND status <> 'confirmed'
+                """, Integer.class, execId);
+        if (n != null && n > 0) {
+            throw new BizException(400, "存在未确认明细，不可审核");
+        }
     }
 }

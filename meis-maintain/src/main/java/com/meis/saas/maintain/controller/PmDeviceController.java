@@ -5,14 +5,16 @@ import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.util.*;
 
 /**
- * PM 设备管理：台账过滤视图（附录 O.5 / OPS.4 / OPS.13 / PLT-UI-02）
+ * PM 设备管理：台账过滤视图（附录 O.5 / OPS.4 / OPS.13 / PLT-UI-02 / OPS.16.11）
  */
 @RestController
 @RequestMapping("/api/pm/device")
@@ -38,20 +40,52 @@ public class PmDeviceController {
             @RequestParam(required = false) String finance_category_id,
             @RequestParam(required = false) String category_kw,
             @RequestParam(required = false) String asset_category_kw,
-            @RequestParam(required = false) String finance_category_kw) {
+            @RequestParam(required = false) String finance_category_kw,
+            @RequestParam(required = false) String ids) {
         return Result.ok(OpsDevicePageSupport.page(
                 jdbc, OpsDevicePageSupport.PM, query,
                 device_status, dept_id, manage_dept_id,
                 device_code, device_name, serial_number, specification, model, brand,
                 due_within_days,
                 category_id, asset_category_id, finance_category_id,
-                category_kw, asset_category_kw, finance_category_kw));
+                category_kw, asset_category_kw, finance_category_kw, ids));
+    }
+
+    @GetMapping("/export")
+    public void export(
+            PageQuery query,
+            @RequestParam(required = false) String device_status,
+            @RequestParam(required = false) String dept_id,
+            @RequestParam(required = false) String manage_dept_id,
+            @RequestParam(required = false) String device_code,
+            @RequestParam(required = false) String device_name,
+            @RequestParam(required = false) String serial_number,
+            @RequestParam(required = false) String specification,
+            @RequestParam(required = false) String model,
+            @RequestParam(required = false) String brand,
+            @RequestParam(required = false) Integer due_within_days,
+            @RequestParam(required = false) String category_id,
+            @RequestParam(required = false) String asset_category_id,
+            @RequestParam(required = false) String finance_category_id,
+            @RequestParam(required = false) String category_kw,
+            @RequestParam(required = false) String asset_category_kw,
+            @RequestParam(required = false) String finance_category_kw,
+            @RequestParam(required = false) String ids,
+            HttpServletResponse resp) throws IOException {
+        OpsDevicePageSupport.export(
+                jdbc, OpsDevicePageSupport.PM, resp, "ops_pm_device_export.csv", query,
+                device_status, dept_id, manage_dept_id,
+                device_code, device_name, serial_number, specification, model, brand,
+                due_within_days,
+                category_id, asset_category_id, finance_category_id,
+                category_kw, asset_category_kw, finance_category_kw, ids);
     }
 
     @GetMapping("/{deviceId}/plans")
     public Result<List<Map<String, Object>>> plans(@PathVariable UUID deviceId) {
         return Result.ok(jdbc.queryForList("""
-                SELECT i.*, p.plan_name, p.plan_no, p.approval_status, p.status AS plan_status, p.template_id, p.template_name
+                SELECT i.*, p.id AS plan_id, p.plan_name, p.plan_no, p.approval_status, p.status AS plan_status,
+                       p.template_id, p.template_name
                 FROM pm_plan_item i
                 INNER JOIN pm_plan p ON p.id = i.plan_id
                 WHERE i.device_id = ?::uuid

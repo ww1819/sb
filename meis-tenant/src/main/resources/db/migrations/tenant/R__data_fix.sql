@@ -808,3 +808,22 @@ UPDATE inspection_record r SET
   device_name = COALESCE(NULLIF(TRIM(r.device_name), ''), d.device_name)
 FROM medical_device d WHERE r.device_id = d.id
   AND (r.device_code IS NULL OR r.device_name IS NULL OR TRIM(r.device_code) = '' OR TRIM(r.device_name) = '');
+
+-- OPS.16.9 执行途径
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('execution_channel', 'web', 'Web', 'web', 1),
+('execution_channel', 'app', 'App', 'app', 2),
+('execution_channel', 'mp', '小程序', 'mp', 3)
+ON CONFLICT (dict_type, dict_code) DO UPDATE SET dict_label = EXCLUDED.dict_label, dict_value = EXCLUDED.dict_value, sort_order = EXCLUDED.sort_order;
+
+-- OPS.16.10 item status confirmed
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('maintain_exec_item_status', 'confirmed', '已确认', 'confirmed', 40),
+('inspect_exec_item_status', 'confirmed', '已确认', 'confirmed', 40)
+ON CONFLICT (dict_type, dict_code) DO UPDATE SET dict_label = EXCLUDED.dict_label, dict_value = EXCLUDED.dict_value, sort_order = EXCLUDED.sort_order;
+
+-- OPS.16.12 execution kind
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('ops_execution_kind', 'due', '到期执行', 'due', 1),
+('ops_execution_kind', 'backfill', '执行补录', 'backfill', 2)
+ON CONFLICT (dict_type, dict_code) DO UPDATE SET dict_label = EXCLUDED.dict_label, dict_value = EXCLUDED.dict_value, sort_order = EXCLUDED.sort_order;

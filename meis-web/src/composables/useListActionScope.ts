@@ -30,15 +30,15 @@ export async function promptListActionScope(
       `已勾选 ${selectedCount} 条。请选择「${actionLabel}」范围。`,
       actionLabel,
       {
-        confirmButtonText: '全部查询结果',
-        cancelButtonText: '仅勾选行',
+        confirmButtonText: '仅勾选行',
+        cancelButtonText: '全部查询结果',
         distinguishCancelAndClose: true,
         type: 'info'
       }
     )
-    return 'all'
+    return 'selected'
   } catch (action) {
-    if (action === 'cancel') return 'selected'
+    if (action === 'cancel') return 'all'
     return null
   }
 }

@@ -421,11 +421,13 @@ public abstract class GenericTableController {
     }
 
     @DeleteMapping("/{table}/{id:[0-9a-fA-F\\-]{36}}")
-    public Result<Void> delete(@PathVariable String table, @PathVariable String id) {
+    public Result<Void> delete(@PathVariable String table, @PathVariable String id,
+                               @RequestParam(required = false) String client) {
         check(table);
         denyRepairWorkorderBypass(table);
         guardInventoryCheckMutable(table, id);
         guardOpsPlanApprovedImmutable(table, id);
+        guardOpsExecutionDeletable(table, id);
         if ("medical_device".equals(table)) {
             MedicalDeviceDeleteGuard.assertDeletable(jdbc(), id);
         }
@@ -433,7 +435,7 @@ public abstract class GenericTableController {
             SparePartDeleteGuard.assertDeletable(jdbc(), id);
         }
         Map<String, Object> before = loadTracked(table, id);
-        int n = SoftDeleteSupport.softDelete(jdbc(), table, id);
+        int n = SoftDeleteSupport.softDelete(jdbc(), table, id, client);
         if (n == 0 && SoftDeleteSupport.supportsSoftDelete(jdbc(), table)) {
             throw new BizException(404, "not found");
         }
@@ -671,6 +673,24 @@ public abstract class GenericTableController {
                 "SELECT approval_status FROM " + table + " WHERE id = ?::uuid AND COALESCE(is_deleted,0)=0", id);
         if (!rows.isEmpty() && "approved".equals(String.valueOf(rows.get(0).get("approval_status")))) {
             throw new BizException(400, "已审核计划不可删除");
+        }
+    }
+
+    /** OPS.16.9：任一明细非 pending（已开始/已完成）则禁止删除执行单 */
+    private void guardOpsExecutionDeletable(String table, String id) {
+        String itemTable = switch (table) {
+            case "maintenance_execution" -> "maintenance_execution_item";
+            case "pm_execution" -> "pm_execution_item";
+            case "inspection_execution" -> "inspection_execution_item";
+            default -> null;
+        };
+        if (itemTable == null) return;
+        Integer n = jdbc().queryForObject(
+                "SELECT COUNT(1)::int FROM " + itemTable
+                        + " WHERE execution_id=?::uuid AND COALESCE(is_deleted,0)=0 AND status <> 'pending'",
+                Integer.class, id);
+        if (n != null && n > 0) {
+            throw new BizException(400, "明细已执行，不可删除执行单");
         }
     }
 

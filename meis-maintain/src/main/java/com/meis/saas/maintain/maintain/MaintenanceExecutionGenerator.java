@@ -3,6 +3,8 @@ package com.meis.saas.maintain.maintain;
 import com.meis.saas.common.audit.DocChangeLogService;
 import com.meis.saas.common.code.DailyBizNoSupport;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.ops.OpsClientChannel;
+import com.meis.saas.common.ops.OpsPlanExecutionSupport;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
@@ -28,28 +30,50 @@ public class MaintenanceExecutionGenerator {
     }
 
     public Map<String, Object> generateOne(UUID planId, Map<String, Object> body) {
+        Map<String, Object> req = body != null ? body : Map.of();
+        try {
+            var plan = loadApprovedPlan(planId);
+            Map<String, Object> p = plan;
+            var items = OpsPlanExecutionSupport.loadDueOrSelectedItems(
+                    jdbc, "maintenance_plan_item", planId, req);
+            return insertFromPlan(p, planId, items, OpsPlanExecutionSupport.KIND_DUE,
+                    req.getOrDefault("planned_date", items.get(0).get("next_due_date")),
+                    null, null, null, "generate_from_plan", req);
+        } catch (BizException ex) {
+            return Map.of("planId", planId, "error", ex.getMessage());
+        }
+    }
+
+    public Map<String, Object> backfillOne(UUID planId, Map<String, Object> body) {
+        Map<String, Object> req = body != null ? body : Map.of();
+        var plan = loadApprovedPlan(planId);
+        OpsPlanExecutionSupport.assertApproved(plan);
+        String plannedDate = OpsPlanExecutionSupport.requireDate(req, "planned_date", "执行日期");
+        String start = OpsPlanExecutionSupport.requireDate(req, "execute_start_time", "开始时间");
+        String end = OpsPlanExecutionSupport.requireDate(req, "execute_end_time", "结束时间");
+        Object nextDue = OpsPlanExecutionSupport.optionalBackfillNextDue(req);
+        var items = OpsPlanExecutionSupport.loadAllOrSelectedItems(
+                jdbc, "maintenance_plan_item", planId, req);
+        return insertFromPlan(plan, planId, items, OpsPlanExecutionSupport.KIND_BACKFILL,
+                plannedDate, start, end, nextDue, "backfill_from_plan", req);
+    }
+
+    private Map<String, Object> loadApprovedPlan(UUID planId) {
         var plan = jdbc.queryForList("""
                 SELECT p.*, t.template_name AS t_name, t.maintenance_level_id AS t_level_id
                 FROM maintenance_plan p
                 LEFT JOIN maintenance_template t ON t.id = p.template_id
                 WHERE p.id = ?::uuid
                 """ + SoftDeleteSupport.notDeletedClause(jdbc, "maintenance_plan", "p"), planId);
-        if (plan.isEmpty()) return Map.of("planId", planId, "error", "plan not found");
-        Map<String, Object> p = plan.get(0);
-        if (!"approved".equals(p.get("approval_status"))) {
-            return Map.of("planId", planId, "error", "plan not approved");
-        }
+        if (plan.isEmpty()) throw new BizException(404, "plan not found");
+        OpsPlanExecutionSupport.assertApproved(plan.get(0));
+        return plan.get(0);
+    }
 
-        var dueItems = jdbc.queryForList("""
-                SELECT * FROM maintenance_plan_item
-                WHERE plan_id = ?::uuid AND COALESCE(item_status,'active') = 'active'
-                  AND next_due_date IS NOT NULL AND next_due_date <= CURRENT_DATE
-                """ + SoftDeleteSupport.notDeletedClause(jdbc, "maintenance_plan_item", null)
-                + " ORDER BY next_due_date, device_code", planId);
-        if (dueItems.isEmpty()) {
-            return Map.of("planId", planId, "error", "无到期明细可生成执行单");
-        }
-
+    private Map<String, Object> insertFromPlan(
+            Map<String, Object> p, UUID planId, List<Map<String, Object>> items,
+            String kind, Object plannedDate, Object start, Object end, Object backfillNext,
+            String event, Map<String, Object> body) {
         UUID execId = UUID.randomUUID();
         String execNo = DailyBizNoSupport.next(jdbc, "maintenance_execution", "execution_no", "ME-");
         String planNo = Objects.toString(p.get("plan_no") != null ? p.get("plan_no") : p.get("plan_code"), null);
@@ -62,18 +86,22 @@ public class MaintenanceExecutionGenerator {
         jdbc.update("""
                 INSERT INTO maintenance_execution (id, execution_no, plan_id, plan_no, source_type, template_id,
                     template_name, maintenance_level_id, maintenance_level, planned_date,
-                    assigned_user_id, assigned_user_name, status, created_by, created_by_name)
-                VALUES (?::uuid,?,?::uuid,?, 'from_plan', ?::uuid, ?, ?::uuid, ?, ?, ?::uuid, ?, 'draft', ?::uuid, ?)
+                    execute_start_time, execute_end_time, execution_kind, backfill_next_due_date,
+                    assigned_user_id, assigned_user_name, status, created_by, created_by_name, create_channel)
+                VALUES (?::uuid,?,?::uuid,?, 'from_plan', ?::uuid, ?, ?::uuid, ?, ?::date,
+                    CAST(? AS timestamptz), CAST(? AS timestamptz), ?, ?::date,
+                    ?::uuid, ?, 'draft', ?::uuid, ?, ?)
                 """, execId, execNo, planId, planNo, p.get("template_id"), templateName, levelId,
-                p.get("maintenance_level"),
-                body.getOrDefault("planned_date", dueItems.get(0).get("next_due_date")),
-                p.get("assigned_user_id"), p.get("assigned_user_name"), userId, createdByName);
+                p.get("maintenance_level"), plannedDate,
+                start, end, kind, backfillNext,
+                p.get("assigned_user_id"), p.get("assigned_user_name"), userId, createdByName,
+                OpsClientChannel.of(body));
 
-        for (Map<String, Object> di : dueItems) {
+        for (Map<String, Object> di : items) {
             insertItemWithResults(execId, execNo, planId, di, p.get("template_id"));
         }
 
-        docLog.event("maintain", "execution", execId, execNo, "generate_from_plan",
+        docLog.event("maintain", "execution", execId, execNo, event,
                 body.get("client") != null ? body.get("client").toString() : "web",
                 "plan=" + planNo);
         return jdbc.queryForList(
@@ -114,11 +142,12 @@ public class MaintenanceExecutionGenerator {
         jdbc.update("""
                 INSERT INTO maintenance_execution (id, execution_no, plan_id, plan_no, source_type, template_id,
                     template_name, maintenance_level_id, maintenance_level, planned_date, status,
-                    created_by, created_by_name, remark)
-                VALUES (?::uuid,?, NULL, NULL, 'ad_hoc', ?::uuid, ?, ?::uuid, ?, ?, 'draft', ?::uuid, ?, ?)
+                    created_by, created_by_name, remark, create_channel)
+                VALUES (?::uuid,?, NULL, NULL, 'ad_hoc', ?::uuid, ?, ?::uuid, ?, ?, 'draft', ?::uuid, ?, ?, ?)
                 """, execId, execNo, templateId, templateName,
                 blankToNull(body.get("maintenance_level_id")), body.get("maintenance_level"),
-                body.get("planned_date"), userId, createdByName, body.get("remark"));
+                body.get("planned_date"), userId, createdByName, body.get("remark"),
+                OpsClientChannel.of(body));
 
         for (Map<String, Object> di : devices) {
             Map<String, Object> row = new LinkedHashMap<>(di);

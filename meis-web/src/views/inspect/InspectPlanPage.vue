@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <WorkflowCrudPage
     ref="pageRef"
     :config="config"
@@ -11,6 +11,11 @@
       <el-button @click="loadDue">到期提醒</el-button>
     </template>
     <template #extra-columns>
+      <el-table-column label="查看" width="70" fixed="right" align="center" header-align="center">
+        <template #default="{ row }">
+          <el-button link type="primary" @click="pageRef?.openView(row)">查看</el-button>
+        </template>
+      </el-table-column>
       <el-table-column label="审核" width="110" fixed="right" align="center" header-align="center">
         <template #default="{ row }">
           <template v-if="row.approval_status === 'draft'">
@@ -31,6 +36,12 @@
           <span v-else class="op-muted">—</span>
         </template>
       </el-table-column>
+      <el-table-column label="执行补录" width="90" fixed="right" align="center" header-align="center">
+        <template #default="{ row }">
+          <el-button v-if="isApproved(row)" link type="warning" @click="openBackfill(row)">补录</el-button>
+          <span v-else class="op-muted">—</span>
+        </template>
+      </el-table-column>
       <el-table-column label="编辑" width="70" fixed="right" align="center" header-align="center">
         <template #default="{ row }">
           <el-button v-if="isDraft(row)" link type="primary" @click="pageRef?.openDetail(row)">编辑</el-button>
@@ -44,17 +55,36 @@
         </template>
       </el-table-column>
     </template>
-    <template #toolbar-extra="{ form, reload }">
-      <el-button v-if="form?.id && form.approval_status === 'draft'" type="primary" @click="approve(form, reload)">审核通过</el-button>
-      <el-button v-if="form?.id && form.approval_status === 'draft'" @click="reject(form, reload)">驳回</el-button>
-      <el-button v-if="form?.id && form.approval_status === 'approved'" type="success" @click="genExec(form, reload)">生成执行单（到期明细）</el-button>
+    <template #toolbar-extra="{ form, reload, editorMode }">
+      <template v-if="editorMode !== 'view'">
+        <el-button v-if="form?.id && form.approval_status === 'draft'" type="primary" @click="approve(form, reload)">审核通过</el-button>
+        <el-button v-if="form?.id && form.approval_status === 'draft'" @click="reject(form, reload)">驳回</el-button>
+        <el-button v-if="form?.id && form.approval_status === 'approved'" type="success" @click="genExec(form, reload)">生成执行单（到期明细）</el-button>
+        <el-button v-if="form?.id && form.approval_status === 'approved'" type="warning" @click="openBackfill(form, reload)">执行补录</el-button>
+      </template>
+      <template v-else-if="form?.id && form.approval_status === 'approved'">
+        <el-button type="success" @click="genExec(form, reload)">生成执行单（到期明细）</el-button>
+        <el-button type="warning" @click="openBackfill(form, reload)">执行补录</el-button>
+      </template>
     </template>
-    <template #drawer-extra="{ form }">
+    <template #drawer-extra="{ form, editorMode, reload }">
       <FormSection title="设备明细（权威到期日）" class="items-section">
         <div class="items-toolbar">
-          <el-button type="primary" size="small" @click="addDevice(form)">添加设备</el-button>
+          <el-button v-if="editorMode !== 'view'" type="primary" size="small" @click="addDevice(form)">添加设备</el-button>
+          <template v-if="form?.approval_status === 'approved'">
+            <el-button type="success" size="small" @click="genSelected(form, reload)">生成执行（勾选）</el-button>
+            <el-button type="warning" size="small" @click="backfillSelected(form, reload)">执行补录（勾选）</el-button>
+          </template>
         </div>
-        <el-table :data="(form.items as Record<string, unknown>[]) || []" border size="small">
+        <el-table
+          ref="itemTableRef"
+          :data="(form.items as Record<string, unknown>[]) || []"
+          border
+          size="small"
+          row-key="id"
+          @selection-change="onItemSelection"
+        >
+          <el-table-column v-if="form?.approval_status === 'approved'" type="selection" width="48" />
           <el-table-column prop="device_code" label="设备编码" width="120" />
           <el-table-column prop="device_name" label="设备名称" min-width="140" />
           <el-table-column label="上次完成" width="140">
@@ -65,16 +95,34 @@
                 value-format="YYYY-MM-DD"
                 size="small"
                 style="width: 100%"
+                :disabled="editorMode === 'view'"
                 @change="() => onLastDoneChange(form, row)"
               />
             </template>
           </el-table-column>
           <el-table-column label="下次到期" width="140">
             <template #default="{ row }">
-              <el-date-picker v-model="row.next_due_date" type="date" value-format="YYYY-MM-DD" size="small" style="width: 100%" />
+              <el-date-picker
+                v-model="row.next_due_date"
+                type="date"
+                value-format="YYYY-MM-DD"
+                size="small"
+                style="width: 100%"
+                :disabled="editorMode === 'view'"
+              />
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="80" fixed="right">
+          <el-table-column v-if="form?.approval_status === 'approved'" label="生成" width="70" align="center">
+            <template #default="{ row }">
+              <el-button link type="success" @click="genOneItem(form, row, reload)">生成</el-button>
+            </template>
+          </el-table-column>
+          <el-table-column v-if="form?.approval_status === 'approved'" label="补录" width="70" align="center">
+            <template #default="{ row }">
+              <el-button link type="warning" @click="backfillOneItem(form, row, reload)">补录</el-button>
+            </template>
+          </el-table-column>
+          <el-table-column v-if="editorMode !== 'view'" label="操作" width="80" fixed="right">
             <template #default="{ $index }">
               <el-button link type="danger" @click="removeItem(form, $index)">删除</el-button>
             </template>
@@ -93,6 +141,8 @@
       <el-table-column prop="dept_name" label="科室" width="120" />
     </el-table>
   </el-dialog>
+
+  <OpsPlanBackfillDialog ref="backfillRef" />
 </template>
 
 <script setup lang="ts">
@@ -102,11 +152,14 @@ import http from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 import WorkflowCrudPage from '@/components/WorkflowCrudPage.vue'
 import FormSection from '@/components/form/FormSection.vue'
+import OpsPlanBackfillDialog from '@/views/ops/OpsPlanBackfillDialog.vue'
 import { calcItemNextDueDate } from '@/utils/cycleDays'
 import type { PageConfig } from '@/config/pageRegistry'
 
 const auth = useAuthStore()
 const pageRef = ref<InstanceType<typeof WorkflowCrudPage> | null>(null)
+const backfillRef = ref<InstanceType<typeof OpsPlanBackfillDialog> | null>(null)
+const selectedItems = ref<Record<string, unknown>[]>([])
 const config: PageConfig = {
   title: '巡检计划',
   apiBase: '/inspect',
@@ -131,7 +184,12 @@ function isApproved(row: Record<string, unknown>) {
 }
 
 function openItems(row: Record<string, unknown>) {
+  selectedItems.value = []
   pageRef.value?.openItemsOnly(row)
+}
+
+function onItemSelection(rows: Record<string, unknown>[]) {
+  selectedItems.value = rows
 }
 
 async function approveRow(row: Record<string, unknown>) {
@@ -146,6 +204,18 @@ async function genExecRow(row: Record<string, unknown>) {
   await genExec(row, () => pageRef.value?.load())
 }
 
+function openBackfill(form: Record<string, unknown>, reload?: () => void) {
+  if (!form.id) return
+  backfillRef.value?.open({
+    module: 'inspect',
+    planId: String(form.id),
+    onDone: () => {
+      reload?.()
+      pageRef.value?.load()
+    }
+  })
+}
+
 async function approve(form: Record<string, unknown>, reload?: () => void) {
   await http.post(`/inspect/plan/${form.id}/approve`, { action: 'approve', approved_by: auth.user?.id })
   ElMessage.success('审核通过')
@@ -158,9 +228,61 @@ async function reject(form: Record<string, unknown>, reload?: () => void) {
   reload?.()
 }
 
-async function genExec(form: Record<string, unknown>, reload?: () => void) {
-  await http.post(`/inspect/plan/${form.id}/generate-execution`, { created_by: auth.user?.id })
-  ElMessage.success('已生成巡检执行单')
+async function genExec(form: Record<string, unknown>, reload?: () => void, planItemIds?: string[]) {
+  const body: Record<string, unknown> = { created_by: auth.user?.id, client: 'web' }
+  if (planItemIds?.length) body.plan_item_ids = planItemIds
+  const { data } = await http.post(`/inspect/plan/${form.id}/generate-execution`, body)
+  const no = data.data?.execution_no
+  ElMessage.success(no ? `已生成执行单 ${no}` : '已生成巡检执行单')
+  reload?.()
+}
+
+async function genSelected(form: Record<string, unknown>, reload?: () => void) {
+  const ids = selectedItems.value.map((r) => String(r.id)).filter(Boolean)
+  if (!ids.length) {
+    ElMessage.warning('请先勾选明细')
+    return
+  }
+  await genExec(form, reload, ids)
+}
+
+async function genOneItem(form: Record<string, unknown>, row: Record<string, unknown>, reload?: () => void) {
+  if (!row.id) {
+    ElMessage.warning('请先保存明细后再生成')
+    return
+  }
+  await genExec(form, reload, [String(row.id)])
+}
+
+function backfillSelected(form: Record<string, unknown>, reload?: () => void) {
+  const ids = selectedItems.value.map((r) => String(r.id)).filter(Boolean)
+  if (!ids.length) {
+    ElMessage.warning('请先勾选明细')
+    return
+  }
+  backfillRef.value?.open({
+    module: 'inspect',
+    planId: String(form.id),
+    planItemIds: ids,
+    onDone: () => reload?.()
+  })
+}
+
+function backfillOneItem(form: Record<string, unknown>, row: Record<string, unknown>, reload?: () => void) {
+  if (!row.id) {
+    ElMessage.warning('请先保存明细后再补录')
+    return
+  }
+  backfillRef.value?.open({
+    module: 'inspect',
+    planId: String(form.id),
+    planItemIds: [String(row.id)],
+    onDone: () => reload?.()
+  })
+}
+
+async function activate(form: Record<string, unknown>, reload?: () => void) {
+  await http.post(`/inspect/plan/${form.id}/activate`)
   reload?.()
 }
 
@@ -218,7 +340,8 @@ function removeItem(form: Record<string, unknown>, index: number) {
 
 <style scoped>
 .items-section { margin-top: 16px; }
-.items-toolbar { margin-bottom: 8px; }
+.items-toolbar { margin-bottom: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
 .due-alert { margin-top: 12px; }
 .op-muted { color: var(--el-text-color-placeholder); }
 </style>
+

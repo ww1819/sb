@@ -28,7 +28,11 @@
           :editor-mode="editorMode"
         />
         <el-button v-if="form?.id && changeLogApi" @click="changeLogVisible = true">修改记录</el-button>
-        <el-button v-if="form?.id && businessType && !headerReadonly" type="primary" @click="submitApproval">
+        <el-button
+          v-if="form?.id && businessType && !headerReadonly && editorMode !== 'view'"
+          type="primary"
+          @click="submitApproval"
+        >
           提交审批
         </el-button>
       </template>
@@ -83,8 +87,8 @@ const crudRef = ref<InstanceType<typeof CrudPage> | null>(null)
 const visible = ref(false)
 const changeLogVisible = ref(false)
 const form = ref<Record<string, unknown> | null>(null)
-/** full=头表+明细；items=仅调明细（已审核入口） */
-const editorMode = ref<'full' | 'items'>('full')
+/** full=头表+明细可编；items=仅调明细；view=整单只读 */
+const editorMode = ref<'full' | 'items' | 'view'>('full')
 
 const mergedConfig = computed<PageConfig>(() => ({
   ...props.config,
@@ -92,17 +96,22 @@ const mergedConfig = computed<PageConfig>(() => ({
 }))
 
 const headerReadonly = computed(
-  () => editorMode.value === 'items' || form.value?.approval_status === 'approved'
+  () =>
+    editorMode.value === 'view' ||
+    editorMode.value === 'items' ||
+    form.value?.approval_status === 'approved'
 )
 
 const showSave = computed(() => {
   if (!mergedConfig.value.saveUrl) return false
+  if (editorMode.value === 'view') return false
   if (editorMode.value === 'items') return true
   return form.value?.approval_status !== 'approved'
 })
 
 const drawerTitle = computed(() => {
   const base = props.config.title
+  if (editorMode.value === 'view') return `查看${base}`
   if (editorMode.value === 'items') return `${base} · 设备明细`
   if (!form.value?.id) return `新增${base}`
   return `${base} 详情`
@@ -156,6 +165,11 @@ async function openDetail(row: Record<string, unknown>) {
   await loadRow(row)
 }
 
+async function openView(row: Record<string, unknown>) {
+  editorMode.value = 'view'
+  await loadRow(row)
+}
+
 async function openItemsOnly(row: Record<string, unknown>) {
   editorMode.value = 'items'
   await loadRow(row)
@@ -200,6 +214,7 @@ function remove(row: Record<string, unknown>) {
 
 defineExpose({
   openDetail,
+  openView,
   openCreate,
   openItemsOnly,
   form,
