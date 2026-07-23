@@ -71,7 +71,8 @@ public class AdverseEventController {
         pageArgs.add(query.limit());
         pageArgs.add(query.offset());
         var rows = jdbc.queryForList("""
-            SELECT a.*, dept.dept_name, reporter.real_name AS reporter_name
+            SELECT a.*, dept.dept_name,
+                   COALESCE(NULLIF(TRIM(a.reporter_name), ''), reporter.real_name, reporter.username) AS reporter_name
             """ + from + where + " ORDER BY a.report_time DESC NULLS LAST, a.created_at DESC LIMIT ? OFFSET ?",
                 pageArgs.toArray());
         return Result.ok(PageResult.of(rows, total != null ? total : 0, query.getPage(), query.getSize()));
@@ -103,8 +104,10 @@ public class AdverseEventController {
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
         var rows = jdbc.queryForList("""
-            SELECT a.*, dept.dept_name, reporter.real_name AS reporter_name,
-                   handler.real_name AS handler_name, reviewer.real_name AS reviewer_name
+            SELECT a.*, dept.dept_name,
+                   COALESCE(NULLIF(TRIM(a.reporter_name), ''), reporter.real_name, reporter.username) AS reporter_name,
+                   COALESCE(NULLIF(TRIM(a.handler_name), ''), handler.real_name, handler.username) AS handler_name,
+                   COALESCE(NULLIF(TRIM(a.reviewer_name), ''), reviewer.real_name, reviewer.username) AS reviewer_name
             FROM adverse_event a
             LEFT JOIN medical_device d ON d.id = a.device_id
             LEFT JOIN department dept ON dept.id = d.dept_id
@@ -130,26 +133,29 @@ public class AdverseEventController {
         String userId = TenantContext.getUserId();
         Object reporterId = body.get("reporter_id") != null ? body.get("reporter_id")
                 : (userId != null ? userId : null);
+        String reporterName = SoftDeleteSupport.resolveUserDisplayName(jdbc, reporterId);
 
         if (!exists) {
             jdbc.update("""
-                INSERT INTO adverse_event (id, event_no, device_id, device_code, device_name, reporter_id, report_time,
+                INSERT INTO adverse_event (id, event_no, device_id, device_code, device_name,
+                reporter_id, reporter_name, report_time,
                 event_type, severity_level, event_description, cause_analysis, impact_description, photos, status, remark)
-                VALUES (?::uuid,?,?::uuid,?,?,?::uuid,COALESCE(?::timestamptz, NOW()),?,?,?,?,?,?,'reported',?)
+                VALUES (?::uuid,?,?::uuid,?,?,?::uuid,?,COALESCE(?::timestamptz, NOW()),?,?,?,?,?,?,'reported',?)
                 """,
                     id, body.getOrDefault("event_no", "AE" + System.currentTimeMillis()),
-                    body.get("device_id"), body.get("device_code"), body.get("device_name"), reporterId,
+                    body.get("device_id"), body.get("device_code"), body.get("device_name"), reporterId, reporterName,
                     body.get("report_time"), body.get("event_type"), body.get("severity_level"),
                     body.get("event_description"), body.get("cause_analysis"), body.get("impact_description"),
                     body.get("photos"), body.get("remark"));
         } else {
             jdbc.update("""
-                UPDATE adverse_event SET device_id=?::uuid, device_code=?, device_name=?, reporter_id=?::uuid,
+                UPDATE adverse_event SET device_id=?::uuid, device_code=?, device_name=?,
+                reporter_id=?::uuid, reporter_name=?,
                 report_time=COALESCE(?::timestamptz, report_time), event_type=?, severity_level=?,
                 event_description=?, cause_analysis=?, impact_description=?, photos=?, remark=?, updated_at=NOW()
                 WHERE id=?::uuid AND status = 'reported'
                 """,
-                    body.get("device_id"), body.get("device_code"), body.get("device_name"), reporterId,
+                    body.get("device_id"), body.get("device_code"), body.get("device_name"), reporterId, reporterName,
                     body.get("report_time"), body.get("event_type"), body.get("severity_level"),
                     body.get("event_description"), body.get("cause_analysis"), body.get("impact_description"),
                     body.get("photos"), body.get("remark"), id);
@@ -173,16 +179,24 @@ public class AdverseEventController {
         String userId = TenantContext.getUserId();
         UUID actor = userId != null ? UUID.fromString(userId) : null;
         switch (target) {
-            case "handling" -> jdbc.update("""
-                UPDATE adverse_event SET status='handling', handler_id=COALESCE(?::uuid, handler_id),
-                handle_measures=?, handle_time=NOW(), updated_at=NOW() WHERE id=?::uuid
-                """, body.get("handler_id") != null ? body.get("handler_id") : actor,
-                    body.get("handle_measures"), id);
-            case "reviewed" -> jdbc.update("""
-                UPDATE adverse_event SET status='reviewed', reviewer_id=COALESCE(?::uuid, reviewer_id),
-                review_comment=?, review_time=NOW(), updated_at=NOW() WHERE id=?::uuid
-                """, body.get("reviewer_id") != null ? body.get("reviewer_id") : actor,
-                    body.get("review_comment"), id);
+            case "handling" -> {
+                Object handlerId = body.get("handler_id") != null ? body.get("handler_id") : actor;
+                String handlerName = SoftDeleteSupport.resolveUserDisplayName(jdbc, handlerId);
+                jdbc.update("""
+                    UPDATE adverse_event SET status='handling', handler_id=COALESCE(?::uuid, handler_id),
+                    handler_name=COALESCE(?, handler_name),
+                    handle_measures=?, handle_time=NOW(), updated_at=NOW() WHERE id=?::uuid
+                    """, handlerId, handlerName, body.get("handle_measures"), id);
+            }
+            case "reviewed" -> {
+                Object reviewerId = body.get("reviewer_id") != null ? body.get("reviewer_id") : actor;
+                String reviewerName = SoftDeleteSupport.resolveUserDisplayName(jdbc, reviewerId);
+                jdbc.update("""
+                    UPDATE adverse_event SET status='reviewed', reviewer_id=COALESCE(?::uuid, reviewer_id),
+                    reviewer_name=COALESCE(?, reviewer_name),
+                    review_comment=?, review_time=NOW(), updated_at=NOW() WHERE id=?::uuid
+                    """, reviewerId, reviewerName, body.get("review_comment"), id);
+            }
             case "closed" -> jdbc.update("UPDATE adverse_event SET status='closed', updated_at=NOW() WHERE id=?::uuid", id);
             default -> jdbc.update("UPDATE adverse_event SET status=?, updated_at=NOW() WHERE id=?::uuid", target, id);
         }

@@ -60,9 +60,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import type { FieldSchema } from '@/config/pageSchemas'
 import { useDict } from '@/composables/useDict'
+import http from '@/api/http'
+import { refSelectConfig } from '@/config/refSelectConfig'
 import RefSelect from '@/components/form/RefSelect.vue'
 import FileUploadField from '@/components/form/FileUploadField.vue'
 import ImageListField from '@/components/form/ImageListField.vue'
@@ -79,6 +81,45 @@ const model = computed({
   get: () => props.modelValue,
   set: (v) => emit('update:modelValue', v)
 })
+
+function detailUrlOf(linkTable: string, id: string): string | null {
+  const meta = refSelectConfig[linkTable]
+  if (!meta?.url) return null
+  const base = meta.url.replace(/\/list\/?$/, '').replace(/\/options\/?$/, '')
+  return `${base}/${id}`
+}
+
+async function applyFillFromLink(id: string) {
+  const map = props.field.fillFromLink
+  const linkTable = props.field.linkTable
+  if (!map || !linkTable || !props.model) return
+  const url = detailUrlOf(linkTable, id)
+  if (!url) return
+  try {
+    const { data } = await http.get(url)
+    const row = (data?.data ?? null) as Record<string, unknown> | null
+    if (!row || typeof row !== 'object') return
+    for (const [formKey, srcKey] of Object.entries(map)) {
+      if (!formKey || !srcKey) continue
+      if (Object.prototype.hasOwnProperty.call(row, srcKey)) {
+        props.model[formKey] = row[srcKey]
+      }
+    }
+  } catch {
+    /* 回填失败不阻断选择 */
+  }
+}
+
+watch(
+  () => props.modelValue,
+  (v, oldV) => {
+    if (!props.field.fillFromLink || !props.field.linkTable) return
+    const next = v == null || v === '' ? '' : String(v)
+    const prev = oldV == null || oldV === '' ? '' : String(oldV)
+    if (!next || next === prev) return
+    void applyFillFromLink(next)
+  }
+)
 
 /** 自引用上级字段编辑时排除自身，避免选成自己的上级 */
 const linkExcludeValues = computed(() => {

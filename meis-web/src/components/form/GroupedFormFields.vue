@@ -126,10 +126,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import FormSection from '@/components/form/FormSection.vue'
 import FieldRenderer from '@/components/FieldRenderer.vue'
 import { getGroupedFields, getSchema, groupTitle, type FieldGroup, type FieldSchema } from '@/config/pageSchemas'
+import { syncCycleDays } from '@/utils/cycleDays'
 
 function buildGroups(schema: FieldSchema[]) {
   const groups = new Map<string, FieldSchema[]>()
@@ -249,6 +250,24 @@ const groups = computed(() => {
 })
 const flatFields = computed(() =>
   props.fields != null ? props.fields : getSchema(props.table).filter((f) => !f.readonly)
+)
+
+const schemaHasCycleTrio = computed(() => {
+  const schema = props.fields != null ? props.fields : getSchema(props.table)
+  const propsSet = new Set(schema.map((f) => f.prop))
+  return propsSet.has('cycle_type') && propsSet.has('cycle_value') && propsSet.has('cycle_days')
+})
+
+watch(
+  () =>
+    schemaHasCycleTrio.value
+      ? [props.model.cycle_type, props.model.cycle_value] as const
+      : null,
+  () => {
+    if (!schemaHasCycleTrio.value) return
+    syncCycleDays(props.model)
+  },
+  { immediate: true }
 )
 </script>
 

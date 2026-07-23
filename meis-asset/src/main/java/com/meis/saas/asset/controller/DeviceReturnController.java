@@ -138,34 +138,40 @@ public class DeviceReturnController {
             actorId = UUID.fromString(ctx.getUserId());
             actorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, actorId);
         }
+        String returnerName = SoftDeleteSupport.resolveUserDisplayName(jdbc, returnerId);
         String returnNo;
         if (!exists) {
             returnNo = blankToNull(body.get("return_no"));
             if (returnNo == null) returnNo = nextReturnNo();
             jdbc.update("""
                 INSERT INTO device_return (
-                    id, return_no, outbound_id, warehouse_id, dept_id, returner_id,
-                    return_date, reason, remark, doc_status, status, approval_status,
+                    id, return_no, outbound_id, warehouse_id, dept_id, returner_id, returner_name,
+                    return_date, reason, remark, operator_id, operator_name,
+                    doc_status, status, approval_status,
                     created_at, updated_at, created_by, created_by_name, updated_by, updated_by_name, is_deleted
-                ) VALUES (?::uuid, ?, ?::uuid, ?::uuid, ?::uuid, ?::uuid, ?::date, ?, ?,
+                ) VALUES (?::uuid, ?, ?::uuid, ?::uuid, ?::uuid, ?::uuid, ?, ?::date, ?, ?, ?::uuid, ?,
                     'draft', 'draft', 'draft', NOW(), NOW(), ?, ?, ?, ?, 0)
                 """,
-                    id, returnNo, outboundId, warehouseId, deptId, returnerId,
+                    id, returnNo, outboundId, warehouseId, deptId, returnerId, returnerName,
                     toDateParam(body.get("return_date")), blankToNull(body.get("reason")), blankToNull(body.get("remark")),
+                    actorId, actorName,
                     actorId, actorName, actorId, actorName);
         } else {
             var nos = jdbc.queryForList("SELECT return_no FROM device_return WHERE id = ?::uuid", id);
             returnNo = nos.isEmpty() ? null : blankToNull(nos.get(0).get("return_no"));
             jdbc.update("""
                 UPDATE device_return
-                SET outbound_id = ?::uuid, warehouse_id = ?::uuid, dept_id = ?::uuid, returner_id = ?::uuid,
+                SET outbound_id = ?::uuid, warehouse_id = ?::uuid, dept_id = ?::uuid,
+                    returner_id = ?::uuid, returner_name = ?,
                     return_date = ?::date, reason = ?, remark = ?,
+                    operator_id = COALESCE(operator_id, ?::uuid),
+                    operator_name = COALESCE(operator_name, ?),
                     updated_at = NOW(), updated_by = ?, updated_by_name = ?
                 WHERE id = ?::uuid
                 """,
-                    outboundId, warehouseId, deptId, returnerId,
+                    outboundId, warehouseId, deptId, returnerId, returnerName,
                     toDateParam(body.get("return_date")), blankToNull(body.get("reason")), blankToNull(body.get("remark")),
-                    actorId, actorName, id);
+                    actorId, actorName, actorId, actorName, id);
         }
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> items = (List<Map<String, Object>>) body.getOrDefault("items", List.of());

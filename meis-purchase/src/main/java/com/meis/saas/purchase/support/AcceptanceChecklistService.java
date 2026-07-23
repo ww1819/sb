@@ -91,13 +91,17 @@ public final class AcceptanceChecklistService {
                 continue;
             }
             if (paramNo == null) paramNo = "";
+            UUID userId = parseUuid(m.get("user_id"));
+            if ((project == null || project.isBlank()) && userId != null) {
+                project = SoftDeleteSupport.resolveUserDisplayName(jdbc, userId);
+            }
             jdbc.update("""
                 INSERT INTO purchase_acceptance_member (id, acceptance_id, member_role, user_id,
                 member_name, acceptance_content, acceptance_result, signed_at, signature_url, remark)
                 VALUES (?,?,?,?,?,?,?,?,?,?)
                 """,
                     parseUuid(m.get("id")) != null ? parseUuid(m.get("id")) : UUID.randomUUID(),
-                    acceptanceId, paramNo, parseUuid(m.get("user_id")),
+                    acceptanceId, paramNo, userId,
                     project, content, result,
                     m.get("signed_at"), m.get("signature_url"), remark);
         }

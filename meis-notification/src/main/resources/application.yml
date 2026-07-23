@@ -19,7 +19,7 @@ meis:
     secret: meis-saas-jwt-secret-change-in-production-256bits
     issuer: meis-saas
     expiration-ms: 86400000
-  # 微信小程序订阅消息：填入�?/notification/wx/bind 才可�?openid
+  # WeChat mini-program subscribe: bind openid via POST /notification/wx/bind
   wechat-mp:
     app-id: ${WECHAT_MP_APP_ID:}
     app-secret: ${WECHAT_MP_APP_SECRET:}

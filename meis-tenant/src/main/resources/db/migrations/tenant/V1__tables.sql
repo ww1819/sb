@@ -442,6 +442,7 @@ CREATE TABLE purchase_plan (
     justification TEXT,
     approval_status VARCHAR(20) DEFAULT 'draft',
     approved_by UUID REFERENCES sys_user(id),
+    approved_by_name VARCHAR(100),
     approved_at TIMESTAMP WITH TIME ZONE,
     remark TEXT,
     is_active BOOLEAN DEFAULT TRUE,
@@ -516,6 +517,8 @@ COMMENT ON COLUMN purchase_plan.unit_budget_price IS '单价(预算/元)';
 COMMENT ON COLUMN purchase_plan.category_id IS '类别';
 COMMENT ON COLUMN purchase_plan.demand_nature IS '需求性质';
 COMMENT ON COLUMN purchase_plan.prefer_import IS '是否首选进口产品';
+COMMENT ON COLUMN purchase_plan.approved_by_name IS '审核人姓名快照（W.5）';
+
 
 -- 3.2 采购计划明细表
 CREATE TABLE purchase_plan_item (
@@ -1057,6 +1060,7 @@ CREATE TABLE device_entry (
     entry_date DATE NOT NULL,
     entry_type VARCHAR(20) DEFAULT 'purchase',
     operator_id UUID REFERENCES sys_user(id),
+    operator_name VARCHAR(100),
     quality_check_passed BOOLEAN,
     quality_checker_id UUID REFERENCES sys_user(id),
     quality_check_date DATE,
@@ -1115,6 +1119,8 @@ COMMENT ON COLUMN device_entry.approval_status IS '审核状态';
 COMMENT ON COLUMN device_entry.approved_by IS '审核人';
 COMMENT ON COLUMN device_entry.approved_by_name IS '审核人姓名';
 COMMENT ON COLUMN device_entry.approved_at IS '审核日期';
+COMMENT ON COLUMN device_entry.operator_name IS '经办人姓名快照（W.5）';
+
 
 -- 4.4 设备入库明细表
 CREATE TABLE device_entry_item (
@@ -1249,6 +1255,7 @@ CREATE TABLE inventory_check (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by UUID REFERENCES sys_user(id),
     approved_by UUID REFERENCES sys_user(id),
+    approved_by_name VARCHAR(100),
     approved_at TIMESTAMP WITH TIME ZONE
 );
 COMMENT ON TABLE inventory_check IS '资产盘点表';
@@ -1279,6 +1286,8 @@ COMMENT ON COLUMN inventory_check.updated_at IS '更新时间';
 COMMENT ON COLUMN inventory_check.created_by IS '制单人';
 COMMENT ON COLUMN inventory_check.approved_by IS '审核人';
 COMMENT ON COLUMN inventory_check.approved_at IS '审核时间';
+COMMENT ON COLUMN inventory_check.approved_by_name IS '审核人姓名快照（W.5）';
+
 
 -- 4.7 资产盘点明细表
 CREATE TABLE inventory_check_item (
@@ -1859,6 +1868,9 @@ CREATE TABLE maintenance_template (
     items JSONB NOT NULL DEFAULT '[]'::jsonb,
     description TEXT,
     estimated_duration INTEGER,
+    cycle_type VARCHAR(20),
+    cycle_value INTEGER,
+    cycle_days INTEGER,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -1873,6 +1885,10 @@ COMMENT ON COLUMN maintenance_template.estimated_duration IS 'estimated duration
 COMMENT ON COLUMN maintenance_template.is_active IS '是否启用';
 COMMENT ON COLUMN maintenance_template.created_at IS '创建时间';
 COMMENT ON COLUMN maintenance_template.updated_at IS '更新时间';
+COMMENT ON COLUMN maintenance_template.cycle_type IS '周期类型（字典 cycle_type；OPS.15）';
+COMMENT ON COLUMN maintenance_template.cycle_value IS '周期值（OPS.15）';
+COMMENT ON COLUMN maintenance_template.cycle_days IS '周期天数（由类型×值计算；OPS.15.1）';
+
 
 -- 6.1.1 保养模板内容项
 CREATE TABLE maintenance_template_item (
@@ -1941,6 +1957,19 @@ COMMENT ON COLUMN maintenance_plan.updated_at IS '更新时间';
 COMMENT ON COLUMN maintenance_plan.plan_code IS '订阅计划编码';
 COMMENT ON COLUMN maintenance_plan.last_maintained_at IS '上次保养日期';
 COMMENT ON COLUMN maintenance_plan.dept_id IS '所属科室';
+COMMENT ON COLUMN maintenance_plan.cycle_days IS '周期天数（由类型×值计算；OPS.15.1）';
+COMMENT ON COLUMN maintenance_plan.approval_status IS '审批状态';
+COMMENT ON COLUMN maintenance_plan.created_by IS '创建人';
+COMMENT ON COLUMN maintenance_plan.approved_by IS '审核人';
+COMMENT ON COLUMN maintenance_plan.approved_at IS '审核时间';
+COMMENT ON COLUMN maintenance_plan.plan_no IS '计划单号（OPS.14）';
+COMMENT ON COLUMN maintenance_plan.template_name IS '模板名称快照';
+COMMENT ON COLUMN maintenance_plan.maintenance_level_id IS '保养级别';
+COMMENT ON COLUMN maintenance_plan.assigned_user_id IS '责任人';
+COMMENT ON COLUMN maintenance_plan.assigned_user_name IS '责任人姓名快照（W.5）';
+COMMENT ON COLUMN maintenance_plan.approved_by_name IS '审核人姓名快照（W.5）';
+COMMENT ON COLUMN maintenance_plan.campus_id IS '院区';
+
 
 -- 6.2.1 保养计划明细（按设备，权威到期日）
 CREATE TABLE maintenance_plan_item (
@@ -2152,6 +2181,7 @@ CREATE TABLE adverse_event (
     device_code VARCHAR(20),
     device_name VARCHAR(200),
     reporter_id UUID REFERENCES sys_user(id),
+    reporter_name VARCHAR(100),
     report_time TIMESTAMP WITH TIME ZONE NOT NULL,
     event_type VARCHAR(50),
     severity_level VARCHAR(20),
@@ -2161,6 +2191,7 @@ CREATE TABLE adverse_event (
     photos JSONB,
     -- 处理信息
     handler_id UUID REFERENCES sys_user(id),
+    handler_name VARCHAR(100),
     handle_measures TEXT,
     handle_time TIMESTAMP WITH TIME ZONE,
     -- 上报信息
@@ -2169,6 +2200,7 @@ CREATE TABLE adverse_event (
     authority_feedback TEXT,
     -- 审核
     reviewer_id UUID REFERENCES sys_user(id),
+    reviewer_name VARCHAR(100),
     review_time TIMESTAMP WITH TIME ZONE,
     review_comment TEXT,
     status VARCHAR(20) DEFAULT 'reported',
@@ -2203,6 +2235,10 @@ COMMENT ON COLUMN adverse_event.status IS '状态';
 COMMENT ON COLUMN adverse_event.remark IS '备注';
 COMMENT ON COLUMN adverse_event.created_at IS '创建时间';
 COMMENT ON COLUMN adverse_event.updated_at IS '更新时间';
+COMMENT ON COLUMN adverse_event.reporter_name IS '上报人姓名快照（W.5）';
+COMMENT ON COLUMN adverse_event.handler_name IS '处理人姓名快照（W.5）';
+COMMENT ON COLUMN adverse_event.reviewer_name IS '审核人姓名快照（W.5）';
+
 
 -- 7.3 计量管理表
 CREATE TABLE metrology_record (
@@ -2365,6 +2401,7 @@ CREATE TABLE metrology_plan (
     approval_status VARCHAR(20) DEFAULT 'draft',
     created_by UUID REFERENCES sys_user(id),
     approved_by UUID REFERENCES sys_user(id),
+    approved_by_name VARCHAR(100),
     approved_at TIMESTAMP WITH TIME ZONE,
     status VARCHAR(20) DEFAULT 'active',
     remark TEXT,
@@ -2372,6 +2409,8 @@ CREATE TABLE metrology_plan (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 COMMENT ON TABLE metrology_plan IS '计量计划表';
+COMMENT ON COLUMN metrology_plan.approved_by_name IS '审核人姓名快照（W.5）';
+
 
 -- 7.3.5 计量执行
 CREATE TABLE metrology_execution (
@@ -2766,6 +2805,7 @@ CREATE TABLE shared_device_loan (
     status VARCHAR(20) DEFAULT 'draft',
     approval_status VARCHAR(20) DEFAULT 'draft',
     approved_by UUID REFERENCES sys_user(id),
+    approved_by_name VARCHAR(100),
     approved_at TIMESTAMP WITH TIME ZONE,
     loan_time TIMESTAMP WITH TIME ZONE,
     return_time TIMESTAMP WITH TIME ZONE,
@@ -2776,6 +2816,8 @@ CREATE TABLE shared_device_loan (
 COMMENT ON TABLE shared_device_loan IS '公用设备借调单';
 COMMENT ON COLUMN shared_device_loan.loan_no IS '借调单号';
 COMMENT ON COLUMN shared_device_loan.status IS '单据状态';
+COMMENT ON COLUMN shared_device_loan.approved_by_name IS '审核人姓名快照（W.5）';
+
 
 -- 9.7 公用设备归还单
 CREATE TABLE shared_device_return (
@@ -2789,12 +2831,15 @@ CREATE TABLE shared_device_return (
     status VARCHAR(20) DEFAULT 'pending',
     approval_status VARCHAR(20) DEFAULT 'pending',
     approved_by UUID REFERENCES sys_user(id),
+    approved_by_name VARCHAR(100),
     approved_at TIMESTAMP WITH TIME ZONE,
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 COMMENT ON TABLE shared_device_return IS '公用设备归还单';
+COMMENT ON COLUMN shared_device_return.approved_by_name IS '审核人姓名快照（W.5）';
+
 
 -- 9.8 公用设备借调收费
 CREATE TABLE shared_device_fee (
@@ -2834,11 +2879,18 @@ CREATE TABLE pm_template (
     items JSONB NOT NULL DEFAULT '[]'::jsonb,
     description TEXT,
     estimated_duration INTEGER,
+    cycle_type VARCHAR(20),
+    cycle_value INTEGER,
+    cycle_days INTEGER,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 COMMENT ON TABLE pm_template IS '预防性维护模板表';
+COMMENT ON COLUMN pm_template.cycle_type IS '周期类型（字典 cycle_type；OPS.15）';
+COMMENT ON COLUMN pm_template.cycle_value IS '周期值（OPS.15）';
+COMMENT ON COLUMN pm_template.cycle_days IS '周期天数（由类型×值计算；OPS.15.1）';
+
 
 CREATE TABLE pm_template_item (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -2884,6 +2936,12 @@ CREATE TABLE pm_plan (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 COMMENT ON TABLE pm_plan IS '预防性维护计划表';
+COMMENT ON COLUMN pm_plan.cycle_days IS '周期天数（由类型×值计算；OPS.15.1）';
+COMMENT ON COLUMN pm_plan.plan_no IS '计划单号（OPS.14）';
+COMMENT ON COLUMN pm_plan.template_name IS '模板名称快照';
+COMMENT ON COLUMN pm_plan.assigned_user_name IS '责任人姓名快照（W.5）';
+COMMENT ON COLUMN pm_plan.approved_by_name IS '审核人姓名快照（W.5）';
+
 
 CREATE TABLE pm_plan_item (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -3429,6 +3487,7 @@ CREATE TABLE IF NOT EXISTS device_outbound (
     outbound_type VARCHAR(30) DEFAULT 'requisition',
     dept_id UUID REFERENCES department(id),
     receiver_id UUID REFERENCES sys_user(id),
+    receiver_name VARCHAR(100),
     warehouse_id UUID REFERENCES warehouse(id),
     outbound_date DATE,
     purpose TEXT,
@@ -3437,6 +3496,7 @@ CREATE TABLE IF NOT EXISTS device_outbound (
     status VARCHAR(20) DEFAULT 'draft',
     approval_status VARCHAR(20) DEFAULT 'draft',
     operator_id UUID REFERENCES sys_user(id),
+    operator_name VARCHAR(100),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -3453,6 +3513,13 @@ COMMENT ON COLUMN device_outbound.doc_status IS 'doc status';
 COMMENT ON COLUMN device_outbound.operator_id IS '关联操作人';
 COMMENT ON COLUMN device_outbound.created_at IS '创建时间';
 COMMENT ON COLUMN device_outbound.updated_at IS '更新时间';
+COMMENT ON COLUMN device_outbound.receiver_name IS '领用人姓名快照（W.5）';
+COMMENT ON COLUMN device_outbound.operator_name IS '经办人姓名快照（W.5）';
+COMMENT ON COLUMN device_outbound.warehouse_id IS '出库库房';
+COMMENT ON COLUMN device_outbound.status IS '业务状态';
+COMMENT ON COLUMN device_outbound.approval_status IS '审批状态';
+
+
 
 CREATE TABLE IF NOT EXISTS device_outbound_item (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -3573,11 +3640,20 @@ CREATE TABLE IF NOT EXISTS inspection_template (
     category_id UUID REFERENCES medical_device_category(id),
     description TEXT,
     estimated_duration INTEGER,
+    cycle_type VARCHAR(20),
+    cycle_value INTEGER,
+    cycle_days INTEGER,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 COMMENT ON TABLE inspection_template IS '巡检模板表';
+COMMENT ON COLUMN inspection_template.cycle_type IS '周期类型（字典 cycle_type；OPS.15）';
+COMMENT ON COLUMN inspection_template.cycle_value IS '周期值（OPS.15）';
+COMMENT ON COLUMN inspection_template.cycle_days IS '周期天数（由类型×值计算；OPS.15.1）';
+COMMENT ON COLUMN inspection_template.template_name IS '模板名称';
+
+
 
 CREATE TABLE IF NOT EXISTS inspection_template_item (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -3606,6 +3682,8 @@ CREATE TABLE IF NOT EXISTS inspection_plan (
     inspection_type_id UUID REFERENCES inspection_type(id),
     inspection_type VARCHAR(50),
     dept_id UUID REFERENCES department(id),
+    cycle_type VARCHAR(20),
+    cycle_value INTEGER,
     cycle_days INTEGER,
     plan_date DATE,
     next_due_date DATE,
@@ -3614,9 +3692,11 @@ CREATE TABLE IF NOT EXISTS inspection_plan (
     end_date DATE,
     frequency VARCHAR(30),
     assigned_inspector_id UUID REFERENCES sys_user(id),
+    assigned_inspector_name VARCHAR(100),
     approval_status VARCHAR(20) DEFAULT 'draft',
     created_by UUID REFERENCES sys_user(id),
     approved_by UUID REFERENCES sys_user(id),
+    approved_by_name VARCHAR(100),
     approved_at TIMESTAMP WITH TIME ZONE,
     status VARCHAR(20) DEFAULT 'pending',
     remark TEXT,
@@ -3636,6 +3716,26 @@ COMMENT ON COLUMN inspection_plan.dept_id IS '所属科室';
 COMMENT ON COLUMN inspection_plan.start_date IS '开始日期';
 COMMENT ON COLUMN inspection_plan.end_date IS '结束日期';
 COMMENT ON COLUMN inspection_plan.frequency IS '执行频率';
+COMMENT ON COLUMN inspection_plan.cycle_type IS '周期类型（字典 cycle_type；OPS.15）';
+COMMENT ON COLUMN inspection_plan.cycle_value IS '周期值（OPS.15）';
+COMMENT ON COLUMN inspection_plan.assigned_inspector_name IS '责任巡检人姓名快照（W.5）';
+COMMENT ON COLUMN inspection_plan.approved_by_name IS '审核人姓名快照（W.5）';
+COMMENT ON COLUMN inspection_plan.plan_no IS '计划单号（OPS.14）';
+COMMENT ON COLUMN inspection_plan.template_name IS '模板名称快照';
+COMMENT ON COLUMN inspection_plan.template_id IS '关联模板';
+COMMENT ON COLUMN inspection_plan.inspection_type_id IS '巡检类型';
+COMMENT ON COLUMN inspection_plan.cycle_days IS '周期天数（由类型×值计算；OPS.15.1）';
+COMMENT ON COLUMN inspection_plan.next_due_date IS '下次到期日';
+COMMENT ON COLUMN inspection_plan.last_inspected_at IS '上次巡检时间';
+COMMENT ON COLUMN inspection_plan.assigned_inspector_id IS '责任巡检人';
+COMMENT ON COLUMN inspection_plan.approval_status IS '审批状态';
+COMMENT ON COLUMN inspection_plan.created_by IS '创建人';
+COMMENT ON COLUMN inspection_plan.approved_by IS '审核人';
+COMMENT ON COLUMN inspection_plan.approved_at IS '审核时间';
+COMMENT ON COLUMN inspection_plan.remark IS '备注';
+COMMENT ON COLUMN inspection_plan.updated_at IS '更新时间';
+
+
 
 CREATE TABLE IF NOT EXISTS inspection_plan_item (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -4186,6 +4286,7 @@ CREATE TABLE IF NOT EXISTS device_return (
     warehouse_id UUID REFERENCES warehouse(id),
     dept_id UUID REFERENCES department(id),
     returner_id UUID REFERENCES sys_user(id),
+    returner_name VARCHAR(100),
     return_date DATE,
     return_type VARCHAR(20) DEFAULT 'unused',
     reason TEXT,
@@ -4193,6 +4294,7 @@ CREATE TABLE IF NOT EXISTS device_return (
     status VARCHAR(20) DEFAULT 'draft',
     approval_status VARCHAR(20) DEFAULT 'draft',
     operator_id UUID REFERENCES sys_user(id),
+    operator_name VARCHAR(100),
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -4212,6 +4314,12 @@ COMMENT ON COLUMN device_return.status IS '退库状态';
 COMMENT ON COLUMN device_return.approval_status IS '审批状态';
 COMMENT ON COLUMN device_return.operator_id IS '经办人';
 COMMENT ON COLUMN device_return.remark IS '备注';
+COMMENT ON COLUMN device_return.returner_name IS '退库人姓名快照（W.5）';
+COMMENT ON COLUMN device_return.operator_name IS '经办人姓名快照（W.5）';
+COMMENT ON COLUMN device_return.created_at IS '创建时间';
+COMMENT ON COLUMN device_return.updated_at IS '更新时间';
+
+
 
 CREATE TABLE IF NOT EXISTS device_return_item (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

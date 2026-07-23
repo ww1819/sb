@@ -2,6 +2,7 @@ package com.meis.saas.maintain.controller;
 
 import com.meis.saas.common.audit.DocChangeLogService;
 import com.meis.saas.common.audit.OperationLog;
+import com.meis.saas.common.biz.CycleDaysSupport;
 import com.meis.saas.common.code.DailyBizNoSupport;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
@@ -59,6 +60,7 @@ public class PmPlanController {
         boolean exists = !jdbc.queryForList(
                 "SELECT 1 FROM pm_plan WHERE id = ?::uuid "
                         + SoftDeleteSupport.notDeletedClause(jdbc, "pm_plan", null), id).isEmpty();
+        CycleDaysSupport.applyToBody(body);
 
         // OPS.14：计划单号系统生成；更新时保留原号，忽略客户端传入
         String planNo;
@@ -82,6 +84,11 @@ public class PmPlanController {
         }
 
         String userId = TenantContext.getUserId();
+        String assignedUserId = blankToNull(body.get("assigned_user_id"));
+        String assignedUserName = blankToNull(body.get("assigned_user_name"));
+        if (assignedUserId != null && assignedUserName == null) {
+            assignedUserName = SoftDeleteSupport.resolveUserDisplayName(jdbc, assignedUserId);
+        }
         if (exists) {
             jdbc.update("""
                     UPDATE pm_plan SET plan_name=?, plan_no=?, plan_code=COALESCE(?, plan_code),
@@ -98,7 +105,7 @@ public class PmPlanController {
                     body.getOrDefault("reminder_days_before", 7),
                     body.getOrDefault("status", "active"), body.getOrDefault("approval_status", "draft"),
                     blankToNull(body.get("dept_id")), blankToNull(body.get("campus_id")),
-                    blankToNull(body.get("assigned_user_id")), body.get("assigned_user_name"),
+                    assignedUserId, assignedUserName,
                     body.get("remark"), userId, id);
         } else {
             jdbc.update("""
@@ -106,15 +113,15 @@ public class PmPlanController {
                     pm_type, pm_type_id, cycle_type, cycle_value, cycle_days,
                     next_due_date, reminder_days_before, status, approval_status, dept_id, campus_id,
                     assigned_user_id, assigned_user_name, created_by, remark)
-                    VALUES (?::uuid,?,?,?,?::uuid,?,?,?::uuid,?,?,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?,?,?)
+                    VALUES (?::uuid,?,?,?,?::uuid,?,?,?::uuid,?,?,?,?,?,?,?,?::uuid,?::uuid,?::uuid,?,?::uuid,?)
                     """, id, planNo, planNo, body.get("plan_name"), body.get("template_id"), templateName,
                     body.getOrDefault("pm_type", "L1"), blankToNull(body.get("pm_type_id")),
                     body.getOrDefault("cycle_type", "month"), body.get("cycle_value"),
-                    body.getOrDefault("cycle_days", 30), LocalDate.now().plusDays(30),
+                    body.get("cycle_days") != null ? body.get("cycle_days") : 30, LocalDate.now().plusDays(30),
                     body.getOrDefault("reminder_days_before", 7),
                     body.getOrDefault("status", "active"), body.getOrDefault("approval_status", "draft"),
                     blankToNull(body.get("dept_id")), blankToNull(body.get("campus_id")),
-                    blankToNull(body.get("assigned_user_id")), body.get("assigned_user_name"),
+                    assignedUserId, assignedUserName,
                     userId, body.get("remark"));
         }
 
@@ -179,19 +186,19 @@ public class PmPlanController {
         String planNo = DailyBizNoSupport.next(jdbc, "pm_plan", "plan_no", "PP-");
         Map<String, Object> t = template.get(0);
         String userId = TenantContext.getUserId();
+        CycleDaysSupport.Cycle cycle = CycleDaysSupport.resolveFromTemplate(body, t, "month", 1);
         LocalDate nextDue = body.get("next_due_date") != null
                 ? LocalDate.parse(body.get("next_due_date").toString())
-                : LocalDate.now().plusDays(((Number) body.getOrDefault("cycle_days", 30)).intValue());
+                : LocalDate.now().plusDays(cycle.days());
 
         jdbc.update("""
                 INSERT INTO pm_plan (id, plan_code, plan_no, plan_name, template_id, template_name,
                 pm_type, pm_type_id, cycle_type, cycle_value, cycle_days, next_due_date,
                 status, approval_status, created_by)
-                VALUES (?::uuid,?,?,?,?::uuid,?,?,?::uuid,?,?,?,?,?,?,?)
+                VALUES (?::uuid,?,?,?,?::uuid,?,?,?::uuid,?,?,?,?,?,?,?::uuid)
                 """, id, planNo, planNo, t.get("template_name") + "计划", templateId, t.get("template_name"),
                 t.getOrDefault("pm_type", "L1"), t.get("pm_type_id"),
-                body.getOrDefault("cycle_type", "month"), body.getOrDefault("cycle_value", 1),
-                body.getOrDefault("cycle_days", 30), nextDue, "active", "draft", userId);
+                cycle.type(), cycle.value(), cycle.days(), nextDue, "active", "draft", userId);
 
         List<Map<String, Object>> items = new ArrayList<>();
         for (String deviceId : deviceIds) {

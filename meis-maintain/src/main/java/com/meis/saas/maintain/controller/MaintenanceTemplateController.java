@@ -1,6 +1,7 @@
 package com.meis.saas.maintain.controller;
 
 import com.meis.saas.common.audit.OperationLog;
+import com.meis.saas.common.biz.CycleDaysSupport;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
@@ -49,24 +50,28 @@ public class MaintenanceTemplateController {
         List<Map<String, Object>> items = (List<Map<String, Object>>) body.getOrDefault("items", List.of());
         String itemsJson = mapper.writeValueAsString(items == null ? List.of() : items);
         String levelCode = resolveMaintenanceLevel(body);
+        CycleDaysSupport.applyToBody(body);
         if (!exists) {
             jdbc.update("""
                 INSERT INTO maintenance_template (id, template_code, template_name, maintenance_level, maintenance_level_id,
-                    category_id, items, description, estimated_duration, is_active)
-                VALUES (?::uuid,?,?,?,?::uuid,?::uuid,?::jsonb,?,?,?)
+                    category_id, items, description, estimated_duration, cycle_type, cycle_value, cycle_days, is_active)
+                VALUES (?::uuid,?,?,?,?::uuid,?::uuid,?::jsonb,?,?,?,?,?,?)
                 """, id, body.get("template_code"), body.get("template_name"),
                     levelCode, blankToNull(body.get("maintenance_level_id")),
                     blankToNull(body.get("category_id")), itemsJson, body.get("description"),
-                    body.get("estimated_duration"), body.getOrDefault("is_active", true));
+                    body.get("estimated_duration"), body.get("cycle_type"), body.get("cycle_value"), body.get("cycle_days"),
+                    body.getOrDefault("is_active", true));
         } else {
             jdbc.update("""
                 UPDATE maintenance_template SET template_code=?, template_name=?, maintenance_level=?, maintenance_level_id=?::uuid,
-                    category_id=?::uuid, items=?::jsonb, description=?, estimated_duration=?, is_active=?, updated_at=NOW()
+                    category_id=?::uuid, items=?::jsonb, description=?, estimated_duration=?,
+                    cycle_type=?, cycle_value=?, cycle_days=?, is_active=?, updated_at=NOW()
                 WHERE id=?::uuid
                 """, body.get("template_code"), body.get("template_name"), levelCode,
                     blankToNull(body.get("maintenance_level_id")), blankToNull(body.get("category_id")),
                     itemsJson, body.get("description"),
-                    body.get("estimated_duration"), body.get("is_active"), id);
+                    body.get("estimated_duration"), body.get("cycle_type"), body.get("cycle_value"), body.get("cycle_days"),
+                    body.get("is_active"), id);
         }
         saveItems(id, items == null ? List.of() : items);
         return get(id);

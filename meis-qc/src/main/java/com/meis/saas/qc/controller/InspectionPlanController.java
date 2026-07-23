@@ -2,6 +2,7 @@ package com.meis.saas.qc.controller;
 
 import com.meis.saas.common.audit.DocChangeLogService;
 import com.meis.saas.common.audit.OperationLog;
+import com.meis.saas.common.biz.CycleDaysSupport;
 import com.meis.saas.common.code.DailyBizNoSupport;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
@@ -59,6 +60,7 @@ public class InspectionPlanController {
         boolean exists = !jdbc.queryForList(
                 "SELECT 1 FROM inspection_plan WHERE id = ?::uuid "
                         + SoftDeleteSupport.notDeletedClause(jdbc, "inspection_plan", null), id).isEmpty();
+        CycleDaysSupport.applyToBody(body);
 
         // OPS.14：计划单号系统生成；更新时保留原号，忽略客户端传入
         String planNo;
@@ -84,36 +86,43 @@ public class InspectionPlanController {
         String userId = TenantContext.getUserId();
         Object assignedId = blankToNull(body.get("assigned_inspector_id"));
         if (assignedId == null) assignedId = blankToNull(body.get("assigned_user_id"));
+        String assignedName = blankToNull(body.get("assigned_inspector_name"));
+        if (assignedName == null) assignedName = blankToNull(body.get("assigned_user_name"));
+        if (assignedId != null && assignedName == null) {
+            assignedName = SoftDeleteSupport.resolveUserDisplayName(jdbc, assignedId);
+        }
 
         if (exists) {
             jdbc.update("""
                     UPDATE inspection_plan SET plan_name=?, plan_no=?, plan_code=COALESCE(?, plan_code),
                     template_id=?::uuid, template_name=?, inspection_type=?, inspection_type_id=?::uuid,
-                    cycle_days=?, start_date=?, end_date=?, frequency=?,
+                    cycle_type=?, cycle_value=?, cycle_days=?, start_date=?, end_date=?, frequency=?,
                     status=?, approval_status=?, dept_id=?::uuid,
-                    assigned_inspector_id=?::uuid, remark=?, updated_at=NOW()
+                    assigned_inspector_id=?::uuid, assigned_inspector_name=?, remark=?, updated_at=NOW(), updated_by=?::uuid
                     WHERE id=?::uuid
                     """, body.get("plan_name"), planNo, planNo,
                     body.get("template_id"), templateName,
                     body.get("inspection_type"), blankToNull(body.get("inspection_type_id")),
-                    body.get("cycle_days"), body.get("start_date"), body.get("end_date"), body.get("frequency"),
-                    body.getOrDefault("status", "active"), body.getOrDefault("approval_status", "draft"),
-                    blankToNull(body.get("dept_id")),
-                    assignedId, body.get("remark"), id);
-        } else {
-            jdbc.update("""
-                    INSERT INTO inspection_plan (id, plan_code, plan_no, plan_name, template_id, template_name,
-                    inspection_type, inspection_type_id, cycle_days, next_due_date,
-                    start_date, end_date, frequency, status, approval_status, dept_id,
-                    assigned_inspector_id, created_by, remark)
-                    VALUES (?::uuid,?,?,?,?::uuid,?,?,?::uuid,?,?,?,?,?,?,?,?::uuid,?::uuid,?,?)
-                    """, id, planNo, planNo, body.get("plan_name"), body.get("template_id"), templateName,
-                    body.get("inspection_type"), blankToNull(body.get("inspection_type_id")),
-                    body.getOrDefault("cycle_days", 7), LocalDate.now().plusDays(7),
+                    body.get("cycle_type"), body.get("cycle_value"), body.get("cycle_days"),
                     body.get("start_date"), body.get("end_date"), body.get("frequency"),
                     body.getOrDefault("status", "active"), body.getOrDefault("approval_status", "draft"),
                     blankToNull(body.get("dept_id")),
-                    assignedId, userId, body.get("remark"));
+                    assignedId, assignedName, body.get("remark"), userId, id);
+        } else {
+            jdbc.update("""
+                    INSERT INTO inspection_plan (id, plan_code, plan_no, plan_name, template_id, template_name,
+                    inspection_type, inspection_type_id, cycle_type, cycle_value, cycle_days, next_due_date,
+                    start_date, end_date, frequency, status, approval_status, dept_id,
+                    assigned_inspector_id, assigned_inspector_name, created_by, remark)
+                    VALUES (?::uuid,?,?,?,?::uuid,?,?,?::uuid,?,?,?,?,?,?,?,?,?,?::uuid,?::uuid,?,?::uuid,?)
+                    """, id, planNo, planNo, body.get("plan_name"), body.get("template_id"), templateName,
+                    body.get("inspection_type"), blankToNull(body.get("inspection_type_id")),
+                    body.get("cycle_type"), body.get("cycle_value"),
+                    body.get("cycle_days") != null ? body.get("cycle_days") : 7, LocalDate.now().plusDays(7),
+                    body.get("start_date"), body.get("end_date"), body.get("frequency"),
+                    body.getOrDefault("status", "active"), body.getOrDefault("approval_status", "draft"),
+                    blankToNull(body.get("dept_id")),
+                    assignedId, assignedName, userId, body.get("remark"));
         }
 
         @SuppressWarnings("unchecked")
@@ -132,12 +141,13 @@ public class InspectionPlanController {
         String action = String.valueOf(body.getOrDefault("action", "approve"));
         String status = "reject".equals(action) ? "rejected" : "approved";
         String userId = TenantContext.getUserId();
+        String userName = SoftDeleteSupport.resolveUserDisplayName(jdbc, userId);
         jdbc.update("""
-                UPDATE inspection_plan SET approval_status=?, approved_by=?::uuid,
+                UPDATE inspection_plan SET approval_status=?, approved_by=?::uuid, approved_by_name=?,
                 approved_at=NOW(),
                 status=CASE WHEN ?='approved' THEN 'active' ELSE status END, updated_at=NOW()
                 WHERE id=?::uuid
-                """, status, userId, status, id);
+                """, status, userId, userName, status, id);
         Result<Map<String, Object>> loaded = get(id);
         Map<String, Object> plan = loaded.getData();
         docLog.event("inspect", "plan", id, Objects.toString(plan.get("plan_no"), null),
@@ -176,17 +186,18 @@ public class InspectionPlanController {
         String planNo = DailyBizNoSupport.next(jdbc, "inspection_plan", "plan_no", "IP-");
         Map<String, Object> t = template.get(0);
         String userId = TenantContext.getUserId();
+        CycleDaysSupport.Cycle cycle = CycleDaysSupport.resolveFromTemplate(body, t, "day", 7);
         LocalDate nextDue = body.get("next_due_date") != null
                 ? LocalDate.parse(body.get("next_due_date").toString())
-                : LocalDate.now().plusDays(((Number) body.getOrDefault("cycle_days", 7)).intValue());
+                : LocalDate.now().plusDays(cycle.days());
 
         jdbc.update("""
                 INSERT INTO inspection_plan (id, plan_code, plan_no, plan_name, template_id, template_name,
-                inspection_type_id, cycle_days, next_due_date, status, approval_status, created_by)
-                VALUES (?::uuid,?,?,?,?::uuid,?,?::uuid,?,?,?,?,?)
+                inspection_type_id, cycle_type, cycle_value, cycle_days, next_due_date, status, approval_status, created_by)
+                VALUES (?::uuid,?,?,?,?::uuid,?,?::uuid,?,?,?,?,?,?,?::uuid)
                 """, id, planNo, planNo, t.get("template_name") + "计划", templateId, t.get("template_name"),
                 t.get("inspection_type_id"),
-                body.getOrDefault("cycle_days", 7), nextDue, "active", "draft", userId);
+                cycle.type(), cycle.value(), cycle.days(), nextDue, "active", "draft", userId);
 
         List<Map<String, Object>> items = new ArrayList<>();
         for (String deviceId : deviceIds) {

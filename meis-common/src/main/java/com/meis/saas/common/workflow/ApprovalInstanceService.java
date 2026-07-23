@@ -2,6 +2,7 @@ package com.meis.saas.common.workflow;
 
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.notify.NotificationHelper;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -206,13 +207,15 @@ public class ApprovalInstanceService {
     }
 
     private void updateBusinessStatus(String businessType, UUID businessId, String status, UUID actorId) {
+        String actorName = actorId == null ? null : SoftDeleteSupport.resolveUserDisplayName(jdbc, actorId);
         switch (businessType) {
             case "purchase_plan" -> {
-                if ("approved".equals(status) && actorId != null) {
+                if (("approved".equals(status) || "rejected".equals(status)) && actorId != null) {
                     jdbc.update("""
-                            UPDATE purchase_plan SET approval_status = ?, approved_by = ?::uuid, approved_at = NOW()
+                            UPDATE purchase_plan SET approval_status = ?, approved_by = ?::uuid,
+                            approved_by_name = ?, approved_at = NOW()
                             WHERE id = ?::uuid
-                            """, status, actorId, businessId);
+                            """, status, actorId, actorName, businessId);
                 } else {
                     jdbc.update("UPDATE purchase_plan SET approval_status = ? WHERE id = ?::uuid", status, businessId);
                 }
@@ -225,7 +228,17 @@ public class ApprovalInstanceService {
                 if ("approved".equals(status)) createPurchaseAcceptance(businessId);
             }
             case "purchase_project" -> jdbc.update("UPDATE purchase_project SET approval_status = ? WHERE id = ?::uuid", status, businessId);
-            case "purchase_acceptance" -> jdbc.update("UPDATE purchase_acceptance SET approval_status = ? WHERE id = ?::uuid", status, businessId);
+            case "purchase_acceptance" -> {
+                if (("approved".equals(status) || "rejected".equals(status)) && actorId != null) {
+                    jdbc.update("""
+                            UPDATE purchase_acceptance SET approval_status = ?, approved_by = ?::uuid,
+                            approved_by_name = ?, approved_at = CURRENT_DATE
+                            WHERE id = ?::uuid
+                            """, status, actorId, actorName, businessId);
+                } else {
+                    jdbc.update("UPDATE purchase_acceptance SET approval_status = ? WHERE id = ?::uuid", status, businessId);
+                }
+            }
             case "contract_payment" -> {
                 jdbc.update("UPDATE contract_payment SET approval_status = ? WHERE id = ?::uuid", status, businessId);
                 if ("approved".equals(status)) markPaymentPaid(businessId);
@@ -240,23 +253,31 @@ public class ApprovalInstanceService {
             }
             case "device_outbound" -> {
                 jdbc.update("UPDATE device_outbound SET doc_status = ?, approval_status = ? WHERE id = ?::uuid", status, status, businessId);
-                if ("approved".equals(status)) autoIssueOutbound(businessId);
+                if ("approved".equals(status)) autoIssueOutbound(businessId, actorId, actorName);
             }
             case "device_return" -> {
                 jdbc.update("UPDATE device_return SET approval_status = ?, doc_status = ? WHERE id = ?::uuid", status, status, businessId);
-                if ("approved".equals(status)) autoCompleteReturn(businessId);
+                if ("approved".equals(status)) autoCompleteReturn(businessId, actorId, actorName);
             }
             case "device_goods_return" -> {
                 jdbc.update("UPDATE device_goods_return SET approval_status = ?, doc_status = ? WHERE id = ?", status, status, businessId);
-                if ("approved".equals(status)) autoCompleteGoodsReturn(businessId);
+                if ("approved".equals(status)) autoCompleteGoodsReturn(businessId, actorId, actorName);
             }
             case "shared_device_loan" -> {
                 if ("approved".equals(status)) {
                     jdbc.update("""
                         UPDATE shared_device_loan SET approval_status = ?, status = ?,
+                        approved_by = COALESCE(approved_by, ?::uuid),
+                        approved_by_name = COALESCE(approved_by_name, ?),
                         approved_at = COALESCE(approved_at, NOW()), billing_start_at = COALESCE(billing_start_at, NOW()),
                         updated_at = NOW() WHERE id = ?::uuid
-                        """, status, "approved", businessId);
+                        """, status, "approved", actorId, actorName, businessId);
+                } else if ("rejected".equals(status) && actorId != null) {
+                    jdbc.update("""
+                        UPDATE shared_device_loan SET approval_status = ?, status = ?,
+                        approved_by = ?::uuid, approved_by_name = ?, updated_at = NOW()
+                        WHERE id = ?::uuid
+                        """, status, status, actorId, actorName, businessId);
                 } else {
                     jdbc.update("""
                         UPDATE shared_device_loan SET approval_status = ?, status = ?, updated_at = NOW()
@@ -265,9 +286,20 @@ public class ApprovalInstanceService {
                 }
             }
             case "shared_device_return" -> {
-                jdbc.update("""
-                    UPDATE shared_device_return SET approval_status = ?, status = ? WHERE id = ?::uuid
-                    """, status, "approved".equals(status) ? "approved" : status, businessId);
+                if (("approved".equals(status) || "rejected".equals(status)) && actorId != null) {
+                    jdbc.update("""
+                        UPDATE shared_device_return SET approval_status = ?, status = ?,
+                        approved_by = COALESCE(approved_by, ?::uuid),
+                        approved_by_name = COALESCE(approved_by_name, ?),
+                        approved_at = CASE WHEN ? = 'approved' THEN COALESCE(approved_at, NOW()) ELSE approved_at END
+                        WHERE id = ?::uuid
+                        """, status, "approved".equals(status) ? "approved" : status,
+                            actorId, actorName, status, businessId);
+                } else {
+                    jdbc.update("""
+                        UPDATE shared_device_return SET approval_status = ?, status = ? WHERE id = ?::uuid
+                        """, status, "approved".equals(status) ? "approved" : status, businessId);
+                }
                 if ("approved".equals(status)) autoCompleteSharedReturn(businessId);
             }
             default -> {}
@@ -289,7 +321,7 @@ public class ApprovalInstanceService {
         jdbc.update("UPDATE asset_transfer SET status = 'completed', updated_at = NOW() WHERE id = ?::uuid", id);
     }
 
-    private void autoCompleteReturn(UUID id) {
+    private void autoCompleteReturn(UUID id, UUID actorId, String actorName) {
         var row = jdbc.queryForList("SELECT warehouse_id FROM device_return WHERE id = ?::uuid", id);
         if (row.isEmpty()) return;
         Object warehouseId = row.get(0).get("warehouse_id");
@@ -302,10 +334,17 @@ public class ApprovalInstanceService {
                     """, warehouseId, item.get("device_id"));
             }
         }
-        jdbc.update("UPDATE device_return SET status = 'returned', doc_status = 'returned', updated_at = NOW() WHERE id = ?::uuid", id);
+        jdbc.update("""
+                UPDATE device_return SET status = 'returned', doc_status = 'returned',
+                approved_by = COALESCE(approved_by, ?::uuid),
+                approved_by_name = COALESCE(approved_by_name, ?),
+                approved_at = COALESCE(approved_at, NOW()),
+                updated_at = NOW()
+                WHERE id = ?::uuid
+                """, actorId, actorName, id);
     }
 
-    private void autoCompleteGoodsReturn(UUID id) {
+    private void autoCompleteGoodsReturn(UUID id, UUID actorId, String actorName) {
         var items = jdbc.queryForList("SELECT device_id FROM device_goods_return_item WHERE return_id = ?", id);
         for (Map<String, Object> item : items) {
             if (item.get("device_id") != null) {
@@ -320,9 +359,12 @@ public class ApprovalInstanceService {
                 SET status = 'returned',
                     doc_status = 'approved',
                     approval_status = 'approved',
+                    approved_by = COALESCE(approved_by, ?),
+                    approved_by_name = COALESCE(approved_by_name, ?),
+                    approved_at = COALESCE(approved_at, CURRENT_DATE),
                     updated_at = NOW()
                 WHERE id = ?
-                """, id);
+                """, actorId, actorName, id);
     }
 
     private void autoCompleteSharedReturn(UUID returnId) {
@@ -369,7 +411,7 @@ public class ApprovalInstanceService {
         return null;
     }
 
-    private void autoIssueOutbound(UUID id) {
+    private void autoIssueOutbound(UUID id, UUID actorId, String actorName) {
         var outs = jdbc.queryForList("SELECT dept_id FROM device_outbound WHERE id = ?::uuid", id);
         Object deptId = outs.isEmpty() ? null : outs.get(0).get("dept_id");
         var items = jdbc.queryForList("SELECT device_id FROM device_outbound_item WHERE outbound_id = ?::uuid", id);
@@ -383,7 +425,14 @@ public class ApprovalInstanceService {
                     """, deptId, item.get("device_id"));
             }
         }
-        jdbc.update("UPDATE device_outbound SET status = 'issued', doc_status = 'approved', updated_at = NOW() WHERE id = ?::uuid", id);
+        jdbc.update("""
+                UPDATE device_outbound SET status = 'issued', doc_status = 'approved',
+                approved_by = COALESCE(approved_by, ?::uuid),
+                approved_by_name = COALESCE(approved_by_name, ?),
+                approved_at = COALESCE(approved_at, NOW()),
+                updated_at = NOW()
+                WHERE id = ?::uuid
+                """, actorId, actorName, id);
     }
 
     private void autoDisposeScrap(UUID id) {

@@ -192,11 +192,13 @@ public class InventoryCheckController {
         }
         String userId = TenantContext.getUserId();
         UUID approver = userId != null ? UUID.fromString(userId) : null;
+        String approverName = SoftDeleteSupport.resolveUserDisplayName(jdbc, approver);
         jdbc.update("""
                 UPDATE inventory_check
-                SET audit_status = 'approved', approved_by = ?::uuid, approved_at = NOW(), updated_at = NOW()
+                SET audit_status = 'approved', approved_by = ?::uuid, approved_by_name = ?,
+                    approved_at = NOW(), updated_at = NOW()
                 WHERE id = ?::uuid
-                """, approver, id);
+                """, approver, approverName, id);
         return get(id);
     }
 

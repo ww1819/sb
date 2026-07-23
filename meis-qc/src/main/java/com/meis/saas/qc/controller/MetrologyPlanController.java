@@ -5,6 +5,7 @@ import com.meis.saas.common.code.DailyBizNoSupport;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
+import com.meis.saas.common.tenant.TenantContext;
 import com.meis.saas.qc.metrology.MetrologyExecutionGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -45,26 +46,30 @@ public class MetrologyPlanController {
         boolean exists = !jdbc.queryForList(
                 "SELECT 1 FROM metrology_plan WHERE id = ?::uuid "
                         + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_plan", null), id).isEmpty();
+        String userId = TenantContext.getUserId();
         if (exists) {
             // OPS.14：更新不改 plan_code
             jdbc.update("""
                 UPDATE metrology_plan SET plan_name=?, template_id=?::uuid, device_id=?::uuid, category_id=?::uuid, org_id=?::uuid,
-                cycle_days=?, next_due_date=?, last_calibrated_at=?, status=?, approval_status=?, remark=?, updated_at=NOW()
+                cycle_days=?, next_due_date=?, last_calibrated_at=?, status=?, approval_status=?, remark=?,
+                updated_at=NOW(), updated_by=?::uuid
                 WHERE id=?::uuid
                 """, body.get("plan_name"), body.get("template_id"), body.get("device_id"), body.get("category_id"),
                     body.get("org_id"), body.get("cycle_days"), body.get("next_due_date"), body.get("last_calibrated_at"),
                     body.getOrDefault("status", "active"), body.getOrDefault("approval_status", "draft"),
-                    body.get("remark"), id);
+                    body.get("remark"), userId, id);
         } else {
             String planCode = DailyBizNoSupport.next(jdbc, "metrology_plan", "plan_code", "JL-");
+            Object createdBy = body.get("created_by") != null && !body.get("created_by").toString().isBlank()
+                    ? body.get("created_by") : userId;
             jdbc.update("""
                 INSERT INTO metrology_plan (id, plan_code, plan_name, template_id, device_id, category_id, org_id,
                 cycle_days, next_due_date, status, approval_status, created_by, remark)
-                VALUES (?::uuid,?,?,?::uuid,?::uuid,?::uuid,?::uuid,?,?,?,?,?,?)
+                VALUES (?::uuid,?,?,?::uuid,?::uuid,?::uuid,?::uuid,?,?,?,?,?::uuid,?)
                 """, id, planCode, body.get("plan_name"),
                     body.get("template_id"), body.get("device_id"), body.get("category_id"), body.get("org_id"),
                     body.get("cycle_days"), body.get("next_due_date"), body.getOrDefault("status", "active"),
-                    body.getOrDefault("approval_status", "draft"), body.get("created_by"), body.get("remark"));
+                    body.getOrDefault("approval_status", "draft"), createdBy, body.get("remark"));
         }
         return get(id);
     }
@@ -75,11 +80,17 @@ public class MetrologyPlanController {
     public Result<Map<String, Object>> approve(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
         String action = String.valueOf(body.getOrDefault("action", "approve"));
         String status = "reject".equals(action) ? "rejected" : "approved";
+        Object approvedBy = body.get("approved_by");
+        if (approvedBy == null || approvedBy.toString().isBlank()) {
+            approvedBy = TenantContext.getUserId();
+        }
+        String approvedByName = SoftDeleteSupport.resolveUserDisplayName(jdbc, approvedBy);
         jdbc.update("""
-                UPDATE metrology_plan SET approval_status=?, approved_by=?::uuid, approved_at=NOW(),
+                UPDATE metrology_plan SET approval_status=?, approved_by=?::uuid, approved_by_name=?,
+                approved_at=NOW(),
                 status=CASE WHEN ?='approved' THEN 'active' ELSE status END, updated_at=NOW()
                 WHERE id=?::uuid
-                """, status, body.get("approved_by"), status, id);
+                """, status, approvedBy, approvedByName, status, id);
         return get(id);
     }
 
@@ -108,18 +119,21 @@ public class MetrologyPlanController {
         @SuppressWarnings("unchecked")
         List<String> deviceIds = (List<String>) body.getOrDefault("deviceIds", List.of());
         List<Map<String, Object>> created = new ArrayList<>();
+        String userId = TenantContext.getUserId();
+        Object createdBy = body.get("created_by") != null && !body.get("created_by").toString().isBlank()
+                ? body.get("created_by") : userId;
         for (String deviceId : deviceIds) {
             UUID id = UUID.randomUUID();
             String planCode = DailyBizNoSupport.next(jdbc, "metrology_plan", "plan_code", "JL-");
             jdbc.update("""
                 INSERT INTO metrology_plan (id, plan_code, plan_name, template_id, device_id, category_id, org_id,
                     cycle_days, next_due_date, status, approval_status, created_by)
-                VALUES (?::uuid,?,?,?::uuid,?::uuid,?::uuid,?::uuid,?,?,?,?,?)
+                VALUES (?::uuid,?,?,?::uuid,?::uuid,?::uuid,?::uuid,?,?,?,?,?::uuid)
                 """, id, planCode, template.get(0).get("template_name") + "计划",
                     templateId, deviceId, template.get(0).get("category_id"), body.get("org_id"),
                     body.getOrDefault("cycle_days", 365),
                     body.getOrDefault("next_due_date", LocalDate.now().plusDays(365)),
-                    "active", "draft", body.get("created_by"));
+                    "active", "draft", createdBy);
             created.add(jdbc.queryForList(
                     "SELECT * FROM metrology_plan WHERE id = ?::uuid "
                             + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_plan", null), id).get(0));

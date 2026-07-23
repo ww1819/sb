@@ -5,6 +5,7 @@ import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
 import com.meis.saas.common.workflow.ApprovalInstanceService;
@@ -96,11 +97,13 @@ public class SharedLoanController {
     @OperationLog(module = "shared", description = "审批借调")
     public Result<Map<String, Object>> approve(@PathVariable UUID id) {
         String userId = TenantContext.getUserId();
+        UUID approver = userId != null ? UUID.fromString(userId) : null;
+        String approverName = SoftDeleteSupport.resolveUserDisplayName(jdbc, approver);
         jdbc.update("""
             UPDATE shared_device_loan SET status='approved', approval_status='approved',
-            approved_by=?::uuid, approved_at=NOW(), billing_start_at=NOW(), updated_at=NOW()
+            approved_by=?::uuid, approved_by_name=?, approved_at=NOW(), billing_start_at=NOW(), updated_at=NOW()
             WHERE id=?::uuid
-            """, userId != null ? UUID.fromString(userId) : null, id);
+            """, approver, approverName, id);
         return get(id);
     }
 

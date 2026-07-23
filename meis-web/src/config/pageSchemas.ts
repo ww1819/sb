@@ -28,6 +28,11 @@ export interface FieldSchema {
   linkValueKey?: string
   /** 外键下拉标签不拼编码，只显示名称（如申报人只显示姓名） */
   linkHideCode?: boolean
+  /**
+   * 外键变更时从关联实体详情回填表单字段（约定包 §5.6）。
+   * key=表单 prop，value=关联实体字段名。
+   */
+  fillFromLink?: Record<string, string>
   widget?: 'repairDevicePicker' | 'devicePicker' | 'stationPicker'
   group?: FieldGroup
   required?: boolean

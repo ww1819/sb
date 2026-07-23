@@ -1924,6 +1924,14 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+| 2.91 | 2026-07-23 11:00:00 | — | PLT-AUDIT-01.3：V1/R__ 补近期加列 COMMENT（OPS.15 周期、W.5 姓名快照、运维计划同族列） |
+| 2.90 | 2026-07-23 10:45:00 | — | PLT-AUDIT-01.2 / BACKLOG-PLT-W02：入库经办人、出库领用人、退库人、不良事件上报/处理/审核人姓名快照；验收成员补姓名 |
+| 2.89 | 2026-07-23 10:30:00 | — | PLT-AUDIT-01.1：公用借调/归还 approved_by_name；巡检计划 assigned_inspector_name；文档乱码修复 |
+| 2.88 | 2026-07-23 10:20:00 | — | PLT-AUDIT-01：全局加列/冗余通检（验收生成入库、审批流 approved_*、保养记录设备快照、计量/计划审核姓名、前端缺列） |
+| 2.87 | 2026-07-23 10:00:00 | — | OPS.15.3：近期加列 CRUD 通检修补（生成计划继承模板周期、巡检审核姓名、计量 created_by、前端缺列） |
+| 2.86 | 2026-07-23 09:50:00 | — | OPS.15.2：计划 INSERT created_by 补 ?::uuid（保养/巡检/PM/计量）；执行单已正确 |
+| 2.85 | 2026-07-23 09:45:00 | — | OPS.15.1：周期类型+周期值自动算周期天数，天数只读；前后端同规则 |
+| 2.84 | 2026-07-23 09:40:00 | — | OPS.15：保养/巡检/PM 模板带周期；新增计划选模板回填级别/类型/周期；约定包 v1.16 §5.6 |
 | 2.83 | 2026-07-22 19:20:00 | — | PLT-UI-02 三期：采购/借调/不良事件/租赁列表状态多选；BACKLOG-PLT-UI02 完成 |
 | 2.82 | 2026-07-22 18:55:00 | — | PLT-UI-02 二期：库房单据+运维计划/执行/记录状态·科室多选；PageableJdbc CSV→IN |
 | 2.81 | 2026-07-22 18:50:00 | — | PLT-UI-02：列表检索多选+分类模糊拆分（一期五页）；约定包 v1.15 §5.5 |
@@ -2153,7 +2161,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | BACKLOG-ANA-10 | 效益 | 资产增减统计 | ANA-UI-03 菜单已挂 | P2 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-ANA-11 | 效益 | 资产占用统计 | ANA-UI-03 菜单已挂 | P2 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-ANA-12 | 效益 | 资产异动统计 | ANA-UI-03 菜单已挂 | P2 | 先菜单入口；业务待排期 | 可排期 |
-| BACKLOG-PLT-W02 | 跨模块 | 非维修业务责任人姓名快照（出入库 operator、不良事件 reporter/handler、验收成员等） | 附录 W.5.3 | P1 | 审计三列与维修责任人先落地 | 可排期 |
+| BACKLOG-PLT-W02 | 跨模块 | 非维修业务责任人姓名快照（出入库 operator、不良事件 reporter/handler、验收成员等） | 附录 W.5.3 | P1 | 01.2 已落地主路径；标签绑定等零星入口可后续 | 已完成 |
 | BACKLOG-PLT-W03 | 跨模块 | 存量主从单据明细缺业务单号/主数据 code·name 的分批补齐（明细见 W.6.4） | 附录 W.6.4 | P1–P2 | P1/P2 及弱项 dept_name 写点已落地 | 已完成 |
 | BACKLOG-PLT-UI02 | 跨模块 | 列表检索多选推广剩余页（采购/借调/不良事件等） | PLT-UI-02 | P2 | 三期已落地 | 已完成 |
 | BACKLOG-MP-01 | 小程序 | uni-app 一期：扫码查询/报修/保养/巡检/PM（在线，同后端同权限） | 附录 MP | P1 | — | 已完成 |
@@ -3175,6 +3183,8 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 移动端本地 SQLite | [MOB.7](#mob7-本地-sqlite-工具类2026-07-21) |
 | 巡检/保养/PM 主从与执行追溯 | [附录 OPS](#附录-ops巡检保养预防性维护主从与执行追溯2026-07-21)、约定包 §6.7 |
 | 运维计划/执行单号系统生成 | [OPS.14](#ops14-计划单号--执行单号系统生成2026-07-22)、约定包 §6.8 |
+| 运维模板周期 / 选模板回填 | [OPS.15](#ops15-模板周期与计划选模板回填2026-07-23)、约定包 §5.6 |
+| 全局加列 / 冗余 CRUD 通检 | [PLT-AUDIT-01](#plt-audit-01-全局加列--对象冗余--crud-通检2026-07-23) |
 | App 离线盘点 / 台账缓存 | [MOB.8](#mob8-离线盘点权限缓存与台账同步2026-07-21)、修订 MOB.7 |
 | 微信小程序（uni-app） | [附录 MP](#附录-mp微信小程序uni-app2026-07-21)、[MP.3](#mp3-手写签名与订阅消息2026-07-21)、第 7 章 BACKLOG-MP-01 |
 | App / 小程序后续能力建议 | [MOB.9](#mob9-移动端与小程序后续能力建议2026-07-21)、[MP.2](#mp2-小程序二期建议2026-07-21)、[MOB.10](#mob10-报修进度与验收落地2026-07-21)、[MOB.11](#mob11-工程师移动维修一期2026-07-21)、[MOB.12](#mob12-四项收尾本地草稿--计量--补打--不良事件2026-07-21) |
@@ -4635,6 +4645,112 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 | **存量** | 旧时间戳单号保留不改；新单按新规则 |
 
 **状态**：已落地（2026-07-22；计量扩展同日）。
+
+### OPS.15 模板周期与计划选模板回填（2026-07-23）
+
+> 来源：用户草稿（保养/巡检/PM 模板带周期；新增计划选模板自动带出级别、类型、周期）。
+
+| 项 | 定稿 |
+|----|------|
+| **范围** | `maintenance_template` / `inspection_template` / `pm_template`；对应 `*_plan` 新增/编辑表单 |
+| **模板周期字段** | 三模板统一增加 `cycle_type`（字典 `cycle_type`）、`cycle_value`、`cycle_days`；列表可展示；表单可维护类型/值 |
+| **巡检计划** | 主表仍以 `cycle_days` 为执行周期权威；模板可存完整三件套，回填时写入计划已有周期字段 |
+| **选模板回填** | 变更 `template_id` 时拉取模板详情，写入：`template_name`；级别/类型（保养 `maintenance_level_id`+`maintenance_level`，巡检 `inspection_type_id`，PM `pm_type_id`+`pm_type`）；周期三件套中计划已有列 |
+| **可改** | 回填为默认值，级别/类型/周期类型/周期值**允许**再改；再次更换模板则**覆盖**上述回填字段 |
+| **时机** | 仅用户变更模板时回填；打开编辑详情的首次赋值**不**覆盖已有计划数据 |
+| **实现** | Schema `fillFromLink` + `FieldRenderer`；库列进 `R__columns_biz` / `V1__tables` |
+
+#### OPS.15.1 周期天数自动计算（2026-07-23）
+
+> 来源：用户草稿（周期类型和周期值设置完毕后自动计算周期天数，周期天数禁止编辑）。
+
+| 项 | 定稿 |
+|----|------|
+| **范围** | 凡表单同时具备 `cycle_type` / `cycle_value` / `cycle_days`：三模板 + 保养/巡检/PM 计划 |
+| **可编** | `cycle_type`、`cycle_value` 可编；`cycle_days` **只读**（禁止手改） |
+| **触发** | 类型与值均有效时立即重算；缺一则清空天数 |
+| **换算** | 字典码：`day`→×1，`week`→×7，`month`→×30，`year`→×365；`cycle_days = cycle_value × 单位天数`（取整） |
+| **后端** | 保存时按同一规则重算并落库，忽略客户端篡改天数 |
+| **实现** | 前端 `calcCycleDays` + `GroupedFormFields` 监听；后端 `CycleDaysSupport` |
+
+#### OPS.15.2 计划保存 UUID 绑定（2026-07-23）
+
+> 现象：新增保养计划报错 `created_by` 类型为 uuid，表达式为 varchar。
+
+| 项 | 定稿 |
+|----|------|
+| **原因** | JDBC 字符串绑定 UUID 列须 `?::uuid`；计划 INSERT 的 `created_by` 漏铸 |
+| **计划** | 保养/巡检/PM 的 save + generate；计量计划 save + generate — 均已补 `created_by=?::uuid` |
+| **执行单** | 三模块 `*ExecutionGenerator` 与计量生成器 **已有** `?::uuid`，UPDATE 人员字段亦已铸，无需改 |
+| **UPDATE** | 计划 `updated_by` / `approved_by` 原先已 `?::uuid` |
+
+#### OPS.15.3 近期加列 CRUD 通检（2026-07-23）
+
+> 来源：用户要求检查新增字段后的 CRUD / 前后端交互缺口。
+
+| 项 | 定稿 / 修补 |
+|----|-------------|
+| **范围** | 运维保养/巡检/PM/计量：近期 OPS / W.6 / OPS.15 加列 |
+| **已对齐（无需改）** | 模板/计划 save 写周期；执行 Generator 写 plan_no/template_name/dept_name/execution_no；UUID 主路径（15.2） |
+| **P1 生成计划** | `/plan/generate`：周期优先 body，否则**模板**三件套并重算天数（巡检 generate 补写 cycle_type/value） |
+| **P2 巡检计划** | 加 `approved_by_name`；approve 写姓名；UPDATE 写 `updated_by` |
+| **P2 计量计划** | `created_by`/`approved_by` 默认取 `TenantContext`；UPDATE 写 `updated_by` |
+| **P2 前端** | 计划补院区/责任人；执行头补 template_name；明细补 dept_name；巡检记录补 device_code/name；巡检周期类型 list |
+
+**状态**：已定稿并落地（2026-07-23；含 15.1 / 15.2 / 15.3）。
+
+### PLT-AUDIT-01 全局加列 / 对象冗余 / CRUD 通检（2026-07-23）
+
+> 来源：用户要求全局扫描同事近期改动后的冗余与 CRUD / 前后端缺口。
+
+| 项 | 定稿 / 修补 |
+|----|-------------|
+| **范围** | 采购/库房/运维/计量/盘点：近期 W.5 / W.6 / OPS / PUR-UI / WH-UI 加列 |
+| **对象冗余结论** | plan_code↔plan_no 运维侧双写同值（过渡，非丢写）；approved_by 缺 _name 列已补（采购计划/计量计划/盘点）；设备/单号快照主路径多数已齐 |
+| **P1 验收→入库** | PurchaseAcceptanceController.pass 明细补 entry_no/厂家/规格/金额 |
+| **P1 审批流** | ApprovalInstanceService：验收写 approved_*；出库/退库/退货 auto 完成写 approved_*；采购计划补 approved_by_name |
+| **P1 保养记录** | MaintenanceRecordController 按 device_id 写 device_code/device_name |
+| **P1 计量/盘点** | metrology_plan/inventory_check 加并写 approved_by_name |
+| **P2 连带** | 保养/PM 计划头责任人服务端补姓名；前端计划审核人/入库明细/合同明细/保养记录字段对齐 |
+| **Backlog** | OPS plan_code 收敛；标签绑定等零星责任人入口可后续 |
+
+
+#### PLT-AUDIT-01.1 公用借调审核姓名 + 巡检责任人姓名（2026-07-23）
+
+| 项 | 定稿 / 修补 |
+|----|-------------|
+| **公用借调/归还** | 加 approved_by_name；手工 approve 与审批流副作用同写 |
+| **巡检计划** | 加 assigned_inspector_name；save 服务端按 ID 解析；前端选人 fillFromLink |
+| **前端** | 借调/归还列表审核人；收费明细补 device_code |
+
+
+#### PLT-AUDIT-01.2 BACKLOG-PLT-W02 非维修责任人姓名（2026-07-23）
+
+| 项 | 定稿 / 修补 |
+|----|-------------|
+| **入库** | device_entry.operator_name；save 同写 |
+| **出库** | receiver_name + operator_name（制单人）；save 同写 |
+| **退库** | returner_name + operator_name；save 同写 |
+| **不良事件** | reporter_name / handler_name / reviewer_name；save 与流转同写；列表优先读快照 |
+| **验收成员** | 有 user_id 且 member_name 空时服务端解析姓名 |
+| **回填** | R__data_fix 按 UUID 补历史姓名 |
+| **前端** | 经办人/领用人/退库人/处理人/审核人展示快照列 |
+
+**状态**：已定稿并落地（2026-07-23；含 01.1 / 01.2）。BACKLOG-PLT-W02 主路径完成。
+
+#### PLT-AUDIT-01.3 表/字段注释缺口（2026-07-23）
+
+> 来源：用户要求检查表和字段注释缺口并补到迁库脚本。
+
+| 项 | 定稿 / 修补 |
+|----|-------------|
+| **原则** | 新租户：`V1__tables.sql` 建表后须有完整 `COMMENT ON`；老租户：近期加列在 `R__columns_biz` 可同写 `COMMENT ON`（覆盖空注释；`SchemaCommentFiller` 仅补空） |
+| **已齐（R__）** | OPS.15 模板周期、巡检计划 cycle_type/value、approved_by_name、assigned_inspector_name、出入库/不良事件姓名快照等 — R__ 本已有 COMMENT |
+| **V1 缺口** | 上述列在 CREATE 中已有但缺 `COMMENT ON`；另补保养/巡检/PM 计划同族列（plan_no、template_name、cycle_days、责任人/审核人姓名等） |
+| **R__ 补** | `maintenance_plan.cycle_days`、`inspection_plan.cycle_days` 补中文 COMMENT |
+| **不做** | 历史英文/半英文字段注释全量重写（SchemaCommentFiller 存量质量问题，另排） |
+
+**状态**：已定稿并落地（2026-07-23；含 01.1 / 01.2 / 01.3）。
 
 ---
 

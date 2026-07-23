@@ -36,18 +36,37 @@ public class MaintenanceRecordController {
         boolean exists = !jdbc.queryForList(
                 "SELECT 1 FROM maintenance_record WHERE id = ?::uuid "
                         + SoftDeleteSupport.notDeletedClause(jdbc, "maintenance_record", null), id).isEmpty();
+        String deviceCode = blankToNull(body.get("device_code"));
+        String deviceName = blankToNull(body.get("device_name"));
+        if (body.get("device_id") != null) {
+            var devices = jdbc.queryForList(
+                    "SELECT device_code, device_name FROM medical_device WHERE id = ?::uuid "
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", null),
+                    body.get("device_id"));
+            if (!devices.isEmpty()) {
+                if (deviceCode == null) deviceCode = blankToNull(devices.get(0).get("device_code"));
+                if (deviceName == null) deviceName = blankToNull(devices.get(0).get("device_name"));
+            }
+        }
         if (!exists) {
             jdbc.update("""
-                INSERT INTO maintenance_record (id, record_no, plan_id, device_id, maintenance_level, template_id,
-                    executor_id, execute_start_time, items_result, overall_result, signature_url, status)
-                VALUES (?::uuid,?,?::uuid,?::uuid,?,?::uuid,?::uuid,?::timestamptz,?::jsonb,?,?,?)
+                INSERT INTO maintenance_record (id, record_no, plan_id, device_id, device_code, device_name,
+                    maintenance_level, template_id, executor_id, execute_start_time, items_result, overall_result,
+                    signature_url, status)
+                VALUES (?::uuid,?,?::uuid,?::uuid,?,?,?,?::uuid,?::uuid,?::timestamptz,?::jsonb,?,?,?)
                 """, id, body.getOrDefault("record_no", "MR" + System.currentTimeMillis()), body.get("plan_id"),
-                    body.get("device_id"), body.getOrDefault("maintenance_level", "L1"), body.get("template_id"),
+                    body.get("device_id"), deviceCode, deviceName,
+                    body.getOrDefault("maintenance_level", "L1"), body.get("template_id"),
                     body.get("executor_id"), Instant.now(), itemsJson, body.get("overall_result"),
                     body.get("signature_url"), body.getOrDefault("status", "completed"));
         } else {
-            jdbc.update("UPDATE maintenance_record SET items_result=?::jsonb, overall_result=?, signature_url=?, status=?, updated_at=NOW() WHERE id=?::uuid",
-                    itemsJson, body.get("overall_result"), body.get("signature_url"), body.get("status"), id);
+            jdbc.update("""
+                    UPDATE maintenance_record SET items_result=?::jsonb, overall_result=?, signature_url=?, status=?,
+                    device_code=COALESCE(?, device_code), device_name=COALESCE(?, device_name), updated_at=NOW()
+                    WHERE id=?::uuid
+                    """,
+                    itemsJson, body.get("overall_result"), body.get("signature_url"), body.get("status"),
+                    deviceCode, deviceName, id);
         }
         if (body.get("plan_id") != null && "submitted".equals(body.get("status"))) {
             jdbc.update("UPDATE maintenance_plan SET last_maintained_at = CURRENT_DATE, status = 'active', updated_at = NOW() WHERE id = ?::uuid",
@@ -56,5 +75,11 @@ public class MaintenanceRecordController {
         return Result.ok(jdbc.queryForList(
                 "SELECT * FROM maintenance_record WHERE id = ?::uuid "
                         + SoftDeleteSupport.notDeletedClause(jdbc, "maintenance_record", null), id).get(0));
+    }
+
+    private static String blankToNull(Object v) {
+        if (v == null) return null;
+        String s = v.toString().trim();
+        return s.isEmpty() ? null : s;
     }
 }

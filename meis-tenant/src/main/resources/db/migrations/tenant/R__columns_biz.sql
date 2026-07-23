@@ -133,6 +133,7 @@ ALTER TABLE maintenance_template ADD COLUMN IF NOT EXISTS template_code VARCHAR(
 ALTER TABLE maintenance_template ADD COLUMN IF NOT EXISTS maintenance_level_id UUID;
 ALTER TABLE maintenance_template ADD COLUMN IF NOT EXISTS description TEXT;
 ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS cycle_days INTEGER;
+COMMENT ON COLUMN maintenance_plan.cycle_days IS '周期天数（由类型×值计算；OPS.15.1）';
 ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20) DEFAULT 'draft';
 ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS created_by UUID;
 ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS approved_by UUID;
@@ -141,6 +142,7 @@ ALTER TABLE maintenance_plan ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP WITH
 ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS template_id UUID;
 ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS inspection_type_id UUID;
 ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS cycle_days INTEGER;
+COMMENT ON COLUMN inspection_plan.cycle_days IS '周期天数（由类型×值计算；OPS.15.1）';
 ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS next_due_date DATE;
 ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS last_inspected_at DATE;
 ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS assigned_inspector_id UUID;
@@ -907,3 +909,68 @@ ALTER TABLE inspection_record ADD COLUMN IF NOT EXISTS device_code VARCHAR(50);
 ALTER TABLE inspection_record ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
 COMMENT ON COLUMN inspection_record.device_code IS '设备编码快照（W.6）';
 COMMENT ON COLUMN inspection_record.device_name IS '设备名称快照（W.6）';
+
+-- ---------- OPS.15：运维模板周期（2026-07-23） ----------
+ALTER TABLE maintenance_template ADD COLUMN IF NOT EXISTS cycle_type VARCHAR(20);
+ALTER TABLE maintenance_template ADD COLUMN IF NOT EXISTS cycle_value INTEGER;
+ALTER TABLE maintenance_template ADD COLUMN IF NOT EXISTS cycle_days INTEGER;
+COMMENT ON COLUMN maintenance_template.cycle_type IS '周期类型（字典 cycle_type）';
+COMMENT ON COLUMN maintenance_template.cycle_value IS '周期值';
+COMMENT ON COLUMN maintenance_template.cycle_days IS '周期天数';
+
+ALTER TABLE inspection_template ADD COLUMN IF NOT EXISTS cycle_type VARCHAR(20);
+ALTER TABLE inspection_template ADD COLUMN IF NOT EXISTS cycle_value INTEGER;
+ALTER TABLE inspection_template ADD COLUMN IF NOT EXISTS cycle_days INTEGER;
+COMMENT ON COLUMN inspection_template.cycle_type IS '周期类型（字典 cycle_type）';
+COMMENT ON COLUMN inspection_template.cycle_value IS '周期值';
+COMMENT ON COLUMN inspection_template.cycle_days IS '周期天数';
+
+ALTER TABLE pm_template ADD COLUMN IF NOT EXISTS cycle_type VARCHAR(20);
+ALTER TABLE pm_template ADD COLUMN IF NOT EXISTS cycle_value INTEGER;
+ALTER TABLE pm_template ADD COLUMN IF NOT EXISTS cycle_days INTEGER;
+COMMENT ON COLUMN pm_template.cycle_type IS '周期类型（字典 cycle_type）';
+COMMENT ON COLUMN pm_template.cycle_value IS '周期值';
+COMMENT ON COLUMN pm_template.cycle_days IS '周期天数';
+
+ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS cycle_type VARCHAR(20);
+ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS cycle_value INTEGER;
+COMMENT ON COLUMN inspection_plan.cycle_type IS '周期类型（字典 cycle_type；OPS.15）';
+COMMENT ON COLUMN inspection_plan.cycle_value IS '周期值（OPS.15）';
+
+-- ---------- OPS.15.3：巡检计划审核人姓名快照（对齐保养/PM） ----------
+ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS approved_by_name VARCHAR(100);
+COMMENT ON COLUMN inspection_plan.approved_by_name IS '审核人姓名快照（W.5）';
+
+-- ---------- PLT-AUDIT-01：审核人姓名列补齐（2026-07-23） ----------
+ALTER TABLE purchase_plan ADD COLUMN IF NOT EXISTS approved_by_name VARCHAR(100);
+COMMENT ON COLUMN purchase_plan.approved_by_name IS '审核人姓名快照（W.5）';
+ALTER TABLE metrology_plan ADD COLUMN IF NOT EXISTS approved_by_name VARCHAR(100);
+COMMENT ON COLUMN metrology_plan.approved_by_name IS '审核人姓名快照（W.5）';
+ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS approved_by_name VARCHAR(100);
+COMMENT ON COLUMN inventory_check.approved_by_name IS '审核人姓名快照（W.5）';
+
+-- ---------- PLT-AUDIT-01.1：公用借调/归还审核人 + 巡检责任人姓名（2026-07-23） ----------
+ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS approved_by_name VARCHAR(100);
+COMMENT ON COLUMN shared_device_loan.approved_by_name IS '审核人姓名快照（W.5）';
+ALTER TABLE shared_device_return ADD COLUMN IF NOT EXISTS approved_by_name VARCHAR(100);
+COMMENT ON COLUMN shared_device_return.approved_by_name IS '审核人姓名快照（W.5）';
+ALTER TABLE inspection_plan ADD COLUMN IF NOT EXISTS assigned_inspector_name VARCHAR(100);
+COMMENT ON COLUMN inspection_plan.assigned_inspector_name IS '责任巡检人姓名快照（W.5）';
+
+-- ---------- PLT-AUDIT-01.2 / BACKLOG-PLT-W02：非维修责任人姓名（2026-07-23） ----------
+ALTER TABLE device_entry ADD COLUMN IF NOT EXISTS operator_name VARCHAR(100);
+COMMENT ON COLUMN device_entry.operator_name IS '经办人姓名快照（W.5）';
+ALTER TABLE device_outbound ADD COLUMN IF NOT EXISTS operator_name VARCHAR(100);
+ALTER TABLE device_outbound ADD COLUMN IF NOT EXISTS receiver_name VARCHAR(100);
+COMMENT ON COLUMN device_outbound.operator_name IS '经办人姓名快照（W.5）';
+COMMENT ON COLUMN device_outbound.receiver_name IS '领用人姓名快照（W.5）';
+ALTER TABLE device_return ADD COLUMN IF NOT EXISTS operator_name VARCHAR(100);
+ALTER TABLE device_return ADD COLUMN IF NOT EXISTS returner_name VARCHAR(100);
+COMMENT ON COLUMN device_return.operator_name IS '经办人姓名快照（W.5）';
+COMMENT ON COLUMN device_return.returner_name IS '退库人姓名快照（W.5）';
+ALTER TABLE adverse_event ADD COLUMN IF NOT EXISTS reporter_name VARCHAR(100);
+ALTER TABLE adverse_event ADD COLUMN IF NOT EXISTS handler_name VARCHAR(100);
+ALTER TABLE adverse_event ADD COLUMN IF NOT EXISTS reviewer_name VARCHAR(100);
+COMMENT ON COLUMN adverse_event.reporter_name IS '上报人姓名快照（W.5）';
+COMMENT ON COLUMN adverse_event.handler_name IS '处理人姓名快照（W.5）';
+COMMENT ON COLUMN adverse_event.reviewer_name IS '审核人姓名快照（W.5）';

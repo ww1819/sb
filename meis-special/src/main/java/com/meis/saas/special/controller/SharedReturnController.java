@@ -5,6 +5,7 @@ import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
 import com.meis.saas.common.workflow.ApprovalInstanceService;
@@ -111,11 +112,13 @@ public class SharedReturnController {
     public Result<Map<String, Object>> approve(@PathVariable UUID id) {
         var ret = loadReturn(id);
         String userId = TenantContext.getUserId();
+        UUID approver = userId != null ? UUID.fromString(userId) : null;
+        String approverName = SoftDeleteSupport.resolveUserDisplayName(jdbc, approver);
         Instant billingEnd = Instant.now();
         jdbc.update("""
             UPDATE shared_device_return SET status='approved', approval_status='approved',
-            approved_by=?::uuid, approved_at=NOW(), updated_at=NOW() WHERE id=?::uuid
-            """, userId != null ? UUID.fromString(userId) : null, id);
+            approved_by=?::uuid, approved_by_name=?, approved_at=NOW(), updated_at=NOW() WHERE id=?::uuid
+            """, approver, approverName, id);
         completeReturn(ret, billingEnd);
         return get(id);
     }

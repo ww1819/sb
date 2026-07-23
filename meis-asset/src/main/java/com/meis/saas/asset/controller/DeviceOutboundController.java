@@ -136,34 +136,37 @@ public class DeviceOutboundController {
             actorId = UUID.fromString(ctx.getUserId());
             actorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, actorId);
         }
+        String receiverName = SoftDeleteSupport.resolveUserDisplayName(jdbc, receiverId);
         String outboundNo;
         if (!exists) {
             outboundNo = blankToNull(body.get("outbound_no"));
             if (outboundNo == null) outboundNo = nextOutboundNo();
             jdbc.update("""
                 INSERT INTO device_outbound (
-                    id, outbound_no, dept_id, receiver_id, warehouse_id, outbound_date, purpose, remark,
-                    doc_status, status, approval_status,
+                    id, outbound_no, dept_id, receiver_id, receiver_name, warehouse_id, outbound_date, purpose, remark,
+                    operator_id, operator_name, doc_status, status, approval_status,
                     created_at, updated_at, created_by, created_by_name, updated_by, updated_by_name, is_deleted
-                ) VALUES (?, ?, ?, ?, ?, ?::date, ?, ?, 'draft', 'draft', 'draft', NOW(), NOW(), ?, ?, ?, ?, 0)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?::date, ?, ?, ?, ?, 'draft', 'draft', 'draft', NOW(), NOW(), ?, ?, ?, ?, 0)
                 """,
                     id, outboundNo,
-                    deptId, receiverId, warehouseId,
+                    deptId, receiverId, receiverName, warehouseId,
                     toDateParam(body.get("outbound_date")), blankToNull(body.get("purpose")), blankToNull(body.get("remark")),
+                    actorId, actorName,
                     actorId, actorName, actorId, actorName);
         } else {
             var nos = jdbc.queryForList("SELECT outbound_no FROM device_outbound WHERE id = ?", id);
             outboundNo = nos.isEmpty() ? null : blankToNull(nos.get(0).get("outbound_no"));
             jdbc.update("""
                 UPDATE device_outbound
-                SET dept_id = ?, receiver_id = ?, warehouse_id = ?, outbound_date = ?::date,
-                    purpose = ?, remark = ?,
+                SET dept_id = ?, receiver_id = ?, receiver_name = ?, warehouse_id = ?, outbound_date = ?::date,
+                    purpose = ?, remark = ?, operator_id = COALESCE(operator_id, ?),
+                    operator_name = COALESCE(operator_name, ?),
                     updated_at = NOW(), updated_by = ?, updated_by_name = ?
                 WHERE id = ?
                 """,
-                    deptId, receiverId, warehouseId,
+                    deptId, receiverId, receiverName, warehouseId,
                     toDateParam(body.get("outbound_date")), blankToNull(body.get("purpose")), blankToNull(body.get("remark")),
-                    actorId, actorName, id);
+                    actorId, actorName, actorId, actorName, id);
         }
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> items = (List<Map<String, Object>>) body.getOrDefault("items", List.of());

@@ -600,6 +600,47 @@ SET operator_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
 FROM sys_user u
 WHERE t.operator_id = u.id AND (t.operator_name IS NULL OR TRIM(t.operator_name) = '');
 
+-- PLT-AUDIT-01.2 / BACKLOG-PLT-W02：非维修责任人姓名回填
+UPDATE device_entry t
+SET operator_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
+FROM sys_user u
+WHERE t.operator_id = u.id AND (t.operator_name IS NULL OR TRIM(t.operator_name) = '');
+
+UPDATE device_outbound t
+SET operator_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
+FROM sys_user u
+WHERE t.operator_id = u.id AND (t.operator_name IS NULL OR TRIM(t.operator_name) = '');
+
+UPDATE device_outbound t
+SET receiver_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
+FROM sys_user u
+WHERE t.receiver_id = u.id AND (t.receiver_name IS NULL OR TRIM(t.receiver_name) = '');
+
+UPDATE device_return t
+SET operator_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
+FROM sys_user u
+WHERE t.operator_id = u.id AND (t.operator_name IS NULL OR TRIM(t.operator_name) = '');
+
+UPDATE device_return t
+SET returner_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
+FROM sys_user u
+WHERE t.returner_id = u.id AND (t.returner_name IS NULL OR TRIM(t.returner_name) = '');
+
+UPDATE adverse_event t
+SET reporter_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
+FROM sys_user u
+WHERE t.reporter_id = u.id AND (t.reporter_name IS NULL OR TRIM(t.reporter_name) = '');
+
+UPDATE adverse_event t
+SET handler_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
+FROM sys_user u
+WHERE t.handler_id = u.id AND (t.handler_name IS NULL OR TRIM(t.handler_name) = '');
+
+UPDATE adverse_event t
+SET reviewer_name = COALESCE(NULLIF(TRIM(u.real_name), ''), u.username)
+FROM sys_user u
+WHERE t.reviewer_id = u.id AND (t.reviewer_name IS NULL OR TRIM(t.reviewer_name) = '');
+
 -- AST-UI-02：device_unit 文本按名称/编码匹配 unit_dict → unit_id；匹配不上留空
 UPDATE medical_device d
 SET unit_id = u.id,

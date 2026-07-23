@@ -317,7 +317,8 @@ public class PurchaseAcceptanceController {
                 traceNo, chainNo, LocalDate.now(), "purchase", "draft");
 
         var devices = jdbc.queryForList("""
-            SELECT device_name, specification, brand, quantity, unit_price
+            SELECT device_name, specification, brand, quantity, unit_price, amount,
+                   manufacturer_id, manufacturer_name
             FROM purchase_acceptance_device
             WHERE acceptance_id = ?
             """ + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_acceptance_device", null) + """
@@ -326,12 +327,9 @@ public class PurchaseAcceptanceController {
 
         if (!devices.isEmpty()) {
             for (Map<String, Object> item : devices) {
-                jdbc.update("""
-                    INSERT INTO device_entry_item (id, entry_id, device_name, brand, model, quantity, unit_price)
-                    VALUES (?,?,?,?,?,?,?)
-                    """,
-                        UUID.randomUUID(), entryId, item.get("device_name"), item.get("brand"),
-                        item.get("specification"), toIntQuantity(item.get("quantity")), item.get("unit_price"));
+                insertGeneratedEntryItem(entryId, entryNo, item.get("device_name"), item.get("brand"),
+                        item.get("specification"), item.get("quantity"), item.get("unit_price"), item.get("amount"),
+                        item.get("manufacturer_id"), item.get("manufacturer_name"));
             }
         } else if (contractId != null && contract != null) {
             var planItems = jdbc.queryForList("""
@@ -344,19 +342,13 @@ public class PurchaseAcceptanceController {
                     + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_project", "pp")
                     + SoftDeleteSupport.notDeletedClause(jdbc, "purchase_contract", "pc"), contractId);
             if (planItems.isEmpty()) {
-                jdbc.update("""
-                    INSERT INTO device_entry_item (id, entry_id, device_name, quantity, unit_price)
-                    VALUES (?,?,?,?,?)
-                    """,
-                        UUID.randomUUID(), entryId, contract.get("contract_name"), 1, contract.get("contract_amount"));
+                insertGeneratedEntryItem(entryId, entryNo, contract.get("contract_name"), null,
+                        null, 1, contract.get("contract_amount"), contract.get("contract_amount"), null, null);
             } else {
                 for (Map<String, Object> item : planItems) {
-                    jdbc.update("""
-                        INSERT INTO device_entry_item (id, entry_id, device_name, model, quantity, unit_price)
-                        VALUES (?,?,?,?,?,?)
-                        """,
-                            UUID.randomUUID(), entryId, item.get("device_name"), item.get("specification"),
-                            toIntQuantity(item.get("quantity")), item.get("estimated_price"));
+                    insertGeneratedEntryItem(entryId, entryNo, item.get("device_name"), null,
+                            item.get("specification"), item.get("quantity"), item.get("estimated_price"),
+                            null, null, null);
                 }
             }
         } else {
@@ -375,6 +367,33 @@ public class PurchaseAcceptanceController {
         result.put("entry_no", entryNo);
         result.put("trace_no", traceNo);
         return Result.ok(result);
+    }
+
+    /** 验收通过生成入库明细：对齐手工入库 W.6 冗余列（entry_no / 厂家 / 规格） */
+    private void insertGeneratedEntryItem(UUID entryId, String entryNo, Object deviceName, Object brand,
+            Object specification, Object quantity, Object unitPrice, Object amount,
+            Object manufacturerId, Object manufacturerName) {
+        if (deviceName == null || deviceName.toString().isBlank()) return;
+        Object qty = quantity != null ? quantity : 1;
+        Object total = amount;
+        if (total == null && unitPrice != null) {
+            try {
+                double q = qty instanceof Number n ? n.doubleValue() : Double.parseDouble(qty.toString());
+                double p = unitPrice instanceof Number n ? n.doubleValue() : Double.parseDouble(unitPrice.toString());
+                total = Math.round(q * p * 100.0) / 100.0;
+            } catch (NumberFormatException ignored) {
+                total = unitPrice;
+            }
+        }
+        String spec = blankToNull(specification);
+        jdbc.update("""
+                INSERT INTO device_entry_item (
+                    id, entry_id, entry_no, device_name, brand, model, specification,
+                    quantity, unit_price, total_price, manufacturer_id, manufacturer_name, created_at
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,NOW())
+                """,
+                UUID.randomUUID(), entryId, entryNo, deviceName, blankToNull(brand),
+                spec, spec, qty, unitPrice, total, parseUuid(manufacturerId), blankToNull(manufacturerName));
     }
 
     private static Integer toIntQuantity(Object v) {

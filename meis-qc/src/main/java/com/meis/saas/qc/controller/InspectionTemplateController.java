@@ -1,6 +1,7 @@
 package com.meis.saas.qc.controller;
 
 import com.meis.saas.common.audit.OperationLog;
+import com.meis.saas.common.biz.CycleDaysSupport;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
@@ -45,20 +46,24 @@ public class InspectionTemplateController {
                         + SoftDeleteSupport.notDeletedClause(jdbc, "inspection_template", null), id).isEmpty();
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> items = (List<Map<String, Object>>) body.getOrDefault("items", List.of());
+        CycleDaysSupport.applyToBody(body);
         if (!exists) {
             jdbc.update("""
-                INSERT INTO inspection_template (id, template_code, template_name, inspection_type_id, category_id, description, estimated_duration, is_active)
-                VALUES (?::uuid,?,?,?::uuid,?::uuid,?,?,?)
+                INSERT INTO inspection_template (id, template_code, template_name, inspection_type_id, category_id,
+                    description, estimated_duration, cycle_type, cycle_value, cycle_days, is_active)
+                VALUES (?::uuid,?,?,?::uuid,?::uuid,?,?,?,?,?,?)
                 """, id, body.get("template_code"), body.get("template_name"), blankToNull(body.get("inspection_type_id")),
                     blankToNull(body.get("category_id")), body.get("description"), body.get("estimated_duration"),
+                    body.get("cycle_type"), body.get("cycle_value"), body.get("cycle_days"),
                     body.getOrDefault("is_active", true));
         } else {
             jdbc.update("""
                 UPDATE inspection_template SET template_code=?, template_name=?, inspection_type_id=?::uuid, category_id=?::uuid,
-                    description=?, estimated_duration=?, is_active=?, updated_at=NOW()
+                    description=?, estimated_duration=?, cycle_type=?, cycle_value=?, cycle_days=?, is_active=?, updated_at=NOW()
                 WHERE id=?::uuid
                 """, body.get("template_code"), body.get("template_name"), blankToNull(body.get("inspection_type_id")),
                     blankToNull(body.get("category_id")), body.get("description"), body.get("estimated_duration"),
+                    body.get("cycle_type"), body.get("cycle_value"), body.get("cycle_days"),
                     body.get("is_active"), id);
         }
         saveItems(id, items == null ? List.of() : items);

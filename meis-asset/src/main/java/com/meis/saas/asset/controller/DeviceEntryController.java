@@ -124,18 +124,21 @@ public class DeviceEntryController {
             SoftDeleteSupport.applyInsertAudit(jdbc, "device_entry", audit);
             UUID createdBy = parseUuid(audit.get("created_by"));
             String createdByName = blankToNull(audit.get("created_by_name"));
+            UUID operatorId = parseUuid(body.get("operator_id"));
+            if (operatorId == null) operatorId = createdBy;
+            String operatorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, operatorId);
             jdbc.update("""
                 INSERT INTO device_entry (
-                    id, entry_no, contract_id, supplier_id, entry_date, entry_type, operator_id,
+                    id, entry_no, contract_id, supplier_id, entry_date, entry_type, operator_id, operator_name,
                     quality_check_passed, quality_checker_id, quality_check_date, quality_check_report_url,
                     installation_completed, installation_date, status, remark, trace_no, warehouse_id,
                     invoice_amount, invoice_no, approval_status,
                     created_by, created_by_name, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
                 """,
                     id, entryNo,
                     contractId, supplierId, toDateOrNull(body.get("entry_date")),
-                    body.getOrDefault("entry_type", "purchase"), parseUuid(body.get("operator_id")),
+                    body.getOrDefault("entry_type", "purchase"), operatorId, operatorName,
                     body.get("quality_check_passed"), parseUuid(body.get("quality_checker_id")),
                     toDateOrNull(body.get("quality_check_date")), blankToNull(body.get("quality_check_report_url")),
                     body.get("installation_completed"), toDateOrNull(body.get("installation_date")),
@@ -160,9 +163,12 @@ public class DeviceEntryController {
             String updatedBy = SoftDeleteSupport.currentUserId();
             String updatedByName = updatedBy != null
                     ? SoftDeleteSupport.resolveUserDisplayName(jdbc, updatedBy) : null;
+            UUID operatorId = parseUuid(body.get("operator_id"));
+            String operatorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, operatorId);
             jdbc.update("""
                 UPDATE device_entry SET
-                    contract_id=?, supplier_id=?, warehouse_id=?, entry_date=?, entry_type=?, operator_id=?,
+                    contract_id=?, supplier_id=?, warehouse_id=?, entry_date=?, entry_type=?,
+                    operator_id=?, operator_name=?,
                     quality_check_passed=?, quality_checker_id=?, quality_check_date=?, quality_check_report_url=?,
                     installation_completed=?, installation_date=?, status=?, remark=?,
                     invoice_amount=?, invoice_no=?,
@@ -170,7 +176,7 @@ public class DeviceEntryController {
                 WHERE id=?
                 """,
                     contractId, supplierId, warehouseId, toDateOrNull(body.get("entry_date")),
-                    body.get("entry_type"), parseUuid(body.get("operator_id")),
+                    body.get("entry_type"), operatorId, operatorName,
                     body.get("quality_check_passed"), parseUuid(body.get("quality_checker_id")),
                     toDateOrNull(body.get("quality_check_date")), blankToNull(body.get("quality_check_report_url")),
                     body.get("installation_completed"), toDateOrNull(body.get("installation_date")),

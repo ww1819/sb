@@ -110,6 +110,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'status', label: '合同状态', dictType: 'contract_status', list: true, group: 'basic', form: false }
   ],
   purchase_contract_item: [
+    { prop: 'contract_code', label: '合同编号', detail: true, readonly: true, form: false },
     { prop: 'device_name', label: '设备名称', detail: true, required: true },
     { prop: 'specification', label: '设备规格型号', detail: true },
     { prop: 'brand', label: '品牌', detail: true },
@@ -372,7 +373,14 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'contract_id', label: '采购合同', linkTable: 'purchase_contract', group: 'basic' },
     { prop: 'entry_date', label: '入库日期', type: 'date', list: true, group: 'basic', width: 120 },
     { prop: 'entry_type', label: '入库类型', dictType: 'entry_type', list: true, group: 'basic', width: 110 },
-    { prop: 'operator_id', label: '经办人', linkTable: 'sys_user', group: 'basic' },
+    {
+      prop: 'operator_id',
+      label: '经办人',
+      linkTable: 'sys_user',
+      group: 'basic',
+      fillFromLink: { operator_name: 'real_name' }
+    },
+    { prop: 'operator_name', label: '经办人', list: true, group: 'basic', readonly: true, form: false, width: 100 },
     { prop: 'remark', label: '备注', group: 'basic' },
     { prop: 'contract_code', label: '合同编号', list: true, group: 'basic', readonly: true, form: false, width: 140 },
     { prop: 'supplier_name', label: '供应商', list: true, group: 'basic', readonly: true, form: false, width: 140 },
@@ -393,6 +401,8 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'status', label: '入库业务状态', dictType: 'entry_status', group: 'basic', form: false }
   ],
   device_entry_item: [
+    { prop: 'entry_no', label: '入库单号', list: true, detail: true, readonly: true, form: false, width: 140 },
+    { prop: 'device_code', label: '资产编码', list: true, detail: true, width: 140 },
     { prop: 'device_name', label: '设备名称', list: true, detail: true, required: true, width: 140 },
     { prop: 'specification', label: '规格型号', detail: true, width: 120 },
     { prop: 'unit', label: '单位', detail: true, width: 72 },
@@ -403,6 +413,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'dept_id', label: '申请科室', linkTable: 'department', detail: true, width: 120 },
     { prop: 'brand', label: '品牌', detail: true, width: 100 },
     { prop: 'manufacturer_id', label: '生产厂家', linkTable: 'manufacturer', detail: true, width: 140 },
+    { prop: 'manufacturer_name', label: '生产厂家', detail: true, readonly: true, form: false, width: 140 },
     { prop: 'factory_code', label: '出厂编码', detail: true, width: 120 },
     { prop: 'financial_code', label: '财务编码', detail: true, width: 110 },
     { prop: 'depreciation_years', label: '折旧年限', type: 'number', detail: true, width: 90 },
@@ -420,7 +431,15 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'dept_id', label: '科室', linkTable: 'department', linkHideCode: true, list: true, group: 'basic', width: 120 },
     { prop: 'created_by_name', label: '制单人', list: true, group: 'basic', readonly: true, form: true, width: 100 },
     { prop: 'outbound_date', label: '制单日期', type: 'date', list: true, group: 'basic', readonly: true, form: true, width: 120 },
-    { prop: 'receiver_id', label: '领用人', linkTable: 'sys_user', list: true, group: 'basic' },
+    {
+      prop: 'receiver_id',
+      label: '领用人',
+      linkTable: 'sys_user',
+      list: true,
+      group: 'basic',
+      fillFromLink: { receiver_name: 'real_name' }
+    },
+    { prop: 'receiver_name', label: '领用人', list: true, group: 'basic', readonly: true, form: false, width: 100 },
     { prop: 'purpose', label: '用途', group: 'basic' },
     { prop: 'total_amount', label: '金额', type: 'number', list: true, group: 'basic', readonly: true, form: true, width: 110 },
     { prop: 'approved_by_name', label: '审核人', list: true, group: 'basic', readonly: true, form: true, width: 100 },
@@ -481,7 +500,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'supervisor_id', label: '监盘人', linkTable: 'sys_user' },
     { prop: 'created_by', label: '制单人', linkTable: 'sys_user', list: true, readonly: true },
     { prop: 'created_at', label: '制单时间', type: 'datetime', list: true, readonly: true },
-    { prop: 'approved_by', label: '审核人', linkTable: 'sys_user', list: true, readonly: true },
+    { prop: 'approved_by_name', label: '审核人', list: true, readonly: true, form: false },
     { prop: 'approved_at', label: '审核时间', type: 'datetime', list: true, readonly: true },
     { prop: 'audit_status', label: '审核状态', dictType: 'audit_status', list: true, readonly: true },
     { prop: 'total_count', label: '应盘数量', type: 'number', list: true, readonly: true },
@@ -507,7 +526,14 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'warehouse_id', label: '仓库', linkTable: 'warehouse', linkHideCode: true, group: 'basic' },
     { prop: 'dept_id', label: '科室', linkTable: 'department', list: true, group: 'basic', width: 120 },
     { prop: 'total_amount', label: '金额', type: 'number', list: true, group: 'basic', readonly: true, form: true, width: 110 },
-    { prop: 'returner_id', label: '退库人', linkTable: 'sys_user', group: 'basic' },
+    {
+      prop: 'returner_id',
+      label: '退库人',
+      linkTable: 'sys_user',
+      group: 'basic',
+      fillFromLink: { returner_name: 'real_name' }
+    },
+    { prop: 'returner_name', label: '退库人', list: true, group: 'basic', readonly: true, form: false, width: 100 },
     { prop: 'return_date', label: '制单日期', type: 'date', list: true, group: 'basic', readonly: true, form: true, width: 120 },
     { prop: 'created_by_name', label: '制单人', list: true, group: 'basic', readonly: true, form: true, width: 100 },
     { prop: 'reason', label: '退库原因', list: true, group: 'basic', width: 160 },
@@ -597,9 +623,11 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'impact_description', label: '影响描述', type: 'textarea', group: 'event' },
     { prop: 'status', label: '处理状态', dictType: 'adverse_status', list: true, group: 'workflow', readonly: true },
     { prop: 'handler_id', label: '处理人', linkTable: 'sys_user', group: 'workflow' },
+    { prop: 'handler_name', label: '处理人', list: true, group: 'workflow', readonly: true, form: false },
     { prop: 'handle_measures', label: '处理措施', type: 'textarea', group: 'workflow' },
     { prop: 'handle_time', label: '处理时间', type: 'datetime', group: 'workflow', readonly: true },
     { prop: 'reviewer_id', label: '审核人', linkTable: 'sys_user', group: 'workflow' },
+    { prop: 'reviewer_name', label: '审核人', list: true, group: 'workflow', readonly: true, form: false },
     { prop: 'review_comment', label: '审核意见', type: 'textarea', group: 'workflow' },
     { prop: 'review_time', label: '审核时间', type: 'datetime', group: 'workflow', readonly: true },
     { prop: 'reported_to_authority', label: '已报监管', type: 'boolean', list: true, group: 'authority' },
@@ -643,6 +671,9 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'template_code', label: '模板编码', list: true, required: true },
     { prop: 'template_name', label: '模板名称', list: true, required: true },
     { prop: 'inspection_type_id', label: '巡检类型', linkTable: 'inspection_type', list: true },
+    { prop: 'cycle_type', label: '周期类型', dictType: 'cycle_type', list: true },
+    { prop: 'cycle_value', label: '周期值', type: 'number' },
+    { prop: 'cycle_days', label: '周期(天)', type: 'number', list: true, readonly: true, form: true },
     { prop: 'description', label: '说明', type: 'textarea' },
     { prop: 'estimated_duration', label: '预计工时(分)', type: 'number' },
     { prop: 'is_active', label: '启用', type: 'boolean', list: true }
@@ -650,12 +681,35 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   inspection_plan: [
     { prop: 'plan_no', label: '计划单号', list: true, readonly: true },
     { prop: 'plan_name', label: '计划名称', list: true, required: true },
-    { prop: 'template_id', label: '巡检模板', linkTable: 'inspection_template', list: true },
+    {
+      prop: 'template_id',
+      label: '巡检模板',
+      linkTable: 'inspection_template',
+      list: true,
+      fillFromLink: {
+        template_name: 'template_name',
+        inspection_type_id: 'inspection_type_id',
+        cycle_type: 'cycle_type',
+        cycle_value: 'cycle_value',
+        cycle_days: 'cycle_days'
+      }
+    },
     { prop: 'inspection_type_id', label: '巡检类别', linkTable: 'inspection_type', list: true },
     { prop: 'dept_id', label: '责任科室', linkTable: 'department', list: true },
-    { prop: 'cycle_days', label: '周期(天)', type: 'number', list: true },
+    {
+      prop: 'assigned_inspector_id',
+      label: '责任人',
+      linkTable: 'sys_user',
+      linkHideCode: true,
+      fillFromLink: { assigned_inspector_name: 'real_name' }
+    },
+    { prop: 'assigned_inspector_name', label: '责任人', list: true, readonly: true, form: false },
+    { prop: 'cycle_type', label: '周期类型', dictType: 'cycle_type', list: true },
+    { prop: 'cycle_value', label: '周期值', type: 'number' },
+    { prop: 'cycle_days', label: '周期(天)', type: 'number', list: true, readonly: true, form: true },
     { prop: 'next_due_date', label: '最近到期(汇总)', type: 'date', list: true, readonly: true },
     { prop: 'approval_status', label: '审核状态', dictType: 'inspect_approval_status', list: true },
+    { prop: 'approved_by_name', label: '审核人', list: true, readonly: true, form: false },
     { prop: 'status', label: '状态', dictType: 'plan_status', list: true }
   ],
   inspection_execution: [
@@ -663,6 +717,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'plan_no', label: '计划单号', list: true, readonly: true },
     { prop: 'source_type', label: '来源', list: true, readonly: true },
     { prop: 'template_id', label: '巡检模板', linkTable: 'inspection_template', list: true },
+    { prop: 'template_name', label: '模板名称', list: true, readonly: true, form: false },
     { prop: 'planned_date', label: '计划日期', type: 'date', list: true },
     { prop: 'status', label: '状态', dictType: 'inspect_exec_status', list: true },
     { prop: 'submitter_name', label: '提交人', list: true, readonly: true },
@@ -672,12 +727,15 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   inspection_execution_item: [
     { prop: 'device_code', label: '设备编码', list: true, readonly: true },
     { prop: 'device_name', label: '设备名称', list: true, readonly: true },
+    { prop: 'dept_name', label: '科室', list: true, readonly: true },
     { prop: 'overall_result', label: '巡检结果', dictType: 'inspect_result', list: true },
     { prop: 'status', label: '状态', dictType: 'inspect_exec_item_status', list: true }
   ],
   inspection_record: [
     { prop: 'record_no', label: '记录编号', list: true },
     { prop: 'plan_id', label: '巡检计划', linkTable: 'inspection_plan', list: true },
+    { prop: 'device_code', label: '设备编码', list: true, readonly: true },
+    { prop: 'device_name', label: '设备名称', list: true, readonly: true },
     { prop: 'inspector_id', label: '巡检人', linkTable: 'sys_user', list: true },
     { prop: 'inspect_date', label: '巡检日期', type: 'date', list: true },
     { prop: 'result_summary', label: '巡检结果', type: 'textarea', list: true },
@@ -744,6 +802,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'next_due_date', label: '下次检定', type: 'date', list: true },
     { prop: 'last_calibrated_at', label: '上次检定', type: 'date' },
     { prop: 'approval_status', label: '审核状态', dictType: 'metrology_approval_status', list: true },
+    { prop: 'approved_by_name', label: '审核人', list: true, readonly: true, form: false },
     { prop: 'status', label: '状态', dictType: 'plan_status', list: true }
   ],
   metrology_execution: [
@@ -852,7 +911,16 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   maintenance_template: [
     { prop: 'template_code', label: '模板编码', list: true, required: true },
     { prop: 'template_name', label: '模板名称', list: true, required: true },
-    { prop: 'maintenance_level_id', label: '保养级别', linkTable: 'maintenance_level', list: true },
+    {
+      prop: 'maintenance_level_id',
+      label: '保养级别',
+      linkTable: 'maintenance_level',
+      list: true,
+      fillFromLink: { maintenance_level: 'level_code' }
+    },
+    { prop: 'cycle_type', label: '周期类型', dictType: 'cycle_type', list: true },
+    { prop: 'cycle_value', label: '周期值', type: 'number' },
+    { prop: 'cycle_days', label: '周期(天)', type: 'number', list: true, readonly: true, form: true },
     { prop: 'description', label: '说明', type: 'textarea' },
     { prop: 'estimated_duration', label: '预计工时(分)', type: 'number' },
     { prop: 'is_active', label: '启用', type: 'boolean', list: true }
@@ -860,14 +928,36 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   maintenance_plan: [
     { prop: 'plan_no', label: '计划单号', list: true, readonly: true },
     { prop: 'plan_name', label: '计划名称', list: true, required: true },
-    { prop: 'template_id', label: '保养模板', linkTable: 'maintenance_template', list: true },
+    {
+      prop: 'template_id',
+      label: '保养模板',
+      linkTable: 'maintenance_template',
+      list: true,
+      fillFromLink: {
+        template_name: 'template_name',
+        maintenance_level_id: 'maintenance_level_id',
+        maintenance_level: 'maintenance_level',
+        cycle_type: 'cycle_type',
+        cycle_value: 'cycle_value',
+        cycle_days: 'cycle_days'
+      }
+    },
     { prop: 'maintenance_level', label: '保养级别', list: true },
     { prop: 'dept_id', label: '责任科室', linkTable: 'department' },
+    { prop: 'campus_id', label: '院区', linkTable: 'campus' },
+    {
+      prop: 'assigned_user_id',
+      label: '责任人',
+      linkTable: 'sys_user',
+      linkHideCode: true,
+      fillFromLink: { assigned_user_name: 'real_name' }
+    },
     { prop: 'cycle_type', label: '周期类型', dictType: 'cycle_type', list: true },
     { prop: 'cycle_value', label: '周期值', type: 'number' },
-    { prop: 'cycle_days', label: '周期(天)', type: 'number', list: true },
+    { prop: 'cycle_days', label: '周期(天)', type: 'number', list: true, readonly: true, form: true },
     { prop: 'next_due_date', label: '最近到期(汇总)', type: 'date', list: true, readonly: true },
     { prop: 'approval_status', label: '审核状态', dictType: 'maintain_approval_status', list: true },
+    { prop: 'approved_by_name', label: '审核人', list: true, readonly: true, form: false },
     { prop: 'status', label: '状态', dictType: 'maintain_plan_status', list: true }
   ],
   maintenance_execution: [
@@ -875,6 +965,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'plan_no', label: '计划单号', list: true, readonly: true },
     { prop: 'source_type', label: '来源', list: true, readonly: true },
     { prop: 'template_id', label: '保养模板', linkTable: 'maintenance_template', list: true },
+    { prop: 'template_name', label: '模板名称', list: true, readonly: true, form: false },
     { prop: 'maintenance_level', label: '保养级别', list: true },
     { prop: 'planned_date', label: '计划日期', type: 'date', list: true },
     { prop: 'status', label: '状态', dictType: 'maintain_exec_status', list: true },
@@ -936,6 +1027,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   maintenance_execution_item: [
     { prop: 'device_code', label: '设备编码', list: true, readonly: true },
     { prop: 'device_name', label: '设备名称', list: true, readonly: true },
+    { prop: 'dept_name', label: '科室', list: true, readonly: true },
     { prop: 'overall_result', label: '保养结果', dictType: 'maintain_result', list: true },
     { prop: 'status', label: '状态', dictType: 'maintain_exec_item_status', list: true }
   ],
@@ -943,12 +1035,12 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'record_no', label: '记录编号', list: true, readonly: true },
     { prop: 'plan_id', label: '保养计划', linkTable: 'maintenance_plan', list: true },
     { prop: 'device_id', label: '设备', linkTable: 'medical_device', list: true },
-    { prop: 'maintainer_id', label: '保养人', linkTable: 'sys_user', list: true },
-    { prop: 'maintained_at', label: '保养时间', type: 'datetime', list: true },
+    { prop: 'device_code', label: '设备编码', list: true, readonly: true },
+    { prop: 'device_name', label: '设备名称', list: true, readonly: true },
+    { prop: 'executor_id', label: '保养人', linkTable: 'repair_engineer', list: true },
+    { prop: 'execute_start_time', label: '保养时间', type: 'datetime', list: true },
     { prop: 'maintenance_level', label: '保养级别', dictType: 'maintenance_level', list: true },
-    { prop: 'result', label: '保养结果', dictType: 'maintain_result', list: true },
-    { prop: 'findings', label: '发现问题', type: 'textarea' },
-    { prop: 'actions_taken', label: '处理措施', type: 'textarea' },
+    { prop: 'overall_result', label: '保养结果', dictType: 'maintain_result', list: true },
     { prop: 'status', label: '状态', dictType: 'maintain_record_status', list: true }
   ],
   life_support_device: [
@@ -1053,6 +1145,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'reason', label: '借调原因', type: 'textarea', list: true, group: 'workflow' },
     { prop: 'status', label: '状态', dictType: 'loan_status', list: true, group: 'workflow', readonly: true },
     { prop: 'applicant_name', label: '申请人', list: true, group: 'workflow', readonly: true },
+    { prop: 'approved_by_name', label: '审核人', list: true, group: 'workflow', readonly: true, form: false },
     { prop: 'loan_time', label: '借出时间', type: 'datetime', group: 'time', readonly: true },
     { prop: 'return_time', label: '归还时间', type: 'datetime', group: 'time', readonly: true },
     { prop: 'remark', label: '备注', type: 'textarea', group: 'remark' }
@@ -1066,12 +1159,14 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'condition_desc', label: '设备状况', type: 'textarea', list: true, group: 'workflow' },
     { prop: 'status', label: '状态', dictType: 'return_status', list: true, group: 'workflow', readonly: true },
     { prop: 'applicant_name', label: '申请人', list: true, group: 'workflow', readonly: true },
+    { prop: 'approved_by_name', label: '审核人', list: true, group: 'workflow', readonly: true, form: false },
     { prop: 'remark', label: '备注', type: 'textarea', group: 'remark' }
   ],
   shared_device_fee: [
     { prop: 'fee_no', label: '收费单号', list: true, group: 'basic', readonly: true },
     { prop: 'loan_id', label: '借调单', linkTable: 'shared_device_loan', list: true, group: 'basic', required: true },
     { prop: 'loan_no', label: '借调单号', list: true, group: 'basic', readonly: true },
+    { prop: 'device_code', label: '设备编码', list: true, group: 'basic', readonly: true },
     { prop: 'device_name', label: '设备名称', list: true, group: 'basic', readonly: true },
     { prop: 'fee_amount', label: '收费金额', type: 'number', list: true, group: 'finance', required: true },
     { prop: 'fee_date', label: '收费日期', type: 'date', list: true, group: 'finance', required: true },
@@ -1098,7 +1193,16 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   pm_template: [
     { prop: 'template_code', label: '模板编码', list: true, required: true },
     { prop: 'template_name', label: '模板名称', list: true, required: true },
-    { prop: 'pm_type_id', label: 'PM类型', linkTable: 'pm_type', list: true },
+    {
+      prop: 'pm_type_id',
+      label: 'PM类型',
+      linkTable: 'pm_type',
+      list: true,
+      fillFromLink: { pm_type: 'type_code' }
+    },
+    { prop: 'cycle_type', label: '周期类型', dictType: 'cycle_type', list: true },
+    { prop: 'cycle_value', label: '周期值', type: 'number' },
+    { prop: 'cycle_days', label: '周期(天)', type: 'number', list: true, readonly: true, form: true },
     { prop: 'description', label: '说明', type: 'textarea' },
     { prop: 'estimated_duration', label: '预计工时(分)', type: 'number' },
     { prop: 'is_active', label: '启用', type: 'boolean', list: true }
@@ -1106,14 +1210,36 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   pm_plan: [
     { prop: 'plan_no', label: '计划单号', list: true, readonly: true },
     { prop: 'plan_name', label: '计划名称', list: true, required: true },
-    { prop: 'template_id', label: 'PM模板', linkTable: 'pm_template', list: true },
+    {
+      prop: 'template_id',
+      label: 'PM模板',
+      linkTable: 'pm_template',
+      list: true,
+      fillFromLink: {
+        template_name: 'template_name',
+        pm_type_id: 'pm_type_id',
+        pm_type: 'pm_type',
+        cycle_type: 'cycle_type',
+        cycle_value: 'cycle_value',
+        cycle_days: 'cycle_days'
+      }
+    },
     { prop: 'pm_type_id', label: 'PM类别', linkTable: 'pm_type', list: true },
     { prop: 'dept_id', label: '责任科室', linkTable: 'department' },
+    { prop: 'campus_id', label: '院区', linkTable: 'campus' },
+    {
+      prop: 'assigned_user_id',
+      label: '责任人',
+      linkTable: 'sys_user',
+      linkHideCode: true,
+      fillFromLink: { assigned_user_name: 'real_name' }
+    },
     { prop: 'cycle_type', label: '周期类型', dictType: 'cycle_type', list: true },
     { prop: 'cycle_value', label: '周期值', type: 'number' },
-    { prop: 'cycle_days', label: '周期(天)', type: 'number', list: true },
+    { prop: 'cycle_days', label: '周期(天)', type: 'number', list: true, readonly: true, form: true },
     { prop: 'next_due_date', label: '最近到期(汇总)', type: 'date', list: true, readonly: true },
     { prop: 'approval_status', label: '审核状态', dictType: 'maintain_approval_status', list: true },
+    { prop: 'approved_by_name', label: '审核人', list: true, readonly: true, form: false },
     { prop: 'status', label: '状态', dictType: 'maintain_plan_status', list: true }
   ],
   pm_execution: [
@@ -1121,6 +1247,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'plan_no', label: '计划单号', list: true, readonly: true },
     { prop: 'source_type', label: '来源', list: true, readonly: true },
     { prop: 'template_id', label: 'PM模板', linkTable: 'pm_template', list: true },
+    { prop: 'template_name', label: '模板名称', list: true, readonly: true, form: false },
     { prop: 'planned_date', label: '计划日期', type: 'date', list: true },
     { prop: 'status', label: '状态', dictType: 'maintain_exec_status', list: true },
     { prop: 'submitter_name', label: '提交人', list: true, readonly: true },
@@ -1130,6 +1257,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   pm_execution_item: [
     { prop: 'device_code', label: '设备编码', list: true, readonly: true },
     { prop: 'device_name', label: '设备名称', list: true, readonly: true },
+    { prop: 'dept_name', label: '科室', list: true, readonly: true },
     { prop: 'overall_result', label: '维护结果', dictType: 'maintain_result', list: true },
     { prop: 'status', label: '状态', dictType: 'maintain_exec_item_status', list: true }
   ],

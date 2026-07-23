@@ -434,7 +434,12 @@ const formFields = computed(() => {
     if (all.length) return all
     return listFields.value
   }
-  const s = schema.value.filter((f) => !f.readonly && f.form !== false)
+  // readonly 默认不进新建/编辑；显式 form:true 的只读字段（如派生周期天数）仍展示
+  const s = schema.value.filter((f) => {
+    if (f.form === false) return false
+    if (f.readonly && f.form !== true) return false
+    return true
+  })
   if (s.length) return s
   return listFields.value
 })
