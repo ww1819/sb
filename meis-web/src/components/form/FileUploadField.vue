@@ -4,7 +4,16 @@
     <el-upload :show-file-list="false" :http-request="onUpload" :disabled="disabled">
       <el-button type="primary" link :loading="uploading">上传</el-button>
     </el-upload>
+    <el-button
+      v-if="!disabled && enableEloam"
+      type="primary"
+      link
+      @click="eloamVisible = true"
+    >
+      高拍仪
+    </el-button>
     <el-link v-if="model" :href="fileUrl" target="_blank" type="primary">查看</el-link>
+    <EloamCaptureDialog v-model="eloamVisible" :max="1" @done="onEloamDone" />
   </div>
 </template>
 
@@ -12,14 +21,21 @@
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/api/http'
+import EloamCaptureDialog from '@/components/form/EloamCaptureDialog.vue'
 
-const props = defineProps<{
-  modelValue?: string
-  placeholder?: string
-  disabled?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    modelValue?: string
+    placeholder?: string
+    disabled?: boolean
+    /** 是否显示高拍仪入口（PLT-CAM-01）；默认开启 */
+    enableEloam?: boolean
+  }>(),
+  { enableEloam: true }
+)
 const emit = defineEmits<{ 'update:modelValue': [v: string] }>()
 const uploading = ref(false)
+const eloamVisible = ref(false)
 
 const model = computed({
   get: () => props.modelValue ?? '',
@@ -52,6 +68,10 @@ async function onUpload(options: { file: File }) {
     uploading.value = false
   }
 }
+
+function onEloamDone(urls: string[]) {
+  if (urls[0]) model.value = urls[0]
+}
 </script>
 
 <style scoped>
@@ -60,8 +80,10 @@ async function onUpload(options: { file: File }) {
   align-items: center;
   gap: 8px;
   width: 100%;
+  flex-wrap: wrap;
 }
 .file-upload-field .el-input {
   flex: 1;
+  min-width: 160px;
 }
 </style>

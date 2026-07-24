@@ -59,14 +59,16 @@ $env:PGPASSWORD='aspt'
 
 ### 2.6 MinIO（可选，文件上传时再装）
 
-本地开发可 **跳过**。仅在使用设备附件、文件上传功能时需要。
+本地开发可 **跳过**。仅在使用设备附件、文件上传、高拍仪「采用并上传」时需要。
+
+> **端口注意（PLT-CAM）**：新良田 Eloam 本机服务固定占 **9000**。MinIO **勿再占用 9000**，否则 `meis-file` 会连到高拍仪并报 `Non-XML response … 404`。本地 API 用 **9100**。
 
 ```cmd
-minio server D:\minio-data --console-address ":9001"
+minio server D:\minio-data --address ":9100" --console-address ":9101"
 ```
 
-- API：`http://localhost:9000`
-- 控制台：`http://localhost:9001`
+- API：`http://localhost:9100`（`meis-file` 默认 `MINIO_ENDPOINT`）
+- 控制台：`http://localhost:9101`
 - 默认账号：`minioadmin` / `minioadmin`
 
 ### 2.7 Nacos（可选）
@@ -196,7 +198,7 @@ powershell -File scripts\restart.ps1 -Profile dev -Build
 | `POSTGRES_USER` | med |
 | `POSTGRES_PASSWORD` | med123456 |
 | `NACOS_SERVER` | localhost:8848 |
-| `MINIO_ENDPOINT` | http://localhost:9000 |
+| `MINIO_ENDPOINT` | http://localhost:9100（勿与 Eloam 抢 9000） |
 | `MINIO_ACCESS_KEY` | minioadmin |
 | `MINIO_SECRET_KEY` | minioadmin |
 

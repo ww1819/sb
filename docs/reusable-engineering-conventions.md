@@ -4,7 +4,7 @@
 > **来源**：`docs/meis-requirements.md` 附录 Q / C / D / E / F / G / H / I / R / S / T 等。  
 > **用法**：新系统可整份复制后，按「落地映射」改路径与模块名；MEIS 专属细节见文末附录。
 
-**版本**：1.21（2026-07-23）
+**版本**：1.23（2026-07-24）
 
 ---
 
@@ -98,9 +98,10 @@
 | 索引 | V2 |
 | 一次性种子 / 历史注释 | V3 / V4（尽量冻结） |
 | 补全字段 | R__（审计列可与业务列分文件，便于非事务逐条 ALTER） |
-| 更正数据 | R__ data_fix（菜单、字典、回填） |
+| 更正数据 | R__ data_fix（字典、回填等非菜单） |
+| 菜单目录 | **独立** R__ menus（唯一维护点；勿散落 data_fix / 临时脚本 / 业务库种子） |
 
-平台库 vs 业务库分目录；菜单幂等同步放 data_fix，勿再拆 `V5+`。
+平台库 vs 业务库分目录；菜单幂等同步放 **专用 menus 槽位**，勿再拆 `V5+`，也勿与 data_fix 混写。
 
 ### 2.2 多 schema / search_path 防护
 
@@ -319,6 +320,19 @@
 
 落地映射：MEIS OPS.16.10 / 16.26 / 16.27 / 16.28（含纳入申请申请途径/确认途径）。
 
+### 5.11 本机外设（高拍仪等）经本地代理
+
+USB 外设（如文档高拍仪）**勿**由浏览器直连硬件；经厂商本机代理服务（常见 WebSocket `127.0.0.1:端口`）：
+
+| 项 | 要求 |
+|----|------|
+| **封装** | 前端薄封装（连接/预览/拍照/关闭）；勿整页拷贝厂商 demo |
+| **上传** | 外设产物（base64/文件）走系统统一文件上传 API，业务只存 URL |
+| **降级** | 无本机服务时友好提示，并保留普通上传/手机相机入口 |
+| **范围** | 仅工作站浏览器；移动端不接本机代理 |
+
+落地映射：MEIS PLT-CAM-01（新良田 Eloam `ws://127.0.0.1:9000`）。开发机注意：Eloam 与对象存储（MinIO）**勿共占 9000**；MEIS 本地 MinIO 默认 API **9100**。
+
 ---
 
 ## 6. 单据草稿 / 提交 / 撤回（业务模式）
@@ -499,7 +513,7 @@
 |----------|---------------|-----------|
 | 协作流程 | `meis-requirements.md` 附录 Q | `.cursor/rules/requirements-delivery-flow.mdc` |
 | 待开发池 | 第 7 章 | — |
-| 迁库固定槽位 | 附录 D.6 / F | `migrations/{public,tenant}/`：`V1`/`V2`/`R__columns_*`/`R__data_fix` |
+| 迁库固定槽位 | 附录 D.6 / F / **PLT-MENU-01** | `migrations/{public,tenant}/`：`V1`/`V2`/`R__columns_*`/`R__data_fix`；**菜单**→`public/R__menus.sql` |
 | search_path 串库 | 附录 D.5 | `TenantSchemaShadowGuard`、`V1TenantGapScan` |
 | 标准七列/软删 | 附录 G / I / K / G.10 | `SoftDeleteSupport`、`R__columns_audit.sql` |
 | 新表 CRUD 清单 | 附录 M.7 | DomainController / CrudPage |
@@ -514,6 +528,7 @@
 | 业务单号系统生成 | 约定包 §6.8、OPS.14 | `DailyBizNoSupport`；计划/执行 Controller 与 Generator |
 | 维修列表功能分列 | 附录 U.14.2 | `WorkorderListPage`（handle/verify 取消操作列、功能分列） |
 | 运维计划操作分列 / 已审核明细 | OPS.16.6–16.16、约定包 §5.7 / §5.8 / **§5.9** / **§5.10** | 三计划操作分列；明细执行/确认/删除；纳入申请+Web确认；编辑/执行分离；全确认即可审核；头表流式紧凑；途径齐套展示 |
+| 本机外设高拍仪 | PLT-CAM-01 / **02**、约定包 **§5.11** | `cameraVendors`；`CameraDebugPage`（系统管理）；设备档案高拍仪；通用上传入口 |
 | 变更记录/快照 | 附录 T（含 T.5） | `EntityChangeLogService` |
 | 主从保存 | 第 4 章 PLT-X-05 | 出入库/计划等专用保存 |
 | 业务冗余字段 | 附录 W（含 W.5 / **W.6**）、约定包 §6.2 / §6.3 | 设备/主数据 code+name；单据号下沉明细；人员姓名快照 |

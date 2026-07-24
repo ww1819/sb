@@ -1137,7 +1137,8 @@ export const pageRegistry: Record<string, PageConfig> = {
   },
   '/system/config': { title: '系统配置', apiBase: '/system', table: 'sys_config',
   enableView: true
-}
+},
+  '/system/camera-debug': { title: '高拍仪调试', apiBase: '/system', table: 'sys_config' }
 }
 
 export function getPageConfig(path: string): PageConfig | undefined {

@@ -432,22 +432,6 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
 
 -- [V11__purchase_phase101112.sql]
--- 采购预算报表菜单
-INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, sort_order) VALUES
-('purchase_report', 'mod_purchase', '预算执行', 'menu', '/purchase/report', 10)
-ON CONFLICT (menu_code) DO NOTHING;
-
--- [V11__purchase_phase101112.sql]
-INSERT INTO sys_package_menu (package_code, menu_code)
-SELECT pkg, 'purchase_report' FROM (VALUES ('standard'), ('flagship')) AS p(pkg)
-ON CONFLICT DO NOTHING;
-
--- [V11__purchase_phase101112.sql]
-INSERT INTO sys_tenant_menu (tenant_id, menu_code)
-SELECT '00000000-0000-0000-0000-000000000001', 'purchase_report'
-FROM sys_menu WHERE menu_code = 'purchase_report'
-ON CONFLICT DO NOTHING;
-
--- [V11__purchase_phase101112.sql]
+-- 采购预算报表菜单已迁入 public/R__menus.sql（PLT-MENU-01），勿在租户脚本写 sys_menu
 UPDATE sys_role SET permissions = '{"menus":["mod_purchase","purchase_plan","purchase_project","purchase_contract","purchase_supplier","purchase_category","purchase_acceptance","purchase_manufacturer","purchase_dashboard","purchase_trace","purchase_report"],"buttons":[],"dataScope":"dept"}'::jsonb
 WHERE role_code = 'purchase_staff';

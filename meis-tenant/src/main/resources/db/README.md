@@ -17,14 +17,15 @@ public/
   V2__indexes.sql        # 索引
   V3__seed_data.sql      # 一次性种子（冻结）：演示租户、套餐、平台账号
   V4__comments.sql       # 历史注释回填（冻结）
-  R__data_fix.sql       # 菜单目录幂等同步 + 数据更正 / 补列（可重复）
+  R__data_fix.sql       # 非菜单数据更正 / 平台表补列（可重复）
+  R__menus.sql           # 菜单唯一维护点（sys_menu + 套餐/租户挂接，可重复）
 ```
 
 **约定**：
 
 1. **新表 / 新字段** → 只改 `V1__tables.sql`（`CREATE TABLE` 须含完整字段）
 2. **已有表加列** → `R__data_fix.sql` 单独一行 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
-3. **新菜单 / 菜单调整** → 只改 `R__data_fix.sql`（`INSERT ON CONFLICT` / `UPDATE`）
+3. **新菜单 / 菜单调整** → **只改** `R__menus.sql`（`INSERT ON CONFLICT`）；禁止写入 `R__data_fix`、租户脚本或临时 SQL
 4. **禁止**再新建 `V5+` / `V20+` 版本化迁移；原 V5–V21 已并入 R__
 5. dev 环境配置 `ignore-migration-patterns: *:missing`，删除旧版本脚本后 Flyway 可正常启动
 

@@ -1,5 +1,6 @@
 ﻿-- MEIS public 种子数据（一次性）：租户、套餐、平台账号
--- 业务菜单目录见 R__data_fix.sql（可重复执行、幂等）
+-- 菜单目录唯一维护点：R__menus.sql（PLT-MENU-01；可重复、幂等）
+-- 下方仅保留平台管理最小种子；完整业务菜单由 R__menus 同步
 
 INSERT INTO sys_tenant (id, tenant_code, tenant_name, schema_name, status, package_code)
 VALUES ('00000000-0000-0000-0000-000000000001', 'demo', '演示医院', 'tenant_demo', 'active', 'standard')

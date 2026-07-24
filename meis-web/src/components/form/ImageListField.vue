@@ -25,8 +25,16 @@
           <span v-else>+ 上传</span>
         </div>
       </el-upload>
+      <div
+        v-if="!disabled && enableEloam && urls.length < max"
+        class="add eloam-add"
+        @click="eloamVisible = true"
+      >
+        高拍仪
+      </div>
     </div>
-    <div class="hint">最多 {{ max }} 张，非必传</div>
+    <div class="hint">最多 {{ max }} 张，非必传；支持普通上传或本机高拍仪</div>
+    <EloamCaptureDialog v-model="eloamVisible" :max="remain" @done="onEloamDone" />
   </div>
 </template>
 
@@ -34,17 +42,20 @@
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/api/http'
+import EloamCaptureDialog from '@/components/form/EloamCaptureDialog.vue'
 
 const props = withDefaults(
   defineProps<{
     modelValue?: unknown
     disabled?: boolean
     max?: number
+    enableEloam?: boolean
   }>(),
-  { max: 3 }
+  { max: 3, enableEloam: true }
 )
 const emit = defineEmits<{ 'update:modelValue': [v: string[]] }>()
 const uploading = ref(false)
+const eloamVisible = ref(false)
 
 const urls = computed(() => {
   const v = props.modelValue
@@ -60,6 +71,7 @@ const urls = computed(() => {
   return [] as string[]
 })
 
+const remain = computed(() => Math.max(0, props.max - urls.value.length))
 const previewList = computed(() => urls.value.map(resolveUrl))
 
 function resolveUrl(u: string) {
@@ -102,6 +114,10 @@ async function onUpload(options: { file: File }) {
     uploading.value = false
   }
 }
+
+function onEloamDone(newUrls: string[]) {
+  setUrls([...urls.value, ...newUrls])
+}
 </script>
 
 <style scoped>
@@ -139,6 +155,11 @@ async function onUpload(options: { file: File }) {
   justify-content: center;
   color: var(--el-text-color-secondary);
   cursor: pointer;
+  font-size: 13px;
+}
+.eloam-add {
+  border-color: var(--el-color-primary-light-5);
+  color: var(--el-color-primary);
 }
 .hint {
   margin-top: 4px;

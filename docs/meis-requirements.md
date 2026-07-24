@@ -1,4 +1,4 @@
-﻿# MEIS 设备管理系统 — 需求与问题跟踪
+# MEIS 设备管理系统 — 需求与问题跟踪
 
 > **用途**：梳理、编写、评审 MEIS 全系统业务需求，并跟踪已知问题与技术债。  
 > 请在本文件中直接增删改；模块细节可拆分子文档后在此链接。
@@ -1924,6 +1924,12 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+| 2.131 | 2026-07-24 12:20:00 | — | PLT-CAM：本地 MinIO 改 9100，避免与 Eloam 9000 冲突导致上传 Non-XML 404 |
+| 2.130 | 2026-07-24 12:15:00 | — | PLT-OCR-01 修订：小程序+腾讯 API 采集；识别结果落从表；Web 确认回填 |
+| 2.129 | 2026-07-24 12:10:00 | — | BACKLOG-AST-11：铭牌图像识别回填台账（引擎待定：本地模型 / 外部 API） |
+| 2.128 | 2026-07-24 12:00:00 | — | PLT-MENU-01：菜单唯一脚本 `public/R__menus.sql`；剥离散落菜单 SQL |
+| 2.127 | 2026-07-24 11:50:00 | — | PLT-CAM-02：厂家可选、系统管理调试页、设备档案高拍仪 |
+| 2.126 | 2026-07-24 11:10:00 | — | PLT-CAM-01：新良田高拍仪 WebSocket 对接定稿并落地（Web） |
 | 2.125 | 2026-07-23 23:30:00 | — | MP.4 方案3落地：执行删图；报修表单+草稿撤回；OPS hub 体验 |
 | 2.124 | 2026-07-23 22:35:00 | — | MP.4：对照近期 App/OPS 审计小程序缺口（结论+待确认修补项） |
 | 2.123 | 2026-07-23 22:20:00 | — | OPS.16.28：执行审核人/时间齐套；纳入申请申请途径+确认途径 |
@@ -2183,6 +2189,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | BACKLOG-AST-07 | 资产 | 科室盘点申请 / 设备盘点报表完整业务（表结构、流程、报表） | AST-UI-07 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-AST-08 | 资产 | 资产动态统计完整业务（指标、图表、导出） | AST-UI-08 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-AST-10 | 资产 | 报废审核 / 报废查询完整业务（状态流转、列表筛选） | AST-UI-10 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
+| BACKLOG-AST-11 | 资产 | 铭牌识别：小程序腾讯 OCR 采集 → 结果落从表 → Web 确认回填台账 | [PLT-OCR-01](#plt-ocr-01-铭牌图像识别回填台账待开发2026-07-24) | P1 | 引擎倾向腾讯 API；密钥走后端；表结构/字段映射排期时定 | 可排期 |
 | BACKLOG-ANA-01 | 效益 | 效率分析完整业务（指标、图表、导出） | ANA-UI-01/02 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-ANA-02 | 效益 | 效益分析查询完整业务 | ANA-UI-02 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-ANA-03 | 效益 | 收费项目审核完整业务 | ANA-UI-02 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
@@ -2391,7 +2398,8 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | **一次性种子** | `V3__seed_data.sql`（冻结） | `V3__seed_data.sql` |
 | **历史注释** | `V4__comments.sql`（冻结） | `V4__comments.sql` |
 | **补全字段** | 平台列：写入 `R__data_fix.sql` 的 ALTER 段 | `R__columns_audit.sql`（七列）+ `R__columns_biz.sql`（业务列） |
-| **更正数据** | `R__data_fix.sql`（菜单等） | `R__data_fix.sql`（字典/回填） |
+| **更正数据** | `R__data_fix.sql`（非菜单） | `R__data_fix.sql`（字典/回填） |
+| **菜单目录** | **`R__menus.sql`（唯一）** | —（菜单属 public；禁止在租户脚本写 `sys_menu`） |
 
 本次整合：合并 `R__audit`+`R__is_deleted` → `R__columns_audit`；拆分原 `R__tenant_schema_sync` → `R__columns_biz` + `R__data_fix`；`V2__extensions` 更名为 `V2__indexes`；删除 `V20`/`V21`；`db/source/patches` 标记废弃。
 
@@ -2460,15 +2468,16 @@ powershell -File scripts/ensure-tenant-tables.ps1
 |------|------|
 | `public/V1__tables.sql` | 平台表全量 `CREATE TABLE` + `COMMENT ON`（含全部字段） |
 | `public/V2__indexes.sql` | 索引 |
-| `public/V3__seed_data.sql` | 一次性：演示租户、套餐、平台管理员 |
+| `public/V3__seed_data.sql` | 一次性：演示租户、套餐、平台管理员（平台菜单最小种子） |
 | `public/V4__comments.sql` | 历史注释回填 |
-| `public/R__data_fix.sql` | **菜单目录**幂等同步；**已有表**逐列 `ADD COLUMN` |
+| `public/R__menus.sql` | **菜单唯一维护点**（`sys_menu` + `sys_package_menu` + 活跃租户挂接） |
+| `public/R__data_fix.sql` | **非菜单**数据更正；**已有表**逐列 `ADD COLUMN` |
 
 ### F.2 操作规则
 
 1. **新平台表** → 写入 `V1__tables.sql`
-2. **平台表加列** → V1 补 `CREATE TABLE` 字段 + R__ 补一行 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
-3. **新菜单 / 改菜单** → 只改 `R__data_fix.sql`（`ON CONFLICT DO UPDATE`）
+2. **平台表加列** → V1 补 `CREATE TABLE` 字段 + `R__data_fix` 补一行 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
+3. **新菜单 / 改菜单** → **只改** `R__menus.sql`（`ON CONFLICT DO UPDATE`）；禁止写入 `R__data_fix`、租户 `V3`/`R__`、临时脚本
 4. **禁止**新建 `V5__xxx.sql` / `V20+` 等版本化脚本（原 V5–V21 已删除并并入 R__）
 5. `spring.flyway.ignore-migration-patterns: "*:missing"` + dev 环境 `repair`，兼容已执行过旧版本的库
 
@@ -2477,7 +2486,8 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 变更 | 说明 |
 |------|------|
 | 删除 | `V5`–`V19`（15 个模块菜单脚本） |
-| 新增 | `R__data_fix.sql`（基础菜单 + 各模块调整 + 套餐/租户授权） |
+| 历史 | 曾把菜单堆进 `R__data_fix.sql`（多段补丁，难维护） |
+| **PLT-MENU-01** | 菜单全量迁入 `R__menus.sql`；`R__data_fix` 不再含菜单语句 |
 | 精简 | `V3__seed_data.sql` 仅保留平台级一次性种子 |
 | 配置 | `application.yml` 增加 `ignore-migration-patterns` |
 
@@ -3205,10 +3215,10 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 | 主题 | 位置 |
 |------|------|
-| **跨项目可复用约定全集** | [reusable-engineering-conventions.md](reusable-engineering-conventions.md)（**v1.21**） |
+| **跨项目可复用约定全集** | [reusable-engineering-conventions.md](reusable-engineering-conventions.md)（**v1.23**） |
 | 数据库迁移双轨 / **固定槽位** / 串库防护 | [附录 D](#附录-d数据库迁移规范必读)（含 D.5 / D.6） |
 | 开发完成验收清单 | [附录 E](#附录-e开发完成验收清单必读) |
-| public schema 迁移 | [附录 F](#附录-fpublic-schema-迁移规范2026-07-11) |
+| public schema 迁移 / **菜单唯一脚本** | [附录 F](#附录-fpublic-schema-迁移规范2026-07-11)、[PLT-MENU-01](#plt-menu-01-菜单唯一维护脚本2026-07-24) |
 | 标准七列 / 软删与审计 / 读过滤 / 物理删盘点 | [附录 G](#附录-g软删除与审计字段规范2026-07-12)、[附录 I](#附录-i删除状态字段-is_deleted2026-07-12)、[附录 K](#附录-k审计字段与软删唯一键修补2026-07-12)、G.10、I.4–I.5 |
 | 外键显示名称 | [附录 H](#附录-h外键字段显示名称2026-07-12) |
 | 新增表/字段 CRUD 通检 | [附录 M.7](#m7-新增表字段通用检查清单每次必做) |
@@ -3224,6 +3234,8 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 运维模板周期 / 选模板回填 | [OPS.15](#ops15-模板周期与计划选模板回填2026-07-23)、约定包 §5.6 |
 | 全局加列 / 冗余 CRUD 通检 | [PLT-AUDIT-01](#plt-audit-01-全局加列--对象冗余--crud-通检2026-07-23) |
 | 主键类型审计（非 UUID） | [PLT-PK-01](#plt-pk-01-主键类型审计非-uuid--非字符串2026-07-23) |
+| 本机外设（高拍仪等） | [PLT-CAM-01](#plt-cam-01-新良田高拍仪对接2026-07-24) / [PLT-CAM-02](#plt-cam-02-厂家选择--调试菜单--设备档案2026-07-24)、约定包 §5.11 |
+| 铭牌图像识别（待开发） | [PLT-OCR-01](#plt-ocr-01-铭牌图像识别回填台账待开发2026-07-24)、第 7 章 `BACKLOG-AST-11` |
 | 计划/执行交互缺口（改记录·审核·明细） | [OPS.16](#ops16-计划执行交互缺口审计修改记录审核明细2026-07-23) |
 | App 离线盘点 / 台账缓存 | [MOB.8](#mob8-离线盘点权限缓存与台账同步2026-07-21)、修订 MOB.7 |
 | 微信小程序（uni-app） | [附录 MP](#附录-mp微信小程序uni-app2026-07-21)、[MP.3](#mp3-手写签名与订阅消息2026-07-21)、[MP.4](#mp4-对照近期-appops-的小程序缺口审计2026-07-23)、第 7 章 BACKLOG-MP-01 |
@@ -5514,3 +5526,78 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 
 **状态**：已落地（2026-07-23；方案3）。
 
+### PLT-CAM-01 新良田高拍仪对接（2026-07-24）
+
+> 来源：厂商 `js_demo` / `vue-demo` 评估；按本机 Eloam WebSocket + Vue 精简封装落地。
+
+#### 评估结论
+
+| 项 | 定稿 |
+|----|------|
+| **协议** | 与两 demo **相同**：浏览器 `ws://127.0.0.1:9000` ↔ 本机 Eloam/新良田服务（非两种硬件协议） |
+| **前端** | meis-web 组合式 `useEloamCamera` + `EloamCaptureDialog`；**不**引入 jQuery demo，**不**整页拷贝 vue-demo |
+| **产物** | 拍照 base64 → Blob → `POST /file/upload` → URL 写入业务字段 |
+| **能力裁剪** | 一期：连接、初始化、开预览、拍照、关设备、可选纠偏；不做身份证/人脸/PDF/打印 |
+| **客户端** | **仅 Web 工作站**；App/小程序继续相机/相册 |
+| **挂载** | 通用 `FileUploadField` / `ImageListField` 旁「高拍仪」按钮；未检测到服务时友好提示并回退普通上传 |
+
+#### 现场部署
+
+| 项 | 说明 |
+|----|------|
+| **驱动** | 每台使用高拍仪的 PC 安装新良田/Eloam 本地服务，监听 `127.0.0.1:9000` |
+| **端口冲突** | Eloam 占 **9000**；本地 MinIO 须改用 **9100**（见 `local-dev-deploy`）。否则上传报 `Non-XML response … 404`（连错服务，非上传代码路径错误） |
+| **浏览器** | Chrome/Edge 等支持 WebSocket；远程桌面/无驱动机不可用 |
+| **HTTPS** | 站点为 `https://` 时，`ws://127.0.0.1` 可能被混合内容拦截；现场须实测；必要时厂商 `wss` 或浏览器例外策略 |
+| **约定包** | 通用原则见 §5.11 |
+
+**状态**：已落地（2026-07-24）。
+
+#### PLT-CAM-02 厂家选择 · 调试菜单 · 设备档案（2026-07-24）
+
+> 来源：用户草稿（品牌可选；调试功能菜单位置；设备档案调用高拍仪整理汇总）。
+
+| 项 | 定稿 |
+|----|------|
+| **厂家** | 前端厂家注册表；用户可选择（本机 localStorage）；一期实现 **新良田/Eloam**；其他品牌占位「待接入」 |
+| **调试菜单** | **系统管理 → 高拍仪调试**（`/system/camera-debug`）。理由：连通性/驱动属外设运维，不宜挂业务菜单；与「系统配置」并列，设备科/运维可测，业务员仍在档案页拍照 |
+| **设备档案** | 「设备档案」Tab 工具栏增加「高拍仪」；拍照后按文件类型归类列表、预览、删除；走 `/file/upload` |
+| **不做** | 本期不扩其他厂家协议实现；档案持久化表若尚未有则先会话内整理（URL 已上传），后端档案库后续另立 |
+
+**状态**：已落地（2026-07-24）。
+
+
+### PLT-MENU-01 菜单唯一维护脚本（2026-07-24）
+
+> 来源：用户要求将菜单 SQL 整合到单一脚本，避免散落各迁移/临时脚本导致管理混乱。
+
+| 项 | 定稿 |
+|----|------|
+| **唯一脚本** | `meis-tenant/.../public/R__menus.sql`（Flyway 可重复槽位） |
+| **覆盖** | `sys_menu` 全量幂等 upsert；`sys_package_menu` 套餐挂接；活跃租户 `sys_tenant_menu` 按套餐同步 |
+| **禁止** | 在 `R__data_fix.sql`、租户 `V3`/`R__`、临时 `.sql`、业务补丁中再写 `INSERT/UPDATE sys_menu` |
+| **`R__data_fix`** | 仅保留非菜单数据更正 / 平台表 `ADD COLUMN` |
+| **`V3`（public）** | 可保留平台管理最小种子；完整业务菜单以 `R__menus` 为准 |
+| **维护方式** | 增删改菜单只改 `R__menus.sql`；重启 meis-tenant 触发 Flyway；可选 `scripts/ExportMenus.java` 从现网导出对齐 |
+
+**状态**：已落地（2026-07-24）。
+
+
+### PLT-OCR-01 铭牌图像识别回填台账（待开发·2026-07-24）
+
+> 来源：台账设备档案 / 现场拍照识别铭牌；2026-07-24 修订采集端与落库方式。记入第 7 章 `BACKLOG-AST-11`。
+
+#### 定稿方向（修订）
+
+| 项 | 定稿 |
+|----|------|
+| **采集端** | **微信小程序**现场拍铭牌；调用**腾讯现成 OCR/视觉 API**（具体产品：通用印刷体 / 智能结构化等，排期时选定） |
+| **密钥** | **禁止**小程序直持 Secret；拍照后上传本系统，由**后端**调腾讯 API 并落库 |
+| **结果落库** | 识别结果写入**独立从表**（挂设备台账，如 `device_id` + 图片 URL + 原始 JSON + 结构化字段 + 状态）；**不**直接改 `asset_device` |
+| **Web 取用** | 资产登记（或设备档案）展示待确认识别记录；用户对照确认后回填台账字段并标记已采用 |
+| **一期字段（建议）** | 资产名称、型号、序列号(SN)、生产厂商（名称模糊对主数据）、出厂编码、出厂日期等 |
+| **与高拍仪** | Web 高拍仪（PLT-CAM）仍可用于档案拍照；铭牌 OCR 一期以小程序+腾讯 API 为主路径 |
+| **待开发编号** | `BACKLOG-AST-11` |
+| **排期前待定** | 腾讯具体接口与计费账号；从表字段清单与状态机（待确认/已采用/已忽略）；是否允许无 `device_id` 的「新建登记」草稿识别 |
+
+**状态**：待开发（`BACKLOG-AST-11`）。

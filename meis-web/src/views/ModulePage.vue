@@ -93,6 +93,7 @@ const pageMap: Record<string, ReturnType<typeof defineAsyncComponent>> = {
   '/system/category': defineAsyncComponent(() => import('@/views/purchase/DeviceCategoryPage.vue')),
   '/system/manufacturer': defineAsyncComponent(() => import('@/views/purchase/ManufacturerPage.vue')),
   '/system/config': defineAsyncComponent(() => import('@/views/system/SystemConfigPage.vue')),
+  '/system/camera-debug': defineAsyncComponent(() => import('@/views/system/CameraDebugPage.vue')),
   '/warehouse/setting': defineAsyncComponent(() => import('@/views/system/WarehousePage.vue')),
   '/warehouse/entry': defineAsyncComponent(() => import('@/views/asset/DeviceEntryPage.vue')),
   '/warehouse/outbound': defineAsyncComponent(() => import('@/views/warehouse/WarehouseOutboundPage.vue')),
