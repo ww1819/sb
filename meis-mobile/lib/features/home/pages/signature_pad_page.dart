@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
+
 /// 简易手写签名，确认后返回本地 PNG 路径。
 class SignaturePadPage extends StatefulWidget {
   const SignaturePadPage({super.key, this.title = '手写签名'});
@@ -52,16 +55,29 @@ class _SignaturePadPageState extends State<SignaturePadPage> {
       body: Column(
         children: [
           const Padding(
-            padding: EdgeInsets.all(12),
-            child: Text('请在下方区域签名'),
+            padding: EdgeInsets.fromLTRB(AppSpacing.pageH, AppSpacing.md, AppSpacing.pageH, AppSpacing.sm),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '请在下方区域签名',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              ),
+            ),
           ),
           Expanded(
             child: Container(
-              margin: const EdgeInsets.all(12),
+              margin: const EdgeInsets.fromLTRB(
+                AppSpacing.pageH,
+                AppSpacing.sm,
+                AppSpacing.pageH,
+                AppSpacing.lg,
+              ),
               decoration: BoxDecoration(
                 color: Colors.white,
-                border: Border.all(color: Colors.grey.shade400),
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                border: Border.all(color: AppColors.borderLight),
               ),
+              clipBehavior: Clip.antiAlias,
               child: RepaintBoundary(
                 key: key,
                 child: GestureDetector(

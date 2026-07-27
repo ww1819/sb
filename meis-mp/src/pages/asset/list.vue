@@ -119,9 +119,14 @@ onShow(() => {
 })
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@import '../../uni.scss';
+
 .asset-list {
   padding: 24rpx 24rpx 48rpx;
+  min-height: 100vh;
+  background: $meis-page-bg;
+  box-sizing: border-box;
 }
 .search-bar {
   display: flex;
@@ -134,19 +139,22 @@ onShow(() => {
   height: 72rpx;
   padding: 0 24rpx;
   background: #fff;
-  border-radius: 12rpx;
-  border: 1px solid #e4e7ec;
+  border-radius: $meis-radius;
+  border: 1px solid $meis-border;
+  color: $meis-text;
 }
 .search-btn {
-  background: #1a5fb4;
+  background: $meis-primary;
   color: #fff;
   margin: 0;
+  border: none;
 }
 .item {
   background: #fff;
-  border-radius: 16rpx;
+  border-radius: $meis-radius-lg;
   padding: 28rpx 24rpx;
   margin-bottom: 16rpx;
+  border: 1px solid $meis-border;
 }
 .item-main {
   margin-bottom: 12rpx;
@@ -154,31 +162,32 @@ onShow(() => {
 .code {
   display: block;
   font-size: 24rpx;
-  color: #1a5fb4;
+  color: $meis-primary;
   margin-bottom: 6rpx;
 }
 .name {
   display: block;
   font-size: 30rpx;
   font-weight: 600;
+  color: $meis-text;
 }
 .item-meta {
   display: flex;
   justify-content: space-between;
   font-size: 24rpx;
-  color: #667085;
+  color: $meis-text-secondary;
 }
 .status {
-  color: #344054;
+  color: $meis-text;
 }
 .empty,
 .more {
   text-align: center;
   padding: 40rpx;
-  color: #98a2b3;
+  color: $meis-text-muted;
   font-size: 26rpx;
 }
 .muted {
-  color: #c0c4cc;
+  color: $meis-text-muted;
 }
 </style>

@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/storage/app_prefs.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/repair_draft_store.dart';
+import '../../../shared/widgets/meis_list_card.dart';
+import '../../../shared/widgets/meis_section_label.dart';
+import '../../../shared/widgets/meis_status_chip.dart';
 import 'repair_form_page.dart';
 
 class RepairPage extends ConsumerStatefulWidget {
@@ -195,7 +200,6 @@ class _RepairPageState extends ConsumerState<RepairPage> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: const Text('扫码报修'),
@@ -211,130 +215,151 @@ class _RepairPageState extends ConsumerState<RepairPage> {
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : items.isEmpty && localDrafts.isEmpty
-              ? const Center(child: Text('暂无报修单，点击右下角新建'))
+              ? const Center(
+                  child: Text(
+                    '暂无报修单，点击右下角新建',
+                    style: TextStyle(color: AppColors.textMuted),
+                  ),
+                )
               : RefreshIndicator(
                   onRefresh: load,
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.pageH,
+                      AppSpacing.md,
+                      AppSpacing.pageH,
+                      88,
+                    ),
                     children: [
                       if (localDrafts.isNotEmpty) ...[
-                        Text('本地草稿（未上传）', style: Theme.of(context).textTheme.titleSmall),
-                        const SizedBox(height: 8),
+                        const MeisSectionLabel('本地草稿（未上传）'),
                         for (final d in localDrafts)
-                          Card(
-                            color: scheme.secondaryContainer.withValues(alpha: 0.35),
-                            margin: const EdgeInsets.only(bottom: 10),
-                            child: ListTile(
-                              title: Text(d['device_name']?.toString() ?? d['device_code']?.toString() ?? '未选设备'),
-                              subtitle: Text('更新：${d['updated_at'] ?? '—'}'),
-                              trailing: IconButton(
-                                icon: Icon(Icons.delete_outline, color: scheme.error),
-                                onPressed: () => deleteLocalDraft(d['id'].toString()),
-                              ),
-                              onTap: () => openForm(localDraftId: d['id']?.toString()),
+                          MeisListCard(
+                            color: AppColors.pageBgTop,
+                            onTap: () => openForm(localDraftId: d['id']?.toString()),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        d['device_name']?.toString() ??
+                                            d['device_code']?.toString() ??
+                                            '未选设备',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '更新：${d['updated_at'] ?? '—'}',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, color: AppColors.danger),
+                                  onPressed: () => deleteLocalDraft(d['id'].toString()),
+                                ),
+                              ],
                             ),
                           ),
-                        const SizedBox(height: 8),
-                        Text('服务器单据', style: Theme.of(context).textTheme.titleSmall),
-                        const SizedBox(height: 8),
+                        const MeisSectionLabel('服务器单据'),
                       ],
                       if (items.isEmpty)
                         const Padding(
-                          padding: EdgeInsets.all(24),
-                          child: Center(child: Text('暂无服务器报修单')),
+                          padding: EdgeInsets.all(AppSpacing.xl),
+                          child: Center(
+                            child: Text(
+                              '暂无服务器报修单',
+                              style: TextStyle(color: AppColors.textMuted),
+                            ),
+                          ),
                         )
                       else
-                        for (final row in items) _buildServerCard(context, scheme, row),
+                        for (final row in items) _buildServerCard(row),
                     ],
                   ),
                 ),
     );
   }
 
-  Widget _buildServerCard(BuildContext context, ColorScheme scheme, Map<String, dynamic> row) {
+  Widget _buildServerCard(Map<String, dynamic> row) {
     final status = row['status']?.toString() ?? '';
     final label = statusLabel[status] ?? status;
     final fault = _text(row, 'fault_description');
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: InkWell(
-        onTap: () => openForm(id: row['id']?.toString()),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return MeisListCard(
+      onTap: () => openForm(id: row['id']?.toString()),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _text(row, 'wo_no'),
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: scheme.primaryContainer.withValues(alpha: 0.55),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(label, style: TextStyle(fontSize: 12, color: scheme.onPrimaryContainer)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text('设备名称：${_text(row, 'device_name')}'),
-              Text('设备编码：${_text(row, 'device_code')}'),
-              Text('规格：${_text(row, 'specification')}'),
-              Text('序列号：${_text(row, 'serial_number')}'),
-              if (fault != '—') ...[
-                const SizedBox(height: 4),
-                Text(
-                  '故障：$fault',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
+              Expanded(
+                child: Text(
+                  _text(row, 'wo_no'),
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
                 ),
-              ],
-              const SizedBox(height: 4),
-              const Divider(height: 12),
-              Wrap(
-                spacing: 4,
-                children: [
-                  if (status == 'draft') ...[
-                    TextButton(
-                      onPressed: () => openForm(id: row['id']?.toString()),
-                      child: const Text('编辑'),
-                    ),
-                    TextButton(
-                      onPressed: () => submit(row),
-                      child: const Text('提交'),
-                    ),
-                    TextButton(
-                      onPressed: () => deleteDraft(row),
-                      style: TextButton.styleFrom(foregroundColor: scheme.error),
-                      child: const Text('删除'),
-                    ),
-                  ] else if (status == 'reported') ...[
-                    TextButton(
-                      onPressed: () => openForm(id: row['id']?.toString()),
-                      child: const Text('查看'),
-                    ),
-                    TextButton(
-                      onPressed: () => withdraw(row),
-                      child: const Text('撤回'),
-                    ),
-                  ] else
-                    TextButton(
-                      onPressed: () => openForm(id: row['id']?.toString()),
-                      child: const Text('查看'),
-                    ),
-                ],
               ),
+              MeisStatusChip(label, emphasize: status == 'draft' || status == 'reported'),
             ],
           ),
-        ),
+          const SizedBox(height: 8),
+          Text(
+            '${_text(row, 'device_name')} · ${_text(row, 'device_code')}',
+            style: const TextStyle(fontSize: 13, color: AppColors.textPrimary, height: 1.35),
+          ),
+          if (fault != '—') ...[
+            const SizedBox(height: 4),
+            Text(
+              fault,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.35),
+            ),
+          ],
+          const Divider(height: 16),
+          Wrap(
+            spacing: 4,
+            children: [
+              if (status == 'draft') ...[
+                TextButton(
+                  onPressed: () => openForm(id: row['id']?.toString()),
+                  child: const Text('编辑'),
+                ),
+                TextButton(
+                  onPressed: () => submit(row),
+                  child: const Text('提交'),
+                ),
+                TextButton(
+                  onPressed: () => deleteDraft(row),
+                  style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+                  child: const Text('删除'),
+                ),
+              ] else if (status == 'reported') ...[
+                TextButton(
+                  onPressed: () => openForm(id: row['id']?.toString()),
+                  child: const Text('查看'),
+                ),
+                TextButton(
+                  onPressed: () => withdraw(row),
+                  child: const Text('撤回'),
+                ),
+              ] else
+                TextButton(
+                  onPressed: () => openForm(id: row['id']?.toString()),
+                  child: const Text('查看'),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/widgets/meis_list_card.dart';
+import '../../../shared/widgets/meis_status_chip.dart';
 import 'my_repairs_page.dart';
 import 'ops_hub_page.dart';
 
@@ -79,30 +83,74 @@ class _MessagePageState extends ConsumerState<MessagePage> {
                   ? ListView(
                       children: const [
                         SizedBox(height: 120),
-                        Center(child: Text('暂无消息')),
+                        Center(child: Text('暂无消息', style: TextStyle(color: AppColors.textMuted))),
                       ],
                     )
                   : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.pageH,
+                        AppSpacing.md,
+                        AppSpacing.pageH,
+                        AppSpacing.xl,
+                      ),
                       itemCount: items.length,
                       itemBuilder: (_, i) {
                         final m = items[i];
                         final unread = m['is_read'] != true;
-                        return ListTile(
-                          leading: Icon(
-                            unread ? Icons.mark_email_unread : Icons.mark_email_read,
-                            color: unread ? Theme.of(context).colorScheme.primary : null,
-                          ),
-                          title: Text(
-                            m['title']?.toString() ?? '',
-                            style: TextStyle(fontWeight: unread ? FontWeight.w600 : FontWeight.normal),
-                          ),
-                          subtitle: Text(
-                            '${m['content'] ?? ''}\n${m['created_at'] ?? ''}',
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          isThreeLine: true,
+                        final content = m['content']?.toString() ?? '';
+                        return MeisListCard(
                           onTap: () => onTap(m),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                unread ? Icons.mark_email_unread_outlined : Icons.mark_email_read_outlined,
+                                color: unread ? AppColors.primary : AppColors.textMuted,
+                                size: 22,
+                              ),
+                              const SizedBox(width: AppSpacing.md),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            m['title']?.toString() ?? '',
+                                            style: TextStyle(
+                                              fontWeight: unread ? FontWeight.w600 : FontWeight.w500,
+                                              fontSize: 15,
+                                              color: AppColors.textPrimary,
+                                            ),
+                                          ),
+                                        ),
+                                        if (unread) const MeisStatusChip('未读', emphasize: true),
+                                      ],
+                                    ),
+                                    if (content.isNotEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        content,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: AppColors.textSecondary,
+                                          height: 1.35,
+                                        ),
+                                      ),
+                                    ],
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      m['created_at']?.toString() ?? '',
+                                      style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         );
                       },
                     ),

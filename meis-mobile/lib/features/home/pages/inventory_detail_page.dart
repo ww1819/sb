@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/local_sync_service.dart';
+import '../../../shared/widgets/meis_list_card.dart';
+import '../../../shared/widgets/meis_status_chip.dart';
 import 'repair_scan_page.dart';
 
 class InventoryDetailPage extends ConsumerStatefulWidget {
@@ -229,41 +233,49 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
 
   Widget buildItemCard(Map<String, dynamic> row) {
     final dirty = row['dirty'] == true || row['dirty'] == 1;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(_text(row, 'device_code'), style: const TextStyle(fontWeight: FontWeight.w600)),
+    return MeisListCard(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _text(row, 'device_code'),
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
                 ),
-                if (dirty)
-                  const Text('未同步', style: TextStyle(fontSize: 12, color: Colors.orange)),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text('名称：${_text(row, 'device_name')}'),
-            Text('账面位置：${_text(row, 'expected_location')}'),
-            Text('实盘位置：${_text(row, 'actual_location')}'),
-            const Divider(height: 16),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('已找到'),
-              value: _isFound(row),
-              onChanged: (v) => patchItem(row, {'is_found': v}),
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('需补打条码'),
-              value: _needReprint(row),
-              onChanged: (v) => patchItem(row, {'need_reprint_label': v}),
-            ),
-          ],
-        ),
+              ),
+              if (dirty) const MeisStatusChip('未同步', emphasize: true),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '名称：${_text(row, 'device_name')}',
+            style: const TextStyle(fontSize: 13, color: AppColors.textPrimary, height: 1.35),
+          ),
+          Text(
+            '账面位置：${_text(row, 'expected_location')}',
+            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.35),
+          ),
+          Text(
+            '实盘位置：${_text(row, 'actual_location')}',
+            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.35),
+          ),
+          const Divider(height: 16),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('已找到'),
+            value: _isFound(row),
+            onChanged: (v) => patchItem(row, {'is_found': v}),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('需补打条码'),
+            value: _needReprint(row),
+            onChanged: (v) => patchItem(row, {'need_reprint_label': v}),
+          ),
+        ],
       ),
     );
   }
@@ -300,10 +312,27 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
           : Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.pageH,
+                    AppSpacing.md,
+                    AppSpacing.pageH,
+                    0,
+                  ),
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: Text('状态：$statusText · 单号：${_text(master, 'check_no')}'),
+                    child: Row(
+                      children: [
+                        MeisStatusChip(statusText),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '单号：${_text(master, 'check_no')}',
+                            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 Expanded(
@@ -312,12 +341,19 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
                     children: List.generate(3, (tab) {
                       final list = filtered(tab);
                       if (list.isEmpty) {
-                        return const Center(child: Text('暂无明细'));
+                        return const Center(
+                          child: Text('暂无明细', style: TextStyle(color: AppColors.textMuted)),
+                        );
                       }
                       return RefreshIndicator(
                         onRefresh: load,
                         child: ListView.builder(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.pageH,
+                            AppSpacing.md,
+                            AppSpacing.pageH,
+                            AppSpacing.xl,
+                          ),
                           itemCount: list.length,
                           itemBuilder: (_, i) => buildItemCard(list[i]),
                         ),

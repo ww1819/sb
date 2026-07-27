@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/meis_brand_header.dart';
 import '../providers/auth_provider.dart';
@@ -53,57 +55,73 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final auth = ref.watch(authProvider);
 
     return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 24),
-              const MeisBrandHeader(subtitle: '用户登录'),
-              const SizedBox(height: 32),
-              TextField(
-                controller: _tenantCtrl,
-                decoration: const InputDecoration(
-                  labelText: '医院编码',
-                  prefixIcon: Icon(Icons.business_outlined),
+      backgroundColor: AppColors.pageBg,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [AppColors.pageBgTop, AppColors.pageBg, AppColors.pageBg],
+            stops: [0, 0.4, 1],
+          ),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xl,
+              AppSpacing.xl,
+              AppSpacing.xl,
+              AppSpacing.xxl,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: AppSpacing.xl),
+                const MeisBrandHeader(subtitle: '用户登录'),
+                const SizedBox(height: AppSpacing.xxl),
+                TextField(
+                  controller: _tenantCtrl,
+                  decoration: const InputDecoration(
+                    labelText: '医院编码',
+                    prefixIcon: Icon(Icons.business_outlined),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _userCtrl,
-                decoration: const InputDecoration(
-                  labelText: '用户名',
-                  prefixIcon: Icon(Icons.person_outline),
+                const SizedBox(height: AppSpacing.lg),
+                TextField(
+                  controller: _userCtrl,
+                  decoration: const InputDecoration(
+                    labelText: '用户名',
+                    prefixIcon: Icon(Icons.person_outline),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _passCtrl,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: '密码',
-                  prefixIcon: Icon(Icons.lock_outline),
+                const SizedBox(height: AppSpacing.lg),
+                TextField(
+                  controller: _passCtrl,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: '密码',
+                    prefixIcon: Icon(Icons.lock_outline),
+                  ),
+                  onSubmitted: (_) => _login(),
                 ),
-                onSubmitted: (_) => _login(),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: auth.loading ? null : _login,
-                child: auth.loading
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Text('登录'),
-              ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: _reconfigure,
-                child: const Text('重新配置服务器连接'),
-              ),
-            ],
+                const SizedBox(height: AppSpacing.xl),
+                FilledButton(
+                  onPressed: auth.loading ? null : _login,
+                  child: auth.loading
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('登录'),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextButton(
+                  onPressed: _reconfigure,
+                  child: const Text('重新配置服务器连接'),
+                ),
+              ],
+            ),
           ),
         ),
       ),

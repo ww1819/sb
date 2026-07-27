@@ -7,10 +7,12 @@ onLaunch(() => {
 })
 </script>
 
-<style>
+<style lang="scss">
+@import './uni.scss';
+
 page {
-  background-color: #f5f7fa;
-  color: #1f2a37;
+  background-color: $meis-page-bg;
+  color: $meis-text;
   font-size: 28rpx;
 }
 </style>

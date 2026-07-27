@@ -192,64 +192,72 @@ async function verifyFail() {
 }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@import '../../uni.scss';
+
 .page {
   min-height: 100vh;
   padding: 24rpx 24rpx 80rpx;
-  background: #f5f7fa;
+  background: $meis-page-bg;
+  box-sizing: border-box;
 }
 .empty {
   text-align: center;
   padding: 80rpx;
-  color: #98a2b3;
+  color: $meis-text-muted;
 }
 .empty-sm {
   font-size: 24rpx;
-  color: #98a2b3;
+  color: $meis-text-muted;
   padding: 12rpx 0;
 }
 .card {
   background: #fff;
-  border-radius: 16rpx;
+  border-radius: $meis-radius-lg;
   padding: 28rpx 24rpx;
   margin-bottom: 20rpx;
+  border: 1px solid $meis-border;
 }
 .no {
   display: block;
   font-size: 32rpx;
   font-weight: 600;
+  color: $meis-text;
 }
 .meta {
   display: block;
   margin-top: 8rpx;
   font-size: 24rpx;
-  color: #667085;
+  color: $meis-text-secondary;
 }
 .desc {
   display: block;
   margin-top: 16rpx;
   font-size: 28rpx;
   line-height: 1.5;
+  color: $meis-text;
 }
 .section {
   display: block;
   font-size: 28rpx;
   font-weight: 600;
   margin-bottom: 16rpx;
+  color: $meis-text;
 }
 .line {
   padding: 12rpx 0;
-  border-bottom: 1px solid #f0f2f5;
+  border-bottom: 1px solid $meis-border;
 }
 .line-title {
   display: block;
   font-size: 26rpx;
+  color: $meis-text;
 }
 .line-meta {
   display: block;
   margin-top: 4rpx;
   font-size: 22rpx;
-  color: #98a2b3;
+  color: $meis-text-muted;
 }
 .actions {
   display: flex;

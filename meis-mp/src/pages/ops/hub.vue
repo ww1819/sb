@@ -593,16 +593,19 @@ function openDetail(execId: string, itemId: string) {
 }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@import '../../uni.scss';
+
 .hub {
   min-height: 100vh;
   padding: 24rpx 24rpx 48rpx;
-  background: #f5f7fa;
+  background: $meis-page-bg;
+  box-sizing: border-box;
 }
 .toolbar {
   display: flex;
   gap: 12rpx;
-  margin-bottom: 28rpx;
+  margin-bottom: 24rpx;
   flex-wrap: wrap;
 }
 .toolbar button {
@@ -610,38 +613,38 @@ function openDetail(execId: string, itemId: string) {
 }
 .section-label {
   font-size: 24rpx;
-  color: #98a2b3;
+  color: $meis-text-muted;
   margin: 0 8rpx 16rpx;
 }
 .empty {
   text-align: center;
-  color: #98a2b3;
+  color: $meis-text-muted;
   padding: 48rpx;
   font-size: 26rpx;
 }
 .due-item {
   background: #fff;
-  border-radius: 16rpx;
+  border-radius: $meis-radius-lg;
   padding: 28rpx 24rpx;
   margin-bottom: 16rpx;
-  border: 1px solid rgba(26, 95, 180, 0.08);
+  border: 1px solid $meis-border;
 }
 .due-title {
   display: block;
   font-size: 30rpx;
   font-weight: 600;
-  color: #1f2a37;
+  color: $meis-text;
 }
 .due-meta {
   display: block;
   margin-top: 8rpx;
   font-size: 24rpx;
-  color: #667085;
+  color: $meis-text-secondary;
 }
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(15, 23, 42, 0.4);
   z-index: 1000;
   display: flex;
   align-items: flex-end;
@@ -650,7 +653,7 @@ function openDetail(execId: string, itemId: string) {
   width: 100%;
   max-height: 70vh;
   background: #fff;
-  border-radius: 24rpx 24rpx 0 0;
+  border-radius: 20rpx 20rpx 0 0;
   padding: 28rpx 28rpx 40rpx;
   box-sizing: border-box;
 }
@@ -661,7 +664,7 @@ function openDetail(execId: string, itemId: string) {
   font-size: 32rpx;
   font-weight: 600;
   margin-bottom: 20rpx;
-  color: #1f2a37;
+  color: $meis-text;
 }
 .sheet-list {
   max-height: 52vh;
@@ -669,18 +672,18 @@ function openDetail(execId: string, itemId: string) {
 }
 .sheet-row {
   padding: 22rpx 8rpx;
-  border-bottom: 1px solid #eef2f6;
+  border-bottom: 1px solid $meis-border;
 }
 .sheet-row-title {
   display: block;
   font-size: 28rpx;
-  color: #1f2a37;
+  color: $meis-text;
 }
 .sheet-row-sub {
   display: block;
   margin-top: 6rpx;
   font-size: 24rpx;
-  color: #667085;
+  color: $meis-text-secondary;
 }
 .form-row {
   display: flex;
@@ -688,24 +691,24 @@ function openDetail(execId: string, itemId: string) {
   justify-content: space-between;
   gap: 16rpx;
   padding: 18rpx 0;
-  border-bottom: 1px solid #eef2f6;
+  border-bottom: 1px solid $meis-border;
 }
 .form-row .label {
   flex-shrink: 0;
   font-size: 28rpx;
-  color: #475467;
+  color: $meis-text-secondary;
 }
 .form-row .value,
 .form-row .input {
   flex: 1;
   text-align: right;
   font-size: 28rpx;
-  color: #1f2a37;
+  color: $meis-text;
 }
 .hint {
   margin: 12rpx 0;
   font-size: 24rpx;
-  color: #98a2b3;
+  color: $meis-text-muted;
 }
 .adhoc-actions {
   display: flex;

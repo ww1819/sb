@@ -11,8 +11,8 @@
       "path": "pages/home/index",
       "style": {
         "navigationBarTitleText": "MEIS 设备助手",
-        "navigationBarBackgroundColor": "#dce9f8",
-        "backgroundColor": "#dce9f8"
+        "navigationBarBackgroundColor": "#e8f1ff",
+        "backgroundColor": "#f0f2f5"
       }
     },
     {
@@ -80,6 +80,6 @@
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "MEIS",
     "navigationBarBackgroundColor": "#ffffff",
-    "backgroundColor": "#f5f7fa"
+    "backgroundColor": "#f0f2f5"
   }
 }

@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/widgets/meis_list_card.dart';
+import '../../../shared/widgets/meis_status_chip.dart';
 import 'my_repair_detail_page.dart';
 
 /// 我的报修与待验收（MOB-F-06 / MOB-F-04）
@@ -87,40 +91,69 @@ class _MyRepairsPageState extends ConsumerState<MyRepairsPage> {
                   ? ListView(
                       children: const [
                         SizedBox(height: 120),
-                        Center(child: Text('暂无工单')),
+                        Center(child: Text('暂无工单', style: TextStyle(color: AppColors.textMuted))),
                       ],
                     )
                   : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.pageH,
+                        AppSpacing.md,
+                        AppSpacing.pageH,
+                        AppSpacing.xl,
+                      ),
                       itemCount: rows.length,
                       itemBuilder: (_, i) {
                         final r = rows[i];
                         final st = r['status']?.toString() ?? '';
-                        return Card(
-                          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          child: ListTile(
-                            title: Text(r['wo_no']?.toString() ?? ''),
-                            subtitle: Text(
-                              '${r['device_name'] ?? ''} · ${statusLabel[st] ?? st}\n'
-                              '${r['fault_description'] ?? ''}',
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            isThreeLine: true,
-                            trailing: st == 'pending_verify'
-                                ? Chip(
-                                    label: const Text('验收'),
-                                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                                  )
-                                : const Icon(Icons.chevron_right),
-                            onTap: () async {
-                              final id = r['id']?.toString();
-                              if (id == null) return;
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => MyRepairDetailPage(workorderId: id)),
-                              );
-                              load();
-                            },
+                        final fault = r['fault_description']?.toString() ?? '';
+                        return MeisListCard(
+                          onTap: () async {
+                            final id = r['id']?.toString();
+                            if (id == null) return;
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => MyRepairDetailPage(workorderId: id)),
+                            );
+                            load();
+                          },
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      r['wo_no']?.toString() ?? '',
+                                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      '${r['device_name'] ?? ''} · ${statusLabel[st] ?? st}',
+                                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                    ),
+                                    if (fault.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        fault,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: AppColors.textPrimary,
+                                          height: 1.35,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              if (st == 'pending_verify')
+                                const MeisStatusChip('验收', emphasize: true)
+                              else
+                                const Icon(Icons.chevron_right, color: AppColors.textMuted),
+                            ],
                           ),
                         );
                       },

@@ -340,27 +340,32 @@ async function confirmItem() {
 }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@import '../../uni.scss';
+
 .detail {
   min-height: 100vh;
   padding: 24rpx 24rpx 80rpx;
-  background: #f5f7fa;
+  background: $meis-page-bg;
+  box-sizing: border-box;
 }
 .empty {
   text-align: center;
   padding: 80rpx;
-  color: #98a2b3;
+  color: $meis-text-muted;
 }
 .head {
   background: #fff;
-  border-radius: 16rpx;
+  border-radius: $meis-radius-lg;
   padding: 28rpx 24rpx;
   margin-bottom: 20rpx;
+  border: 1px solid $meis-border;
 }
 .no {
   display: block;
   font-size: 32rpx;
   font-weight: 600;
+  color: $meis-text;
 }
 .meta,
 .status,
@@ -368,30 +373,32 @@ async function confirmItem() {
   display: block;
   margin-top: 8rpx;
   font-size: 24rpx;
-  color: #667085;
+  color: $meis-text-secondary;
 }
 .locked {
   display: block;
   margin-top: 8rpx;
   font-size: 24rpx;
-  color: #d97706;
+  color: #faad14;
 }
 .card {
   background: #fff;
-  border-radius: 16rpx;
+  border-radius: $meis-radius-lg;
   padding: 24rpx;
   margin-bottom: 20rpx;
+  border: 1px solid $meis-border;
 }
 .item-name {
   display: block;
   font-size: 30rpx;
   font-weight: 600;
   margin-bottom: 8rpx;
+  color: $meis-text;
 }
 .item-content {
   display: block;
   font-size: 24rpx;
-  color: #667085;
+  color: $meis-text-secondary;
   margin-bottom: 16rpx;
 }
 .status-row {
@@ -402,27 +409,29 @@ async function confirmItem() {
 }
 .chip {
   padding: 8rpx 20rpx;
-  border-radius: 999rpx;
-  background: #f3f6fa;
+  border-radius: $meis-radius;
+  background: $meis-page-bg;
   font-size: 24rpx;
-  color: #667085;
+  color: $meis-text-secondary;
 }
 .chip.active {
-  background: #1a5fb4;
+  background: $meis-primary;
   color: #fff;
 }
 .chip.fail {
-  background: #d92d20;
+  background: #ff4d4f;
+  color: #fff;
 }
 .input,
 .textarea {
   width: 100%;
   box-sizing: border-box;
-  background: #f3f6fa;
-  border-radius: 12rpx;
+  background: $meis-page-bg;
+  border-radius: $meis-radius;
   padding: 16rpx 20rpx;
   font-size: 26rpx;
   margin-bottom: 12rpx;
+  color: $meis-text;
 }
 .textarea {
   min-height: 100rpx;
@@ -442,7 +451,7 @@ async function confirmItem() {
   width: 120rpx;
   height: 120rpx;
   border-radius: 8rpx;
-  background: #eee;
+  background: $meis-page-bg;
 }
 .thumb-del {
   position: absolute;
@@ -453,7 +462,7 @@ async function confirmItem() {
   line-height: 32rpx;
   text-align: center;
   border-radius: 50%;
-  background: #d92d20;
+  background: #ff4d4f;
   color: #fff;
   font-size: 28rpx;
 }
@@ -466,12 +475,12 @@ async function confirmItem() {
 }
 .label {
   font-size: 26rpx;
-  color: #667085;
+  color: $meis-text-secondary;
 }
 .sign-img {
   width: 240rpx;
   height: 100rpx;
-  background: #f3f6fa;
+  background: $meis-page-bg;
 }
 .actions {
   display: flex;

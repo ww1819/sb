@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/widgets/meis_list_card.dart';
+import '../../../shared/widgets/meis_section_label.dart';
+import '../../../shared/widgets/meis_status_chip.dart';
 
 class MyRepairDetailPage extends ConsumerStatefulWidget {
   const MyRepairDetailPage({super.key, required this.workorderId});
@@ -161,54 +166,113 @@ class _MyRepairDetailPageState extends ConsumerState<MyRepairDetailPage> {
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.pageH,
+                AppSpacing.md,
+                AppSpacing.pageH,
+                AppSpacing.xl,
+              ),
               children: [
-                Text(
-                  '${wo?['device_name'] ?? ''}（${wo?['device_code'] ?? ''}）',
-                  style: Theme.of(context).textTheme.titleMedium,
+                MeisListCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${wo?['device_name'] ?? ''}（${wo?['device_code'] ?? ''}）',
+                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          MeisStatusChip(
+                            statusLabel[st] ?? st,
+                            emphasize: st == 'pending_verify',
+                          ),
+                        ],
+                      ),
+                      if ((wo?['fault_description']?.toString() ?? '').isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          wo?['fault_description']?.toString() ?? '',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textPrimary,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Text('状态：${statusLabel[st] ?? st}'),
-                const SizedBox(height: 8),
-                Text(wo?['fault_description']?.toString() ?? ''),
-                const Divider(height: 32),
-                Text('进度', style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: 8),
+                const MeisSectionLabel('进度'),
                 if (milestones.isNotEmpty)
                   ...milestones.map((m) {
                     final map = Map<String, dynamic>.from(m as Map);
-                    return ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        map['done'] == true || map['completed'] == true
-                            ? Icons.check_circle
-                            : Icons.radio_button_unchecked,
-                        color: Theme.of(context).colorScheme.primary,
+                    final done = map['done'] == true || map['completed'] == true;
+                    return MeisListCard(
+                      child: Row(
+                        children: [
+                          Icon(
+                            done ? Icons.check_circle : Icons.radio_button_unchecked,
+                            color: done ? AppColors.primary : AppColors.textMuted,
+                            size: 22,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  map['title']?.toString() ?? map['name']?.toString() ?? '',
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  map['at']?.toString() ?? map['time']?.toString() ?? '',
+                                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      title: Text(map['title']?.toString() ?? map['name']?.toString() ?? ''),
-                      subtitle: Text(map['at']?.toString() ?? map['time']?.toString() ?? ''),
                     );
                   })
+                else if (events.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+                    child: Text('暂无进度', style: TextStyle(color: AppColors.textMuted)),
+                  )
                 else
                   ...events.map((e) {
                     final map = Map<String, dynamic>.from(e as Map);
-                    return ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(map['event_type']?.toString() ?? map['remark']?.toString() ?? ''),
-                      subtitle: Text(
-                        '${map['to_status'] ?? ''} · ${map['created_at'] ?? ''}',
+                    return MeisListCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            map['event_type']?.toString() ?? map['remark']?.toString() ?? '',
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${map['to_status'] ?? ''} · ${map['created_at'] ?? ''}',
+                            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                          ),
+                        ],
                       ),
                     );
                   }),
                 if (canVerify) ...[
-                  const SizedBox(height: 24),
+                  const SizedBox(height: AppSpacing.lg),
                   FilledButton(
                     onPressed: submitting ? null : () => doVerify(pass: true),
                     child: const Text('验收通过'),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.sm),
                   OutlinedButton(
                     onPressed: submitting ? null : () => doVerify(pass: false),
                     child: const Text('拒绝验收'),

@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/widgets/meis_list_card.dart';
+import '../../../shared/widgets/meis_section_label.dart';
 import 'ops_exec_detail_page.dart';
 import 'repair_scan_page.dart';
 
@@ -679,60 +683,69 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
           IconButton(icon: const Icon(Icons.refresh), onPressed: loadDue),
         ],
       ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          FloatingActionButton.extended(
-            heroTag: 'ops_search',
-            onPressed: searchDevice,
-            icon: const Icon(Icons.search),
-            label: const Text('搜索设备'),
-          ),
-          const SizedBox(height: 12),
-          FloatingActionButton.extended(
-            heroTag: 'ops_scan',
-            onPressed: scanAndExecute,
-            icon: const Icon(Icons.qr_code_scanner),
-            label: const Text('扫码执行'),
-          ),
-        ],
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: scanAndExecute,
+        icon: const Icon(Icons.qr_code_scanner),
+        label: const Text('扫码执行'),
       ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: loadDue,
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.pageH,
+                  AppSpacing.md,
+                  AppSpacing.pageH,
+                  88,
+                ),
                 children: [
-                  Text('近 7 日到期设备', style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 8),
+                  const MeisSectionLabel('近 7 日到期设备'),
                   if (dueItems.isEmpty)
                     const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Center(child: Text('暂无到期任务，可扫码/搜索设备后执行')),
+                      padding: EdgeInsets.symmetric(vertical: 32),
+                      child: Center(
+                        child: Text(
+                          '暂无到期任务，可扫码或搜索设备后执行',
+                          style: TextStyle(color: AppColors.textMuted),
+                        ),
+                      ),
                     )
                   else
-                    ...dueItems.map((d) => Card(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          child: ListTile(
-                            title: Text(d['device_name']?.toString() ?? ''),
-                            subtitle: Text(
-                              '${d['device_code'] ?? ''} · 计划 ${d['plan_no'] ?? ''} · 到期 ${d['next_due_date'] ?? ''}',
+                    ...dueItems.map(
+                      (d) => MeisListCard(
+                        onTap: () async {
+                          final id = d['device_id']?.toString();
+                          if (id == null) return;
+                          await openDeviceTasks({
+                            'id': id,
+                            'device_code': d['device_code'],
+                            'device_name': d['device_name'],
+                          });
+                        },
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    d['device_name']?.toString() ?? '',
+                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${d['device_code'] ?? ''} · ${d['plan_no'] ?? ''} · ${d['next_due_date'] ?? ''}',
+                                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                  ),
+                                ],
+                              ),
                             ),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: () async {
-                              final id = d['device_id']?.toString();
-                              if (id == null) return;
-                              await openDeviceTasks({
-                                'id': id,
-                                'device_code': d['device_code'],
-                                'device_name': d['device_name'],
-                              });
-                            },
-                          ),
-                        )),
-                  const SizedBox(height: 72),
+                            const Icon(Icons.chevron_right, color: AppColors.textMuted),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),

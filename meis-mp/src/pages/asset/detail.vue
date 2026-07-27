@@ -84,40 +84,47 @@ onLoad((query) => {
 })
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@import '../../uni.scss';
+
 .detail-page {
   padding: 24rpx;
+  min-height: 100vh;
+  background: $meis-page-bg;
+  box-sizing: border-box;
 }
 .card {
   background: #fff;
-  border-radius: 16rpx;
+  border-radius: $meis-radius-lg;
   padding: 8rpx 24rpx 32rpx;
+  border: 1px solid $meis-border;
 }
 .row {
   display: flex;
   justify-content: space-between;
   padding: 24rpx 0;
-  border-bottom: 1px solid #f0f2f5;
+  border-bottom: 1px solid $meis-border;
   gap: 24rpx;
 }
 .label {
-  color: #667085;
+  color: $meis-text-secondary;
   flex-shrink: 0;
 }
 .value {
   text-align: right;
-  color: #1f2a37;
+  color: $meis-text;
   word-break: break-all;
 }
 .btn-repair {
   margin-top: 32rpx;
-  background: #1a5fb4;
+  background: $meis-primary;
   color: #fff;
-  border-radius: 12rpx;
+  border-radius: $meis-radius;
+  border: none;
 }
 .empty {
   text-align: center;
   padding: 80rpx;
-  color: #98a2b3;
+  color: $meis-text-muted;
 }
 </style>

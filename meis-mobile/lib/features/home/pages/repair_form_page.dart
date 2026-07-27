@@ -4,8 +4,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/storage/app_prefs.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/repair_draft_store.dart';
+import '../../../shared/widgets/meis_list_card.dart';
 import 'repair_scan_page.dart';
 
 class RepairFormPage extends ConsumerStatefulWidget {
@@ -388,7 +391,12 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
       body: loading && workorderId != null && device == null
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.pageH,
+                AppSpacing.lg,
+                AppSpacing.pageH,
+                AppSpacing.xxl,
+              ),
               children: [
                 Row(
                   children: [
@@ -398,7 +406,6 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
                         enabled: !readonly,
                         decoration: const InputDecoration(
                           labelText: '设备（编码/名称/首拼）',
-                          border: OutlineInputBorder(),
                         ),
                         onSubmitted: (_) => lookupCode(),
                       ),
@@ -425,56 +432,94 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
                   ],
                 ),
                 if (candidates.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Text('检索到 ${candidates.length} 台设备，请选择', style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    '检索到 ${candidates.length} 台，请选择',
+                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
                   ...candidates.map(
-                    (d) => Card(
-                      child: ListTile(
-                        title: Text(d['device_name']?.toString() ?? ''),
-                        subtitle: Text(
-                          '${d['device_code'] ?? ''} · ${d['dept_name'] ?? '—'} · ${d['device_status_label'] ?? d['device_status'] ?? ''}',
-                        ),
-                        trailing: d['can_report'] == false
-                            ? Text('不可报修', style: TextStyle(color: Theme.of(context).colorScheme.error))
-                            : const Icon(Icons.chevron_right),
-                        onTap: d['can_report'] == false ? null : () => selectDevice(d),
+                    (d) => MeisListCard(
+                      onTap: d['can_report'] == false ? null : () => selectDevice(d),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  d['device_name']?.toString() ?? '',
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${d['device_code'] ?? ''} · ${d['dept_name'] ?? '—'}',
+                                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (d['can_report'] == false)
+                            const Text('不可报修', style: TextStyle(color: AppColors.danger, fontSize: 12))
+                          else
+                            const Icon(Icons.chevron_right, color: AppColors.textMuted),
+                        ],
                       ),
                     ),
                   ),
                 ],
                 if (device != null) ...[
-                  const SizedBox(height: 12),
-                  Card(
+                  const SizedBox(height: AppSpacing.md),
+                  MeisListCard(
                     color: canContinue
-                        ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.35)
-                        : Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.45),
-                    child: ListTile(
-                      title: Text(device!['device_name']?.toString() ?? ''),
-                      subtitle: Text(
-                        canContinue
-                            ? '${device!['device_code'] ?? ''} · ${device!['dept_name'] ?? '—'} · 可报修'
-                            : (device!['cannot_report_reason']?.toString() ?? '不可报修'),
-                      ),
-                      trailing: readonly
-                          ? null
-                          : TextButton(onPressed: () => setState(() => device = null), child: const Text('更换')),
+                        ? AppColors.primary.withValues(alpha: 0.06)
+                        : AppColors.danger.withValues(alpha: 0.08),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                device!['device_name']?.toString() ?? '',
+                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                canContinue
+                                    ? '${device!['device_code'] ?? ''} · ${device!['dept_name'] ?? '—'} · 可报修'
+                                    : (device!['cannot_report_reason']?.toString() ?? '不可报修'),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: canContinue ? AppColors.textSecondary : AppColors.danger,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (!readonly)
+                          TextButton(
+                            onPressed: () => setState(() => device = null),
+                            child: const Text('更换'),
+                          ),
+                      ],
                     ),
                   ),
                 ],
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.lg),
                 DropdownButtonFormField<String>(
                   value: urgency,
-                  decoration: const InputDecoration(labelText: '紧急程度', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(labelText: '紧急程度'),
                   items: [
                     for (final o in urgencyOptions)
                       DropdownMenuItem(value: o.$1, child: Text(o.$2)),
                   ],
                   onChanged: readonly || !canContinue ? null : (v) => setState(() => urgency = v ?? 'normal'),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<String?>(
                   value: faultTypeId,
-                  decoration: const InputDecoration(labelText: '故障类型', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(labelText: '故障类型'),
                   items: [
                     const DropdownMenuItem(value: null, child: Text('未选择')),
                     for (final t in faultTypes)
@@ -485,26 +530,26 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
                   ],
                   onChanged: readonly || !canContinue ? null : (v) => setState(() => faultTypeId = v),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 TextField(
                   controller: faultCtrl,
                   enabled: !readonly && canContinue,
                   maxLines: 4,
-                  decoration: const InputDecoration(
-                    labelText: '故障描述 *',
-                    border: OutlineInputBorder(),
-                  ),
+                  decoration: const InputDecoration(labelText: '故障描述 *'),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 TextField(
                   controller: remarkCtrl,
                   enabled: !readonly && canContinue,
                   maxLines: 2,
-                  decoration: const InputDecoration(labelText: '备注', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(labelText: '备注'),
                 ),
-                const SizedBox(height: 16),
-                Text('故障图片（最多 3 张，非必传）', style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.lg),
+                const Text(
+                  '故障图片（最多 3 张）',
+                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: AppSpacing.sm),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -532,13 +577,13 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
                     ],
                   ],
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: AppSpacing.xl),
                 if (!readonly) ...[
                   OutlinedButton(
                     onPressed: loading ? null : saveLocal,
                     child: Text(localDraftId == null ? '存本地（无网）' : '更新本地草稿'),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.md),
                   FilledButton(
                     onPressed: loading || !canContinue ? null : saveAndAskSubmit,
                     child: loading

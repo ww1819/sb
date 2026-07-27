@@ -385,20 +385,27 @@ onLoad(async (query) => {
 })
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@import '../../uni.scss';
+
 .repair-page {
   padding: 24rpx 24rpx 60rpx;
+  background: $meis-page-bg;
+  min-height: 100vh;
+  box-sizing: border-box;
 }
 .section {
   background: #fff;
-  border-radius: 16rpx;
+  border-radius: $meis-radius-lg;
   padding: 28rpx 24rpx;
-  margin-bottom: 24rpx;
+  margin-bottom: 20rpx;
+  border: 1px solid $meis-border;
 }
 .section-title {
   display: block;
-  font-size: 30rpx;
+  font-size: 28rpx;
   font-weight: 600;
+  color: $meis-text;
   margin-bottom: 20rpx;
 }
 .row-actions {
@@ -416,17 +423,18 @@ onLoad(async (query) => {
   display: block;
   margin-bottom: 10rpx;
   font-size: 24rpx;
-  color: #667085;
+  color: $meis-text-secondary;
 }
 .input,
 .picker,
 .textarea {
   width: 100%;
   box-sizing: border-box;
-  background: #f3f6fa;
-  border-radius: 12rpx;
+  background: $meis-page-bg;
+  border-radius: $meis-radius;
   padding: 20rpx 24rpx;
   font-size: 28rpx;
+  color: $meis-text;
 }
 .textarea {
   min-height: 180rpx;
@@ -441,38 +449,39 @@ onLoad(async (query) => {
 .candidate {
   padding: 20rpx;
   margin-bottom: 12rpx;
-  background: #f7fbff;
-  border-radius: 12rpx;
-  border: 1px solid #d6e6f8;
+  background: #fff;
+  border-radius: $meis-radius;
+  border: 1px solid $meis-border;
 }
 .device-box {
   margin-top: 8rpx;
   padding: 20rpx;
-  background: #f7fbff;
-  border-radius: 12rpx;
-  border: 1px solid #d6e6f8;
+  background: rgba(22, 119, 255, 0.06);
+  border-radius: $meis-radius;
+  border: 1px solid $meis-border;
 }
 .d-name {
   display: block;
   font-size: 30rpx;
   font-weight: 600;
+  color: $meis-text;
 }
 .d-meta {
   display: block;
   margin-top: 8rpx;
   font-size: 24rpx;
-  color: #667085;
+  color: $meis-text-secondary;
 }
 .warn {
   display: block;
   margin-top: 10rpx;
-  color: #d92d20;
+  color: #ff4d4f;
   font-size: 24rpx;
 }
 .ok {
   display: block;
   margin-top: 10rpx;
-  color: #039855;
+  color: #52c41a;
   font-size: 24rpx;
 }
 .photos {
@@ -490,7 +499,7 @@ onLoad(async (query) => {
   width: 120rpx;
   height: 120rpx;
   border-radius: 8rpx;
-  background: #eee;
+  background: $meis-page-bg;
 }
 .thumb-del {
   position: absolute;
@@ -501,22 +510,23 @@ onLoad(async (query) => {
   line-height: 32rpx;
   text-align: center;
   border-radius: 50%;
-  background: #d92d20;
+  background: #ff4d4f;
   color: #fff;
   font-size: 28rpx;
 }
 .actions button {
   margin: 0;
-  background: #1a5fb4;
+  background: $meis-primary;
   color: #fff;
-  border-radius: 12rpx;
+  border-radius: $meis-radius;
+  border: none;
 }
 .actions button[disabled] {
   opacity: 0.5;
 }
 .hint-ro {
   text-align: center;
-  color: #98a2b3;
+  color: $meis-text-muted;
   font-size: 26rpx;
   padding: 24rpx;
 }

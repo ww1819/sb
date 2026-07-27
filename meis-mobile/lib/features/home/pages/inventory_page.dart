@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/local_sync_service.dart';
+import '../../../shared/widgets/meis_list_card.dart';
+import '../../../shared/widgets/meis_section_label.dart';
+import '../../../shared/widgets/meis_status_chip.dart';
 import 'inventory_detail_page.dart';
 
 class InventoryPage extends ConsumerStatefulWidget {
@@ -99,7 +104,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: Text(offlineMode ? '盘点任务（离线）' : '盘点任务'),
@@ -118,29 +122,38 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
           : RefreshIndicator(
               onRefresh: load,
               child: ListView(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.pageH,
+                  AppSpacing.md,
+                  AppSpacing.pageH,
+                  AppSpacing.xl,
+                ),
                 children: [
                   if (offline.isNotEmpty) ...[
-                    Text('本地离线盘点单', style: Theme.of(context).textTheme.titleSmall),
-                    const SizedBox(height: 8),
-                    ...offline.map((row) => _card(scheme, row, local: true)),
-                    const SizedBox(height: 16),
+                    const MeisSectionLabel('本地离线盘点单'),
+                    ...offline.map((row) => _card(row, local: true)),
                   ],
                   if (!offlineMode) ...[
-                    Text('服务器盘点单', style: Theme.of(context).textTheme.titleSmall),
-                    const SizedBox(height: 8),
+                    const MeisSectionLabel('服务器盘点单'),
                     if (online.isEmpty)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 24),
-                        child: Center(child: Text('暂无盘点单')),
+                        child: Center(
+                          child: Text('暂无盘点单', style: TextStyle(color: AppColors.textMuted)),
+                        ),
                       )
                     else
-                      ...online.map((row) => _card(scheme, row, local: false)),
+                      ...online.map((row) => _card(row, local: false)),
                   ],
                   if (offlineMode && offline.isEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 48),
-                      child: Center(child: Text('请联网后下载未审核盘点单')),
+                      child: Center(
+                        child: Text(
+                          '请联网后下载未审核盘点单',
+                          style: TextStyle(color: AppColors.textMuted),
+                        ),
+                      ),
                     ),
                 ],
               ),
@@ -148,54 +161,40 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
     );
   }
 
-  Widget _card(ColorScheme scheme, Map row, {required bool local}) {
+  Widget _card(Map row, {required bool local}) {
     final status = row['status']?.toString() ?? '';
     final audit = row['audit_status']?.toString() ?? '';
     final label = statusLabel[status] ?? status;
     final auditLabel = statusLabel[audit] ?? audit;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () {
-          final id = row['id']?.toString();
-          if (id != null) openDetail(id, localOnly: local);
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return MeisListCard(
+      onTap: () {
+        final id = row['id']?.toString();
+        if (id != null) openDetail(id, localOnly: local);
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _text(row, 'check_name'),
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                  if (local)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: Icon(Icons.cloud_off, size: 16, color: scheme.outline),
-                    ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: scheme.primaryContainer.withValues(alpha: 0.55),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text('$label / $auditLabel',
-                        style: TextStyle(fontSize: 12, color: scheme.onPrimaryContainer)),
-                  ),
-                ],
+              Expanded(
+                child: Text(
+                  _text(row, 'check_name'),
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                ),
               ),
-              const SizedBox(height: 8),
-              Text('单号：${_text(row, 'check_no')}'),
-              Text('应盘/已盘：${_text(row, 'total_count')} / ${_text(row, 'checked_count')}'),
+              if (local) ...[
+                const Icon(Icons.cloud_off, size: 16, color: AppColors.textMuted),
+                const SizedBox(width: 6),
+              ],
+              MeisStatusChip('$label / $auditLabel'),
             ],
           ),
-        ),
+          const SizedBox(height: 8),
+          Text(
+            '${_text(row, 'check_no')} · ${_text(row, 'checked_count')} / ${_text(row, 'total_count')}',
+            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
+        ],
       ),
     );
   }

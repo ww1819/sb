@@ -166,24 +166,27 @@ async function submit() {
 }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@import '../../uni.scss';
+
 .page {
   min-height: 100vh;
   padding: 24rpx 28rpx 80rpx;
-  background: #f5f7fa;
+  background: $meis-page-bg;
   box-sizing: border-box;
 }
 .section {
   background: #fff;
-  border-radius: 16rpx;
+  border-radius: $meis-radius-lg;
   padding: 28rpx;
   margin-bottom: 24rpx;
+  border: 1px solid $meis-border;
 }
 .section-title {
   display: block;
   font-size: 28rpx;
   font-weight: 600;
-  color: #1f2a37;
+  color: $meis-text;
   margin-bottom: 20rpx;
 }
 .row-actions {
@@ -200,7 +203,7 @@ async function submit() {
 .label {
   display: block;
   font-size: 24rpx;
-  color: #667085;
+  color: $meis-text-secondary;
   margin-bottom: 8rpx;
 }
 .input,
@@ -209,29 +212,31 @@ async function submit() {
   width: 100%;
   box-sizing: border-box;
   padding: 16rpx 20rpx;
-  background: #f5f7fa;
-  border-radius: 12rpx;
+  background: $meis-page-bg;
+  border-radius: $meis-radius;
   font-size: 28rpx;
+  color: $meis-text;
 }
 .textarea {
   min-height: 160rpx;
 }
 .device-box {
   padding: 20rpx;
-  background: #eef4fb;
-  border-radius: 12rpx;
+  background: rgba(22, 119, 255, 0.06);
+  border-radius: $meis-radius;
+  border: 1px solid $meis-border;
 }
 .d-name {
   display: block;
   font-size: 30rpx;
   font-weight: 600;
-  color: #1f2a37;
+  color: $meis-text;
 }
 .d-meta {
   display: block;
   margin-top: 8rpx;
   font-size: 24rpx;
-  color: #667085;
+  color: $meis-text-secondary;
 }
 .submit {
   margin-top: 12rpx;

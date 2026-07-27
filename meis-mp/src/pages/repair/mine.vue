@@ -198,11 +198,14 @@ async function deleteRow(r: Record<string, unknown>) {
 }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@import '../../uni.scss';
+
 .page {
   min-height: 100vh;
   padding: 24rpx;
-  background: #f5f7fa;
+  background: $meis-page-bg;
+  box-sizing: border-box;
 }
 .tabs,
 .toolbar {
@@ -218,31 +221,34 @@ async function deleteRow(r: Record<string, unknown>) {
 .empty {
   text-align: center;
   padding: 80rpx;
-  color: #98a2b3;
+  color: $meis-text-muted;
 }
 .card {
   position: relative;
   background: #fff;
-  border-radius: 16rpx;
+  border-radius: $meis-radius-lg;
   padding: 28rpx 24rpx;
   margin-bottom: 16rpx;
+  border: 1px solid $meis-border;
 }
 .no {
   display: block;
   font-size: 30rpx;
   font-weight: 600;
+  color: $meis-text;
+  padding-right: 100rpx;
 }
 .meta {
   display: block;
   margin-top: 8rpx;
   font-size: 24rpx;
-  color: #667085;
+  color: $meis-text-secondary;
 }
 .desc {
   display: block;
   margin-top: 10rpx;
   font-size: 26rpx;
-  color: #1f2a37;
+  color: $meis-text;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -252,8 +258,8 @@ async function deleteRow(r: Record<string, unknown>) {
   right: 24rpx;
   top: 28rpx;
   font-size: 22rpx;
-  color: #1a5fb4;
-  background: #e8f1fb;
+  color: $meis-primary;
+  background: rgba(22, 119, 255, 0.1);
   padding: 4rpx 12rpx;
   border-radius: 8rpx;
 }
@@ -263,7 +269,7 @@ async function deleteRow(r: Record<string, unknown>) {
   gap: 12rpx;
   margin-top: 16rpx;
   padding-top: 12rpx;
-  border-top: 1px solid #f0f2f5;
+  border-top: 1px solid $meis-border;
 }
 .row-ops button {
   margin: 0;

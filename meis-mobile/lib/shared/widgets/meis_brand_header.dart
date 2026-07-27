@@ -15,7 +15,7 @@ class MeisBrandHeader extends StatelessWidget {
           height: 72,
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [AppColors.headerStart, AppColors.primaryDark],
+              colors: [AppColors.primary, AppColors.primaryDark],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -27,8 +27,9 @@ class MeisBrandHeader extends StatelessWidget {
         Text(
           'MEIS',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+                letterSpacing: 1.2,
               ),
         ),
         if (subtitle != null) ...[

@@ -121,21 +121,24 @@ function confirm() {
 }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@import '../../uni.scss';
+
 .page {
   min-height: 100vh;
   padding: 24rpx;
-  background: #f5f7fa;
+  background: $meis-page-bg;
+  box-sizing: border-box;
 }
 .tip {
   font-size: 26rpx;
-  color: #667085;
+  color: $meis-text-secondary;
   margin-bottom: 16rpx;
 }
 .canvas {
   background: #fff;
-  border: 1px solid #d0d5dd;
-  border-radius: 12rpx;
+  border: 1px solid $meis-border;
+  border-radius: $meis-radius;
 }
 .actions {
   margin-top: 28rpx;

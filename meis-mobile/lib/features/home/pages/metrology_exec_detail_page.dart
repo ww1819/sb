@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/widgets/meis_list_card.dart';
+import '../../../shared/widgets/meis_section_label.dart';
+import '../../../shared/widgets/meis_status_chip.dart';
 
 /// 计量执行明细填写（一期：结果状态 + 证书号）
 class MetrologyExecDetailPage extends ConsumerStatefulWidget {
@@ -133,11 +138,46 @@ class _MetrologyExecDetailPageState extends ConsumerState<MetrologyExecDetailPag
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.pageH,
+                AppSpacing.md,
+                AppSpacing.pageH,
+                AppSpacing.xl,
+              ),
               children: [
-                Text('执行单：${exec?['execution_no'] ?? widget.executionId}'),
-                Text('设备：${item?['device_code'] ?? '—'} · ${item?['device_name'] ?? ''}'),
-                const SizedBox(height: 16),
+                MeisListCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '执行单：${exec?['execution_no'] ?? widget.executionId}',
+                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                            ),
+                          ),
+                          MeisStatusChip(
+                            overall == 'pass'
+                                ? '合格'
+                                : overall == 'fail'
+                                    ? '不合格'
+                                    : overall == 'na'
+                                        ? '不适用'
+                                        : overall,
+                            emphasize: true,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '设备：${item?['device_code'] ?? '—'} · ${item?['device_name'] ?? ''}',
+                        style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                const MeisSectionLabel('填写结果'),
                 DropdownButtonFormField<String>(
                   value: overall,
                   decoration: const InputDecoration(labelText: '总体结果', border: OutlineInputBorder()),
@@ -148,66 +188,68 @@ class _MetrologyExecDetailPageState extends ConsumerState<MetrologyExecDetailPag
                   ],
                   onChanged: editable ? (v) => setState(() => overall = v ?? 'pass') : null,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 TextField(
                   controller: certCtrl,
                   enabled: editable,
                   decoration: const InputDecoration(labelText: '证书编号', border: OutlineInputBorder()),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 TextField(
                   controller: remarkCtrl,
                   enabled: editable,
                   maxLines: 2,
                   decoration: const InputDecoration(labelText: '备注', border: OutlineInputBorder()),
                 ),
-                const SizedBox(height: 16),
-                Text('检定项', style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: 8),
+                const MeisSectionLabel('检定项'),
                 if (results.isEmpty)
-                  const Text('无检定项明细（可直接填总体结果完成）')
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+                    child: Text(
+                      '无检定项明细（可直接填总体结果完成）',
+                      style: TextStyle(color: AppColors.textMuted),
+                    ),
+                  )
                 else
                   for (final r in results)
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(r.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 8),
-                            DropdownButtonFormField<String>(
-                              value: r.status == 'pending' ? 'pass' : r.status,
-                              decoration: const InputDecoration(
-                                labelText: '结果',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                              items: const [
-                                DropdownMenuItem(value: 'pass', child: Text('合格')),
-                                DropdownMenuItem(value: 'fail', child: Text('不合格')),
-                                DropdownMenuItem(value: 'na', child: Text('不适用')),
-                              ],
-                              onChanged: editable
-                                  ? (v) => setState(() => r.status = v ?? 'pass')
-                                  : null,
+                    MeisListCard(
+                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(r.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                          const SizedBox(height: 8),
+                          DropdownButtonFormField<String>(
+                            value: r.status == 'pending' ? 'pass' : r.status,
+                            decoration: const InputDecoration(
+                              labelText: '结果',
+                              border: OutlineInputBorder(),
+                              isDense: true,
                             ),
-                            const SizedBox(height: 8),
-                            TextFormField(
-                              initialValue: r.value,
-                              enabled: editable,
-                              decoration: const InputDecoration(
-                                labelText: '测定值',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                              onChanged: (v) => r.value = v,
+                            items: const [
+                              DropdownMenuItem(value: 'pass', child: Text('合格')),
+                              DropdownMenuItem(value: 'fail', child: Text('不合格')),
+                              DropdownMenuItem(value: 'na', child: Text('不适用')),
+                            ],
+                            onChanged: editable
+                                ? (v) => setState(() => r.status = v ?? 'pass')
+                                : null,
+                          ),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            initialValue: r.value,
+                            enabled: editable,
+                            decoration: const InputDecoration(
+                              labelText: '测定值',
+                              border: OutlineInputBorder(),
+                              isDense: true,
                             ),
-                          ],
-                        ),
+                            onChanged: (v) => r.value = v,
+                          ),
+                        ],
                       ),
                     ),
-                const SizedBox(height: 24),
+                const SizedBox(height: AppSpacing.lg),
                 if (editable)
                   FilledButton(
                     onPressed: saving ? null : complete,

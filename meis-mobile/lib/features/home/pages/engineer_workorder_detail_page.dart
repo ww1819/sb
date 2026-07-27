@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/widgets/meis_list_card.dart';
+import '../../../shared/widgets/meis_section_label.dart';
+import '../../../shared/widgets/meis_status_chip.dart';
 
 class EngineerWorkorderDetailPage extends ConsumerStatefulWidget {
   const EngineerWorkorderDetailPage({super.key, required this.workorderId});
@@ -309,50 +314,104 @@ class _EngineerWorkorderDetailPageState
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.pageH,
+                AppSpacing.md,
+                AppSpacing.pageH,
+                AppSpacing.xl,
+              ),
               children: [
-                Text(
-                  '${wo?['device_name'] ?? ''}（${wo?['device_code'] ?? ''}）',
-                  style: Theme.of(context).textTheme.titleMedium,
+                MeisListCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${wo?['device_name'] ?? ''}（${wo?['device_code'] ?? ''}）',
+                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          MeisStatusChip(
+                            statusLabel[status] ?? status,
+                            emphasize: status == 'pending_accept' || status == 'repairing',
+                          ),
+                        ],
+                      ),
+                      if ((wo?['fault_description']?.toString() ?? '').isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          wo?['fault_description']?.toString() ?? '',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textPrimary,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Text('状态：${statusLabel[status] ?? status}'),
-                const SizedBox(height: 8),
-                Text(wo?['fault_description']?.toString() ?? ''),
-                const Divider(height: 32),
                 if (canGrab)
                   FilledButton(onPressed: busy ? null : grab, child: const Text('抢单并开始')),
                 if (canAccept) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.sm),
                   FilledButton(onPressed: busy ? null : accept, child: const Text('接单并开始')),
                 ],
                 if (canSegment) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.sm),
                   OutlinedButton(onPressed: busy ? null : addSegment, child: const Text('添加进程')),
                 ],
                 if (canComplete) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.sm),
                   FilledButton.tonal(
                     onPressed: busy ? null : complete,
                     child: const Text('完工提交验收'),
                   ),
                 ],
-                const SizedBox(height: 24),
-                Text('进程记录', style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.md),
+                const MeisSectionLabel('进程记录'),
                 if (segments.isEmpty)
-                  const Text('暂无进程段')
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+                    child: Text('暂无进程段', style: TextStyle(color: AppColors.textMuted)),
+                  )
                 else
                   ...segments.map((s) {
                     final parts = s['parts'] is List ? s['parts'] as List : [];
-                    return Card(
-                      child: ListTile(
-                        title: Text(s['type_name']?.toString() ?? s['process_type_name']?.toString() ?? '进程'),
-                        subtitle: Text(
-                          '${s['started_at'] ?? ''} ${s['remark'] ?? ''}\n'
-                          '${parts.isEmpty ? '' : '配件 ${parts.length} 项'}',
-                        ),
-                        isThreeLine: parts.isNotEmpty,
+                    final remark = '${s['started_at'] ?? ''} ${s['remark'] ?? ''}'.trim();
+                    return MeisListCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  s['type_name']?.toString() ??
+                                      s['process_type_name']?.toString() ??
+                                      '进程',
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                                ),
+                              ),
+                              if (parts.isNotEmpty) MeisStatusChip('配件 ${parts.length} 项'),
+                            ],
+                          ),
+                          if (remark.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              remark,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppColors.textSecondary,
+                                height: 1.35,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     );
                   }),

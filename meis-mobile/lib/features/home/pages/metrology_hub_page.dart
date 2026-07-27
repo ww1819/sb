@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/widgets/meis_list_card.dart';
+import '../../../shared/widgets/meis_section_label.dart';
 import 'metrology_exec_detail_page.dart';
 
 /// 计量移动执行（MOB.12 / BACKLOG-MOB-11）
@@ -123,55 +127,94 @@ class _MetrologyHubPageState extends ConsumerState<MetrologyHubPage> {
           : RefreshIndicator(
               onRefresh: load,
               child: ListView(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.pageH,
+                  AppSpacing.md,
+                  AppSpacing.pageH,
+                  AppSpacing.xl,
+                ),
                 children: [
-                  Text('到期计划（30 天内）', style: Theme.of(context).textTheme.titleSmall),
-                  const SizedBox(height: 8),
+                  const MeisSectionLabel('到期计划（30 天内）'),
                   if (duePlans.isEmpty)
-                    const Card(child: ListTile(title: Text('暂无到期计划')))
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Text('暂无到期计划', style: TextStyle(color: AppColors.textMuted)),
+                    )
                   else
                     for (final p in duePlans)
-                      Card(
-                        child: ListTile(
-                          title: Text(p['device_name']?.toString() ?? p['plan_name']?.toString() ?? '计划'),
-                          subtitle: Text(
-                            '${p['device_code'] ?? '—'} · 到期 ${p['next_due_date'] ?? '—'}',
-                          ),
-                          trailing: generating
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.play_arrow),
-                          onTap: generating ? null : () => generateFromPlan(p),
+                      MeisListCard(
+                        onTap: generating ? null : () => generateFromPlan(p),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    p['device_name']?.toString() ?? p['plan_name']?.toString() ?? '计划',
+                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${p['device_code'] ?? '—'} · ${p['next_due_date'] ?? '—'}',
+                                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (generating)
+                              const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            else
+                              const Icon(Icons.play_arrow, color: AppColors.primary),
+                          ],
                         ),
                       ),
-                  const SizedBox(height: 16),
-                  Text('进行中执行单', style: Theme.of(context).textTheme.titleSmall),
-                  const SizedBox(height: 8),
+                  const MeisSectionLabel('进行中执行单'),
                   if (openExecs.isEmpty)
-                    const Card(child: ListTile(title: Text('暂无进行中执行单')))
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Text('暂无进行中执行单', style: TextStyle(color: AppColors.textMuted)),
+                    )
                   else
                     for (final e in openExecs)
-                      Card(
-                        child: ListTile(
-                          title: Text(e['execution_no']?.toString() ?? e['id']?.toString() ?? ''),
-                          subtitle: Text('状态：${e['status'] ?? '—'} · ${e['template_name'] ?? ''}'),
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: () async {
-                            final id = e['id']?.toString();
-                            if (id == null) return;
-                            try {
-                              await openExecution(id);
-                              await load();
-                            } on ApiException catch (ex) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context)
-                                    .showSnackBar(SnackBar(content: Text(ex.message)));
-                              }
+                      MeisListCard(
+                        onTap: () async {
+                          final id = e['id']?.toString();
+                          if (id == null) return;
+                          try {
+                            await openExecution(id);
+                            await load();
+                          } on ApiException catch (ex) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(SnackBar(content: Text(ex.message)));
                             }
-                          },
+                          }
+                        },
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    e['execution_no']?.toString() ?? e['id']?.toString() ?? '',
+                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${e['status'] ?? '—'} · ${e['template_name'] ?? ''}',
+                                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right, color: AppColors.textMuted),
+                          ],
                         ),
                       ),
                 ],

@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/widgets/meis_list_card.dart';
+import '../../../shared/widgets/meis_section_label.dart';
+import '../../../shared/widgets/meis_status_chip.dart';
 
 /// 标签补打一期：记流水 + 展示编码（蓝牙 SDK 后置，MOB.12）
 class LabelReprintPage extends ConsumerStatefulWidget {
@@ -150,43 +155,112 @@ class _LabelReprintPageState extends ConsumerState<LabelReprintPage> {
           ? const Center(child: CircularProgressIndicator())
           : checkId == null
               ? ListView(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.pageH,
+                    AppSpacing.md,
+                    AppSpacing.pageH,
+                    AppSpacing.xl,
+                  ),
                   children: [
-                    const Text('选择盘点单，查看需补打明细'),
-                    const SizedBox(height: 8),
-                    for (final c in checks)
-                      Card(
-                        child: ListTile(
-                          title: Text(c['check_no']?.toString() ?? c['check_name']?.toString() ?? ''),
-                          subtitle: Text('状态：${c['status'] ?? '—'} / 审核：${c['audit_status'] ?? '—'}'),
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: () => selectCheck(c),
+                    const MeisSectionLabel('选择盘点单'),
+                    if (checks.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
+                        child: Center(
+                          child: Text('暂无盘点单', style: TextStyle(color: AppColors.textMuted)),
                         ),
-                      ),
+                      )
+                    else
+                      for (final c in checks)
+                        MeisListCard(
+                          onTap: () => selectCheck(c),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      c['check_no']?.toString() ?? c['check_name']?.toString() ?? '',
+                                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      '状态：${c['status'] ?? '—'} / 审核：${c['audit_status'] ?? '—'}',
+                                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Icon(Icons.chevron_right, color: AppColors.textMuted),
+                            ],
+                          ),
+                        ),
                   ],
                 )
               : reprintItems.isEmpty
-                  ? const Center(child: Text('该单暂无需补打明细'))
+                  ? const Center(
+                      child: Text('该单暂无需补打明细', style: TextStyle(color: AppColors.textMuted)),
+                    )
                   : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-                      itemCount: reprintItems.length,
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.pageH,
+                        AppSpacing.md,
+                        AppSpacing.pageH,
+                        AppSpacing.xl,
+                      ),
+                      itemCount: reprintItems.length + 1,
                       itemBuilder: (_, i) {
-                        final it = reprintItems[i];
+                        if (i == 0) {
+                          return const MeisSectionLabel('需补打明细');
+                        }
+                        final it = reprintItems[i - 1];
                         final id = it['id']?.toString() ?? '';
-                        return CheckboxListTile(
-                          value: selected.contains(id),
-                          onChanged: (v) {
+                        final checked = selected.contains(id);
+                        return MeisListCard(
+                          onTap: () {
                             setState(() {
-                              if (v == true) {
-                                selected.add(id);
-                              } else {
+                              if (checked) {
                                 selected.remove(id);
+                              } else {
+                                selected.add(id);
                               }
                             });
                           },
-                          title: Text(it['device_name']?.toString() ?? ''),
-                          subtitle: Text(
-                            '${it['device_code'] ?? ''} · 已打 ${it['label_print_count'] ?? 0} 次',
+                          child: Row(
+                            children: [
+                              Checkbox(
+                                value: checked,
+                                onChanged: (v) {
+                                  setState(() {
+                                    if (v == true) {
+                                      selected.add(id);
+                                    } else {
+                                      selected.remove(id);
+                                    }
+                                  });
+                                },
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      it['device_name']?.toString() ?? '',
+                                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      it['device_code']?.toString() ?? '',
+                                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              MeisStatusChip('已打 ${it['label_print_count'] ?? 0} 次'),
+                            ],
                           ),
                         );
                       },

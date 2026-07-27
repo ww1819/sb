@@ -160,31 +160,33 @@ function onLogout() {
 }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@import '../../uni.scss';
+
 .home {
   min-height: 100vh;
   padding: 0 0 64rpx;
   box-sizing: border-box;
-  background: linear-gradient(180deg, #dce9f8 0%, #f5f7fa 38%, #f5f7fa 100%);
+  background: linear-gradient(180deg, $meis-page-bg-top 0%, $meis-page-bg 36%, $meis-page-bg 100%);
 }
 
 .hero {
-  padding: 36rpx 36rpx 48rpx;
+  padding: 32rpx 32rpx 40rpx;
 }
 
 .hero-top {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 36rpx;
+  margin-bottom: 32rpx;
 }
 
 .brand {
   display: block;
   font-size: 44rpx;
   font-weight: 700;
-  color: #1a5fb4;
-  letter-spacing: 3rpx;
+  color: $meis-primary;
+  letter-spacing: 2rpx;
   line-height: 1.1;
 }
 
@@ -192,12 +194,12 @@ function onLogout() {
   display: block;
   margin-top: 8rpx;
   font-size: 24rpx;
-  color: #5b6b7c;
+  color: $meis-text-secondary;
 }
 
 .logout {
   font-size: 26rpx;
-  color: #1a5fb4;
+  color: $meis-primary;
   padding: 8rpx 4rpx 8rpx 20rpx;
 }
 
@@ -205,7 +207,7 @@ function onLogout() {
   display: block;
   font-size: 40rpx;
   font-weight: 600;
-  color: #1f2a37;
+  color: $meis-text;
   line-height: 1.3;
 }
 
@@ -213,49 +215,47 @@ function onLogout() {
   display: block;
   margin-top: 10rpx;
   font-size: 24rpx;
-  color: #667085;
+  color: $meis-text-secondary;
 }
 
 .section {
-  margin: 0 28rpx 28rpx;
+  margin: 0 28rpx 24rpx;
 }
 
 .section-label {
   display: block;
-  margin: 0 8rpx 20rpx;
+  margin: 0 8rpx 16rpx;
   font-size: 24rpx;
-  color: #98a2b3;
+  color: $meis-text-muted;
   letter-spacing: 1rpx;
 }
 
 .tile {
   display: flex;
   align-items: center;
-  gap: 24rpx;
-  padding: 32rpx 28rpx;
-  margin-bottom: 20rpx;
+  gap: 20rpx;
+  padding: 28rpx 24rpx;
+  margin-bottom: 16rpx;
   background: #fff;
-  border-radius: 20rpx;
-  border: 1px solid rgba(26, 95, 180, 0.08);
-  box-shadow: 0 8rpx 28rpx rgba(26, 95, 180, 0.06);
+  border-radius: $meis-radius-lg;
+  border: 1px solid $meis-border;
 }
 
 .tile--primary {
-  padding: 40rpx 28rpx;
-  background: linear-gradient(135deg, #1a5fb4 0%, #2b7fd4 100%);
+  padding: 36rpx 24rpx;
+  background: $meis-primary;
   border-color: transparent;
-  box-shadow: 0 12rpx 36rpx rgba(26, 95, 180, 0.28);
 }
 
 .tile--pressed {
-  opacity: 0.92;
+  opacity: 0.9;
 }
 
 .tile-icon {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 20rpx;
-  background: #eef4fb;
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 16rpx;
+  background: rgba(22, 119, 255, 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -276,7 +276,7 @@ function onLogout() {
 }
 
 .icon-scan.dark {
-  border-color: #1a5fb4;
+  border-color: $meis-primary;
 }
 
 .icon-scan::after {
@@ -291,13 +291,13 @@ function onLogout() {
 }
 
 .icon-scan.dark::after {
-  background: #1a5fb4;
+  background: $meis-primary;
 }
 
 .icon-search {
   width: 28rpx;
   height: 28rpx;
-  border: 4rpx solid #1a5fb4;
+  border: 4rpx solid $meis-primary;
   border-radius: 50%;
   position: relative;
   box-sizing: border-box;
@@ -308,7 +308,7 @@ function onLogout() {
   position: absolute;
   width: 12rpx;
   height: 4rpx;
-  background: #1a5fb4;
+  background: $meis-primary;
   right: -10rpx;
   bottom: -2rpx;
   transform: rotate(45deg);
@@ -324,20 +324,20 @@ function onLogout() {
   display: block;
   font-size: 32rpx;
   font-weight: 600;
-  color: #1f2a37;
-  margin-bottom: 8rpx;
+  color: $meis-text;
+  margin-bottom: 6rpx;
 }
 
 .tile--primary .tile-title {
   color: #fff;
-  font-size: 36rpx;
+  font-size: 34rpx;
 }
 
 .tile-desc {
   display: block;
   font-size: 24rpx;
-  color: #667085;
-  line-height: 1.45;
+  color: $meis-text-secondary;
+  line-height: 1.4;
 }
 
 .tile--primary .tile-desc {
@@ -346,7 +346,7 @@ function onLogout() {
 
 .tile-arrow {
   font-size: 40rpx;
-  color: #c0c4cc;
+  color: $meis-text-muted;
   line-height: 1;
   flex-shrink: 0;
 }
@@ -356,21 +356,21 @@ function onLogout() {
 }
 
 .tip {
-  margin: 12rpx 36rpx 0;
+  margin: 8rpx 36rpx 0;
   padding: 0 8rpx;
 }
 
 .tip-title {
   display: block;
   font-size: 24rpx;
-  color: #98a2b3;
-  margin-bottom: 10rpx;
+  color: $meis-text-muted;
+  margin-bottom: 8rpx;
 }
 
 .tip-text {
   display: block;
   font-size: 22rpx;
-  color: #98a2b3;
+  color: $meis-text-muted;
   line-height: 1.55;
 }
 </style>

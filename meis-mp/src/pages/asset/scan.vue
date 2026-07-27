@@ -65,29 +65,32 @@ function scan() {
 }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@import '../../uni.scss';
+
 .scan-page {
   min-height: 100vh;
   padding: 32rpx;
-  background: #f5f7fa;
+  background: $meis-page-bg;
+  box-sizing: border-box;
 }
 .card {
   background: #fff;
-  border-radius: 20rpx;
+  border-radius: $meis-radius-lg;
   padding: 40rpx 32rpx;
-  box-shadow: 0 8rpx 28rpx rgba(26, 95, 180, 0.06);
+  border: 1px solid $meis-border;
 }
 .title {
   display: block;
   font-size: 36rpx;
   font-weight: 600;
-  color: #1f2a37;
+  color: $meis-text;
 }
 .desc {
   display: block;
   margin: 12rpx 0 32rpx;
   font-size: 24rpx;
-  color: #667085;
+  color: $meis-text-secondary;
   line-height: 1.5;
 }
 .actions {
@@ -100,9 +103,10 @@ function scan() {
   margin: 0;
 }
 .input {
-  background: #f3f6fa;
-  border-radius: 12rpx;
+  background: $meis-page-bg;
+  border-radius: $meis-radius;
   padding: 22rpx 24rpx;
   font-size: 28rpx;
+  color: $meis-text;
 }
 </style>

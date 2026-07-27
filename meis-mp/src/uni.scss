@@ -1,3 +1,20 @@
+/**
+ * MEIS 小程序设计令牌（MOB-UI-01）
+ * 品牌色与 App / Web 对齐：#1677FF
+ */
+$meis-primary: #1677ff;
+$meis-primary-dark: #0958d9;
+$meis-page-bg: #f0f2f5;
+$meis-page-bg-top: #e8f1ff;
+$meis-text: #303133;
+$meis-text-secondary: #909399;
+$meis-text-muted: #a8abb2;
+$meis-border: #ebeef5;
+$meis-radius: 12rpx;
+$meis-radius-lg: 16rpx;
+
 page {
-  background-color: #f5f7fa;
+  background-color: $meis-page-bg;
+  color: $meis-text;
+  font-size: 28rpx;
 }

@@ -3,7 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/widgets/meis_list_card.dart';
+import '../../../shared/widgets/meis_section_label.dart';
+import '../../../shared/widgets/meis_status_chip.dart';
 import 'ops_hub_page.dart';
 import 'signature_pad_page.dart';
 
@@ -292,89 +297,114 @@ class _OpsExecDetailPageState extends ConsumerState<OpsExecDetailPage> {
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.pageH,
+                AppSpacing.md,
+                AppSpacing.pageH,
+                AppSpacing.xl,
+              ),
               children: [
-                Text(
-                  '${item?['device_name'] ?? ''} · ${item?['device_code'] ?? ''}',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                Text('状态：${exec?['status'] ?? ''} / 明细：${item?['status'] ?? ''}'),
-                Text(
-                  '制单途径：${_channelLabel(exec?['create_channel'])} · 审核途径：${_channelLabel(exec?['audit_channel'])}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                Text(
-                  '审核人：${_blankDash(exec?['auditor_name'])} · 审核时间：${_blankDash(exec?['audited_at'])}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                Text(
-                  '执行途径：${_channelLabel(item?['execution_channel'])} · 确认途径：${_channelLabel(item?['confirm_channel'])}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                if (item?['status']?.toString() == 'confirmed')
-                  const Padding(
-                    padding: EdgeInsets.only(top: 8),
-                    child: Text('已确认，不可再修改', style: TextStyle(color: Colors.orange)),
-                  ),
-                const SizedBox(height: 12),
-                ...results.map((r) => Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(r.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                            if (r.content.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Text(r.content, style: Theme.of(context).textTheme.bodySmall),
-                              ),
-                            const SizedBox(height: 8),
-                            SegmentedButton<String>(
-                              segments: const [
-                                ButtonSegment(value: 'pass', label: Text('合格')),
-                                ButtonSegment(value: 'fail', label: Text('异常')),
-                                ButtonSegment(value: 'na', label: Text('不适用')),
-                              ],
-                              selected: {r.status == 'pending' ? 'pass' : r.status},
-                              onSelectionChanged: !editable ? null : (s) => setState(() => r.status = s.first),
+                MeisListCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${item?['device_name'] ?? ''} · ${item?['device_code'] ?? ''}',
+                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
                             ),
-                            if (editable) ...[
-                              TextFormField(
-                                initialValue: r.value,
-                                decoration: const InputDecoration(labelText: '结果值'),
-                                onChanged: (v) => r.value = v,
+                          ),
+                          const SizedBox(width: 8),
+                          MeisStatusChip(
+                            '${exec?['status'] ?? ''} / ${item?['status'] ?? ''}',
+                            emphasize: item?['status']?.toString() == 'confirmed',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '制单途径：${_channelLabel(exec?['create_channel'])} · 审核途径：${_channelLabel(exec?['audit_channel'])}',
+                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
+                      ),
+                      Text(
+                        '审核人：${_blankDash(exec?['auditor_name'])} · 审核时间：${_blankDash(exec?['audited_at'])}',
+                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
+                      ),
+                      Text(
+                        '执行途径：${_channelLabel(item?['execution_channel'])} · 确认途径：${_channelLabel(item?['confirm_channel'])}',
+                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
+                      ),
+                      if (item?['status']?.toString() == 'confirmed')
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8),
+                          child: Text(
+                            '已确认，不可再修改',
+                            style: TextStyle(color: AppColors.warning, fontSize: 13),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const MeisSectionLabel('检查项'),
+                ...results.map((r) => MeisListCard(
+                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(r.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                          if (r.content.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                r.content,
+                                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                               ),
-                              TextFormField(
-                                initialValue: r.remark,
-                                decoration: const InputDecoration(labelText: '备注'),
-                                onChanged: (v) => r.remark = v,
-                              ),
+                            ),
+                          const SizedBox(height: 8),
+                          SegmentedButton<String>(
+                            segments: const [
+                              ButtonSegment(value: 'pass', label: Text('合格')),
+                              ButtonSegment(value: 'fail', label: Text('异常')),
+                              ButtonSegment(value: 'na', label: Text('不适用')),
                             ],
-                            const SizedBox(height: 8),
-                            const Text('检查项照片', style: TextStyle(fontSize: 12)),
-                            photoRow(
-                              r.photos,
-                              onAdd: () => addResultPhoto(r),
-                              onRemove: (i) => setState(() => r.photos = [...r.photos]..removeAt(i)),
+                            selected: {r.status == 'pending' ? 'pass' : r.status},
+                            onSelectionChanged: !editable ? null : (s) => setState(() => r.status = s.first),
+                          ),
+                          if (editable) ...[
+                            TextFormField(
+                              initialValue: r.value,
+                              decoration: const InputDecoration(labelText: '结果值'),
+                              onChanged: (v) => r.value = v,
+                            ),
+                            TextFormField(
+                              initialValue: r.remark,
+                              decoration: const InputDecoration(labelText: '备注'),
+                              onChanged: (v) => r.remark = v,
                             ),
                           ],
-                        ),
+                          const SizedBox(height: 8),
+                          const Text('检查项照片', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                          photoRow(
+                            r.photos,
+                            onAdd: () => addResultPhoto(r),
+                            onRemove: (i) => setState(() => r.photos = [...r.photos]..removeAt(i)),
+                          ),
+                        ],
                       ),
                     )),
-                const SizedBox(height: 8),
-                Text('设备现场照片', style: Theme.of(context).textTheme.titleSmall),
+                const MeisSectionLabel('设备现场照片'),
                 photoRow(
                   itemPhotos,
                   onAdd: addItemPhoto,
                   onRemove: (i) => setState(() => itemPhotos = [...itemPhotos]..removeAt(i)),
                 ),
-                const SizedBox(height: 12),
-                Text('执行签名', style: Theme.of(context).textTheme.titleSmall),
+                const MeisSectionLabel('执行签名'),
                 if (signatureUrl != null)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                     child: Image.network(signatureUrl!, height: 80, fit: BoxFit.contain,
                         errorBuilder: (_, __, ___) => const Text('签名已上传')),
                   ),
@@ -385,7 +415,7 @@ class _OpsExecDetailPageState extends ConsumerState<OpsExecDetailPage> {
                     label: Text(signatureUrl == null ? '手写签名' : '重签'),
                   ),
                 if (editable) ...[
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.lg),
                   FilledButton(
                     onPressed: saving ? null : complete,
                     child: saving
@@ -394,7 +424,7 @@ class _OpsExecDetailPageState extends ConsumerState<OpsExecDetailPage> {
                   ),
                 ],
                 if (canConfirmItem) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.sm),
                   OutlinedButton(
                     onPressed: saving ? null : confirmItem,
                     child: const Text('确认本设备项'),

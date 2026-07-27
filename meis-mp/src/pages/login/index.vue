@@ -63,34 +63,36 @@ async function onLogin() {
 }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@import '../../uni.scss';
+
 .login-page {
   min-height: 100vh;
   padding: 120rpx 48rpx 48rpx;
-  background: linear-gradient(180deg, #e8f1ff 0%, #f5f7fa 45%);
+  background: linear-gradient(180deg, $meis-page-bg-top 0%, $meis-page-bg 45%);
   box-sizing: border-box;
 }
 .hero {
-  margin-bottom: 64rpx;
+  margin-bottom: 56rpx;
 }
 .brand {
   display: block;
   font-size: 64rpx;
   font-weight: 700;
-  color: #1a5fb4;
+  color: $meis-primary;
   letter-spacing: 4rpx;
 }
 .subtitle {
   display: block;
   margin-top: 12rpx;
   font-size: 28rpx;
-  color: #5b6b7c;
+  color: $meis-text-secondary;
 }
 .form-card {
   background: #fff;
-  border-radius: 24rpx;
+  border-radius: 20rpx;
   padding: 40rpx 32rpx;
-  box-shadow: 0 8rpx 32rpx rgba(26, 95, 180, 0.08);
+  border: 1px solid $meis-border;
 }
 .field {
   margin-bottom: 28rpx;
@@ -99,27 +101,28 @@ async function onLogin() {
   display: block;
   margin-bottom: 12rpx;
   font-size: 26rpx;
-  color: #5b6b7c;
+  color: $meis-text-secondary;
 }
 .input {
   height: 80rpx;
   padding: 0 24rpx;
-  background: #f3f6fa;
+  background: $meis-page-bg;
   border-radius: 12rpx;
   font-size: 28rpx;
 }
 .btn-primary {
   margin-top: 16rpx;
-  background: #1a5fb4;
+  background: $meis-primary;
   color: #fff;
   border-radius: 12rpx;
   font-size: 30rpx;
+  border: none;
 }
 .hint {
   display: block;
   margin-top: 24rpx;
   text-align: center;
   font-size: 22rpx;
-  color: #98a2b3;
+  color: $meis-text-muted;
 }
 </style>
