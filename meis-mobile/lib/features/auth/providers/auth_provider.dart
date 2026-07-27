@@ -34,6 +34,10 @@ class AuthState {
 
 class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier(this._prefs, this._api, this._ref) : super(const AuthState()) {
+    _api.onUnauthorized = () async {
+      await _prefs.clearAuth();
+      state = state.copyWith(clearUser: true);
+    };
     _restore();
   }
 

@@ -112,8 +112,18 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
       setState(() {
         dueItems = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       });
+    } on ApiException catch (e) {
+      setState(() => dueItems = []);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
     } catch (_) {
       setState(() => dueItems = []);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('加载到期任务失败')),
+        );
+      }
     } finally {
       if (mounted) setState(() => loading = false);
     }

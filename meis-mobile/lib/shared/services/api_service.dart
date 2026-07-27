@@ -24,6 +24,9 @@ class ApiService {
   Dio? _dio;
   String _baseUrl = '';
 
+  /// 401 时由 Auth 注入：清本地会话并更新状态
+  Future<void> Function()? onUnauthorized;
+
   String get baseUrl => _baseUrl;
 
   void configure(String baseUrl) {
@@ -134,6 +137,7 @@ class ApiService {
       final res = await dio.get<Map<String, dynamic>>(path, queryParameters: query);
       return _unwrap(res.data);
     } on DioException catch (e) {
+      await _handleUnauthorized(e);
       throw ApiException(_dioMessage(e), statusCode: e.response?.statusCode);
     }
   }
@@ -143,6 +147,7 @@ class ApiService {
       final res = await dio.post<Map<String, dynamic>>(path, data: data ?? {});
       return _unwrap(res.data);
     } on DioException catch (e) {
+      await _handleUnauthorized(e);
       throw ApiException(_dioMessage(e), statusCode: e.response?.statusCode);
     }
   }
@@ -152,6 +157,7 @@ class ApiService {
       final res = await dio.put<Map<String, dynamic>>(path, data: data);
       return _unwrap(res.data);
     } on DioException catch (e) {
+      await _handleUnauthorized(e);
       throw ApiException(_dioMessage(e), statusCode: e.response?.statusCode);
     }
   }
@@ -161,6 +167,7 @@ class ApiService {
       final res = await dio.patch<Map<String, dynamic>>(path, data: data);
       return _unwrap(res.data);
     } on DioException catch (e) {
+      await _handleUnauthorized(e);
       throw ApiException(_dioMessage(e), statusCode: e.response?.statusCode);
     }
   }
@@ -170,6 +177,7 @@ class ApiService {
       final res = await dio.delete<Map<String, dynamic>>(path);
       _unwrap(res.data);
     } on DioException catch (e) {
+      await _handleUnauthorized(e);
       throw ApiException(_dioMessage(e), statusCode: e.response?.statusCode);
     }
   }
@@ -194,6 +202,7 @@ class ApiService {
       }
       throw ApiException('上传失败');
     } on DioException catch (e) {
+      await _handleUnauthorized(e);
       throw ApiException(_dioMessage(e), statusCode: e.response?.statusCode);
     }
   }
@@ -206,11 +215,27 @@ class ApiService {
     return body['data'];
   }
 
+  Future<void> _handleUnauthorized(DioException e) async {
+    if (e.response?.statusCode != 401) return;
+    final cb = onUnauthorized;
+    if (cb != null) {
+      await cb();
+    } else {
+      await _prefs.clearAuth();
+    }
+  }
+
   String _dioMessage(DioException e) {
     final data = e.response?.data;
     if (data is Map && data['message'] != null) {
-      return data['message'].toString();
+      final msg = data['message'].toString().trim();
+      if (msg.isNotEmpty) return msg;
     }
+    final code = e.response?.statusCode;
+    if (code == 401) return '登录已过期，请重新登录';
+    if (code == 403) return '无权限执行此操作';
+    if (code == 404) return '接口或资源不存在';
+    if (code != null && code >= 500) return '服务器错误（$code），请稍后重试';
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
@@ -219,7 +244,9 @@ class ApiService {
       case DioExceptionType.connectionError:
         return '无法连接服务器，请确认手机和服务器在同一网络';
       default:
-        return e.message ?? '网络请求失败';
+        // 避免把 Dio 英文长文（如 validateStatus/401）直接抛给用户
+        if (code != null) return '请求失败（$code）';
+        return '网络请求失败';
     }
   }
 }
