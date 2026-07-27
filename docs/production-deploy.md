@@ -1,6 +1,12 @@
 # MEIS 生产环境部署与启动
 
-本文档面向 **Linux 生产服务器**（Docker / Kubernetes）。本地 Windows 开发请阅读：[local-dev-deploy.md](local-dev-deploy.md)
+本文档面向 **Linux 生产服务器**（Docker / Kubernetes）。
+
+| 场景 | 文档 |
+|------|------|
+| Windows 本地开发 | [local-dev-deploy.md](local-dev-deploy.md) |
+| **Windows Server 生产**（原生 JAR + Nginx/IIS） | [windows-production-deploy.md](windows-production-deploy.md) |
+| Linux 生产（本文） | 当前文档 |
 
 ---
 

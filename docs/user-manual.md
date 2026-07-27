@@ -21,7 +21,7 @@
 
 扫码报修、盘点、保养任务 — 见 `meis-mobile/README.md`
 
-部署文档：[local-dev-deploy.md](local-dev-deploy.md)、[production-deploy.md](production-deploy.md)
+部署文档：[local-dev-deploy.md](local-dev-deploy.md)、[windows-production-deploy.md](windows-production-deploy.md)、[production-deploy.md](production-deploy.md)
 
 ## 4. 管理员手册
 

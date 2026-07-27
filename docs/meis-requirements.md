@@ -14,6 +14,8 @@
 - [设备报修 / 维修工单](repair-workorder.md)
 - [用户手册（骨架）](user-manual.md)
 - [本地开发部署](local-dev-deploy.md)
+- [Windows 生产部署](windows-production-deploy.md)
+- [Linux 生产部署](production-deploy.md)
 - [**可复用工程约定包**](reusable-engineering-conventions.md)（跨项目沉淀，其他系统可直接复用）
 
 ---
@@ -1924,6 +1926,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+| 2.137 | 2026-07-27 23:50:00 | — | PLT-DEP-01：Windows Server 生产部署文档 `windows-production-deploy.md` |
 | 2.136 | 2026-07-27 14:50:00 | — | MOB-UI-01 第③批落地：其余页双端对齐；BACKLOG-MOB-13 已完成 |
 | 2.135 | 2026-07-27 14:40:00 | — | MOB-UI-01 第②批落地：报修/运维/盘点等高频页双端简洁化 |
 | 2.134 | 2026-07-27 14:30:00 | — | MOB-UI-01 第①批落地：App/MP 主题壳+首页；BACKLOG-MOB-13 进行中 |
@@ -3247,6 +3250,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 微信小程序（uni-app） | [附录 MP](#附录-mp微信小程序uni-app2026-07-21)、[MP.3](#mp3-手写签名与订阅消息2026-07-21)、[MP.4](#mp4-对照近期-appops-的小程序缺口审计2026-07-23)、第 7 章 BACKLOG-MP-01 |
 | App / 小程序后续能力建议 | [MOB.9](#mob9-移动端与小程序后续能力建议2026-07-21)、[MP.2](#mp2-小程序二期建议2026-07-21)、[MOB.10](#mob10-报修进度与验收落地2026-07-21)、[MOB.11](#mob11-工程师移动维修一期2026-07-21)、[MOB.12](#mob12-四项收尾本地草稿--计量--补打--不良事件2026-07-21) |
 | App / 小程序 UI 简洁化（已完成） | [MOB-UI-01](#mob-ui-01-app--小程序界面与操作简洁化待开发2026-07-27)、第 7 章 `BACKLOG-MOB-13` |
+| Windows Server 生产部署 | [PLT-DEP-01](#plt-dep-01-windows-server-生产部署文档已完成2026-07-27)、[windows-production-deploy.md](windows-production-deploy.md) |
 | 列表勾选 / 批量作用域 | [附录 V](#附录-v列表勾选跨页缓存与批量作用域2026-07-15) |
 | 列表筛选多选 / 分类模糊拆分 | [PLT-UI-02](#plt-ui-02-定稿2026-07-22)、约定包 §5.5 |
 | 业务冗余字段（device / 人员姓名 / **单据下沉**） | [附录 W](#附录-w业务冗余字段约定2026-07-15)（含 **W.5** / **W.6**）、约定包 §6.2 |
@@ -5633,3 +5637,19 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 | ③ | 其余页面对齐 | **已落地** | App：消息、登录、标签补打、盘点/报修/工程师/运维/计量详情、签名板；MP：资产扫码/列表/详情、报修详情、运维详情/签名、不良事件上报 |
 
 **状态**：已完成（`BACKLOG-MOB-13`；①②③均已落地）。
+
+### PLT-DEP-01 Windows Server 生产部署文档（已完成·2026-07-27）
+
+> 来源：需补充 Windows 生产环境部署说明（原仅有 Linux 生产 + Windows 本地开发）。  
+> **完整正文已独立成篇，勿在本需求文档内展开步骤**：[docs/windows-production-deploy.md](windows-production-deploy.md)
+
+| 项 | 定稿 |
+|----|------|
+| **目标** | 院内 Windows Server 可按文档完成中间件、JAR、前端、反向代理与开机自启 |
+| **形态** | 原生部署（JDK + PostgreSQL + Memurai + MinIO + JAR + Nginx/IIS）；不强制 Docker |
+| **独立文档** | [windows-production-deploy.md](windows-production-deploy.md) |
+| **关联** | [local-dev-deploy.md](local-dev-deploy.md)、[production-deploy.md](production-deploy.md) |
+| **要点摘要** | 启动顺序（tenant 先迁库）；MinIO **9100**（避 Eloam 9000）；NSSM/WinSW 服务化；HTTPS；改默认口令与 JWT |
+| **不做** | 本文不替代 Linux/K8s 方案；不改业务代码；部署步骤不写入本需求文件 |
+
+**状态**：已完成（正文仅在独立文档维护）。

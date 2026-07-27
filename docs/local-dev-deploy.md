@@ -2,7 +2,10 @@
 
 本文档面向 **Windows 物理机本地开发**（无 Docker Desktop）。涵盖软件安装、中间件配置、数据库初始化、后端/前端构建与启动、验证与排错。
 
-生产环境请阅读：[production-deploy.md](production-deploy.md)
+生产环境请阅读：
+
+- Linux（Docker / K8s）：[production-deploy.md](production-deploy.md)
+- Windows Server 原生部署：[windows-production-deploy.md](windows-production-deploy.md)
 
 ---
 
