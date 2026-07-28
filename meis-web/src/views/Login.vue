@@ -1,15 +1,30 @@
 <template>
   <div class="login-page">
     <div class="login-brand">
-      <div class="brand-inner">
+      <div class="brand-header">
         <h1 class="brand-logo">MEIS</h1>
         <p class="brand-title">医院设备管理系统</p>
         <p class="brand-desc">Medical Equipment Information System</p>
-        <ul class="brand-features">
-          <li>全生命周期设备管理</li>
-          <li>多租户 SaaS 架构</li>
-          <li>精细化权限与数据范围</li>
-        </ul>
+      </div>
+      <div class="login-hero" aria-hidden="true">
+        <div class="login-hero-stage">
+          <div class="f2c-animate-img-bottom login-hero-layer" style="bottom: 14%; right: 12%">
+            <img src="/login-banner/banner-bottom.png?v=size-up" height="400" alt="" />
+          </div>
+          <div class="f2c-animate-img-block login-hero-layer" style="top: 6%; left: 38%">
+            <img src="/login-banner/banner-block.png" height="260" alt="" />
+          </div>
+          <div class="f2c-animate-img-left login-hero-layer" style="top: 18%; left: 20%">
+            <img src="/login-banner/banner-left.png" height="142" alt="" />
+          </div>
+          <div class="f2c-animate-img-right login-hero-layer" style="top: 18%; right: 23%">
+            <img src="/login-banner/banner-right.png" height="82" alt="" />
+          </div>
+          <div class="f2c-animate-img-AI login-hero-layer" style="top: 8%; left: 47%">
+            <img src="/login-banner/banner-AI.png" height="130" alt="" />
+          </div>
+          <img class="login-hero-base" src="/login-banner/banner-bg.png" height="493" alt="" />
+        </div>
       </div>
     </div>
     <div class="login-form-panel">
@@ -122,64 +137,192 @@ async function onPlatformSubmit() {
 
 .login-brand {
   flex: 1;
+  position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--meis-header-gradient-start) 0%, var(--meis-header-gradient-end) 60%, #1677ff 100%);
-  color: #fff;
-  padding: 48px;
+  background: linear-gradient(180deg, #f0f4ff 0%, #f7f9ff 55%, #eef2ff 100%);
+  padding: 40px 24px 48px;
+  overflow: hidden;
 }
 
-.brand-inner {
-  max-width: 420px;
+.brand-header {
+  position: absolute;
+  top: 40px;
+  left: 48px;
+  z-index: 2;
+  color: #1f2a44;
 }
 
 .brand-logo {
-  margin: 0 0 8px;
-  font-size: 48px;
+  margin: 0 0 6px;
+  font-size: 36px;
   font-weight: 700;
   letter-spacing: 4px;
+  color: #1677ff;
 }
 
 .brand-title {
-  margin: 0 0 8px;
-  font-size: 22px;
-  font-weight: 500;
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2a44;
 }
 
 .brand-desc {
-  margin: 0 0 32px;
-  font-size: 14px;
-  opacity: 0.75;
-}
-
-.brand-features {
   margin: 0;
-  padding: 0;
-  list-style: none;
+  font-size: 13px;
+  color: #64748b;
 }
 
-.brand-features li {
+.login-hero {
+  width: 100%;
+  max-width: 1040px;
+  margin-top: 28px;
+  display: flex;
+  justify-content: center;
+}
+
+/*
+ * 官网：底图 height=493（约宽 793），叠加层 height 分别为 400/260/142/82/130。
+ * 按容器宽度等比缩放；放宽 max-width，使左侧展示接近官网体量。
+ */
+.login-hero-stage {
   position: relative;
-  padding: 8px 0 8px 20px;
-  font-size: 14px;
-  opacity: 0.9;
+  width: 100%;
+  container-type: inline-size;
+  line-height: 0;
 }
 
-.brand-features li::before {
-  content: '';
+.login-hero-base {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.login-hero-layer {
   position: absolute;
-  left: 0;
-  top: 50%;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.6);
-  transform: translateY(-50%);
+  z-index: 1;
+  line-height: 0;
+}
+
+.login-hero-layer img {
+  display: block;
+  width: auto;
+  max-width: none;
+}
+
+.f2c-animate-img-bottom img {
+  height: calc(100cqw * 400 / 793);
+}
+
+.f2c-animate-img-block img {
+  height: calc(100cqw * 260 / 793);
+}
+
+.f2c-animate-img-left img {
+  height: calc(100cqw * 142 / 793);
+}
+
+.f2c-animate-img-right img {
+  height: calc(100cqw * 82 / 793);
+}
+
+.f2c-animate-img-AI img {
+  height: calc(100cqw * 130 / 793);
+}
+
+.f2c-animate-img-bottom {
+  animation: float-slow 4s ease-in-out 0.9s infinite;
+}
+
+.f2c-animate-img-block {
+  opacity: 0;
+  transform: translateY(-30px);
+  animation: slideDown 1s ease-out 0.1s forwards;
+}
+
+.f2c-animate-img-left {
+  opacity: 0;
+  transform: translateY(30px);
+  animation:
+    slideUp 0.8s ease-out 0.5s forwards,
+    float 4s ease-in-out 1.2s infinite;
+}
+
+.f2c-animate-img-right {
+  opacity: 0;
+  transform: translateY(30px);
+  animation:
+    slideUp 0.8s ease-out 0.5s forwards,
+    float-delayed 5s ease-in-out 1.2s infinite;
+}
+
+.f2c-animate-img-AI {
+  opacity: 0;
+  transform: translateY(30px);
+  animation:
+    slideUp 0.8s ease-out 0.5s forwards,
+    float-slow 4s ease-in-out 1.2s infinite;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
+
+@keyframes float-delayed {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-25px);
+  }
+}
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(10px);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .login-form-panel {
   width: 480px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -226,9 +369,22 @@ async function onPlatformSubmit() {
   .login-page {
     flex-direction: column;
   }
+
   .login-brand {
-    padding: 32px 24px;
+    padding: 28px 24px 16px;
+    min-height: auto;
   }
+
+  .brand-header {
+    position: static;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+
+  .login-hero {
+    display: none;
+  }
+
   .login-form-panel {
     width: 100%;
   }
