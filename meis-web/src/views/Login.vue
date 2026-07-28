@@ -28,7 +28,7 @@
       </div>
     </div>
     <div class="login-form-panel">
-      <el-card class="login-card" shadow="never">
+      <div class="login-form-inner">
         <h2 class="form-title">欢迎登录</h2>
         <p class="form-subtitle">请选择登录方式并输入凭据</p>
         <el-tabs v-model="mode" class="login-tabs">
@@ -75,7 +75,7 @@
             <p class="hint">平台管理员负责开户、套餐与菜单授权，不进入医院业务数据。</p>
           </el-tab-pane>
         </el-tabs>
-      </el-card>
+      </div>
     </div>
   </div>
 </template>
@@ -323,28 +323,32 @@ async function onPlatformSubmit() {
 .login-form-panel {
   width: 480px;
   flex-shrink: 0;
+  align-self: stretch;
+  min-height: 100vh;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px;
-  background: var(--meis-page-bg);
+  background: #fff;
+  border-left: 1px solid var(--meis-border-light);
+  box-sizing: border-box;
 }
 
-.login-card {
+.login-form-inner {
   width: 100%;
-  border-radius: var(--meis-card-radius);
-  border: 1px solid var(--meis-border-light);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 48px 48px;
+  box-sizing: border-box;
 }
 
 .form-title {
-  margin: 0 0 4px;
-  font-size: 22px;
+  margin: 0 0 8px;
+  font-size: 28px;
   font-weight: 600;
   color: var(--meis-text-primary);
 }
 
 .form-subtitle {
-  margin: 0 0 20px;
+  margin: 0 0 28px;
   font-size: 13px;
   color: var(--meis-text-secondary);
 }
@@ -387,6 +391,14 @@ async function onPlatformSubmit() {
 
   .login-form-panel {
     width: 100%;
+    min-height: auto;
+    border-left: none;
+    border-top: 1px solid var(--meis-border-light);
+  }
+
+  .login-form-inner {
+    padding: 28px 24px 40px;
+    justify-content: flex-start;
   }
 }
 </style>
