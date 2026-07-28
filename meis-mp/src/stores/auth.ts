@@ -11,7 +11,7 @@ export interface UserInfo {
   tenantCode: string
   schemaName: string
   roles?: string[]
-  permissions?: Record<string, unknown>
+  permissions?: { menus?: string[]; buttons?: string[]; dataScope?: string; [key: string]: unknown }
   userType?: string
 }
 

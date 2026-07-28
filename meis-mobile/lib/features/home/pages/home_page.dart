@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../shared/utils/permission_util.dart';
 import '../../../shared/widgets/meis_nav_tile.dart';
 import '../../../shared/widgets/meis_section_label.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -17,6 +18,7 @@ import 'metrology_hub_page.dart';
 import 'my_repairs_page.dart';
 import 'pm_page.dart';
 import 'repair_page.dart';
+import 'shared_hub_page.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -150,6 +152,13 @@ class HomePage extends ConsumerWidget {
                 subtitle: '现场补打记录与预览',
                 onTap: () => _push(context, const LabelReprintPage()),
               ),
+              if (hasAnyMenu(user, SharedHubPage.menuCodes))
+                MeisNavTile(
+                  icon: Icons.devices_other_outlined,
+                  title: '设备调配',
+                  subtitle: '公用设备借调 / 归还',
+                  onTap: () => _push(context, const SharedHubPage()),
+                ),
               const SizedBox(height: AppSpacing.md),
               const MeisSectionLabel('运维执行'),
               MeisNavTile(
