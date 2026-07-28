@@ -923,6 +923,10 @@ ALTER TABLE sys_user ADD COLUMN IF NOT EXISTS wx_openid VARCHAR(64);
 COMMENT ON COLUMN sys_user.wx_openid IS 'WeChat mini-program openid for subscribe message';
 CREATE UNIQUE INDEX IF NOT EXISTS uk_sys_user_wx_openid ON sys_user (wx_openid) WHERE wx_openid IS NOT NULL AND wx_openid <> '';
 
+-- ---------- DASH-UI-06: 用户 UI 偏好（快捷入口等，与 RBAC permissions 分离） ----------
+ALTER TABLE sys_user ADD COLUMN IF NOT EXISTS preferences JSONB NOT NULL DEFAULT '{}'::jsonb;
+COMMENT ON COLUMN sys_user.preferences IS '用户 UI 偏好 JSON；如 quickEntryPaths 快捷入口 path 列表';
+
 -- ---------- 附录 W.6 / BACKLOG-PLT-W03：明细业务单号与主数据冗余（2026-07-22） ----------
 ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS entry_no VARCHAR(30);
 ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS device_code VARCHAR(50);

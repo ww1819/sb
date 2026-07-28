@@ -128,7 +128,8 @@ CREATE TABLE sys_user (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     permissions JSONB,
-    permission_mode VARCHAR(20) DEFAULT 'synced'
+    permission_mode VARCHAR(20) DEFAULT 'synced',
+    preferences JSONB NOT NULL DEFAULT '{}'::jsonb
 );
 COMMENT ON TABLE sys_user IS '用户表';
 COMMENT ON COLUMN sys_user.id IS '主键';
@@ -149,6 +150,7 @@ COMMENT ON COLUMN sys_user.created_at IS '创建时间';
 COMMENT ON COLUMN sys_user.updated_at IS '更新时间';
 COMMENT ON COLUMN sys_user.permissions IS '权限JSON';
 COMMENT ON COLUMN sys_user.permission_mode IS '权限模式（synced/custom）';
+COMMENT ON COLUMN sys_user.preferences IS '用户UI偏好JSON（如快捷入口）';
 
 -- 1.5 角色表
 CREATE TABLE sys_role (
