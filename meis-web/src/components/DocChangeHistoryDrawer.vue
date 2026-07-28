@@ -12,7 +12,9 @@
       <el-table-column prop="old_value" label="改前" min-width="120" show-overflow-tooltip />
       <el-table-column prop="new_value" label="改后" min-width="120" show-overflow-tooltip />
       <el-table-column prop="operator_name" label="操作人" width="100" show-overflow-tooltip />
-      <el-table-column prop="client" label="端" width="70" />
+      <el-table-column label="途径" width="80">
+        <template #default="{ row }">{{ channelLabel(row.client) }}</template>
+      </el-table-column>
       <el-table-column prop="remark" label="备注" min-width="100" show-overflow-tooltip />
     </el-table>
     <template #footer>
@@ -51,6 +53,12 @@ const EVENT_LABELS: Record<string, string> = {
   complete_item: '完成明细'
 }
 
+const CHANNEL_LABELS: Record<string, string> = {
+  web: 'Web',
+  app: 'App',
+  mp: '小程序'
+}
+
 watch(
   () => props.modelValue,
   (v) => {
@@ -85,5 +93,11 @@ function fmt(v: unknown) {
 function eventLabel(v: unknown) {
   const k = String(v ?? '')
   return EVENT_LABELS[k] ?? k
+}
+
+function channelLabel(v: unknown) {
+  const k = String(v ?? '').trim().toLowerCase()
+  if (!k) return '—'
+  return CHANNEL_LABELS[k] ?? String(v)
 }
 </script>

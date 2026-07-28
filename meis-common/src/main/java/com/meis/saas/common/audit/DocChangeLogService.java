@@ -54,7 +54,9 @@ public class DocChangeLogService {
                  field_name, old_value, new_value, client, operator_id, operator_name, remark)
                 VALUES (?::uuid,?,?,?::uuid,?,?,?,?,?,?,?,?,?::uuid,?,?)
                 """, UUID.randomUUID(), module, docType, docId, docNo, eventType, entityType, entityId,
-                field, oldValue, newValue, client != null ? client : "web", userId, name, remark);
+                field, oldValue, newValue,
+                com.meis.saas.common.ops.OpsClientChannel.normalize(client),
+                userId, name, remark);
     }
 
     private static String stringify(Object v) {

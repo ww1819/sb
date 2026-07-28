@@ -564,7 +564,7 @@ public class RepairWorkorderController {
         }
         Map<String, Object> row = requireWo(id);
         addEvent(id, "created", null, "draft", null, null, null, null, null, "保存草稿", null);
-        changeLog.recordCreate("repair_workorder", id, row);
+        changeLog.recordCreate("repair_workorder", id, row, createChannel);
         return Result.ok(row);
     }
 
@@ -615,7 +615,7 @@ public class RepairWorkorderController {
         jdbc.update("UPDATE repair_workorder SET " + String.join(", ", sets) + " WHERE id = ?::uuid", args.toArray());
         Map<String, Object> after = requireWo(id);
         addEvent(id, "update", "draft", "draft", null, null, null, null, null, "修改草稿", null);
-        changeLog.recordUpdate("repair_workorder", id, before, after);
+        changeLog.recordUpdate("repair_workorder", id, before, after, OpsClientChannel.of(body));
         return Result.ok(after);
     }
 
@@ -646,7 +646,7 @@ public class RepairWorkorderController {
         syncDeviceStatus(before.get("device_id"), "maintenance");
         Map<String, Object> after = requireWo(id);
         addEvent(id, "submit", "draft", "reported", null, null, null, null, null, "提交报修", null);
-        changeLog.recordAction("repair_workorder", id, "submit", before, after, "提交报修");
+        changeLog.recordAction("repair_workorder", id, "submit", before, after, "提交报修", channel);
         return Result.ok(after);
     }
 
@@ -665,7 +665,7 @@ public class RepairWorkorderController {
         String remark = body != null ? str(body.get("remark")) : "撤回报修";
         if (remark.isBlank()) remark = "撤回报修";
         addEvent(id, "withdraw", "reported", "draft", null, null, null, null, null, remark, null);
-        changeLog.recordAction("repair_workorder", id, "withdraw", before, after, remark);
+        changeLog.recordAction("repair_workorder", id, "withdraw", before, after, remark, OpsClientChannel.of(body));
         return Result.ok(after);
     }
 
@@ -678,7 +678,7 @@ public class RepairWorkorderController {
             throw new BizException(400, "仅未提交的报修单可删除");
         }
         addEvent(id, "delete", "draft", "draft", null, null, null, null, null, "删除草稿", null);
-        changeLog.recordDelete("repair_workorder", id, before);
+        changeLog.recordDelete("repair_workorder", id, before, client);
         SoftDeleteSupport.softDelete(jdbc, "repair_workorder", id.toString(), client);
         return Result.ok();
     }
@@ -1115,7 +1115,7 @@ public class RepairWorkorderController {
         addEvent(id, "cancel", current, "cancelled", str(wo.get("repair_sub_status")), null,
                 null, null, null, remark, null);
         syncDeviceStatus(wo.get("device_id"), "normal");
-        changeLog.recordAction("repair_workorder", id, "cancel", wo, requireWo(id), remark);
+        changeLog.recordAction("repair_workorder", id, "cancel", wo, requireWo(id), remark, OpsClientChannel.of(body));
         return Result.ok(loadWorkorder(id));
     }
 

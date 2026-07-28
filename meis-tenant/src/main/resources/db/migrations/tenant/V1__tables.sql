@@ -236,6 +236,8 @@ COMMENT ON COLUMN sys_entity_change_log.snapshot_json IS '精简快照 JSON';
 COMMENT ON COLUMN sys_entity_change_log.operator_id IS '操作人ID';
 COMMENT ON COLUMN sys_entity_change_log.operator_name IS '操作人姓名';
 COMMENT ON COLUMN sys_entity_change_log.remark IS '备注';
+ALTER TABLE sys_entity_change_log ADD COLUMN IF NOT EXISTS client VARCHAR(20);
+COMMENT ON COLUMN sys_entity_change_log.client IS '操作端 web/app/mp（OPS.16.30）';
 
 -- 1.8 单据变更/事件流水（附录 OPS.6）
 CREATE TABLE sys_doc_change_log (
