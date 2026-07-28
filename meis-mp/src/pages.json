@@ -74,6 +74,48 @@
       "style": {
         "navigationBarTitleText": "不良事件上报"
       }
+    },
+    {
+      "path": "pages/shared/hub",
+      "style": {
+        "navigationBarTitleText": "设备调配"
+      }
+    },
+    {
+      "path": "pages/shared/loan-list",
+      "style": {
+        "navigationBarTitleText": "借调申请"
+      }
+    },
+    {
+      "path": "pages/shared/loan-form",
+      "style": {
+        "navigationBarTitleText": "借调表单"
+      }
+    },
+    {
+      "path": "pages/shared/loan-approve",
+      "style": {
+        "navigationBarTitleText": "借调审核"
+      }
+    },
+    {
+      "path": "pages/shared/return-list",
+      "style": {
+        "navigationBarTitleText": "归还申请"
+      }
+    },
+    {
+      "path": "pages/shared/return-form",
+      "style": {
+        "navigationBarTitleText": "归还表单"
+      }
+    },
+    {
+      "path": "pages/shared/return-approve",
+      "style": {
+        "navigationBarTitleText": "归还审核"
+      }
     }
   ],
   "globalStyle": {
