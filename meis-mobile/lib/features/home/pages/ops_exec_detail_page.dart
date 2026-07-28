@@ -326,7 +326,11 @@ class _OpsExecDetailPageState extends ConsumerState<OpsExecDetailPage> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '制单途径：${_channelLabel(exec?['create_channel'])} · 审核途径：${_channelLabel(exec?['audit_channel'])}',
+                        '制单途径：${_channelLabel(exec?['create_channel'])} · 提交途径：${_channelLabel(exec?['submit_channel'])} · 修改途径：${_channelLabel(exec?['update_channel'])}',
+                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
+                      ),
+                      Text(
+                        '审核途径：${_channelLabel(exec?['audit_channel'])}${_optionalChannel('删除途径', exec?['delete_channel'])}',
                         style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
                       ),
                       Text(
@@ -334,7 +338,7 @@ class _OpsExecDetailPageState extends ConsumerState<OpsExecDetailPage> {
                         style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
                       ),
                       Text(
-                        '执行途径：${_channelLabel(item?['execution_channel'])} · 确认途径：${_channelLabel(item?['confirm_channel'])}',
+                        '执行途径：${_channelLabel(item?['execution_channel'])} · 修改途径：${_channelLabel(item?['update_channel'])} · 确认途径：${_channelLabel(item?['confirm_channel'])}',
                         style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
                       ),
                       if (item?['status']?.toString() == 'confirmed')
@@ -440,6 +444,12 @@ class _OpsExecDetailPageState extends ConsumerState<OpsExecDetailPage> {
     if (v.isEmpty) return '—';
     const map = {'web': 'Web', 'app': 'App', 'mp': '小程序'};
     return map[v] ?? v;
+  }
+
+  String _optionalChannel(String label, Object? raw) {
+    final v = raw?.toString().trim() ?? '';
+    if (v.isEmpty) return '';
+    return ' · $label：${_channelLabel(raw)}';
   }
 
   String _blankDash(Object? raw) {

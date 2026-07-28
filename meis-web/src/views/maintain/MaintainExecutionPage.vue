@@ -61,7 +61,10 @@
         </el-form>
         <div v-if="exec" class="header-channels">
           制单途径 {{ channelLabel(exec.create_channel) }}
+          · 提交途径 {{ channelLabel(exec.submit_channel) }}
+          · 修改途径 {{ channelLabel(exec.update_channel) }}
           · 审核途径 {{ channelLabel(exec.audit_channel) }}
+          <template v-if="exec.delete_channel"> · 删除途径 {{ channelLabel(exec.delete_channel) }}</template>
           · 审核人 {{ blankDash(exec.auditor_name) }}
           · 审核时间 {{ blankDash(exec.audited_at) }}
         </div>
@@ -81,6 +84,9 @@
             <el-table-column prop="confirmed_at" label="确认时间" width="160" />
             <el-table-column label="执行途径" width="90">
               <template #default="{ row }">{{ channelLabel(row.execution_channel) }}</template>
+            </el-table-column>
+            <el-table-column label="修改途径" width="90">
+              <template #default="{ row }">{{ channelLabel(row.update_channel) }}</template>
             </el-table-column>
             <el-table-column label="确认途径" width="90">
               <template #default="{ row }">{{ channelLabel(row.confirm_channel) }}</template>
@@ -131,6 +137,7 @@
           {{ currentItem.device_code }} · {{ currentItem.device_name }}
           <span class="item-channels">
             执行途径 {{ channelLabel(currentItem.execution_channel) }}
+            · 修改途径 {{ channelLabel(currentItem.update_channel) }}
             · 确认途径 {{ channelLabel(currentItem.confirm_channel) }}
           </span>
         </div>

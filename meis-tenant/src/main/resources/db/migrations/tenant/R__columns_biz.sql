@@ -1214,3 +1214,63 @@ COMMENT ON COLUMN pm_execution.execution_kind IS 'due=到期执行 backfill=执�
 COMMENT ON COLUMN pm_execution.backfill_next_due_date IS '补录可选下次到期（OPS.16.12）';
 COMMENT ON COLUMN inspection_execution.execution_kind IS 'due=到期执行 backfill=执行补录（OPS.16.12）';
 COMMENT ON COLUMN inspection_execution.backfill_next_due_date IS '补录可选下次到期（OPS.16.12）';
+
+-- OPS.16.29 修改途径 update_channel（最后一次修改端 web/app/mp）
+ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE pm_execution ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE inspection_execution ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE pm_execution_item ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE inspection_execution_item ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE ops_plan_include_request ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+COMMENT ON COLUMN maintenance_execution.update_channel IS '修改途径 web/app/mp（OPS.16.29）';
+COMMENT ON COLUMN pm_execution.update_channel IS '修改途径 web/app/mp（OPS.16.29）';
+COMMENT ON COLUMN inspection_execution.update_channel IS '修改途径 web/app/mp（OPS.16.29）';
+COMMENT ON COLUMN maintenance_execution_item.update_channel IS '修改途径 web/app/mp（OPS.16.29）';
+COMMENT ON COLUMN pm_execution_item.update_channel IS '修改途径 web/app/mp（OPS.16.29）';
+COMMENT ON COLUMN inspection_execution_item.update_channel IS '修改途径 web/app/mp（OPS.16.29）';
+COMMENT ON COLUMN ops_plan_include_request.update_channel IS '修改途径 web/app/mp（OPS.16.29）';
+
+
+-- OPS.16.29 多端业务补列（报修/盘点/计量/不良事件 + 执行明细删除途径）
+ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS delete_channel VARCHAR(20);
+ALTER TABLE pm_execution_item ADD COLUMN IF NOT EXISTS delete_channel VARCHAR(20);
+ALTER TABLE inspection_execution_item ADD COLUMN IF NOT EXISTS delete_channel VARCHAR(20);
+
+ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS submit_channel VARCHAR(20);
+ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS confirm_channel VARCHAR(20);
+ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS delete_channel VARCHAR(20);
+ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS audit_channel VARCHAR(20);
+
+ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS submit_channel VARCHAR(20);
+ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS confirm_channel VARCHAR(20);
+ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS delete_channel VARCHAR(20);
+ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS audit_channel VARCHAR(20);
+ALTER TABLE inventory_check_item ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE inventory_check_item ADD COLUMN IF NOT EXISTS confirm_channel VARCHAR(20);
+
+ALTER TABLE metrology_execution ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE metrology_execution ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE metrology_execution ADD COLUMN IF NOT EXISTS submit_channel VARCHAR(20);
+ALTER TABLE metrology_execution ADD COLUMN IF NOT EXISTS confirm_channel VARCHAR(20);
+ALTER TABLE metrology_execution ADD COLUMN IF NOT EXISTS delete_channel VARCHAR(20);
+ALTER TABLE metrology_execution ADD COLUMN IF NOT EXISTS audit_channel VARCHAR(20);
+ALTER TABLE metrology_execution_item ADD COLUMN IF NOT EXISTS execution_channel VARCHAR(20);
+ALTER TABLE metrology_execution_item ADD COLUMN IF NOT EXISTS confirm_channel VARCHAR(20);
+ALTER TABLE metrology_execution_item ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+
+ALTER TABLE adverse_event ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE adverse_event ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE adverse_event ADD COLUMN IF NOT EXISTS submit_channel VARCHAR(20);
+ALTER TABLE adverse_event ADD COLUMN IF NOT EXISTS confirm_channel VARCHAR(20);
+ALTER TABLE adverse_event ADD COLUMN IF NOT EXISTS delete_channel VARCHAR(20);
+ALTER TABLE adverse_event ADD COLUMN IF NOT EXISTS audit_channel VARCHAR(20);
+
+COMMENT ON COLUMN repair_workorder.create_channel IS '制单途径 web/app/mp（OPS.16.29）';
+COMMENT ON COLUMN inventory_check.create_channel IS '制单途径 web/app/mp（OPS.16.29）';
+COMMENT ON COLUMN metrology_execution.create_channel IS '制单途径 web/app/mp（OPS.16.29）';
+COMMENT ON COLUMN adverse_event.create_channel IS '制单途径 web/app/mp（OPS.16.29）';

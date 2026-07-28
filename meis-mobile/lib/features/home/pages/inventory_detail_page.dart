@@ -199,7 +199,7 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
     try {
       await ref.read(apiServiceProvider).postData(
         '/asset/inventory/${widget.checkId}/scan',
-        {'device_code': code},
+        {'device_code': code, 'client': 'app'},
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('已盘到：$code')));

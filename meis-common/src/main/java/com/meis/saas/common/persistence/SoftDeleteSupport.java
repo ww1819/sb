@@ -26,13 +26,18 @@ public final class SoftDeleteSupport {
      */
     public static final Set<String> UPDATE_SKIP_COLUMNS = Set.of(
             "id", "created_at", "created_by", "created_by_name",
-            "updated_at", "updated_by", "updated_by_name");
+            "updated_at", "updated_by", "updated_by_name",
+            // 途径列由服务端按动作写入，禁止客户端直接伪造（OPS.16.29）
+            "create_channel", "submit_channel", "audit_channel", "delete_channel",
+            "confirm_channel", "execution_channel", "update_channel");
 
     /** 普通 PUT 时从请求体剔除，防止客户端伪造软删状态或审计字段。 */
     public static final Set<String> CLIENT_UPDATE_STRIP = Set.of(
             "id", "created_at", "created_by", "created_by_name",
             "updated_at", "updated_by", "updated_by_name",
-            "deleted_at", "deleted_by", "deleted_by_name", "is_deleted");
+            "deleted_at", "deleted_by", "deleted_by_name", "is_deleted",
+            "create_channel", "submit_channel", "audit_channel", "delete_channel",
+            "confirm_channel", "execution_channel", "update_channel");
 
     public static boolean isUpdateSkipColumn(String column) {
         return column != null && UPDATE_SKIP_COLUMNS.contains(column);
@@ -152,6 +157,38 @@ public final class SoftDeleteSupport {
         if (cols.contains("is_active") && !body.containsKey("is_active")) {
             body.put("is_active", true);
         }
+        // OPS.16.29：有 create_channel 则写入归一后的 client（保留已显式传入的非空值）
+        if (cols.contains("create_channel")) {
+            Object existing = body.get("create_channel");
+            if (existing == null || String.valueOf(existing).isBlank()) {
+                body.put("create_channel", com.meis.saas.common.ops.OpsClientChannel.of(body));
+            } else {
+                body.put("create_channel",
+                        com.meis.saas.common.ops.OpsClientChannel.normalize(String.valueOf(existing)));
+            }
+        }
+    }
+
+    /**
+     * 业务 UPDATE 时写入 update_channel（最后一次修改端）。表无该列则跳过。
+     * {@code clientRaw} 可为 body.client 或已归一码值。
+     */
+    public static void appendUpdateChannel(Set<String> cols, List<String> sets, List<Object> args, String clientRaw) {
+        if (cols == null || !cols.contains("update_channel")) return;
+        if (sets.stream().anyMatch(s -> s != null && s.startsWith("update_channel"))) return;
+        sets.add("update_channel = ?");
+        args.add(com.meis.saas.common.ops.OpsClientChannel.normalize(clientRaw));
+    }
+
+    public static void appendUpdateChannel(JdbcTemplate jdbc, String table, List<String> sets, List<Object> args,
+                                           String clientRaw) {
+        appendUpdateChannel(TableColumnCache.columns(jdbc, table), sets, args, clientRaw);
+    }
+
+    /** 从请求体取 client 并追加 update_channel（有列才写）。 */
+    public static void appendUpdateChannelFromBody(JdbcTemplate jdbc, String table, List<String> sets,
+                                                   List<Object> args, Map<String, Object> body) {
+        appendUpdateChannel(jdbc, table, sets, args, com.meis.saas.common.ops.OpsClientChannel.of(body));
     }
 
     /**

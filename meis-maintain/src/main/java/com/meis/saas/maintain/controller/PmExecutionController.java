@@ -159,6 +159,7 @@ public class PmExecutionController {
                     "execute_end_time", old.get(0).get("execute_end_time"), body.get("execute_end_time"), client);
         }
         if (sets.isEmpty()) return get(id);
+        SoftDeleteSupport.appendUpdateChannel(jdbc, "pm_execution", sets, args, client);
         sets.add("updated_at=NOW()");
         args.add(id);
         jdbc.update("UPDATE pm_execution SET " + String.join(", ", sets) + " WHERE id=?::uuid", args.toArray());
@@ -256,6 +257,7 @@ public class PmExecutionController {
             args.add(body.get("end_time"));
         }
         if (sets.isEmpty()) throw new BizException(400, "无更新字段");
+        SoftDeleteSupport.appendUpdateChannel(jdbc, "pm_execution_item", sets, args, client);
         sets.add("row_version = COALESCE(row_version,1) + 1");
         sets.add("updated_at = NOW()");
         args.add(itemId);
@@ -263,6 +265,7 @@ public class PmExecutionController {
         int n = jdbc.update("UPDATE pm_execution_item SET " + String.join(", ", sets)
                 + " WHERE id=?::uuid AND COALESCE(row_version,1)=?", args.toArray());
         if (n == 0) throw new BizException(409, "明细已被他人修改，请刷新后重试");
+        touchHeaderUpdateChannel(execId, client);
         return get(execId);
     }
 
@@ -304,6 +307,11 @@ public class PmExecutionController {
         int n = jdbc.update("UPDATE pm_execution_result SET " + String.join(", ", sets)
                 + " WHERE id=?::uuid AND COALESCE(row_version,1)=?", args.toArray());
         if (n == 0) throw new BizException(409, "内容已被他人修改，请刷新后重试");
+        Object itemIdRaw = old.get("execution_item_id");
+        if (itemIdRaw != null) {
+            touchItemUpdateChannel(UUID.fromString(itemIdRaw.toString()), client);
+        }
+        touchHeaderUpdateChannel(execId, client);
         return get(execId);
     }
 
@@ -544,6 +552,24 @@ public class PmExecutionController {
 
     private static String clientOf(Map<String, Object> body) {
         return OpsClientChannel.of(body);
+    }
+
+    private void touchHeaderUpdateChannel(UUID execId, String client) {
+        List<String> sets = new ArrayList<>();
+        List<Object> args = new ArrayList<>();
+        SoftDeleteSupport.appendUpdateChannel(jdbc, "pm_execution", sets, args, client);
+        if (sets.isEmpty()) return;
+        args.add(execId);
+        jdbc.update("UPDATE pm_execution SET " + String.join(", ", sets) + " WHERE id=?::uuid", args.toArray());
+    }
+
+    private void touchItemUpdateChannel(UUID itemId, String client) {
+        List<String> sets = new ArrayList<>();
+        List<Object> args = new ArrayList<>();
+        SoftDeleteSupport.appendUpdateChannel(jdbc, "pm_execution_item", sets, args, client);
+        if (sets.isEmpty()) return;
+        args.add(itemId);
+        jdbc.update("UPDATE pm_execution_item SET " + String.join(", ", sets) + " WHERE id=?::uuid", args.toArray());
     }
 
     private void assertAllItemsCompleted(UUID execId) {

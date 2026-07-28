@@ -7,13 +7,16 @@
         <text class="meta">{{ item?.device_name }} · {{ item?.device_code }}</text>
         <text class="status">状态：{{ exec?.status || '—' }} / 明细：{{ item?.status || '—' }}</text>
         <text class="channels">
-          制单途径：{{ channelLabel(exec?.create_channel) }} · 审核途径：{{ channelLabel(exec?.audit_channel) }}
+          制单途径：{{ channelLabel(exec?.create_channel) }} · 提交途径：{{ channelLabel(exec?.submit_channel) }} · 修改途径：{{ channelLabel(exec?.update_channel) }}
+        </text>
+        <text class="channels">
+          审核途径：{{ channelLabel(exec?.audit_channel) }}<template v-if="hasChannel(exec?.delete_channel)"> · 删除途径：{{ channelLabel(exec?.delete_channel) }}</template>
         </text>
         <text class="channels">
           审核人：{{ blankDash(exec?.auditor_name) }} · 审核时间：{{ blankDash(exec?.audited_at) }}
         </text>
         <text class="channels">
-          执行途径：{{ channelLabel(item?.execution_channel) }} · 确认途径：{{ channelLabel(item?.confirm_channel) }}
+          执行途径：{{ channelLabel(item?.execution_channel) }} · 修改途径：{{ channelLabel(item?.update_channel) }} · 确认途径：{{ channelLabel(item?.confirm_channel) }}
         </text>
         <text v-if="String(item?.status) === 'confirmed'" class="locked">已确认，不可再修改</text>
       </view>
@@ -159,6 +162,10 @@ function channelLabel(raw: unknown) {
   if (!v) return '—'
   const map: Record<string, string> = { web: 'Web', app: 'App', mp: '小程序' }
   return map[v] || v
+}
+
+function hasChannel(raw: unknown) {
+  return String(raw ?? '').trim().length > 0
 }
 
 function blankDash(raw: unknown) {

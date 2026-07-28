@@ -204,6 +204,15 @@ class _MyRepairDetailPageState extends ConsumerState<MyRepairDetailPage> {
                           ),
                         ),
                       ],
+                      const SizedBox(height: 8),
+                      Text(
+                        '制单途径：${_channelLabel(wo?['create_channel'])} · 提交途径：${_channelLabel(wo?['submit_channel'])}',
+                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
+                      ),
+                      Text(
+                        '修改途径：${_channelLabel(wo?['update_channel'])} · 验收途径：${_channelLabel(wo?['confirm_channel'])}',
+                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
+                      ),
                     ],
                   ),
                 ),
@@ -281,5 +290,20 @@ class _MyRepairDetailPageState extends ConsumerState<MyRepairDetailPage> {
               ],
             ),
     );
+  }
+
+  String _channelLabel(Object? raw) {
+    final v = raw?.toString().trim() ?? '';
+    if (v.isEmpty) return '—';
+    switch (v) {
+      case 'web':
+        return 'Web';
+      case 'app':
+        return 'App';
+      case 'mp':
+        return '小程序';
+      default:
+        return v;
+    }
   }
 }
