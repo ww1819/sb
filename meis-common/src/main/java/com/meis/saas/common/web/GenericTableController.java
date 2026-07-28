@@ -304,13 +304,17 @@ public abstract class GenericTableController {
         applyCategoryHierarchyDefaults(table, body);
         SoftDeleteSupport.applyInsertAudit(jdbc(), table, body);
         var cols = TableColumnCache.columns(jdbc(), table);
+        String clientHint = body.get("client") == null ? null : String.valueOf(body.get("client"));
+        body.keySet().removeIf(k -> !cols.contains(k));
         var softDeletedId = SoftDeleteSupport.findSoftDeletedId(jdbc(), table, body);
         if (softDeletedId.isPresent()) {
             String existingId = softDeletedId.get();
             Map<String, Object> before = loadTracked(table, existingId);
             body.put("id", existingId);
             SoftDeleteSupport.prepareRestore(body, cols);
+            if (clientHint != null) body.put("client", clientHint);
             executeUpdate(table, existingId, body);
+            body.remove("client");
             Map<String, Object> after = loadTracked(table, existingId);
             if (changeLogService != null) {
                 changeLogService.recordUpdate(table, existingId, before, after);
@@ -652,7 +656,11 @@ public abstract class GenericTableController {
             sets.add(k + " = " + placeholder(k));
             args.add(v);
         });
+        boolean hasBusinessSets = !sets.isEmpty();
         SoftDeleteSupport.appendUpdateAuditSets(jdbc(), cols, sets, args);
+        if (hasBusinessSets) {
+            SoftDeleteSupport.appendUpdateChannelFromBody(jdbc(), table, sets, args, body);
+        }
         if (sets.isEmpty()) return;
         args.add(id);
         jdbc().update("UPDATE " + table + " SET " + String.join(",", sets) + " WHERE id = ?::uuid", args.toArray());

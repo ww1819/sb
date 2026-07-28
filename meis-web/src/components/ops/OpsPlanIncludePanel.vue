@@ -11,6 +11,9 @@
       <el-table-column label="申请途径" width="90">
         <template #default="{ row }">{{ channelLabel(row.create_channel) }}</template>
       </el-table-column>
+      <el-table-column label="修改途径" width="90">
+        <template #default="{ row }">{{ channelLabel(row.update_channel) }}</template>
+      </el-table-column>
       <el-table-column label="确认途径" width="90">
         <template #default="{ row }">{{ channelLabel(row.confirm_channel) }}</template>
       </el-table-column>

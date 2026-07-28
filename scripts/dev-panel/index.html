@@ -641,6 +641,16 @@
       <tbody id="frontend-row"></tbody>
     </table>
 
+    <div class="section-title">移动端 App <span class="section-hint">Flutter Windows · flutter run -d windows · 小程序本期不接入</span></div>
+    <table>
+      <thead>
+        <tr>
+          <th>服务</th><th>说明</th><th>平台</th><th>状态</th><th>PID</th><th>操作</th><th>汇入日志</th>
+        </tr>
+      </thead>
+      <tbody id="mobile-row"></tbody>
+    </table>
+
     <div class="section-title">公共库模块</div>
     <table>
       <thead>
@@ -1096,6 +1106,25 @@
       frontendPendingUntil = 0
     }
 
+    let mobilePendingUntil = 0
+
+    function isMobilePending() {
+      if (!mobilePendingUntil) return false
+      if (Date.now() >= mobilePendingUntil) {
+        mobilePendingUntil = 0
+        return false
+      }
+      return true
+    }
+
+    function markMobilePending(seconds = 300) {
+      mobilePendingUntil = Date.now() + seconds * 1000
+    }
+
+    function clearMobilePending() {
+      mobilePendingUntil = 0
+    }
+
     function loadBuildOpts(names) {
       // 后端构建模式已改为按钮，无需持久化；保留 key 避免旧数据报错
       buildOpts = {}
@@ -1209,6 +1238,33 @@
       if (isFrontendPending()) return '<span class="dot debug"></span>启动中'
       return statusDot(false)
     }
+
+    function renderMobileActions(mob) {
+      const running = !!mob.running
+      const pending = isMobilePending()
+      let html = ''
+      if (!running && !pending) {
+        html += `<button onclick="mobileAct('start')">启动</button>`
+      }
+      if (pending && !running) {
+        html += `<span style="font-size:0.74rem;color:var(--warn);align-self:center">Flutter 启动中…</span>`
+      }
+      if (running || pending) {
+        html += `<button onclick="mobileAct('stop')">停止</button>`
+        html += `<button onclick="mobileAct('restart')">重启</button>`
+      }
+      if (running) {
+        html += `<span style="font-size:0.72rem;color:var(--muted);align-self:center" title="终端热重载：r；退出：q（面板日志可见）">Windows 调试中</span>`
+      }
+      return html
+    }
+
+    function renderMobileStatus(mob) {
+      if (mob.running) return statusDot(true)
+      if (isMobilePending()) return '<span class="dot debug"></span>启动中'
+      return statusDot(false)
+    }
+
     function renderBackendBuildOpts(svc) {
       const name = svc.name
       const canQuick = svc.jarExists && svc.jarHealthy
@@ -1651,6 +1707,26 @@
       }
     }
 
+    async function mobileAct(action) {
+      if (!tryAcquireBusy()) return
+      selectOnlyLogFilter('meis-mobile')
+      const labels = { start: '启动', restart: '重启', stop: '停止' }
+      try {
+        showToast('meis-mobile: 正在' + (labels[action] || action) + '…', true)
+        if (action === 'start' || action === 'restart') markMobilePending()
+        if (action === 'stop') clearMobilePending()
+        const data = await api('/api/mobile/' + action, 'POST', action === 'stop' ? 20000 : 30000)
+        showToast('meis-mobile: ' + (labels[action] || action) + ' 已提交后台，请稍候刷新状态', data.ok !== false)
+        pollServiceStatus()
+        refreshLogs()
+      } catch (e) {
+        showToast(e.message, false)
+        if (action !== 'stop') clearMobilePending()
+      } finally {
+        releaseBusy()
+      }
+    }
+
     async function serviceAct(name, action) {
       if (!tryAcquireBusy()) return
       pinnedService = name
@@ -1778,7 +1854,7 @@
           const filterCount = getActiveLogFilters().length
           let hint = '暂无日志（服务未启动或 logs 目录无输出）'
           if (filterCount === 0) {
-            hint = '未勾选任何显示服务，请在「服务」筛选中至少勾选一个（含 meis-web 前端）'
+            hint = '未勾选任何显示服务，请在「服务」筛选中至少勾选一个（含 meis-web / meis-mobile）'
           } else if (watchedCount === 0) {
             hint = '未勾选任何服务的「汇入日志」，请在服务列表右侧勾选'
           } else if (document.getElementById('log-errors-only').checked) {
@@ -1831,6 +1907,7 @@
       const up = (data.services || []).filter(s => s.httpUp).length
       const total = (data.services || []).length
       const fe = data.frontend?.httpUp ? 1 : 0
+      const mobile = data.mobile?.running ? 1 : 0
       const bg = asArray(data.backgroundJobs)
       const buildLabels = {
         'reactor-clean': '整体 Clean',
@@ -1846,6 +1923,7 @@
       document.getElementById('stats').innerHTML = `
         <div class="stat"><div class="label">后端在线</div><div class="value">${up}/${total}</div></div>
         <div class="stat"><div class="label">前端</div><div class="value">${fe ? '运行' : '停止'}</div></div>
+        <div class="stat"><div class="label">App</div><div class="value">${mobile ? '运行' : '停止'}</div></div>
         <div class="stat"><div class="label">Redis</div><div class="value">${data.redisUp ? 'OK' : '—'}</div></div>
         <div class="stat"><div class="label">网关</div><div class="value" style="font-size:0.95rem"><a href="${data.gatewayUrl}" target="_blank">:8080</a></div></div>
         ${staleHint}
@@ -1868,6 +1946,28 @@
           <td>
             <label class="log-watch" title="勾选后该服务日志汇入底部综合窗口">
               <input type="checkbox" ${feWatch ? 'checked' : ''} onchange="toggleLogWatch('${fe.name}', this.checked)" />
+              汇入
+            </label>
+          </td>
+        </tr>
+      `
+    }
+
+    function renderMobile(mob) {
+      if (!mob) return
+      const name = mob.name || 'meis-mobile'
+      const watch = isLogWatched(name)
+      document.getElementById('mobile-row').innerHTML = `
+        <tr>
+          <td class="mono">${escapeHtml(name)}</td>
+          <td>${renderServiceInfo(mob)}</td>
+          <td class="mono">${escapeHtml(mob.platform || 'windows')}</td>
+          <td>${renderMobileStatus(mob)}</td>
+          <td class="mono">${mob.pid ? mob.pid : '<span class="muted">—</span>'}</td>
+          <td class="actions">${renderMobileActions(mob)}</td>
+          <td>
+            <label class="log-watch" title="勾选后该服务日志汇入底部综合窗口">
+              <input type="checkbox" ${watch ? 'checked' : ''} onchange="toggleLogWatch('${name}', this.checked)" />
               汇入
             </label>
           </td>
@@ -2176,7 +2276,7 @@
         const data = await api('/api/status', 'GET', 20000)
         lastStatusData = data
         coreServiceNames = data.coreServices || []
-        const names = ['meis-web', 'panel']
+        const names = ['meis-web', 'meis-mobile', 'panel']
           .concat(asArray(data.libraries).map(l => l.name))
           .concat(asArray(data.services).map(s => s.name))
         loadLogWatch(names)
@@ -2184,8 +2284,10 @@
         loadBuildOpts(names)
         renderStats(data)
         renderFrontend(data.frontend)
+        renderMobile(data.mobile)
         if (data.frontend?.httpUp) clearFrontendPending()
         if (!data.frontend?.buildInProgress) delete buildPendingUntil['meis-web']
+        if (data.mobile?.running) clearMobilePending()
         renderLibraries(asArray(data.libraries))
         renderServices(asArray(data.services))
         autoHotReloadEnabled = data.autoHotReload === true

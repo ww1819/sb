@@ -314,6 +314,7 @@ function buildBody() {
     reporter_id: auth.user?.userId,
     report_dept_id: device.value!.dept_id,
     report_method: 'miniprogram',
+    client: 'mp',
     fault_description: faultDescription.value.trim(),
     urgency_level: urgencyOptions[urgencyIndex.value].value,
     fault_type_id: ft?.id ?? null,

@@ -1938,7 +1938,11 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+<<<<<<< HEAD
 | 2.131 | 2026-07-28 | — | SYS-UI-01：登录页左侧 fit2cloud 同构分层立体插画；右侧表单不变 |
+=======
+| 2.140 | 2026-07-28 17:10:00 | — | DEV-PANEL-MOB + OPS.16.29：面板 App 启停；多端途径含修改途径并强化约定 |
+>>>>>>> 65f9b41484dda6bff6c168431d1aeb2050b42cad
 | 2.139 | 2026-07-28 11:25:00 | — | PLT-OPS-02：平台端服务状态监控（聚合 API + 仅平台管理员） |
 | 2.138 | 2026-07-28 11:10:00 | — | PLT-OPS-01：生产服务监测文档 `production-monitoring.md` + `scripts/health-check.ps1` |
 | 2.137 | 2026-07-27 23:50:00 | — | PLT-DEP-01：Windows Server 生产部署文档 `windows-production-deploy.md` |
@@ -3268,6 +3272,8 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | Windows Server 生产部署 | [PLT-DEP-01](#plt-dep-01-windows-server-生产部署文档已完成2026-07-27)、[windows-production-deploy.md](windows-production-deploy.md) |
 | 生产服务运行状态监测 | [PLT-OPS-01](#plt-ops-01-生产服务运行状态监测已完成2026-07-28)、[production-monitoring.md](production-monitoring.md) |
 | 平台端服务状态监控 | [PLT-OPS-02](#plt-ops-02-平台端服务运行状态监控已完成2026-07-28)、[production-monitoring.md](production-monitoring.md) §十 |
+| 开发面板 App 调试 | [DEV-PANEL-MOB](#dev-panel-mob-开发面板接入-app-调试启动已完成2026-07-28) |
+| 多端途径（含修改） | [OPS.16.29](#ops1629-多端途径齐套含修改途径--约定强化已完成2026-07-28)、约定包 §5.10 |
 | 列表勾选 / 批量作用域 | [附录 V](#附录-v列表勾选跨页缓存与批量作用域2026-07-15) |
 | 列表筛选多选 / 分类模糊拆分 | [PLT-UI-02](#plt-ui-02-定稿2026-07-22)、约定包 §5.5 |
 | 业务冗余字段（device / 人员姓名 / **单据下沉**） | [附录 W](#附录-w业务冗余字段约定2026-07-15)（含 **W.5** / **W.6**）、约定包 §6.2 |
@@ -5699,3 +5705,32 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 | **不做** | 浏览器直连端口；Prometheus；租户管理员可见；中间件深度探活（一期） |
 
 **状态**：已完成。
+
+### DEV-PANEL-MOB 开发面板接入 App 调试启动（已完成·2026-07-28）
+
+> 来源：将 App 调试启动加入开发控制面板；小程序本期不动。
+
+| 项 | 定稿 |
+|----|------|
+| **目标** | `scripts/dev-panel` 可启停 Flutter App（Windows 桌面调试） |
+| **命令** | 工作目录 `meis-mobile`，`flutter run -d windows`（与 `run-mobile.ps1` 一致） |
+| **能力** | 启动 / 停止 / 重启 / 状态；日志进面板 `meis-mobile` |
+| **不做** | 小程序启停；Android 模拟器/真机（可后续扩展） |
+
+**状态**：已完成。
+
+### OPS.16.29 多端途径齐套（含修改途径）· 约定强化（已完成·2026-07-28）
+
+> 来源：多端业务制单/提交/确认/修改/删除/审核须写途径并三端展示；约定沉淀便于后续多端功能自动加列。
+
+| 项 | 定稿 |
+|----|------|
+| **适用范围** | **仅已有多端业务**（Web+App 和/或 Web+小程序有写入口）；纯 Web 主数据不强加 |
+| **码值** | 统一 `web` / `app` / `mp`（`OpsClientChannel`）；请求体 `client` |
+| **动作→字段** | 制单 `create_channel`；提交 `submit_channel`；确认 `confirm_channel`；**修改 `update_channel`（最后一次修改端）**；删除 `delete_channel`；审核 `audit_channel`；明细执行 `execution_channel` |
+| **展示** | Web / App / 小程序列表或详情显示中文途径；空为「—」；有字段则显 |
+| **本期落地** | ① 运维三执行 + 纳入申请：补 `update_channel` 写与展示，补齐提交/删除展示 ② 报修/盘点/计量/不良事件：补齐适用动作的途径列与写入口、展示 |
+| **报修** | `report_method` 保留为报修来源语义；另按 OPS 补 `*_channel`（勿把 report_method 当动作途径） |
+| **约定** | 双写约定包 **§5.10**：新增多端写能力时，对象/表**必须**按动作自动加途径列并写+显 |
+
+**状态**：已完成（约定 + 缺口修补）。

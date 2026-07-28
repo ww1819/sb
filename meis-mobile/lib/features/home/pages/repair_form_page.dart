@@ -163,6 +163,7 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
       'reporter_id': user?.userId,
       'report_dept_id': device!['dept_id'],
       'report_method': 'app',
+      'client': 'app',
       'fault_description': faultCtrl.text.trim(),
       'urgency_level': urgency,
       'fault_type_id': faultTypeId,

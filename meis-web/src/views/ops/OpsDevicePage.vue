@@ -114,6 +114,9 @@
           <el-table-column v-if="docKind === 'execution'" label="执行途径" width="90">
             <template #default="{ row }">{{ channelLabel(row.execution_channel) }}</template>
           </el-table-column>
+          <el-table-column v-if="docKind === 'execution'" label="修改途径" width="90">
+            <template #default="{ row }">{{ channelLabel(row.update_channel) }}</template>
+          </el-table-column>
           <el-table-column v-if="docKind === 'execution'" label="确认途径" width="90">
             <template #default="{ row }">{{ channelLabel(row.confirm_channel) }}</template>
           </el-table-column>

@@ -312,7 +312,7 @@ async function applyInclude(device: Record<string, unknown>) {
             device_name: device.device_name,
             dept_id: device.dept_id
           })
-          uni.showToast({ title: '已提交，待 Web 确认', icon: 'success' })
+          uni.showToast({ title: '已提交，待 Web 确认（申请途径：小程序）', icon: 'none', duration: 2500 })
         } catch (e: unknown) {
           uni.showToast({ title: e instanceof Error ? e.message : '提交失败', icon: 'none' })
         } finally {

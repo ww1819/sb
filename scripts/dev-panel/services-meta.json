@@ -7,6 +7,10 @@
     "labelZh": "前端 Web",
     "descZh": "Vue 管理界面，Vite 热更新开发服务"
   },
+  "meis-mobile": {
+    "labelZh": "移动端 App",
+    "descZh": "Flutter Windows 桌面调试（flutter run -d windows）"
+  },
   "meis-common": {
     "labelZh": "公共库",
     "descZh": "通用 CRUD、软删除、分页、导入导出等；无独立进程，classes 打入各微服务 JAR"
