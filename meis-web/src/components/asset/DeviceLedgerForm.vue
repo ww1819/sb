@@ -22,35 +22,84 @@
       <DeviceArchivePanel v-show="activeTab === 'archive'" :readonly="isView" />
       <DeviceImagePanel v-show="activeTab === 'images'" :readonly="isView" />
 
+      <DeviceLabelPanel
+        v-show="activeTab === 'label'"
+        :device-id="deviceId"
+        :device-code="String(model.device_code ?? '')"
+        :device-name="String(model.device_name ?? '')"
+      />
+
       <DeviceRecordTablePanel
         v-show="activeTab === 'repair'"
         :columns="repairColumns"
         empty-text="暂无维修记录"
         filter-placeholder="工单号 / 故障描述"
+        load-url="/repair/workorder/page"
+        :device-id="deviceId"
       />
       <DeviceRecordTablePanel
         v-show="activeTab === 'maintain'"
-        :columns="maintainColumns"
+        :columns="opsExecColumns"
         empty-text="暂无保养记录"
-        filter-placeholder="记录号 / 计划名称"
+        filter-placeholder="执行单号 / 计划单号"
+        load-url="/maintain/device/{deviceId}/executions"
+        :device-id="deviceId"
+      />
+      <DeviceRecordTablePanel
+        v-show="activeTab === 'maintain_plan'"
+        :columns="opsPlanColumns"
+        empty-text="暂无保养计划"
+        filter-placeholder="计划单号 / 计划名称"
+        load-url="/maintain/device/{deviceId}/plans"
+        :device-id="deviceId"
       />
       <DeviceRecordTablePanel
         v-show="activeTab === 'inspection'"
-        :columns="inspectionColumns"
+        :columns="opsExecColumns"
         empty-text="暂无巡检记录"
-        filter-placeholder="巡检单号"
+        filter-placeholder="执行单号 / 计划单号"
+        load-url="/inspect/device/{deviceId}/executions"
+        :device-id="deviceId"
+      />
+      <DeviceRecordTablePanel
+        v-show="activeTab === 'inspection_plan'"
+        :columns="opsPlanColumns"
+        empty-text="暂无巡检计划"
+        filter-placeholder="计划单号 / 计划名称"
+        load-url="/inspect/device/{deviceId}/plans"
+        :device-id="deviceId"
       />
       <DeviceRecordTablePanel
         v-show="activeTab === 'metrology'"
         :columns="metrologyColumns"
         empty-text="暂无计量记录"
-        filter-placeholder="计量编号"
+        filter-placeholder="执行单号 / 证书号"
+        load-url="/metrology/query/page"
+        :device-id="deviceId"
       />
       <DeviceRecordTablePanel
-        v-show="activeTab === 'inventory'"
-        :columns="inventoryColumns"
-        empty-text="暂无盘点记录"
-        filter-placeholder="盘点单号"
+        v-show="activeTab === 'metrology_plan'"
+        :columns="metrologyPlanColumns"
+        empty-text="暂无计量计划"
+        filter-placeholder="计划编号 / 计划名称"
+        load-url="/metrology/device/{deviceId}/plans"
+        :device-id="deviceId"
+      />
+      <DeviceRecordTablePanel
+        v-show="activeTab === 'pm'"
+        :columns="opsExecColumns"
+        empty-text="暂无PM维护记录"
+        filter-placeholder="执行单号 / 计划单号"
+        load-url="/pm/device/{deviceId}/executions"
+        :device-id="deviceId"
+      />
+      <DeviceRecordTablePanel
+        v-show="activeTab === 'pm_plan'"
+        :columns="opsPlanColumns"
+        empty-text="暂无PM维护计划"
+        filter-placeholder="计划单号 / 计划名称"
+        load-url="/pm/device/{deviceId}/plans"
+        :device-id="deviceId"
       />
       <DeviceRecordTablePanel
         v-show="activeTab === 'shared_loan'"
@@ -58,7 +107,7 @@
         empty-text="暂无借调记录"
         filter-placeholder="借调单号"
         load-url="/shared/loan/page"
-        :device-id="String(model.id ?? '')"
+        :device-id="deviceId"
       />
       <DeviceRecordTablePanel
         v-show="activeTab === 'shared_fee'"
@@ -66,7 +115,15 @@
         empty-text="暂无借调费用"
         filter-placeholder="收费单号"
         load-url="/shared/fee/page"
-        :device-id="String(model.id ?? '')"
+        :device-id="deviceId"
+      />
+      <DeviceRecordTablePanel
+        v-show="activeTab === 'inventory'"
+        :columns="inventoryColumns"
+        empty-text="暂无盘点记录"
+        filter-placeholder="盘点单号"
+        load-url="/asset/inventory/by-device/{deviceId}"
+        :device-id="deviceId"
       />
       <DeviceRecordTablePanel
         v-show="activeTab === 'adverse'"
@@ -74,17 +131,19 @@
         empty-text="暂无不良事件"
         filter-placeholder="事件编号"
         load-url="/qc/adverse/page"
-        :device-id="String(model.id ?? '')"
+        :device-id="deviceId"
       />
       <DeviceCurrentReadingPanel
         v-show="activeTab === 'current'"
-        :device-id="String(model.id ?? '')"
+        :device-id="deviceId"
       />
-      <DeviceLabelPanel
-        v-show="activeTab === 'label'"
-        :device-id="String(model.id ?? '')"
-        :device-code="String(model.device_code ?? '')"
-        :device-name="String(model.device_name ?? '')"
+      <DeviceRecordTablePanel
+        v-show="activeTab === 'current_bind'"
+        :columns="currentBindColumns"
+        empty-text="暂无电流标签绑定记录"
+        filter-placeholder="标签编码 / 备注"
+        load-url="/power/device/{deviceId}/bind-log"
+        :device-id="deviceId"
       />
     </div>
   </el-form>
@@ -118,6 +177,7 @@ const props = withDefaults(
 const activeTab = ref('basic')
 const isView = computed(() => props.mode === 'view')
 const isCreate = computed(() => props.mode === 'create' || !props.model.id)
+const deviceId = computed(() => String(props.model.id ?? ''))
 
 type CrudBeforeSaveApi = {
   register: (fn: () => void | Promise<void>) => void
@@ -125,6 +185,7 @@ type CrudBeforeSaveApi = {
 }
 const crudBeforeSave = inject<CrudBeforeSaveApi | null>('crudBeforeSave', null)
 
+/** AST-UI-14 / 附录 P.2：查看态完整顺序 */
 const allTabs = [
   { key: 'basic', label: '基本信息' },
   { key: 'card', label: '资产卡片' },
@@ -133,22 +194,26 @@ const allTabs = [
   { key: 'label', label: '资产标签' },
   { key: 'repair', label: '维修记录' },
   { key: 'maintain', label: '保养记录' },
+  { key: 'maintain_plan', label: '保养计划' },
   { key: 'inspection', label: '巡检记录' },
+  { key: 'inspection_plan', label: '巡检计划' },
   { key: 'metrology', label: '计量记录' },
+  { key: 'metrology_plan', label: '计量计划' },
+  { key: 'pm', label: 'PM维护记录' },
+  { key: 'pm_plan', label: 'PM维护计划' },
   { key: 'shared_loan', label: '借调记录' },
   { key: 'shared_fee', label: '借调费用' },
   { key: 'inventory', label: '盘点记录' },
   { key: 'adverse', label: '不良事件' },
-  { key: 'current', label: '电流度数' }
+  { key: 'current', label: '电流读数' },
+  { key: 'current_bind', label: '电流标签绑定记录' }
 ]
 
-/** 新增：仅基本信息/档案/图片；编辑与查看：全部 Tab */
+const ledgerKeys = new Set(['basic', 'archive', 'images'])
+
 const visibleTabs = computed(() => {
-  if (isCreate.value) {
-    const createKeys = new Set(['basic', 'archive', 'images'])
-    return allTabs.filter((t) => createKeys.has(t.key))
-  }
-  return allTabs
+  if (isView.value) return allTabs
+  return allTabs.filter((t) => ledgerKeys.has(t.key))
 })
 
 watch(
@@ -327,34 +392,43 @@ const basicFields = computed(() => {
 
 const repairColumns: RecordColumn[] = [
   { prop: 'wo_no', label: '工单号', minWidth: 140 },
-  { prop: 'fault_desc', label: '故障描述', minWidth: 180 },
+  { prop: 'fault_description', label: '故障描述', minWidth: 180 },
   { prop: 'status', label: '状态', minWidth: 100 },
-  { prop: 'engineer_name', label: '工程师', minWidth: 120 },
+  { prop: 'assigned_user_name', label: '工程师', minWidth: 120 },
   { prop: 'report_time', label: '报修时间', minWidth: 160 }
 ]
 
-const maintainColumns: RecordColumn[] = [
-  { prop: 'record_no', label: '记录号', minWidth: 140 },
-  { prop: 'plan_name', label: '计划名称', minWidth: 160 },
-  { prop: 'status', label: '状态', minWidth: 100 },
-  { prop: 'maintain_date', label: '保养日期', minWidth: 140 },
-  { prop: 'engineer_name', label: '执行人', minWidth: 120 }
+const opsExecColumns: RecordColumn[] = [
+  { prop: 'execution_no', label: '执行单号', minWidth: 140 },
+  { prop: 'plan_no', label: '计划单号', minWidth: 140 },
+  { prop: 'execution_status', label: '执行状态', minWidth: 100 },
+  { prop: 'status', label: '明细状态', minWidth: 100 },
+  { prop: 'planned_date', label: '计划日期', minWidth: 120 }
 ]
 
-const inspectionColumns: RecordColumn[] = [
-  { prop: 'inspection_no', label: '巡检单号', minWidth: 140 },
-  { prop: 'inspection_type', label: '巡检类型', minWidth: 120 },
-  { prop: 'status', label: '状态', minWidth: 100 },
-  { prop: 'inspector_name', label: '巡检人', minWidth: 120 },
-  { prop: 'inspection_date', label: '巡检日期', minWidth: 140 }
+const opsPlanColumns: RecordColumn[] = [
+  { prop: 'plan_no', label: '计划单号', minWidth: 140 },
+  { prop: 'plan_name', label: '计划名称', minWidth: 160 },
+  { prop: 'approval_status', label: '审核状态', minWidth: 100 },
+  { prop: 'plan_status', label: '计划状态', minWidth: 100 },
+  { prop: 'next_due_date', label: '下次到期', minWidth: 120 }
 ]
 
 const metrologyColumns: RecordColumn[] = [
-  { prop: 'metrology_no', label: '计量编号', minWidth: 140 },
-  { prop: 'metrology_type', label: '计量类型', minWidth: 120 },
-  { prop: 'result', label: '计量结果', minWidth: 120 },
+  { prop: 'execution_no', label: '执行单号', minWidth: 140 },
+  { prop: 'template_name', label: '模板', minWidth: 140 },
+  { prop: 'overall_result', label: '计量结果', minWidth: 100 },
   { prop: 'org_name', label: '计量机构', minWidth: 140 },
-  { prop: 'metrology_date', label: '计量日期', minWidth: 140 }
+  { prop: 'completed_at', label: '完成时间', minWidth: 160 }
+]
+
+const metrologyPlanColumns: RecordColumn[] = [
+  { prop: 'plan_code', label: '计划编号', minWidth: 140 },
+  { prop: 'plan_name', label: '计划名称', minWidth: 160 },
+  { prop: 'approval_status', label: '审核状态', minWidth: 100 },
+  { prop: 'status', label: '状态', minWidth: 100 },
+  { prop: 'next_due_date', label: '下次到期', minWidth: 120 },
+  { prop: 'org_name', label: '计量机构', minWidth: 140 }
 ]
 
 const inventoryColumns: RecordColumn[] = [
@@ -389,6 +463,14 @@ const adverseColumns: RecordColumn[] = [
   { prop: 'event_type', label: '事件类型', minWidth: 120 },
   { prop: 'status', label: '处理状态', minWidth: 100 },
   { prop: 'report_time', label: '上报时间', minWidth: 160 }
+]
+
+const currentBindColumns: RecordColumn[] = [
+  { prop: 'tag_code', label: '标签编码', minWidth: 120 },
+  { prop: 'tag_name', label: '标签名称', minWidth: 140 },
+  { prop: 'bound_at', label: '绑定开始', minWidth: 160 },
+  { prop: 'unbound_at', label: '绑定结束', minWidth: 160 },
+  { prop: 'remark', label: '备注', minWidth: 120 }
 ]
 </script>
 

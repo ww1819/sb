@@ -26,6 +26,22 @@ public class InventoryCheckController {
 
     private final JdbcTemplate jdbc;
 
+    /** AST-UI-14：按设备查盘点参与记录 */
+    @GetMapping("/by-device/{deviceId}")
+    public Result<List<Map<String, Object>>> byDevice(@PathVariable UUID deviceId) {
+        return Result.ok(jdbc.queryForList("""
+                SELECT c.check_no, c.check_name, c.check_type, c.status, c.audit_status,
+                       c.dept_id, dept.dept_name, i.check_date, i.is_found, i.is_matched,
+                       i.actual_location, i.condition_status
+                FROM inventory_check_item i
+                INNER JOIN inventory_check c ON c.id = i.check_id
+                LEFT JOIN department dept ON dept.id = c.dept_id
+                WHERE i.device_id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check_item", "i")
+                + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check", "c")
+                + " ORDER BY COALESCE(i.check_date, c.created_at) DESC NULLS LAST", deviceId));
+    }
+
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(PageQuery query,
             @RequestParam(required = false) String audit_status,

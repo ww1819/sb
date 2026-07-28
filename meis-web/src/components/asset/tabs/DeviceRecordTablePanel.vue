@@ -63,7 +63,8 @@ async function load() {
   if (!props.loadUrl || !props.deviceId) return
   loading.value = true
   try {
-    const { data } = await http.get(props.loadUrl, {
+    const url = props.loadUrl.replaceAll('{deviceId}', props.deviceId)
+    const { data } = await http.get(url, {
       params: {
         page: 1,
         size: 50,
@@ -71,7 +72,17 @@ async function load() {
         keyword: keyword.value || undefined
       }
     })
-    rows.value = data.data?.records ?? []
+    const payload = data.data
+    let list: Record<string, unknown>[] = Array.isArray(payload)
+      ? payload
+      : ((payload?.records as Record<string, unknown>[]) ?? [])
+    const kw = keyword.value.trim().toLowerCase()
+    if (kw && Array.isArray(payload)) {
+      list = list.filter((row) =>
+        Object.values(row).some((v) => String(v ?? '').toLowerCase().includes(kw))
+      )
+    }
+    rows.value = list
   } finally {
     loading.value = false
   }

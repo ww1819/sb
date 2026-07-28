@@ -286,11 +286,16 @@ public class RepairWorkorderController {
             @RequestParam(required = false) String assignedUserId,
             @RequestParam(required = false) String assignment,
             @RequestParam(required = false) String reportTimeFrom,
-            @RequestParam(required = false) String reportTimeTo) {
+            @RequestParam(required = false) String reportTimeTo,
+            @RequestParam(required = false) UUID deviceId) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null));
         List<Object> args = new ArrayList<>();
 
+        if (deviceId != null) {
+            where.append(" AND device_id = ?::uuid ");
+            args.add(deviceId);
+        }
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
             String kw = "%" + query.getKeyword().trim() + "%";
             where.append("""
