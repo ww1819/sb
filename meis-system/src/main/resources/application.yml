@@ -27,6 +27,12 @@ meis:
     expiration-ms: 86400000
   cache:
     enabled: true
+  # 平台「服务状态」探测目标（可按部署覆盖 URL）
+  ops:
+    timeout-ms: 2500
+    # health-targets:
+    #   - name: meis-gateway
+    #     url: http://127.0.0.1:8080/actuator/health
 management:
   endpoints:
     web:

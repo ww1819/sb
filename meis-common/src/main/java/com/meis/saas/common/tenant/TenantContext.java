@@ -17,5 +17,12 @@ public final class TenantContext {
         TenantInfo i = HOLDER.get();
         return i != null ? i.getTenantId() : null;
     }
+    public static String getUserType() {
+        TenantInfo i = HOLDER.get();
+        return i != null ? i.getUserType() : null;
+    }
+    public static boolean isPlatformAdmin() {
+        return "platform".equalsIgnoreCase(getUserType());
+    }
     public static void clear() { HOLDER.remove(); }
 }

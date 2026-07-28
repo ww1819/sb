@@ -140,7 +140,12 @@ public class AuthService {
 
         String userId = user.get("id").toString();
         Map<String, Object> permissions = Map.of(
-                "menus", List.of("mod_platform", "platform_tenant", "platform_tenant_menu", "platform_package"),
+                "menus", List.of(
+                        "mod_platform",
+                        "platform_tenant",
+                        "platform_tenant_menu",
+                        "platform_package",
+                        "platform_service_health"),
                 "buttons", List.of("*"),
                 "dataScope", "all");
         List<String> roles = List.of("platform_admin");

@@ -375,9 +375,14 @@ powershell -File scripts\restore-db.ps1
 | `meis-tenant` 立即退出 | 查看 `D:\meis\logs\` 或 NSSM stderr；Flyway 失败会主动退出 |
 | 前端白屏 | `try_files` / IIS Rewrite 是否回写 `index.html`；API 域名 CORS/证书 |
 
-### 健康检查
+### 健康检查与日常监测
+
+完整说明见独立文档：[production-monitoring.md](production-monitoring.md)。
 
 ```powershell
+powershell -File scripts\status.ps1
+powershell -File scripts\health-check.ps1
+powershell -File scripts\health-check.ps1 -GatewayUrl 'https://api.example.com'
 Invoke-RestMethod https://api.example.com/api/auth/health
 ```
 

@@ -16,6 +16,7 @@
 - [本地开发部署](local-dev-deploy.md)
 - [Windows 生产部署](windows-production-deploy.md)
 - [Linux 生产部署](production-deploy.md)
+- [生产服务状态监测](production-monitoring.md)
 - [**可复用工程约定包**](reusable-engineering-conventions.md)（跨项目沉淀，其他系统可直接复用）
 
 ---
@@ -1926,6 +1927,8 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+| 2.139 | 2026-07-28 11:25:00 | — | PLT-OPS-02：平台端服务状态监控（聚合 API + 仅平台管理员） |
+| 2.138 | 2026-07-28 11:10:00 | — | PLT-OPS-01：生产服务监测文档 `production-monitoring.md` + `scripts/health-check.ps1` |
 | 2.137 | 2026-07-27 23:50:00 | — | PLT-DEP-01：Windows Server 生产部署文档 `windows-production-deploy.md` |
 | 2.136 | 2026-07-27 14:50:00 | — | MOB-UI-01 第③批落地：其余页双端对齐；BACKLOG-MOB-13 已完成 |
 | 2.135 | 2026-07-27 14:40:00 | — | MOB-UI-01 第②批落地：报修/运维/盘点等高频页双端简洁化 |
@@ -3251,6 +3254,8 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | App / 小程序后续能力建议 | [MOB.9](#mob9-移动端与小程序后续能力建议2026-07-21)、[MP.2](#mp2-小程序二期建议2026-07-21)、[MOB.10](#mob10-报修进度与验收落地2026-07-21)、[MOB.11](#mob11-工程师移动维修一期2026-07-21)、[MOB.12](#mob12-四项收尾本地草稿--计量--补打--不良事件2026-07-21) |
 | App / 小程序 UI 简洁化（已完成） | [MOB-UI-01](#mob-ui-01-app--小程序界面与操作简洁化待开发2026-07-27)、第 7 章 `BACKLOG-MOB-13` |
 | Windows Server 生产部署 | [PLT-DEP-01](#plt-dep-01-windows-server-生产部署文档已完成2026-07-27)、[windows-production-deploy.md](windows-production-deploy.md) |
+| 生产服务运行状态监测 | [PLT-OPS-01](#plt-ops-01-生产服务运行状态监测已完成2026-07-28)、[production-monitoring.md](production-monitoring.md) |
+| 平台端服务状态监控 | [PLT-OPS-02](#plt-ops-02-平台端服务运行状态监控已完成2026-07-28)、[production-monitoring.md](production-monitoring.md) §十 |
 | 列表勾选 / 批量作用域 | [附录 V](#附录-v列表勾选跨页缓存与批量作用域2026-07-15) |
 | 列表筛选多选 / 分类模糊拆分 | [PLT-UI-02](#plt-ui-02-定稿2026-07-22)、约定包 §5.5 |
 | 业务冗余字段（device / 人员姓名 / **单据下沉**） | [附录 W](#附录-w业务冗余字段约定2026-07-15)（含 **W.5** / **W.6**）、约定包 §6.2 |
@@ -5653,3 +5658,32 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 | **不做** | 本文不替代 Linux/K8s 方案；不改业务代码；部署步骤不写入本需求文件 |
 
 **状态**：已完成（正文仅在独立文档维护）。
+
+### PLT-OPS-01 生产服务运行状态监测（已完成·2026-07-28）
+
+> 来源：如何监测生产环境各个服务运行状态。  
+> **完整正文已独立成篇**：[production-monitoring.md](production-monitoring.md)
+
+| 项 | 定稿 |
+|----|------|
+| **目标** | 运维可快速判断各微服务与中间件是否存活、HTTP 是否就绪 |
+| **手段** | 端口监听 + Actuator health + 网关 /api/auth/health；Windows 服务 / Docker / K8s 分层检查 |
+| **脚本** | scripts/status.ps1（端口）；scripts/health-check.ps1（端口+HTTP，失败非零退出） |
+| **独立文档** | [production-monitoring.md](production-monitoring.md) |
+| **不做** | 不在本需求文件展开巡检步骤；不强制上 Prometheus（可后续对接） |
+
+**状态**：已完成（正文仅在独立文档维护）。
+
+### PLT-OPS-02 平台端服务运行状态监控（已完成·2026-07-28）
+
+> 来源：后端聚合探测 + 前端仅平台管理员可查看。运维脚本见 [PLT-OPS-01](#plt-ops-01-生产服务运行状态监测已完成2026-07-28) / [production-monitoring.md](production-monitoring.md)。
+
+| 项 | 定稿 |
+|----|------|
+| **后端** | `GET /api/system/platform/service-health`：`meis-system` 内网并行探测各服务 `/actuator/health` |
+| **鉴权** | JWT `userType=platform`，否则 403 |
+| **前端** | 平台管理 → 服务状态 `/platform/service-health`；租户账号不可见 |
+| **配置** | `meis.ops.health-targets` / `timeout-ms` |
+| **不做** | 浏览器直连端口；Prometheus；租户管理员可见；中间件深度探活（一期） |
+
+**状态**：已完成。

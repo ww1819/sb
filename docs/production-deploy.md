@@ -285,11 +285,15 @@ server {
 | 文件上传失败 | MinIO 连通性、`meis-file` 环境变量 |
 | 迁移失败 | 查看 `meis-tenant` 日志；勿多实例同时跑 Flyway |
 
-### 健康检查
+### 健康检查与日常监测
+
+完整说明见独立文档：[production-monitoring.md](production-monitoring.md)。
 
 ```bash
-curl https://api.example.com/api/auth/health
-curl https://api.example.com/actuator/health
+curl -sf https://api.example.com/api/auth/health
+curl -sf https://api.example.com/actuator/health
+# Windows 运维机亦可：
+# powershell -File scripts/health-check.ps1 -GatewayUrl 'https://api.example.com'
 ```
 
 ### OpenAPI

@@ -5,7 +5,12 @@ import { useTabsStore } from '@/stores/tabs'
 import { getHomePath } from '@/utils/home'
 import { clearPersistedTabs } from '@/utils/tabStorage'
 
-const PLATFORM_PATHS = ['/tenant/list', '/platform/tenant-menu', '/platform/package']
+const PLATFORM_PATHS = [
+  '/tenant/list',
+  '/platform/tenant-menu',
+  '/platform/package',
+  '/platform/service-health'
+]
 
 let isFirstAuthenticatedNav = true
 
@@ -26,6 +31,7 @@ const router = createRouter({
         { path: 'tenant/list', component: () => import('@/views/TenantList.vue') },
         { path: 'platform/tenant-menu', component: () => import('@/views/platform/TenantMenuAuth.vue') },
         { path: 'platform/package', component: () => import('@/views/platform/PackagePage.vue') },
+        { path: 'platform/service-health', component: () => import('@/views/platform/ServiceHealthPage.vue') },
         { path: 'platform/integration', component: () => import('@/views/platform/IntegrationPage.vue') },
         { path: 'analytics/reports', component: () => import('@/views/Reports.vue') },
         { path: 'analytics/benefit', redirect: '/analytics/summary' },

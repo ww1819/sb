@@ -177,7 +177,11 @@ public class MenuService {
 
     private List<Map<String, Object>> buildPlatformNavMenus() {
         Set<String> allowed = Set.of(
-                "mod_platform", "platform_tenant", "platform_tenant_menu", "platform_package");
+                "mod_platform",
+                "platform_tenant",
+                "platform_tenant_menu",
+                "platform_package",
+                "platform_service_health");
         List<Map<String, Object>> allMenus = jdbc.queryForList(
                 "SELECT * FROM public.sys_menu WHERE is_active = true ORDER BY sort_order");
         List<Map<String, Object>> modules = allMenus.stream()

@@ -25,9 +25,11 @@ public class TenantWebFilter implements Filter {
                     String tenantId = req.getHeader(TenantConstants.HEADER_TENANT_ID);
                     String userId = req.getHeader(TenantConstants.HEADER_USER_ID);
                     String username = req.getHeader(TenantConstants.HEADER_USERNAME);
+                    String userType = req.getHeader(TenantConstants.HEADER_USER_TYPE);
                     if (StringUtils.hasText(tenantId)) b.tenantId(tenantId);
                     if (StringUtils.hasText(userId)) b.userId(userId);
                     if (StringUtils.hasText(username)) b.username(username);
+                    if (StringUtils.hasText(userType)) b.userType(userType);
                     TenantContext.set(b.build());
                 }
             }

@@ -12,5 +12,7 @@ public class TenantInfo {
     private String schemaName;
     private String userId;
     private String username;
+    /** tenant | platform */
+    private String userType;
     private List<String> roles;
 }

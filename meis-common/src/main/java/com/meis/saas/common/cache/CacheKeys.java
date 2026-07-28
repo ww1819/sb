@@ -27,7 +27,7 @@ public final class CacheKeys {
     }
 
     public static String platformNav() {
-        return PREFIX + "menu:platform-nav";
+        return PREFIX + "menu:platform-nav:v2";
     }
 
     public static String platformMenuTree() {
