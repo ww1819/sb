@@ -1,6 +1,7 @@
 package com.meis.saas.asset.controller;
 
 import com.meis.saas.common.asset.MedicalDeviceDeleteGuard;
+import com.meis.saas.common.audit.EntityChangeLogService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.code.DeviceCodeGenerator;
 import com.meis.saas.common.exception.BizException;
@@ -8,6 +9,7 @@ import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
+import com.meis.saas.common.persistence.TableColumnCache;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.rbac.PermissionContext;
 import com.meis.saas.common.rbac.PermissionInterceptor;
@@ -25,8 +27,17 @@ import java.util.*;
 @RequestMapping("/api/asset/device")
 @RequiredArgsConstructor
 public class AssetDeviceController {
+    private static final int BATCH_LIMIT = 5000;
+    private static final Set<String> BATCH_UUID_FIELDS = Set.of(
+            "dept_id", "manage_dept_id", "campus_id", "building_id", "warehouse_id");
+    private static final Set<String> BATCH_STR_FIELDS = Set.of("device_status", "risk_level");
+    private static final Set<String> BATCH_BOOL_FIELDS = Set.of(
+            "is_life_support", "is_emergency", "is_metrology", "is_shared_device",
+            "is_maintain_device", "is_inspection_device", "is_pm_device");
+
     private final JdbcTemplate jdbc;
     private final DeviceCodeGenerator codeGenerator;
+    private final EntityChangeLogService changeLog;
 
     /** App 台账增量同步（MOB.8）：按 updated_at 水位 + 数据权限过滤。 */
     @GetMapping("/sync")
@@ -140,8 +151,8 @@ public class AssetDeviceController {
         FilterCsvSupport.appendUuidIn(where, args, "d.category_id", category_id);
         FilterCsvSupport.appendUuidIn(where, args, "d.asset_category_id", asset_category_id);
         FilterCsvSupport.appendUuidIn(where, args, "d.finance_category_id", finance_category_id);
-        boolean needSupplier = hasText(supplier_name);
-        boolean needManufacturer = hasText(manufacturer_name) && !hasText(manufacturer_id);
+        boolean needSupplier = true;
+        boolean needManufacturer = true;
         // 列表须带出科室/仓库/分类名称
         boolean needUseDept = true;
         boolean needManageDept = true;
@@ -191,11 +202,256 @@ public class AssetDeviceController {
                        ac.category_name AS asset_category_name,
                        fc.finance_name AS finance_category_name,
                        u.unit_name AS unit_name,
-                       CASE WHEN d.warehouse_id IS NOT NULL THEN 1 ELSE 0 END AS stock_quantity
+                       mfr.manufacturer_code AS manufacturer_code,
+                       mfr.manufacturer_name AS manufacturer_name,
+                       sup.supplier_code AS supplier_code,
+                       sup.supplier_name AS supplier_name,
+                       CASE WHEN d.warehouse_id IS NOT NULL THEN 1 ELSE 0 END AS stock_quantity,
+                       CASE WHEN d.service_expiry_date IS NULL THEN NULL
+                            WHEN d.service_expiry_date <= CURRENT_DATE THEN TRUE
+                            ELSE FALSE END AS service_expiry_reached,
+                       CASE WHEN d.service_expiry_date IS NULL THEN NULL
+                            ELSE GREATEST(0, (d.service_expiry_date - CURRENT_DATE)) END AS service_expiry_remaining_days
                 """ + from + where + buildOrderBy(query) + " LIMIT ? OFFSET ?", args.toArray());
         MedicalDeviceDeleteGuard.enrichCanDelete(jdbc, rows);
         return Result.ok(new PageResult<>(rows, total, query.getPage(), query.getSize()));
     }
+
+    /** AST-UI-15：当前筛选条件下全部设备 id（全选查询结果） */
+    @GetMapping("/ids")
+    public Result<List<String>> ids(
+            PageQuery query,
+            @RequestParam(value = "enable_dateFrom", required = false) String enable_dateFrom,
+            @RequestParam(value = "enable_dateTo", required = false) String enable_dateTo,
+            @RequestParam(value = "supplier_id", required = false) String supplier_id,
+            @RequestParam(value = "manufacturer_id", required = false) String manufacturer_id,
+            @RequestParam(value = "supplier_name", required = false) String supplier_name,
+            @RequestParam(value = "manufacturer_name", required = false) String manufacturer_name,
+            @RequestParam(value = "device_name", required = false) String device_name,
+            @RequestParam(value = "specification", required = false) String specification,
+            @RequestParam(value = "model", required = false) String model,
+            @RequestParam(value = "dept_id", required = false) String dept_id,
+            @RequestParam(value = "manage_dept_id", required = false) String manage_dept_id,
+            @RequestParam(value = "dept_name", required = false) String dept_name,
+            @RequestParam(value = "manage_dept_name", required = false) String manage_dept_name,
+            @RequestParam(value = "serial_number", required = false) String serial_number,
+            @RequestParam(value = "device_code", required = false) String device_code,
+            @RequestParam(value = "device_status", required = false) String device_status,
+            @RequestParam(value = "warehouse_id", required = false) String warehouse_id,
+            @RequestParam(value = "category_id", required = false) String category_id,
+            @RequestParam(value = "asset_category_id", required = false) String asset_category_id,
+            @RequestParam(value = "finance_category_id", required = false) String finance_category_id,
+            @RequestParam(value = "category_kw", required = false) String category_kw,
+            @RequestParam(value = "asset_category_kw", required = false) String asset_category_kw,
+            @RequestParam(value = "finance_category_kw", required = false) String finance_category_kw,
+            @RequestParam(value = "stock_scope", required = false) String stock_scope,
+            @RequestParam(value = "hide_returned", required = false) Boolean hide_returned) {
+        FilterBuild fb = buildListFilter(query, enable_dateFrom, enable_dateTo, supplier_id, manufacturer_id,
+                supplier_name, manufacturer_name, device_name, specification, model, dept_id, manage_dept_id,
+                dept_name, manage_dept_name, serial_number, device_code, device_status, warehouse_id,
+                category_id, asset_category_id, finance_category_id, category_kw, asset_category_kw,
+                finance_category_kw, stock_scope, hide_returned);
+        long total = Optional.ofNullable(jdbc.queryForObject(
+                "SELECT COUNT(*) " + fb.from + fb.where, Long.class, fb.args.toArray())).orElse(0L);
+        if (total > BATCH_LIMIT) {
+            throw new BizException(400, "当前查询结果超过 " + BATCH_LIMIT + " 条，请缩小条件后再全选");
+        }
+        var rows = jdbc.queryForList("SELECT d.id " + fb.from + fb.where + " ORDER BY d.created_at DESC NULLS LAST",
+                fb.args.toArray());
+        List<String> ids = new ArrayList<>(rows.size());
+        for (Map<String, Object> row : rows) {
+            if (row.get("id") != null) ids.add(String.valueOf(row.get("id")));
+        }
+        return Result.ok(ids);
+    }
+
+    /** AST-UI-15：批量修改白名单字段 */
+    @PostMapping("/batch-update")
+    @Transactional
+    @OperationLog(module = "asset", description = "批量修改设备")
+    public Result<Map<String, Object>> batchUpdate(@RequestBody Map<String, Object> body) {
+        List<String> ids = Boolean.TRUE.equals(body.get("all"))
+                ? resolveIdsByFilterBody(body)
+                : parseIds(body.get("ids"));
+        if (ids.isEmpty()) {
+            throw new BizException(400, "请选择设备或确认当前查询条件下有结果");
+        }
+        if (ids.size() > BATCH_LIMIT) {
+            throw new BizException(400, "单次批量修改不能超过 " + BATCH_LIMIT + " 条，请缩小查询条件");
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> fields = body.get("fields") instanceof Map<?, ?> m
+                ? (Map<String, Object>) m
+                : Map.of();
+        if (fields.isEmpty()) {
+            throw new BizException(400, "请至少勾选一项要修改的字段");
+        }
+        Set<String> cols = TableColumnCache.columns(jdbc, "medical_device");
+        List<String> sets = new ArrayList<>();
+        List<Object> baseArgs = new ArrayList<>();
+        for (Map.Entry<String, Object> e : fields.entrySet()) {
+            String key = e.getKey();
+            if (BATCH_UUID_FIELDS.contains(key)) {
+                if (!cols.contains(key)) continue;
+                sets.add(key + " = ?::uuid");
+                Object v = e.getValue();
+                baseArgs.add(v == null || String.valueOf(v).isBlank() ? null : String.valueOf(v));
+            } else if (BATCH_STR_FIELDS.contains(key)) {
+                if (!cols.contains(key)) continue;
+                sets.add(key + " = ?");
+                Object v = e.getValue();
+                baseArgs.add(v == null || String.valueOf(v).isBlank() ? null : String.valueOf(v));
+            } else if (BATCH_BOOL_FIELDS.contains(key)) {
+                if (!cols.contains(key)) continue;
+                sets.add(key + " = ?");
+                baseArgs.add(Boolean.TRUE.equals(e.getValue()) || "true".equalsIgnoreCase(String.valueOf(e.getValue())));
+            }
+        }
+        if (sets.isEmpty()) {
+            throw new BizException(400, "没有可更新的字段");
+        }
+        SoftDeleteSupport.appendUpdateAuditSets(jdbc, cols, sets, baseArgs);
+        int updated = 0;
+        for (String idStr : ids) {
+            Map<String, Object> before = changeLog.loadRow("medical_device", idStr);
+            if (before == null) continue;
+            List<Object> args = new ArrayList<>(baseArgs);
+            args.add(idStr);
+            jdbc.update("UPDATE medical_device SET " + String.join(", ", sets)
+                    + " WHERE id = ?::uuid"
+                    + SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", null), args.toArray());
+            changeLog.recordUpdate("medical_device", idStr, before, changeLog.loadRow("medical_device", idStr));
+            updated++;
+        }
+        return Result.ok(Map.of("updated", updated));
+    }
+
+    private FilterBuild buildListFilter(
+            PageQuery query,
+            String enable_dateFrom, String enable_dateTo,
+            String supplier_id, String manufacturer_id,
+            String supplier_name, String manufacturer_name,
+            String device_name, String specification, String model,
+            String dept_id, String manage_dept_id,
+            String dept_name, String manage_dept_name,
+            String serial_number, String device_code, String device_status,
+            String warehouse_id, String category_id, String asset_category_id, String finance_category_id,
+            String category_kw, String asset_category_kw, String finance_category_kw,
+            String stock_scope, Boolean hide_returned) {
+        StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d"));
+        List<Object> args = new ArrayList<>();
+        if ("warehouse".equalsIgnoreCase(stock_scope)) {
+            where.append(" AND d.warehouse_id IS NOT NULL ");
+        } else if ("dept".equalsIgnoreCase(stock_scope)) {
+            where.append(" AND d.warehouse_id IS NULL ");
+        }
+        if (Boolean.TRUE.equals(hide_returned)) {
+            where.append(" AND COALESCE(d.device_status, '') <> 'returned' ");
+        }
+        if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
+            String kw = "%" + query.getKeyword().trim() + "%";
+            where.append("""
+                     AND (d.device_code ILIKE ? OR d.device_name ILIKE ? OR d.specification ILIKE ?
+                          OR d.financial_code ILIKE ? OR d.serial_number ILIKE ?)
+                    """);
+            args.add(kw);
+            args.add(kw);
+            args.add(kw);
+            args.add(kw);
+            args.add(kw);
+        }
+        appendUuidEq(where, args, "d.supplier_id", supplier_id);
+        appendUuidEq(where, args, "d.manufacturer_id", manufacturer_id);
+        FilterCsvSupport.appendUuidIn(where, args, "d.dept_id", dept_id);
+        FilterCsvSupport.appendUuidIn(where, args, "d.manage_dept_id", manage_dept_id);
+        appendUuidEq(where, args, "d.warehouse_id", warehouse_id);
+        FilterCsvSupport.appendUuidIn(where, args, "d.category_id", category_id);
+        FilterCsvSupport.appendUuidIn(where, args, "d.asset_category_id", asset_category_id);
+        FilterCsvSupport.appendUuidIn(where, args, "d.finance_category_id", finance_category_id);
+        if (hasText(supplier_name)) {
+            appendSupplierSearch(where, args, supplier_name);
+        }
+        if (!hasText(manufacturer_id)) {
+            appendNameOrPinyin(where, args, "mfr.manufacturer_name", "mfr.pinyin_code", manufacturer_name);
+        }
+        appendNameOrPinyin(where, args, "d.device_name", "d.pinyin_code", device_name);
+        appendLike(where, args, "d.specification", specification);
+        appendLike(where, args, "d.model", model);
+        if (!hasText(dept_id)) {
+            appendNameOrPinyin(where, args, "use_dept.dept_name", "use_dept.pinyin_code", dept_name);
+        }
+        if (!hasText(manage_dept_id)) {
+            appendNameOrPinyin(where, args, "mgr_dept.dept_name", "mgr_dept.pinyin_code", manage_dept_name);
+        }
+        appendLike(where, args, "d.serial_number", serial_number);
+        appendLike(where, args, "d.device_code", device_code);
+        FilterCsvSupport.appendStrIn(where, args, "d.device_status", device_status);
+        FilterCsvSupport.appendCodeNamePinyin(where, args, "mdc.category_code", "mdc.category_name", null, category_kw);
+        FilterCsvSupport.appendCodeNamePinyin(where, args, "ac.category_code", "ac.category_name", null, asset_category_kw);
+        FilterCsvSupport.appendCodeNamePinyin(where, args, "fc.finance_code", "fc.finance_name", null, finance_category_kw);
+        if (enable_dateFrom != null && !enable_dateFrom.isBlank()) {
+            where.append(" AND d.enable_date >= ?::date ");
+            args.add(enable_dateFrom.trim());
+        }
+        if (enable_dateTo != null && !enable_dateTo.isBlank()) {
+            where.append(" AND d.enable_date <= ?::date ");
+            args.add(enable_dateTo.trim());
+        }
+        String from = buildFrom(true, true, true, true, true, true);
+        return new FilterBuild(from, where.toString(), args);
+    }
+
+    private List<String> resolveIdsByFilterBody(Map<String, Object> body) {
+        PageQuery query = new PageQuery();
+        Object kw = body.get("keyword");
+        if (kw != null) query.setKeyword(String.valueOf(kw));
+        FilterBuild fb = buildListFilter(
+                query,
+                str(body.get("enable_dateFrom")), str(body.get("enable_dateTo")),
+                str(body.get("supplier_id")), str(body.get("manufacturer_id")),
+                str(body.get("supplier_name")), str(body.get("manufacturer_name")),
+                str(body.get("device_name")), str(body.get("specification")), str(body.get("model")),
+                str(body.get("dept_id")), str(body.get("manage_dept_id")),
+                str(body.get("dept_name")), str(body.get("manage_dept_name")),
+                str(body.get("serial_number")), str(body.get("device_code")), str(body.get("device_status")),
+                str(body.get("warehouse_id")), str(body.get("category_id")),
+                str(body.get("asset_category_id")), str(body.get("finance_category_id")),
+                str(body.get("category_kw")), str(body.get("asset_category_kw")), str(body.get("finance_category_kw")),
+                str(body.get("stock_scope")),
+                body.get("hide_returned") == null ? null : Boolean.valueOf(String.valueOf(body.get("hide_returned"))));
+        long total = Optional.ofNullable(jdbc.queryForObject(
+                "SELECT COUNT(*) " + fb.from + fb.where, Long.class, fb.args.toArray())).orElse(0L);
+        if (total > BATCH_LIMIT) {
+            throw new BizException(400, "单次批量修改不能超过 " + BATCH_LIMIT + " 条，请缩小查询条件");
+        }
+        var rows = jdbc.queryForList("SELECT d.id " + fb.from + fb.where, fb.args.toArray());
+        List<String> ids = new ArrayList<>(rows.size());
+        for (Map<String, Object> row : rows) {
+            if (row.get("id") != null) ids.add(String.valueOf(row.get("id")));
+        }
+        return ids;
+    }
+
+    private static List<String> parseIds(Object raw) {
+        if (raw == null) return List.of();
+        if (raw instanceof Collection<?> c) {
+            List<String> out = new ArrayList<>();
+            for (Object o : c) {
+                if (o != null && !String.valueOf(o).isBlank()) out.add(String.valueOf(o));
+            }
+            return out;
+        }
+        String s = String.valueOf(raw).trim();
+        if (s.isEmpty()) return List.of();
+        return Arrays.stream(s.split(",")).map(String::trim).filter(x -> !x.isEmpty()).toList();
+    }
+
+    private static String str(Object v) {
+        return v == null ? null : String.valueOf(v);
+    }
+
+    private record FilterBuild(String from, String where, List<Object> args) {}
 
     private static boolean hasText(String value) {
         return value != null && !value.isBlank();
