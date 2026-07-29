@@ -213,7 +213,10 @@ class LocalSyncService {
               'row_version': r['row_version'] ?? 1,
             })
         .toList();
-    final data = await _api.postData('/asset/inventory/$checkId/offline-sync', {'items': items});
+    final data = await _api.postData('/asset/inventory/$checkId/offline-sync', {
+      'items': items,
+      'client': 'app',
+    });
     if (data is Map) {
       // 成功后清 dirty：以服务端详情为准重存
       try {

@@ -63,6 +63,8 @@ public class SharedLoanController {
                     body.get("fee_mode"), body.get("fee_time_unit"), body.get("fee_unit_price"),
                     body.get("reason"),
                     body.getOrDefault("status", "draft"), body.getOrDefault("approval_status", "draft"));
+            SoftDeleteSupport.applyChannels(jdbc, "shared_device_loan", id, body,
+                    "create_channel", "update_channel");
         } else {
             jdbc.update("""
                 UPDATE shared_device_loan SET to_dept_id=?::uuid, loan_start=?, loan_end=?,
@@ -70,6 +72,7 @@ public class SharedLoanController {
                 WHERE id=?::uuid AND status IN ('draft','pending')
                 """, body.get("to_dept_id"), body.get("loan_start"), body.get("loan_end"),
                     body.get("reason"), body.get("remark"), id);
+            SoftDeleteSupport.applyChannels(jdbc, "shared_device_loan", id, body, "update_channel");
         }
         return get(id);
     }
@@ -88,6 +91,8 @@ public class SharedLoanController {
             UPDATE shared_device_loan SET status='pending', approval_status='pending', updated_at=NOW()
             WHERE id=?::uuid
             """, id);
+        SoftDeleteSupport.applyChannels(jdbc, "shared_device_loan", id, body,
+                "submit_channel", "update_channel");
         approvalService.submit("shared_device_loan", id, loan.get("loan_no").toString(),
                 "公用设备借调 " + loan.get("loan_no"), applicantId, 0);
         return get(id);
@@ -95,7 +100,8 @@ public class SharedLoanController {
 
     @PostMapping("/{id}/approve")
     @OperationLog(module = "shared", description = "审批借调")
-    public Result<Map<String, Object>> approve(@PathVariable UUID id) {
+    public Result<Map<String, Object>> approve(@PathVariable UUID id,
+            @RequestBody(required = false) Map<String, Object> body) {
         String userId = TenantContext.getUserId();
         UUID approver = userId != null ? UUID.fromString(userId) : null;
         String approverName = SoftDeleteSupport.resolveUserDisplayName(jdbc, approver);
@@ -104,23 +110,28 @@ public class SharedLoanController {
             approved_by=?::uuid, approved_by_name=?, approved_at=NOW(), billing_start_at=NOW(), updated_at=NOW()
             WHERE id=?::uuid
             """, approver, approverName, id);
+        SoftDeleteSupport.applyChannels(jdbc, "shared_device_loan", id, body,
+                "confirm_channel", "update_channel");
         return get(id);
     }
 
     @PostMapping("/{id}/reject")
     @OperationLog(module = "shared", description = "驳回借调")
-    public Result<Map<String, Object>> reject(@PathVariable UUID id) {
+    public Result<Map<String, Object>> reject(@PathVariable UUID id,
+            @RequestBody(required = false) Map<String, Object> body) {
         jdbc.update("""
             UPDATE shared_device_loan SET status='rejected', approval_status='rejected', updated_at=NOW()
             WHERE id=?::uuid
             """, id);
+        SoftDeleteSupport.applyChannels(jdbc, "shared_device_loan", id, body, "update_channel");
         return get(id);
     }
 
     @PostMapping("/{id}/lend")
     @Transactional
     @OperationLog(module = "shared", description = "执行借出")
-    public Result<Map<String, Object>> lend(@PathVariable UUID id) {
+    public Result<Map<String, Object>> lend(@PathVariable UUID id,
+            @RequestBody(required = false) Map<String, Object> body) {
         var loan = loadLoan(id);
         if (!"approved".equals(String.valueOf(loan.get("status")))) {
             throw new BizException(400, "仅已审批单据可借出");
@@ -128,6 +139,8 @@ public class SharedLoanController {
         jdbc.update("""
             UPDATE shared_device_loan SET status='on_loan', loan_time=NOW(), updated_at=NOW() WHERE id=?::uuid
             """, id);
+        SoftDeleteSupport.applyChannels(jdbc, "shared_device_loan", id, body,
+                "confirm_channel", "update_channel");
         if (loan.get("device_id") != null && loan.get("to_dept_id") != null) {
             jdbc.update("UPDATE medical_device SET dept_id = ?::uuid, updated_at = NOW() WHERE id = ?::uuid",
                     loan.get("to_dept_id"), loan.get("device_id"));

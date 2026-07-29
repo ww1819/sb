@@ -66,7 +66,7 @@ class _SharedReturnApprovePageState extends ConsumerState<SharedReturnApprovePag
     );
     if (ok != true) return;
     try {
-      await api.postData('/shared/return/$id/approve');
+      await api.postData('/shared/return/$id/approve', {'client': 'app'});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已通过')));
       }
@@ -98,7 +98,7 @@ class _SharedReturnApprovePageState extends ConsumerState<SharedReturnApprovePag
     );
     if (ok != true) return;
     try {
-      await api.postData('/shared/return/$id/reject');
+      await api.postData('/shared/return/$id/reject', {'client': 'app'});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已驳回')));
       }

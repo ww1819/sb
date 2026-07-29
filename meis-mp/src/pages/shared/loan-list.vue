@@ -112,7 +112,7 @@ async function submitRow(r: Record<string, unknown>) {
   })
   if (!ok) return
   try {
-    await http.post(`/shared/loan/${r.id}/submit`, { applicantId: auth.user?.userId })
+    await http.post(`/shared/loan/${r.id}/submit`, { applicantId: auth.user?.userId, client: 'mp' })
     uni.showToast({ title: '已提交', icon: 'success' })
     await load()
   } catch (e: unknown) {
@@ -130,7 +130,7 @@ async function lendRow(r: Record<string, unknown>) {
   })
   if (!ok) return
   try {
-    await http.post(`/shared/loan/${r.id}/lend`)
+    await http.post(`/shared/loan/${r.id}/lend`, { client: 'mp' })
     uni.showToast({ title: '已借出', icon: 'success' })
     await load()
   } catch (e: unknown) {

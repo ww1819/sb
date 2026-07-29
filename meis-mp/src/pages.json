@@ -116,6 +116,42 @@
       "style": {
         "navigationBarTitleText": "归还审核"
       }
+    },
+    {
+      "path": "pages/power/hub",
+      "style": {
+        "navigationBarTitleText": "电流标签"
+      }
+    },
+    {
+      "path": "pages/power/form",
+      "style": {
+        "navigationBarTitleText": "维护标签"
+      }
+    },
+    {
+      "path": "pages/power/bind",
+      "style": {
+        "navigationBarTitleText": "绑定设备"
+      }
+    },
+    {
+      "path": "pages/power/readings",
+      "style": {
+        "navigationBarTitleText": "监测记录"
+      }
+    },
+    {
+      "path": "pages/power/station-hub",
+      "style": {
+        "navigationBarTitleText": "电流基站"
+      }
+    },
+    {
+      "path": "pages/power/station-form",
+      "style": {
+        "navigationBarTitleText": "维护基站"
+      }
     }
   ],
   "globalStyle": {

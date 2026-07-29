@@ -367,6 +367,7 @@ class _SharedLoanFormPageState extends ConsumerState<SharedLoanFormPage> {
       'applicant_id': userId,
       'remark': remarkCtrl.text.trim(),
       'status': status ?? 'draft',
+      'client': 'app',
     };
 
     setState(() => loading = true);
@@ -377,7 +378,7 @@ class _SharedLoanFormPageState extends ConsumerState<SharedLoanFormPage> {
       status = saved['status']?.toString() ?? status;
 
       if (andSubmit && loanId != null) {
-        await api.postData('/shared/loan/$loanId/submit', {'applicantId': userId});
+        await api.postData('/shared/loan/$loanId/submit', {'applicantId': userId, 'client': 'app'});
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存并提交')));
           Navigator.pop(context, true);

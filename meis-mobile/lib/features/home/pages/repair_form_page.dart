@@ -365,7 +365,7 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
         ),
       );
       if (submit == true && workorderId != null) {
-        await api.postData('/repair/workorder/$workorderId/submit');
+        await api.postData('/repair/workorder/$workorderId/submit', {'client': 'app'});
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已提交')));
           Navigator.pop(context, true);

@@ -89,7 +89,7 @@ class _SharedLoanListPageState extends ConsumerState<SharedLoanListPage> {
     );
     if (ok != true) return;
     try {
-      await api.postData('/shared/loan/$id/submit', {'applicantId': userId});
+      await api.postData('/shared/loan/$id/submit', {'applicantId': userId, 'client': 'app'});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已提交')));
       }
@@ -117,7 +117,7 @@ class _SharedLoanListPageState extends ConsumerState<SharedLoanListPage> {
     );
     if (ok != true) return;
     try {
-      await api.postData('/shared/loan/$id/lend');
+      await api.postData('/shared/loan/$id/lend', {'client': 'app'});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已借出')));
       }

@@ -172,9 +172,9 @@ class ApiService {
     }
   }
 
-  Future<void> deleteData(String path) async {
+  Future<void> deleteData(String path, {Map<String, dynamic>? query}) async {
     try {
-      final res = await dio.delete<Map<String, dynamic>>(path);
+      final res = await dio.delete<Map<String, dynamic>>(path, queryParameters: query);
       _unwrap(res.data);
     } on DioException catch (e) {
       await _handleUnauthorized(e);
@@ -209,8 +209,12 @@ class ApiService {
 
   dynamic _unwrap(Map<String, dynamic>? body) {
     if (body == null) throw ApiException('空响应');
-    if (body['code'] != 0 && body['code'] != 200) {
-      throw ApiException(body['message']?.toString() ?? '请求失败');
+    final code = body['code'];
+    if (code != 0 && code != 200) {
+      throw ApiException(
+        body['message']?.toString() ?? '请求失败',
+        statusCode: code is int ? code : int.tryParse(code?.toString() ?? ''),
+      );
     }
     return body['data'];
   }

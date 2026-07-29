@@ -160,6 +160,7 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
     try {
       final payload = Map<String, dynamic>.from(body);
       if (row['row_version'] != null) payload['row_version'] = row['row_version'];
+      payload['client'] = 'app';
       await ref.read(apiServiceProvider).patchData(
             '/asset/inventory/${widget.checkId}/items/$itemId',
             payload,

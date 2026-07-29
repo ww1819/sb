@@ -46,6 +46,7 @@ public class MetrologyExecutionGenerator {
                 """, execId, execNo, planId, p.get("template_id"), p.get("category_id"), p.get("org_id"),
                 body.getOrDefault("planned_date", p.get("next_due_date")),
                 p.get("assigned_inspector_id"), "pending", body.get("created_by"));
+        SoftDeleteSupport.applyChannels(jdbc, "metrology_execution", execId, body, "create_channel", "update_channel");
 
         UUID itemId = UUID.randomUUID();
         var device = jdbc.queryForList(

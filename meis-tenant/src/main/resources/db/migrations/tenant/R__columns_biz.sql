@@ -1278,3 +1278,33 @@ COMMENT ON COLUMN repair_workorder.create_channel IS '制单途径 web/app/mp（
 COMMENT ON COLUMN inventory_check.create_channel IS '制单途径 web/app/mp（OPS.16.29）';
 COMMENT ON COLUMN metrology_execution.create_channel IS '制单途径 web/app/mp（OPS.16.29）';
 COMMENT ON COLUMN adverse_event.create_channel IS '制单途径 web/app/mp（OPS.16.29）';
+
+-- MOB-PWR-01 电流标签多端途径
+ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+COMMENT ON COLUMN power_tag.create_channel IS '制单途径 web/app/mp（MOB-PWR-01）';
+COMMENT ON COLUMN power_tag.update_channel IS '修改途径 web/app/mp（MOB-PWR-01）';
+
+-- MOB-PWR-02 基站多端途径
+ALTER TABLE power_base_station ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE power_base_station ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+COMMENT ON COLUMN power_base_station.create_channel IS '制单途径 web/app/mp（MOB-PWR-02）';
+COMMENT ON COLUMN power_base_station.update_channel IS '修改途径 web/app/mp（MOB-PWR-02）';
+
+-- OPS.16.29 / MOB-CHANNEL-01 公用借还多端途径
+ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS submit_channel VARCHAR(20);
+ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS confirm_channel VARCHAR(20);
+ALTER TABLE shared_device_return ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE shared_device_return ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE shared_device_return ADD COLUMN IF NOT EXISTS submit_channel VARCHAR(20);
+ALTER TABLE shared_device_return ADD COLUMN IF NOT EXISTS confirm_channel VARCHAR(20);
+COMMENT ON COLUMN shared_device_loan.create_channel IS '制单途径 web/app/mp';
+COMMENT ON COLUMN shared_device_loan.update_channel IS '修改途径 web/app/mp';
+COMMENT ON COLUMN shared_device_loan.submit_channel IS '提交途径 web/app/mp';
+COMMENT ON COLUMN shared_device_loan.confirm_channel IS '审核/借出途径 web/app/mp';
+COMMENT ON COLUMN shared_device_return.create_channel IS '制单途径 web/app/mp';
+COMMENT ON COLUMN shared_device_return.update_channel IS '修改途径 web/app/mp';
+COMMENT ON COLUMN shared_device_return.submit_channel IS '提交途径 web/app/mp';
+COMMENT ON COLUMN shared_device_return.confirm_channel IS '审核途径 web/app/mp';

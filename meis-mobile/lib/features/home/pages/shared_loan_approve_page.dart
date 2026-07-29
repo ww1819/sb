@@ -66,7 +66,7 @@ class _SharedLoanApprovePageState extends ConsumerState<SharedLoanApprovePage> {
     );
     if (ok != true) return;
     try {
-      await api.postData('/shared/loan/$id/approve');
+      await api.postData('/shared/loan/$id/approve', {'client': 'app'});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已通过')));
       }
@@ -98,7 +98,7 @@ class _SharedLoanApprovePageState extends ConsumerState<SharedLoanApprovePage> {
     );
     if (ok != true) return;
     try {
-      await api.postData('/shared/loan/$id/reject');
+      await api.postData('/shared/loan/$id/reject', {'client': 'app'});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已驳回')));
       }

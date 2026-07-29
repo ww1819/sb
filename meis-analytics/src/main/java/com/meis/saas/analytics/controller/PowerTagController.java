@@ -3,9 +3,11 @@ package com.meis.saas.analytics.controller;
 import com.meis.saas.analytics.service.PowerReadingQueryService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.ops.OpsClientChannel;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
+import com.meis.saas.common.persistence.TableColumnCache;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
 import jakarta.servlet.http.HttpServletResponse;
@@ -25,9 +27,11 @@ import java.util.*;
 @RequestMapping("/api/power/tag")
 @RequiredArgsConstructor
 public class PowerTagController {
-    private static final String TAG_SELECT = """
+    private static final String TAG_SELECT_BASE = """
             SELECT t.id, t.tag_code, t.tag_name, t.device_id, t.station_id,
                    t.rated_power, t.install_date, t.is_active, t.remark, t.created_at, t.updated_at,
+            """;
+    private static final String TAG_SELECT_JOINS = """
                    COALESCE(t.device_code, d.device_code) AS device_code,
                    COALESCE(t.device_name, d.device_name) AS device_name,
                    s.station_name, s.station_code,
@@ -43,6 +47,14 @@ public class PowerTagController {
 
     private final JdbcTemplate jdbc;
     private final PowerReadingQueryService readingQuery;
+
+    private String tagSelect() {
+        boolean hasChannel = TableColumnCache.hasColumn(jdbc, "power_tag", "create_channel");
+        String channels = hasChannel
+                ? " t.create_channel, t.update_channel, "
+                : " CAST(NULL AS VARCHAR) AS create_channel, CAST(NULL AS VARCHAR) AS update_channel, ";
+        return TAG_SELECT_BASE + channels + TAG_SELECT_JOINS;
+    }
 
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(PageQuery query,
@@ -73,13 +85,29 @@ public class PowerTagController {
         int offset = (query.getPage() - 1) * query.getSize();
         args.add(query.getSize());
         args.add(offset);
-        var rows = jdbc.queryForList(TAG_SELECT + where + " ORDER BY t.tag_code LIMIT ? OFFSET ?", args.toArray());
+        var rows = jdbc.queryForList(tagSelect() + where + " ORDER BY t.tag_code LIMIT ? OFFSET ?", args.toArray());
         return Result.ok(new PageResult<>(rows, total, query.getPage(), query.getSize()));
+    }
+
+    /** MOB-PWR-01：扫码精确匹配标签编码（仅未软删；软删视为不存在） */
+    @GetMapping("/by-code/{tagCode}")
+    public Result<Map<String, Object>> getByCode(@PathVariable String tagCode) {
+        String code = tagCode == null ? "" : tagCode.trim();
+        if (code.isEmpty()) {
+            throw new BizException(400, "标签编码不能为空");
+        }
+        String where = " WHERE t.tag_code = ? " + SoftDeleteSupport.notDeletedClause(jdbc, "power_tag", "t");
+        var rows = jdbc.queryForList(tagSelect() + where + " LIMIT 1", code);
+        if (rows.isEmpty()) {
+            throw new BizException(404, "标签不存在");
+        }
+        return Result.ok(rows.get(0));
     }
 
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
-        var rows = jdbc.queryForList(TAG_SELECT + " WHERE t.id = ?::uuid", id);
+        String where = " WHERE t.id = ?::uuid " + SoftDeleteSupport.notDeletedClause(jdbc, "power_tag", "t");
+        var rows = jdbc.queryForList(tagSelect() + where, id);
         if (rows.isEmpty()) {
             throw new BizException(404, "not found");
         }
@@ -141,35 +169,102 @@ public class PowerTagController {
         UUID id = resolveTagId(body);
         boolean exists = tagExists(id);
         UUID oldDeviceId = null;
+        String existingCode = null;
         if (exists) {
-            var oldRows = jdbc.queryForList("SELECT device_id FROM power_tag WHERE id = ?::uuid", id);
+            var oldRows = jdbc.queryForList(
+                    "SELECT device_id, tag_code FROM power_tag WHERE id = ?::uuid", id);
             if (!oldRows.isEmpty()) {
                 oldDeviceId = parseUuidFromDb(oldRows.get(0).get("device_id"));
+                existingCode = oldRows.get(0).get("tag_code") != null
+                        ? oldRows.get(0).get("tag_code").toString() : null;
             }
         }
+        normalizeTagCode(body);
+        enforceTagCodeImmutable(exists, existingCode, body);
         fillDeviceInfo(body);
         UUID newDeviceId = parseUuid(body.get("device_id"));
+        ensureDeviceAvailable(newDeviceId, id);
         normalizeTagName(body);
+        String channel = OpsClientChannel.of(body);
+        boolean hasCreate = TableColumnCache.hasColumn(jdbc, "power_tag", "create_channel");
+        boolean hasUpdate = TableColumnCache.hasColumn(jdbc, "power_tag", "update_channel");
         if (exists) {
-            int updated = jdbc.update("""
+            String sql = """
                     UPDATE power_tag SET tag_code=?, tag_name=?, device_id=?::uuid, station_id=?::uuid,
                     device_code=?, device_name=?, rated_power=?, install_date=?, is_active=?, remark=?,
                     is_deleted=0, deleted_at=NULL, deleted_by=NULL, updated_at=NOW(), updated_by=?::uuid
-                    WHERE id=?::uuid
-                    """, body.get("tag_code"), body.get("tag_name"), body.get("device_id"), body.get("station_id"),
-                    body.get("device_code"), body.get("device_name"), body.get("rated_power"), body.get("install_date"),
-                    body.getOrDefault("is_active", true), body.get("remark"), TenantContext.getUserId(), id);
+                    """;
+            List<Object> args = new ArrayList<>();
+            args.add(body.get("tag_code"));
+            args.add(body.get("tag_name"));
+            args.add(body.get("device_id"));
+            args.add(body.get("station_id"));
+            args.add(body.get("device_code"));
+            args.add(body.get("device_name"));
+            args.add(body.get("rated_power"));
+            args.add(body.get("install_date"));
+            args.add(body.getOrDefault("is_active", true));
+            args.add(body.get("remark"));
+            args.add(TenantContext.getUserId());
+            if (hasUpdate) {
+                sql += ", update_channel=? ";
+                args.add(channel);
+            }
+            sql += " WHERE id=?::uuid";
+            args.add(id);
+            int updated = jdbc.update(sql, args.toArray());
             if (updated == 0) {
                 throw new BizException(404, "tag not found");
             }
         } else {
-            jdbc.update("""
-                    INSERT INTO power_tag (id, tag_code, tag_name, device_id, station_id, device_code, device_name,
-                    rated_power, install_date, is_active, remark)
-                    VALUES (?::uuid,?,?,?::uuid,?::uuid,?,?,?,?,?,?)
-                    """, id, body.get("tag_code"), body.get("tag_name"), body.get("device_id"), body.get("station_id"),
-                    body.get("device_code"), body.get("device_name"), body.get("rated_power"), body.get("install_date"),
-                    body.getOrDefault("is_active", true), body.get("remark"));
+            List<String> cols = new ArrayList<>();
+            cols.add("id");
+            cols.add("tag_code");
+            cols.add("tag_name");
+            cols.add("device_id");
+            cols.add("station_id");
+            cols.add("device_code");
+            cols.add("device_name");
+            cols.add("rated_power");
+            cols.add("install_date");
+            cols.add("is_active");
+            cols.add("remark");
+            List<String> placeholders = new ArrayList<>();
+            placeholders.add("?::uuid");
+            placeholders.add("?");
+            placeholders.add("?");
+            placeholders.add("?::uuid");
+            placeholders.add("?::uuid");
+            placeholders.add("?");
+            placeholders.add("?");
+            placeholders.add("?");
+            placeholders.add("?");
+            placeholders.add("?");
+            placeholders.add("?");
+            List<Object> args = new ArrayList<>();
+            args.add(id);
+            args.add(body.get("tag_code"));
+            args.add(body.get("tag_name"));
+            args.add(body.get("device_id"));
+            args.add(body.get("station_id"));
+            args.add(body.get("device_code"));
+            args.add(body.get("device_name"));
+            args.add(body.get("rated_power"));
+            args.add(body.get("install_date"));
+            args.add(body.getOrDefault("is_active", true));
+            args.add(body.get("remark"));
+            if (hasCreate) {
+                cols.add("create_channel");
+                placeholders.add("?");
+                args.add(channel);
+            }
+            if (hasUpdate) {
+                cols.add("update_channel");
+                placeholders.add("?");
+                args.add(channel);
+            }
+            jdbc.update("INSERT INTO power_tag (" + String.join(", ", cols) + ") VALUES ("
+                    + String.join(", ", placeholders) + ")", args.toArray());
         }
         recordBindChange(id, oldDeviceId, newDeviceId, body);
         return get(id);
@@ -194,6 +289,40 @@ public class PowerTagController {
                 WHERE id=?::uuid
                 """, body.get("standby_current_max_ma"), body.get("standby_current_min_ma"), deviceId);
         return get(id);
+    }
+
+    /** PWR-B-03：同一设备仅允许一个未软删标签绑定 */
+    private void ensureDeviceAvailable(UUID deviceId, UUID tagId) {
+        if (deviceId == null) {
+            return;
+        }
+        String sql = """
+                SELECT tag_code FROM power_tag
+                WHERE device_id = ?::uuid AND id <> ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "power_tag", null) + " LIMIT 1";
+        var rows = jdbc.queryForList(sql, deviceId, tagId);
+        if (!rows.isEmpty()) {
+            Object code = rows.get(0).get("tag_code");
+            throw new BizException(400, "该设备已绑定标签 " + (code != null ? code : "") + "，请先解绑");
+        }
+    }
+
+    private static void normalizeTagCode(Map<String, Object> body) {
+        Object code = body.get("tag_code");
+        if (code == null || code.toString().isBlank()) {
+            throw new BizException(400, "请填写标签编码");
+        }
+        body.put("tag_code", code.toString().trim());
+    }
+
+    private static void enforceTagCodeImmutable(boolean exists, String existingCode, Map<String, Object> body) {
+        if (!exists || existingCode == null || existingCode.isBlank()) {
+            return;
+        }
+        String bodyCode = body.get("tag_code") != null ? body.get("tag_code").toString().trim() : "";
+        if (!existingCode.equals(bodyCode)) {
+            throw new BizException(400, "标签编码不可修改");
+        }
     }
 
     private void recordBindChange(UUID tagId, UUID oldDeviceId, UUID newDeviceId, Map<String, Object> body) {
@@ -241,7 +370,7 @@ public class PowerTagController {
         return deviceId;
     }
 
-    /** 优先按 tag_code 解析已有标签，避免编辑时 id 缺失导致误 INSERT。 */
+    /** 优先按 tag_code 解析已有标签（含软删），避免编辑时 id 缺失导致误 INSERT。 */
     private UUID resolveTagId(Map<String, Object> body) {
         Object code = body.get("tag_code");
         if (code != null && !code.toString().isBlank()) {
@@ -332,7 +461,9 @@ public class PowerTagController {
     }
 
     private void ensureTag(UUID id) {
-        if (jdbc.queryForObject("SELECT COUNT(*) FROM power_tag WHERE id = ?::uuid", Long.class, id) == 0) {
+        String sql = "SELECT COUNT(*) FROM power_tag WHERE id = ?::uuid"
+                + SoftDeleteSupport.notDeletedClause(jdbc, "power_tag", null);
+        if (jdbc.queryForObject(sql, Long.class, id) == 0) {
             throw new BizException(404, "not found");
         }
     }
