@@ -334,8 +334,8 @@ export function buildMultiKpiGaugeOption(
               fill: dark ? '#a3a6ad' : '#909399',
               fontSize: 13,
               fontWeight: 400,
-              textAlign: 'center',
-              textVerticalAlign: 'middle'
+              align: 'center',
+              verticalAlign: 'middle'
             },
             left: 'center',
             top: -14
@@ -347,8 +347,8 @@ export function buildMultiKpiGaugeOption(
               fill: dark ? '#60a5fa' : '#2f7cf6',
               fontSize: 28,
               fontWeight: 700,
-              textAlign: 'center',
-              textVerticalAlign: 'middle'
+              align: 'center',
+              verticalAlign: 'middle'
             },
             left: 'center',
             top: 12

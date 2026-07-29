@@ -55,7 +55,7 @@ export interface PageConfig {
   /** 列表分页接口附加模式：apply / handle / verify */
   listMode?: string
   /** 列表分页固定查询参数 */
-  listParams?: Record<string, string | number | boolean>
+  listParams?: Record<string, string | number | boolean | undefined>
   /** 保存接口（POST，支持新增/编辑合一） */
   saveUrl?: string
   /** 启用查看（只读） */

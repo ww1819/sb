@@ -1,0 +1,1 @@
+import{F as e}from"./FeaturePlaceholderPage-D4mIaZL0.js";import{d as t,o as a,A as o}from"./index-Dr59-LAb.js";import"./SystemPageCard-DQ-RFZwI.js";const m=t({__name:"AssetDynamicStatsPage",setup(r){return(s,n)=>(a(),o(e,{title:"资产动态统计",subtitle:"资产管理 / 资产查询",description:"资产动态统计功能开发中",hint:"菜单已开通（AST-UI-08）；完整统计能力见待开发池 BACKLOG-AST-08"}))}});export{m as default};

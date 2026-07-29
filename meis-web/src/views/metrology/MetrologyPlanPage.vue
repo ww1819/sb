@@ -26,13 +26,13 @@ const config: PageConfig = { title: '计量计划', apiBase: '/metrology', table
 const dueList = ref<Record<string, unknown>[]>([])
 
 async function approve(form: Record<string, unknown>, reload?: () => void) {
-  await http.post(`/metrology/plan/${form.id}/approve`, { action: 'approve', approved_by: auth.user?.id })
+  await http.post(`/metrology/plan/${form.id}/approve`, { action: 'approve', approved_by: auth.user?.userId })
   ElMessage.success('审核通过')
   reload?.()
 }
 
 async function genExec(form: Record<string, unknown>, reload?: () => void) {
-  await http.post(`/metrology/plan/${form.id}/generate-execution`, { created_by: auth.user?.id })
+  await http.post(`/metrology/plan/${form.id}/generate-execution`, { created_by: auth.user?.userId })
   ElMessage.success('已生成计量执行单')
   reload?.()
 }

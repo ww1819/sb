@@ -82,13 +82,13 @@ const leftItems = computed(() => [
   { label: '品牌型号', value: brandModel.value },
   { label: '设备状态', value: statusLabel.value },
   { label: '启用日期', value: display(props.model.enable_date) }
-])
+] as Array<{ label: string; value: string; mono?: boolean }>)
 
 const rightItems = computed(() => [
   { label: '资产编码', value: display(props.model.device_code), mono: true },
   { label: '领用科室', value: deptLabel.value },
   { label: '折旧起点 / 当前净值', value: financeText.value }
-])
+] as Array<{ label: string; value: string; mono?: boolean }>)
 
 function display(val: unknown) {
   if (val === null || val === undefined || val === '') return '-'

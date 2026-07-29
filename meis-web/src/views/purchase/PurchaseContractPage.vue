@@ -384,9 +384,9 @@ function confirmBiddingRef() {
     return
   }
   form.items = biddingSelected.value.map((row) => {
-    const quantity = row.quantity ?? ''
-    const unitPrice = row.estimated_price ?? ''
-    let amount: string | number = row.total_price ?? ''
+    const quantity = (row.quantity ?? '') as string | number
+    const unitPrice = (row.estimated_price ?? '') as string | number
+    let amount: string | number = (row.total_price ?? '') as string | number
     if ((amount === '' || amount == null) && quantity !== '' && unitPrice !== '') {
       const q = Number(quantity)
       const p = Number(unitPrice)

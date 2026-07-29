@@ -45,7 +45,7 @@ const editableFields = computed(() => {
 })
 
 function openCreate() {
-  loan.value = { status: 'draft', applicant_id: auth.user?.id }
+  loan.value = { status: 'draft', applicant_id: auth.user?.userId }
   visible.value = true
 }
 
@@ -65,7 +65,7 @@ async function save() {
 }
 
 async function submit(row: Record<string, unknown>) {
-  await http.post(`/shared/loan/${row.id}/submit`, { applicantId: auth.user?.id })
+  await http.post(`/shared/loan/${row.id}/submit`, { applicantId: auth.user?.userId })
   ElMessage.success('已提交审批')
   visible.value = false
   crudRef.value?.load()

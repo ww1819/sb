@@ -201,7 +201,7 @@
             <div class="power-states">
               <div
                 v-for="s in powerStates"
-                :key="s.name"
+                :key="s.key"
                 class="power-state"
               >
                 <span class="power-state__dot" :class="`power-state__dot--${s.key}`" />
@@ -328,7 +328,7 @@ const deviceStatusOption = computed<EChartsOption>(() => ({
     },
     data: deviceStatus.value.map((r, i) => ({
       name: DEVICE_STATUS_MAP[String(r.name)] || String(r.name),
-      value: r.value,
+      value: Number(r.value) || 0,
       itemStyle: { color: CHART_COLORS[i % CHART_COLORS.length] }
     }))
   }]
@@ -358,10 +358,10 @@ const deptOption = computed<EChartsOption>(() => ({
   series: [{
     type: 'bar',
     data: [...deptDistribution.value].reverse().map((r, i) => ({
-      value: r.value,
+      value: Number(r.value) || 0,
       itemStyle: {
         color: {
-          type: 'linear',
+          type: 'linear' as const,
           x: 0, y: 0, x2: 1, y2: 0,
           colorStops: [
             { offset: 0, color: 'rgba(0, 212, 255, 0.25)' },
@@ -403,7 +403,7 @@ const repairTrendOption = computed<EChartsOption>(() => ({
     smooth: true,
     symbol: 'circle',
     symbolSize: 6,
-    data: repairTrend.value.map(r => r.count),
+    data: repairTrend.value.map(r => Number(r.count) || 0),
     lineStyle: { width: 2, color: '#00ffc6' },
     itemStyle: { color: '#00ffc6', borderColor: '#061428', borderWidth: 2 },
     areaStyle: {

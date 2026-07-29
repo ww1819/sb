@@ -484,7 +484,7 @@ async function load() {
   loading.value = true
   try {
     const url = props.config.listPageUrl ?? `${props.config.apiBase}/${props.config.table}/page`
-    const params: Record<string, string | number> = {
+    const params: Record<string, string | number | boolean> = {
       page: page.value,
       size: size.value
     }
@@ -522,7 +522,7 @@ async function load() {
       if (v !== undefined && v !== null && v !== '') params[f.key] = v as string | number
     }
     for (const [k, v] of Object.entries(props.config.listParams ?? {})) {
-      if (v !== undefined && v !== null && v !== '') params[k] = v
+      if (v !== undefined && v !== null && v !== '') params[k] = v as string | number | boolean
     }
     for (const [k, v] of Object.entries(props.extraQuery ?? {})) {
       if (v !== undefined && v !== null && v !== '') params[k] = v as string | number | boolean
@@ -806,7 +806,7 @@ onMounted(async () => {
     if (f.dictType) {
       const all = await loadDict(f.dictType)
       filterOptions[f.key] = f.dictValues?.length
-        ? all.filter((o) => f.dictValues!.includes(o.value))
+        ? all.filter((o: { label: string; value: string }) => f.dictValues!.includes(o.value))
         : all
     } else if (f.options?.length) {
       filterOptions[f.key] = f.options

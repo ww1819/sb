@@ -56,7 +56,7 @@ flutter run
 |------|---------|
 | Android 模拟器访问本机 | `10.0.2.2` |
 | 真机访问电脑 | 电脑局域网 IP，如 `192.168.1.100` |
-| 端口 | 默认 `8080`（Gateway） |
+| 端口 | 默认 `5174`（Nginx 入口，反代到 Gateway；直连 Gateway 可填 `8080`） |
 
 测试连接请求：`GET http://{ip}:{port}/api/auth/health`
 

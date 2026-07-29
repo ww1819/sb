@@ -139,8 +139,25 @@ function buildGroups(schema: FieldSchema[]) {
     if (!groups.has(g)) groups.set(g, [])
     groups.get(g)!.push(f)
   }
-  const order = ['basic', 'finance', 'location', 'vendor', 'time', 'accounting', 'status', 'workflow', 'approval', 'compliance', 'other', 'attachment', 'remark']
-  return order.filter((g) => groups.has(g)).map((g) => ({ group: g as FieldSchema['group'], fields: groups.get(g)! }))
+  const order: FieldGroup[] = [
+    'basic',
+    'finance',
+    'location',
+    'vendor',
+    'time',
+    'accounting',
+    'status',
+    'workflow',
+    'approval',
+    'compliance',
+    'event',
+    'authority',
+    'rule',
+    'other',
+    'attachment',
+    'remark'
+  ]
+  return order.filter((g) => groups.has(g)).map((g) => ({ group: g, fields: groups.get(g)! }))
 }
 
 const props = defineProps<{

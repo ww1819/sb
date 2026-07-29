@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MEIS 实施运维面板</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --card: #fff;
+      --text: #1a2332;
+      --muted: #5c6b7a;
+      --line: #d8dee6;
+      --ok: #1b7f4e;
+      --ok-bg: #e6f5ed;
+      --down: #a33b3b;
+      --down-bg: #fceaea;
+      --accent: #1f5fbf;
+      --warn: #9a6b00;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+    }
+    header {
+      background: #152033;
+      color: #e8eef7;
+      padding: 16px 20px;
+    }
+    header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+    header p { margin: 6px 0 0; font-size: 12px; color: #9eb0c7; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 16px 20px 40px; }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: end;
+      background: var(--card);
+      border: 1px solid var(--line);
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+    label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+    input[type=password], input[type=text] {
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      font-size: 14px;
+      min-width: 180px;
+    }
+    button {
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 8px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      color: var(--text);
+    }
+    button:hover { background: #eef2f7; }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button.primary:hover { filter: brightness(1.05); }
+    button.danger { background: #fff; border-color: #c96; color: var(--down); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 20px;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    .meta b { color: var(--text); font-weight: 600; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--card);
+      border: 1px solid var(--line);
+      font-size: 13px;
+    }
+    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    th { background: #eef2f7; font-size: 12px; color: var(--muted); font-weight: 600; }
+    tr:last-child td { border-bottom: 0; }
+    .dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+      background: #999;
+    }
+    .dot.up { background: var(--ok); }
+    .dot.down { background: var(--down); }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 12px;
+      border-radius: 2px;
+    }
+    .badge.up { background: var(--ok-bg); color: var(--ok); }
+    .badge.down { background: var(--down-bg); color: var(--down); }
+    .badge.core { background: #e8eef8; color: #1f5fbf; margin-left: 6px; }
+    .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .jobs {
+      margin-top: 14px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      padding: 12px 14px;
+      font-size: 12px;
+    }
+    .jobs h2 { margin: 0 0 8px; font-size: 13px; }
+    .job-line { color: var(--muted); margin: 4px 0; }
+    .job-line.ok { color: var(--ok); }
+    .job-line.error { color: var(--down); }
+    .job-line.running { color: var(--warn); }
+    .logbox {
+      margin-top: 14px;
+      background: #152033;
+      color: #d7e0ec;
+      padding: 12px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      max-height: 280px;
+      overflow: auto;
+      white-space: pre-wrap;
+      display: none;
+    }
+    .warn-banner {
+      background: #fff8e6;
+      border: 1px solid #e6d19a;
+      color: #6b5300;
+      padding: 10px 12px;
+      font-size: 12px;
+      margin-bottom: 14px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>MEIS 实施运维面板</h1>
+    <p>仅本机 localhost · 启停后端 JAR · 不含打包/热加载 · 长期生产请改用 Windows 服务（NSSM）</p>
+  </header>
+  <div class="wrap">
+    <div class="warn-banner">
+      变更操作需要口令。默认口令请在启动脚本时用 <code>-Token</code> 修改。面板关闭后已启动的服务仍继续运行。
+    </div>
+
+    <div class="toolbar">
+      <label>操作口令
+        <input id="token" type="password" placeholder="与启动脚本 -Token 一致" autocomplete="off" />
+      </label>
+      <button class="primary" id="btnStartCore" type="button">启动核心</button>
+      <button class="primary" id="btnStartAll" type="button">启动全部</button>
+      <button class="danger" id="btnStopAll" type="button">停止全部</button>
+      <button type="button" id="btnRefresh">刷新状态</button>
+      <button type="button" id="btnOpenGw">打开 Gateway</button>
+    </div>
+
+    <div class="meta" id="meta"></div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>服务</th>
+          <th>端口</th>
+          <th>状态</th>
+          <th>JAR</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+
+    <div class="jobs">
+      <h2>后台任务</h2>
+      <div id="jobs">暂无</div>
+    </div>
+
+    <div class="logbox" id="logbox"></div>
+  </div>
+
+  <script>
+    const tokenInput = document.getElementById('token');
+    const saved = sessionStorage.getItem('meisOpsToken');
+    if (saved) tokenInput.value = saved;
+    tokenInput.addEventListener('change', () => {
+      sessionStorage.setItem('meisOpsToken', tokenInput.value || '');
+    });
+
+    function tokenHeaders() {
+      return { 'X-Meis-Ops-Token': tokenInput.value || '' };
+    }
+
+    async function api(path, opts = {}) {
+      const res = await fetch(path, opts);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || ('HTTP ' + res.status));
+      return data;
+    }
+
+    function esc(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    async function refresh() {
+      const data = await api('/api/status');
+      const up = (data.services || []).filter(s => s.httpUp).length;
+      const total = (data.services || []).length;
+      document.getElementById('meta').innerHTML =
+        '<span>时间 <b>' + esc((data.timestamp || '').replace('T', ' ').slice(0, 19)) + '</b></span>' +
+        '<span>Profile <b>' + esc(data.profile) + '</b></span>' +
+        '<span>Redis <b>' + (data.redisUp ? 'OK' : 'DOWN') + '</b></span>' +
+        '<span>服务 <b>' + up + ' / ' + total + '</b> 在线</span>' +
+        '<span>Gateway <b>' + esc(data.gatewayUrl) + '</b></span>';
+
+      const tb = document.getElementById('tbody');
+      tb.innerHTML = (data.services || []).map(s => {
+        const st = s.httpUp
+          ? '<span class="badge up"><span class="dot up"></span>运行中</span>'
+          : '<span class="badge down"><span class="dot down"></span>未启动</span>';
+        const jar = s.jarHealthy ? '正常' : (s.jarExists ? 'JAR 偏小/异常' : '缺少 JAR');
+        const core = s.isCore ? '<span class="badge core">核心</span>' : '';
+        return '<tr>' +
+          '<td><div><b>' + esc(s.labelZh || s.name) + '</b>' + core + '</div>' +
+          '<div style="color:#5c6b7a;font-size:12px">' + esc(s.name) + (s.descZh ? ' · ' + esc(s.descZh) : '') + '</div></td>' +
+          '<td>' + esc(s.port) + '</td>' +
+          '<td>' + st + '</td>' +
+          '<td>' + esc(jar) + (s.jarMtime ? '<div style="color:#5c6b7a;font-size:11px">' + esc(s.jarMtime) + '</div>' : '') + '</td>' +
+          '<td><div class="row-actions">' +
+          '<button type="button" data-act="start" data-name="' + esc(s.name) + '">启动</button>' +
+          '<button type="button" data-act="stop" data-name="' + esc(s.name) + '">停止</button>' +
+          '<button type="button" data-act="restart" data-name="' + esc(s.name) + '">重启</button>' +
+          '<button type="button" data-act="logs" data-name="' + esc(s.name) + '">日志</button>' +
+          '</div></td></tr>';
+      }).join('');
+
+      const jobs = data.jobs || [];
+      const box = document.getElementById('jobs');
+      if (!jobs.length) {
+        box.textContent = '暂无';
+      } else {
+        box.innerHTML = jobs.slice().reverse().map(j => {
+          const cls = j.state === 'ok' ? 'ok' : (j.state === 'error' ? 'error' : 'running');
+          return '<div class="job-line ' + cls + '">[' + esc(j.state) + '] ' + esc(j.label) +
+            (j.message ? ' — ' + esc(j.message) : '') +
+            (j.finishedAt ? ' @ ' + esc(j.finishedAt) : '') + '</div>';
+        }).join('');
+      }
+    }
+
+    async function postAction(path) {
+      if (!tokenInput.value) {
+        alert('请先填写操作口令');
+        return;
+      }
+      try {
+        const r = await api(path, { method: 'POST', headers: tokenHeaders() });
+        alert(r.message || '已提交后台任务');
+        await refresh();
+      } catch (e) {
+        alert(e.message || String(e));
+      }
+    }
+
+    document.getElementById('btnStartCore').onclick = () => postAction('/api/start-core');
+    document.getElementById('btnStartAll').onclick = () => {
+      if (confirm('将启动全部后端服务（耗时较长，请确认中间件已就绪）？')) postAction('/api/start-all');
+    };
+    document.getElementById('btnStopAll').onclick = () => {
+      if (confirm('确认停止全部后端 JAR？')) postAction('/api/stop-all');
+    };
+    document.getElementById('btnRefresh').onclick = () => refresh().catch(e => alert(e.message));
+    document.getElementById('btnOpenGw').onclick = () => window.open('http://localhost:8080', '_blank');
+
+    document.getElementById('tbody').addEventListener('click', async (ev) => {
+      const btn = ev.target.closest('button[data-act]');
+      if (!btn) return;
+      const act = btn.getAttribute('data-act');
+      const name = btn.getAttribute('data-name');
+      if (act === 'logs') {
+        try {
+          const data = await api('/api/logs/' + encodeURIComponent(name) + '?lines=100');
+          const box = document.getElementById('logbox');
+          box.style.display = 'block';
+          box.textContent = (name + ' @ ' + (data.fetchedAt || '') + '\n') +
+            ((data.lines && data.lines.length) ? data.lines.join('\n') : '(无日志)');
+          box.scrollTop = box.scrollHeight;
+        } catch (e) {
+          alert(e.message);
+        }
+        return;
+      }
+      await postAction('/api/service/' + encodeURIComponent(name) + '/' + act);
+    });
+
+    refresh().catch(e => {
+      document.getElementById('meta').textContent = '无法连接面板 API: ' + e.message;
+    });
+    setInterval(() => refresh().catch(() => {}), 5000);
+  </script>
+</body>
+</html>

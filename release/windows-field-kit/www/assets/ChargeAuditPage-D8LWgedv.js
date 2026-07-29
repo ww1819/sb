@@ -1,0 +1,1 @@
+import{F as e}from"./FeaturePlaceholderPage-D4mIaZL0.js";import{d as t,o,A as r}from"./index-Dr59-LAb.js";import"./SystemPageCard-DQ-RFZwI.js";const m=t({__name:"ChargeAuditPage",setup(a){return(i,n)=>(o(),r(e,{title:"收费项目审核",subtitle:"数据决策 / 效率分析",description:"收费项目审核功能开发中",hint:"菜单已开通（ANA-UI-02）；完整能力见待开发池 BACKLOG-ANA-03"}))}});export{m as default};

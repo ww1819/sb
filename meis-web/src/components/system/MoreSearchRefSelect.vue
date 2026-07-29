@@ -116,7 +116,10 @@ async function remoteSearch(keyword: string) {
     }
     const mapped = mapRows(rows ?? [], meta)
     if (props.multiple) {
-      const keep = options.value.filter((o) => selectValue.value.includes(o.value))
+      const selected = selectValue.value
+      const keep = Array.isArray(selected)
+        ? options.value.filter((o) => selected.includes(o.value))
+        : []
       const seen = new Set(keep.map((o) => o.value))
       options.value = [...keep, ...mapped.filter((o) => !seen.has(o.value))]
     } else {

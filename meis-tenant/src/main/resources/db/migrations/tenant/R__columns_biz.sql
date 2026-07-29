@@ -218,7 +218,9 @@ ALTER TABLE device_return_item ADD COLUMN IF NOT EXISTS deleted_by_name VARCHAR(
 ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS from_warehouse_id UUID;
 ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS to_warehouse_id UUID;
 ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS warehouse_id UUID;
--- ---------- ?????? / ????????? AST.INV? ----------
+ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS approved_by UUID;
+COMMENT ON COLUMN inventory_check.approved_by IS '审核人';
+-- ---------- inventory_check_item / label print AST.INV ----------
 ALTER TABLE inventory_check_item ADD COLUMN IF NOT EXISTS need_reprint_label BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE inventory_check_item ADD COLUMN IF NOT EXISTS label_printed BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE inventory_check_item ADD COLUMN IF NOT EXISTS label_print_count INT NOT NULL DEFAULT 0;

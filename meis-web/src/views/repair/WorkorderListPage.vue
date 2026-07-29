@@ -152,8 +152,8 @@
               工程师：{{ (seg.user_names as string[]).filter(Boolean).join('、') }}
             </div>
             <div v-else-if="seg.user_name" class="muted">工程师：{{ seg.user_name }}</div>
-            <div v-if="seg.parts?.length" class="seg-parts">
-              <div v-for="p in seg.parts" :key="String(p.id)" class="muted seg-part-line">
+            <div v-if="segmentParts(seg).length" class="seg-parts">
+              <div v-for="p in segmentParts(seg)" :key="String(p.id)" class="muted seg-part-line">
                 配件：{{ p.part_name || p.spare_part_id }} × {{ p.quantity }}
                 <span v-if="p.unit_price != null && p.unit_price !== ''"> · 单价 {{ p.unit_price }}</span>
                 <span v-if="p.total_price != null && p.total_price !== ''"> · 金额 {{ p.total_price }}</span>
@@ -1311,6 +1311,10 @@ async function doDeleteSegment(seg: Record<string, unknown>) {
   }
   ElMessage.success('进程段已删除')
   await refresh()
+}
+
+function segmentParts(seg: Record<string, unknown>): Record<string, unknown>[] {
+  return Array.isArray(seg.parts) ? (seg.parts as Record<string, unknown>[]) : []
 }
 
 function openEditPart(seg: Record<string, unknown>, part: Record<string, unknown>) {

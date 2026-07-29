@@ -94,7 +94,7 @@ async function saveTemplate() {
     ElMessage.warning('请填写模板名称')
     return
   }
-  const payload = { ...templateForm.value, items: templateItems.value }
+  const payload: Record<string, unknown> = { ...templateForm.value, items: templateItems.value }
   if (!payload.id) delete payload.id
   await http.post('/inspect/template', payload)
   ElMessage.success('保存成功')

@@ -32,7 +32,8 @@ import { useDict } from '@/composables/useDict'
 import { openFilePreview } from '@/composables/useFilePreview'
 
 const props = defineProps<{
-  field: FieldSchema
+  /** 列表/详情单元格只需 prop（及可选 dictType 等），label 可省略 */
+  field: Pick<FieldSchema, 'prop'> & Partial<Omit<FieldSchema, 'prop'>>
   value: unknown
   /** 行上联表/快照名称，外键缓存未命中时优先展示 */
   labelHint?: string
