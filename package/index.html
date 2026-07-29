@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MEIS 现场运维</title>
+  <style>
+    :root {
+      --bg: #f3f5f7;
+      --card: #fff;
+      --text: #1b2430;
+      --muted: #617084;
+      --line: #d5dbe3;
+      --ok: #18794e;
+      --bad: #b42318;
+      --warn: #8a6d00;
+      --accent: #1d4f91;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); }
+    header { background: #132033; color: #e7eef8; padding: 16px 20px; }
+    header h1 { margin: 0; font-size: 18px; }
+    header p { margin: 6px 0 0; font-size: 12px; color: #9db0c8; }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 16px 20px 40px; }
+    .banner { padding: 10px 12px; margin-bottom: 12px; font-size: 13px; border: 1px solid var(--line); background: #fff; }
+    .banner.ok { border-color: #b7e0c7; background: #eefaf3; color: var(--ok); }
+    .banner.bad { border-color: #f0c0ba; background: #fff1f0; color: var(--bad); }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; background: var(--card); border: 1px solid var(--line); padding: 12px; margin-bottom: 12px; }
+    label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+    input { padding: 8px 10px; border: 1px solid var(--line); min-width: 160px; }
+    button { padding: 8px 12px; border: 1px solid var(--line); background: #fff; cursor: pointer; font-size: 13px; }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button.danger { color: var(--bad); }
+    .meta { font-size: 12px; color: var(--muted); margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 14px; }
+    .meta b { color: var(--text); }
+    table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); font-size: 13px; }
+    th, td { padding: 9px 11px; border-bottom: 1px solid var(--line); text-align: left; }
+    th { background: #eef2f7; color: var(--muted); font-size: 12px; }
+    .up { color: var(--ok); font-weight: 600; }
+    .down { color: var(--bad); }
+    .miss { color: var(--warn); }
+    .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+    .jobs { margin-top: 12px; background: var(--card); border: 1px solid var(--line); padding: 12px; font-size: 12px; }
+    .jobs h2 { margin: 0 0 8px; font-size: 13px; }
+    .log { display: none; margin-top: 12px; background: #132033; color: #d8e2ef; padding: 12px; font-family: Consolas, monospace; font-size: 12px; max-height: 260px; overflow: auto; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>MEIS 现场运维</h1>
+    <p>检查 package\jars 是否齐全，并启动/停止后端 JAR（需先运行「启动运维.bat」）</p>
+  </header>
+  <div class="wrap">
+    <div id="complete" class="banner">正在检查 JAR…</div>
+    <div class="toolbar">
+      <label>操作口令（默认 meis-ops）
+        <input id="token" type="password" value="meis-ops" />
+      </label>
+      <button class="primary" id="btnCore" type="button">启动核心</button>
+      <button class="primary" id="btnAll" type="button">启动全部</button>
+      <button class="danger" id="btnStop" type="button">停止全部</button>
+      <button type="button" id="btnRefresh">刷新</button>
+      <button type="button" id="btnGw">打开 Gateway</button>
+    </div>
+    <div class="meta" id="meta"></div>
+    <table>
+      <thead>
+        <tr><th>服务</th><th>端口</th><th>JAR</th><th>运行</th><th>操作</th></tr>
+      </thead>
+      <tbody id="tb"></tbody>
+    </table>
+    <div class="jobs"><h2>后台任务</h2><div id="jobs">暂无</div></div>
+    <div class="log" id="log"></div>
+  </div>
+  <script>
+    const tokenEl = document.getElementById('token');
+    const saved = sessionStorage.getItem('meisPkgToken');
+    if (saved) tokenEl.value = saved;
+    tokenEl.onchange = () => sessionStorage.setItem('meisPkgToken', tokenEl.value || '');
+
+    function headers() { return { 'X-Meis-Ops-Token': tokenEl.value || '' }; }
+    function esc(s) {
+      return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+    async function api(path, opts={}) {
+      const res = await fetch(path, opts);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || ('HTTP ' + res.status));
+      return data;
+    }
+
+    async function refresh() {
+      const d = await api('/api/status');
+      const box = document.getElementById('complete');
+      if (d.complete) {
+        box.className = 'banner ok';
+        box.textContent = 'JAR 齐全：' + d.presentCount + ' / ' + d.expectedCount;
+      } else {
+        box.className = 'banner bad';
+        box.textContent = 'JAR 不齐：已有 ' + d.presentCount + ' / ' + d.expectedCount +
+          '，缺少：' + ((d.missingJars || []).join(', ') || '-');
+      }
+      const up = (d.services || []).filter(s => s.httpUp).length;
+      document.getElementById('meta').innerHTML =
+        '<span>目录 <b>' + esc(d.jarsDir) + '</b></span>' +
+        '<span>在线 <b>' + up + ' / ' + (d.services || []).length + '</b></span>' +
+        '<span>Profile <b>' + esc(d.profile) + '</b></span>';
+
+      document.getElementById('tb').innerHTML = (d.services || []).map(s => {
+        const jar = !s.jarExists ? '<span class="miss">缺失</span>'
+          : (s.jarHealthy ? ('有 (' + s.jarSizeKb + ' KB)') : '<span class="miss">异常偏小</span>');
+        const run = s.httpUp ? '<span class="up">运行中</span>' : '<span class="down">未启动</span>';
+        const core = s.core ? ' · 核心' : '';
+        return '<tr><td><b>' + esc(s.label || s.name) + '</b><div style="color:#617084;font-size:12px">' +
+          esc(s.name) + core + '</div></td><td>' + s.port + '</td><td>' + jar + '</td><td>' + run +
+          '</td><td><div class="acts">' +
+          '<button type="button" data-a="start" data-n="' + esc(s.name) + '">启动</button>' +
+          '<button type="button" data-a="stop" data-n="' + esc(s.name) + '">停止</button>' +
+          '<button type="button" data-a="restart" data-n="' + esc(s.name) + '">重启</button>' +
+          '<button type="button" data-a="logs" data-n="' + esc(s.name) + '">日志</button>' +
+          '</div></td></tr>';
+      }).join('');
+
+      const jobs = d.jobs || [];
+      document.getElementById('jobs').innerHTML = jobs.length
+        ? jobs.slice().reverse().map(j => {
+            const c = j.state === 'ok' ? 'up' : (j.state === 'error' ? 'down' : 'miss');
+            return '<div class="' + c + '">[' + esc(j.state) + '] ' + esc(j.label) +
+              (j.message ? ' — ' + esc(j.message) : '') + '</div>';
+          }).join('')
+        : '暂无';
+    }
+
+    async function post(path) {
+      try {
+        const r = await api(path, { method: 'POST', headers: headers() });
+        alert(r.message || '已提交');
+        await refresh();
+      } catch (e) { alert(e.message); }
+    }
+
+    document.getElementById('btnCore').onclick = () => post('/api/start-core');
+    document.getElementById('btnAll').onclick = () => {
+      if (confirm('启动全部后端？请确认 PostgreSQL/Redis 等已就绪。')) post('/api/start-all');
+    };
+    document.getElementById('btnStop').onclick = () => {
+      if (confirm('停止全部后端 JAR？')) post('/api/stop-all');
+    };
+    document.getElementById('btnRefresh').onclick = () => refresh().catch(e => alert(e.message));
+    document.getElementById('btnGw').onclick = () => window.open('http://localhost:8080', '_blank');
+
+    document.getElementById('tb').addEventListener('click', async (ev) => {
+      const b = ev.target.closest('button[data-a]');
+      if (!b) return;
+      const a = b.getAttribute('data-a');
+      const n = b.getAttribute('data-n');
+      if (a === 'logs') {
+        try {
+          const d = await api('/api/logs/' + encodeURIComponent(n));
+          const el = document.getElementById('log');
+          el.style.display = 'block';
+          el.textContent = n + '\n' + ((d.lines && d.lines.length) ? d.lines.join('\n') : '(无日志)');
+        } catch (e) { alert(e.message); }
+        return;
+      }
+      await post('/api/service/' + encodeURIComponent(n) + '/' + a);
+    });
+
+    refresh().catch(e => {
+      document.getElementById('complete').className = 'banner bad';
+      document.getElementById('complete').textContent =
+        '连不上运维助手。请先双击「启动运维.bat」。' + e.message;
+    });
+    setInterval(() => refresh().catch(() => {}), 4000);
+  </script>
+</body>
+</html>

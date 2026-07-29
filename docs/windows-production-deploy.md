@@ -1,12 +1,183 @@
-# MEIS Windows 生产环境部署与启动
+# MEIS Windows 生产 / 实施环境部署
 
-本文档面向 **Windows Server 生产机**（不强制 Docker），按「中间件 → 数据库 → 后端 JAR → 前端静态资源 → 反向代理 → 开机自启」落地。
+本文档面向 **Windows Server**（不强制 Docker）。**现场实施优先走 `package\` 现场包**；正式上线再按后文做 NSSM 服务化、HTTPS 与防火墙收敛。
 
 | 场景 | 文档 |
 |------|------|
+| **实施环境快速部署（推荐）** | 本文 [§〇](#〇实施环境部署流程推荐) |
 | Windows **本地开发** | [local-dev-deploy.md](local-dev-deploy.md) |
 | **Linux** 生产（Docker / K8s） | [production-deploy.md](production-deploy.md) |
-| **Windows** 生产（本文） | 当前文档 |
+| Windows **正式生产加固** | 本文 [§一](#一适用场景与架构) 及以后 |
+
+---
+
+## 〇、实施环境部署流程（推荐）
+
+适合：院内试运行 / 实施验收 / 短期演示。目标是 **少步骤、可双击、可拷走**。
+
+```text
+┌──────────────┐     拷贝整个 package\      ┌──────────────────┐
+│  开发 / 构建机 │  ─────────────────────►  │  实施 / 现场机    │
+│ 双击 打包.bat  │                          │ 双击 启动运维.bat │
+│ → jars\ 齐套  │                          │ → :5098 启停服务  │
+└──────────────┘                          └──────────────────┘
+```
+
+### 〇.1 流程总览
+
+| 步骤 | 在哪做 | 做什么 |
+|------|--------|--------|
+| 1 | 开发机 | 配置 `package\env.txt`（JDK / Maven） |
+| 2 | 开发机 | 双击 `package\打包.bat`，生成 `package\jars\` |
+| 3 | — | **整份** `package` 文件夹拷到实施机（U 盘 / 共享盘均可） |
+| 4 | 实施机 | 安装 JDK 17、PostgreSQL、Redis（Memurai）、MinIO（见 〇.3） |
+| 5 | 实施机 | 改实施机上的 `package\env.txt`（JAVA_HOME、数据库等） |
+| 6 | 实施机 | 双击 `启动运维.bat` → 浏览器 `http://localhost:5098` |
+| 7 | 实施机 | 齐套检查 →「启动核心」或「启动全部」→ 冒烟验证 |
+| 8 | 实施机 | （可选）Nginx 托管前端 + `/api` 反代；App 填 Nginx 端口 |
+
+> **禁止**直接双击打开 `index.html`（无法启动 Java）。  
+> **禁止**把运维口 `5098` 暴露到院内网 / 公网。
+
+### 〇.2 开发机：打包
+
+1. 进入仓库根目录下的 `package\`。
+2. 若尚无 `env.txt`：复制 `env.example.txt` → `env.txt`，至少填写：
+
+| 项 | 说明 |
+|----|------|
+| `JAVA_HOME` | JDK 17 根目录（内含 `bin\java.exe`） |
+| `MAVEN_HOME` | Maven 根目录（内含 `bin\mvn.cmd`），或改用 `MAVEN_CMD=` 指向 `mvn.cmd` |
+
+3. **双击 `打包.bat`**，等待窗口提示 Build OK。  
+   - 成功后 `package\jars\` 下应有全部 `meis-*-1.0.0-SNAPSHOT.jar`（与 `services.json` 一致）。  
+   - 失败时看窗口报错；常见原因：JDK/Maven 路径错误、某模块编译失败。
+
+4. 将 **整个 `package` 目录** 复制到实施环境（不要只拷 `jars`，运维页与脚本要一起带走）。
+
+建议拷贝前可删掉体积大且无用的运行日志（可选）：
+
+```text
+package\logs\*.log
+package\logs\jobs\
+```
+
+**不要删**：`jars\`、`*.bat`、`*.ps1`、`index.html`、`services.json`、`env.txt` / `env.example.txt`。
+
+### 〇.3 实施机：中间件前置
+
+实施机至少需要：
+
+| 组件 | 要求 | 备注 |
+|------|------|------|
+| JDK 17 | 已安装，路径写入 `env.txt` 的 `JAVA_HOME` | 与开发机路径可不同 |
+| PostgreSQL 15 | 库 `meis`、账号可用 | 密码写入 `POSTGRES_*` |
+| Redis / Memurai | 默认 `127.0.0.1:6379` | |
+| MinIO | API 建议 **9100**（避开高拍仪 Eloam 的 **9000**） | `MINIO_ENDPOINT=http://127.0.0.1:9100` |
+
+库与账号可用仓库脚本（若实施机有完整源码）；仅现场包时，由实施人员按院内规范建库，保证 `env.txt` 中库名/用户/密码正确即可。
+
+### 〇.4 实施机：改 `env.txt`
+
+打开实施机上的 `package\env.txt`，按现场改：
+
+```text
+JAVA_HOME=C:\Program Files\Java\jdk-17
+OPS_TOKEN=现场自定口令
+OPS_PORT=5098
+PROFILE=dev
+
+POSTGRES_HOST=127.0.0.1
+POSTGRES_PORT=5432
+POSTGRES_DB=meis
+POSTGRES_USER=med
+POSTGRES_PASSWORD=<现场密码>
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+MINIO_ENDPOINT=http://127.0.0.1:9100
+```
+
+| 项 | 说明 |
+|----|------|
+| `JAVA_HOME` | **必改**为实施机真实路径 |
+| `MAVEN_HOME` | 实施机只启停 JAR **可不填**（打包只在开发机） |
+| `OPS_TOKEN` | 运维页启停操作口令；勿用默认值长期对外 |
+| `POSTGRES_*` / `MINIO_*` | 必须与现场中间件一致 |
+
+### 〇.5 实施机：启动运维
+
+1. **双击 `启动运维.bat`**（或 `start-ops.bat`）。
+2. 浏览器自动打开（或手动访问）`http://localhost:5098/`。
+3. 页面上：
+   - 先看 **JAR 齐套**：缺包则回到开发机重新 `打包.bat` 再拷 `jars\`。
+   - 填运维口令（与 `OPS_TOKEN` 一致）。
+   - 建议顺序：**启动核心**（含 tenant → auth → … → gateway）→ 业务需要再 **启动全部**。
+4. 关闭运维窗口 **不会**停掉已启动的业务 JAR；要停服务用页面上的停止，或结束对应 `java.exe`。
+
+启动顺序约定（页面「核心」已按此编排）：
+
+| 顺序 | 服务 | 端口 |
+|------|------|------|
+| 1 | meis-tenant（首次会 Flyway 迁库） | 8082 |
+| 2 | meis-auth | 8081 |
+| 3 | 其它业务 JAR | 8083–8094 |
+| 最后 | meis-gateway | 8080 |
+
+日志目录：`package\logs\`。tenant 失败时优先看 `meis-tenant.out.log`。
+
+### 〇.6 冒烟验证
+
+在实施机本机执行：
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8080/api/auth/health
+Invoke-RestMethod -Method POST http://127.0.0.1:8080/api/auth/login `
+  -ContentType 'application/json' `
+  -Body '{"tenantCode":"demo","username":"admin","password":"admin123"}'
+```
+
+| 检查项 | 期望 |
+|--------|------|
+| health | 返回正常 |
+| login | 能拿到 token |
+| 运维页 | 核心端口为监听中 |
+
+上线前务必修改或禁用演示账号 `admin/admin123`。
+
+### 〇.7 前端 / Nginx / App（实施常用）
+
+现场包当前以 **后端 JAR + 运维启停** 为主。浏览器访问若已有 Nginx：
+
+| 项 | 建议 |
+|----|------|
+| 静态页 | Nginx `root` 指向 `meis-web` 的 `dist`（需另拷前端构建产物） |
+| API | `location /api/` → `http://127.0.0.1:8080` |
+| 临时对外端口 | 若暂用 **5174** 对外，须在 Nginx 配置 `listen 5174` 且带 `/api` 反代 |
+| Flutter App | 服务器 IP + 端口 **5174**（走 Nginx）；直连 Gateway 才填 **8080** |
+| 正式生产 | 改为 **443 + HTTPS**，勿长期对外暴露 5174/8080 |
+
+网关与各微服务端口 **不要**对院内普通终端开放；只开放 Nginx 入口。
+
+### 〇.8 实施检查清单
+
+- [ ] 开发机 `打包.bat` 成功，`jars\` 齐全  
+- [ ] 整份 `package` 已拷到实施机  
+- [ ] 实施机 JDK / PG / Redis / MinIO 就绪  
+- [ ] `env.txt` 的 `JAVA_HOME`、库密码、MinIO 地址正确  
+- [ ] `启动运维.bat` → `:5098` 能开页  
+- [ ] 核心服务启动；`/api/auth/health`、登录成功  
+- [ ] （如有）Nginx `/api` 反代；App/浏览器可登录  
+- [ ] 运维口 `5098` 仅本机；演示口令已改  
+
+### 〇.9 升级现场包
+
+1. 开发机重新 `打包.bat`。  
+2. 实施机运维页 **停止全部**（或停相关服务）。  
+3. 用新 `jars\` 覆盖旧包（建议先备份旧 `jars`）。  
+4. 再 `启动运维.bat` → 先启 **meis-tenant**（确认迁库）→ 再启其余。  
+5. 冒烟：登录、台账、上传（若启用 MinIO）。
+
+长期稳定运行请改为 NSSM/WinSW（见 [§七](#七注册为-windows-服务推荐)），避免注销桌面后进程退出。
 
 ---
 
@@ -62,6 +233,7 @@
 D:\meis\
   ├── jdk-17\
   ├── app\                 # 仓库或发布包根目录
+  ├── package\             # 现场包（实施推荐）
   ├── jars\                # 各服务 jar 副本（可选）
   ├── logs\                # 运行日志
   ├── minio-data\
@@ -129,6 +301,27 @@ minio.exe server D:\meis\minio-data --address ":9100" --console-address ":9101"
 
 ## 四、构建与制品
 
+### 4.1 实施交付（推荐）：`package\` 现场包
+
+**日常实施请直接按 [§〇](#〇实施环境部署流程推荐) 执行。** 目录要点：
+
+```text
+package\
+  打包.bat          ← 开发机：编译并收集全部 JAR → jars\
+  启动运维.bat      ← 实施机：打开本机运维页 :5098
+  env.txt           ← 各机各自配置（模板见 env.example.txt）
+  jars\             ← 全部后端 JAR
+  index.html + ops-helper.ps1 / 运维助手.ps1
+  services.json     ← 服务名 / 端口 / 启停顺序
+```
+
+开发机：双击 `打包.bat` → 拷走整个 `package`。  
+实施机：改 `env.txt` → 双击 `启动运维.bat` → 齐套检查并启停。
+
+> 纯双击 HTML **不能**启动 Java；必须先开「启动运维.bat」。
+
+### 4.2 全量源码构建（备选）
+
 在**构建机**或生产机（需 Maven + Node）执行：
 
 ```powershell
@@ -144,15 +337,17 @@ powershell -File scripts\build.ps1
 
 也可只在构建机打包，将 JAR + `dist` 拷贝到生产机 `D:\meis\`。
 
+**备选旧包：** `scripts\pack-windows-field-kit.ps1` 仍可打 `release\windows-field-kit\`。
+
 ---
 
 ## 五、环境变量与安全配置
 
-启动前为会话或「系统环境变量」设置（示例）：
+启动前为会话或「系统环境变量」设置（示例）。使用 `package\env.txt` 时，运维助手会把其中项注入启动进程。
 
 | 变量 | 生产示例 |
 |------|----------|
-| `MEIS_JAVA_HOME` | `D:\meis\jdk-17` |
+| `MEIS_JAVA_HOME` / `JAVA_HOME` | `D:\meis\jdk-17` |
 | `POSTGRES_HOST` | `127.0.0.1` |
 | `POSTGRES_PORT` | `5432` |
 | `POSTGRES_DB` | `meis` |
@@ -181,11 +376,14 @@ powershell -File scripts\build.ps1
 
 端口一览与开发一致，见 [local-dev-deploy.md §6.6](local-dev-deploy.md)。
 
-### 6.2 使用仓库脚本（运维窗口）
+### 6.2 现场包运维页（实施首选）
+
+见 [§〇.5](#〇5-实施机启动运维)。地址仅 `http://localhost:5098`，口令见 `OPS_TOKEN`。
+
+### 6.3 仓库脚本（完整源码机）
 
 ```powershell
 cd D:\meis\app
-# 生产机建议使用与运维约定的 profile；当前脚本默认 Profile=dev（直连路由）
 powershell -File scripts\start.ps1 -Profile dev
 powershell -File scripts\status.ps1
 powershell -File scripts\stop.ps1
@@ -193,16 +391,18 @@ powershell -File scripts\stop.ps1
 
 > 脚本面向「本机运维窗口」便捷启停。**正式生产**请改为 NSSM/WinSW 服务（见第七节），避免注销桌面会话后进程退出。
 
-### 6.3 手动启动单服务（排错）
+仓库内另有 `scripts\ops-panel.ps1`（同为 localhost:5098），与 `package\启动运维.bat` 能力类似；**交付实施请优先给 `package\`**，勿把完整 `scripts` 目录当现场包。
+
+### 6.4 手动启动单服务（排错）
 
 ```powershell
 $java = Join-Path $env:MEIS_JAVA_HOME 'bin\java.exe'
-& $java -jar D:\meis\app\meis-tenant\target\meis-tenant-1.0.0-SNAPSHOT.jar
+& $java -jar D:\meis\package\jars\meis-tenant-1.0.0-SNAPSHOT.jar
 ```
 
 确认 `meis-tenant` 日志出现 `Public schema migrated`、演示或正式租户 Schema 就绪后，再启其余服务。
 
-### 6.4 验证 API
+### 6.5 验证 API
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8080/api/auth/health
@@ -233,8 +433,8 @@ nssm start MeisMinio
 
 ```cmd
 nssm install MeisTenant "D:\meis\jdk-17\bin\java.exe"
-nssm set MeisTenant AppParameters -Xms256m -Xmx512m -jar D:\meis\app\meis-tenant\target\meis-tenant-1.0.0-SNAPSHOT.jar
-nssm set MeisTenant AppDirectory D:\meis\app\meis-tenant
+nssm set MeisTenant AppParameters -Xms256m -Xmx512m -jar D:\meis\package\jars\meis-tenant-1.0.0-SNAPSHOT.jar
+nssm set MeisTenant AppDirectory D:\meis\package
 nssm set MeisTenant AppEnvironmentExtra POSTGRES_PASSWORD=*** MINIO_ENDPOINT=http://127.0.0.1:9100
 nssm set MeisTenant AppStdout D:\meis\logs\meis-tenant.out.log
 nssm set MeisTenant AppStderr D:\meis\logs\meis-tenant.err.log
@@ -263,10 +463,32 @@ npm run build
 
 ### 8.2 Nginx for Windows（推荐）
 
-`api` 反代 Gateway，`app` 托管静态页：
+`api` 反代 Gateway，`app` 托管静态页。实施临时入口可用 `5174`（须含 `/api`），正式请用 443：
 
 ```nginx
-# API
+# 实施临时：单端口同时出静态 + API（示例 5174）
+server {
+    listen 5174;
+    server_name _;
+
+    client_max_body_size 50m;
+    root D:/meis/www;
+    index index.html;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:8080/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+
+# 正式：API
 server {
     listen 443 ssl;
     server_name api.example.com;
@@ -284,7 +506,7 @@ server {
     }
 }
 
-# Web
+# 正式：Web
 server {
     listen 443 ssl;
     server_name app.example.com;
@@ -299,7 +521,7 @@ server {
 }
 ```
 
-将 Nginx 亦注册为 Windows 服务；防火墙仅放行 **443**（及运维 RDP）。
+将 Nginx 亦注册为 Windows 服务；防火墙仅放行 **443**（及运维 RDP）。临时 5174 仅限实施窗口使用。
 
 ### 8.3 IIS（备选）
 
@@ -316,10 +538,10 @@ server {
 |------|------|
 | 入站 443 | 对外 Web / API |
 | 入站 3389 | 仅运维网段（或走堡垒机） |
-| **禁止** 入站 8080–8094、5432、6379、8848、9100/9101 | 仅本机或内网应用访问 |
+| **禁止** 入站 8080–8094、5432、6379、8848、9100/9101、**5098** | 仅本机或内网应用访问 |
 | 出站 | 按院内策略；通知/集成模块若需外联另开白名单 |
 
-移动端（Flutter App / 小程序）生产环境将 API Base 配为 `https://api.医院域名/api`。
+移动端（Flutter App / 小程序）生产环境将 API Base 配为 `https://api.医院域名/api`；实施临时可为 `http://服务器IP:5174/api`。
 
 ---
 
@@ -343,9 +565,9 @@ powershell -File scripts\restore-db.ps1
 
 ## 十一、升级发布
 
-1. 维护窗口通知；`scripts\stop.ps1` 或停止 Windows 服务（Gateway 可先停）。
+1. 维护窗口通知；运维页停止或停止 Windows 服务（Gateway 可先停）。
 2. 备份数据库与 MinIO。
-3. 替换 JAR / `www` 静态资源。
+3. 替换 `package\jars\` / `www` 静态资源。
 4. **先启 `meis-tenant`**，确认迁移成功。
 5. 再启其余服务与 Gateway；冒烟：登录、台账列表、文件上传。
 6. 结构变更只走 Flyway 固定槽位（见需求文档附录 D），禁止手工改生产表结构。
@@ -354,11 +576,11 @@ powershell -File scripts\restore-db.ps1
 
 ## 十二、安全 checklist
 
-- [ ] 修改所有默认密码（PG、MinIO、演示 `admin`）
+- [ ] 修改所有默认密码（PG、MinIO、演示 `admin`、`OPS_TOKEN`）
 - [ ] 统一修改 `meis.jwt.secret`
 - [ ] MinIO 控制台不对公网
-- [ ] 全站 HTTPS；关闭明文 80 或仅跳转
-- [ ] 防火墙收敛端口
+- [ ] 全站 HTTPS；关闭明文 80 或仅跳转（正式环境）
+- [ ] 防火墙收敛端口（含 5098）
 - [ ] Windows Update / 防病毒排除策略与日志目录协商
 - [ ] 操作审计与备份策略落地
 
@@ -370,9 +592,12 @@ powershell -File scripts\restore-db.ps1
 |------|------|
 | 登录 401 | `meis-tenant` 是否迁库成功；JWT secret 是否各服务一致；Token 是否过期 |
 | 网关 503 / 404 | 对应微服务是否在监听端口；Gateway 路由/直连配置 |
+| 前端 / App 登录 405 | Nginx 是否配置了 `/api` → Gateway；是否误打到纯静态端口 |
 | 文件上传失败 / Non-XML 404 | MinIO 是否在 **9100**；是否误连 Eloam **9000** |
 | 服务「启动后消失」 | 用桌面会话跑 jar 会随注销退出 → 改为 NSSM/WinSW |
-| `meis-tenant` 立即退出 | 查看 `D:\meis\logs\` 或 NSSM stderr；Flyway 失败会主动退出 |
+| `meis-tenant` 立即退出 | 查看 `package\logs\`；Flyway 失败会主动退出 |
+| 运维页打不开 | 须先双击 `启动运维.bat`，勿只开 HTML；确认 `OPS_PORT` |
+| `打包.bat` 失败 | 检查 `env.txt` 的 `JAVA_HOME` / `MAVEN_HOME`；看 Maven 编译日志 |
 | 前端白屏 | `try_files` / IIS Rewrite 是否回写 `index.html`；API 域名 CORS/证书 |
 
 ### 健康检查与日常监测
@@ -392,8 +617,9 @@ Invoke-RestMethod https://api.example.com/api/auth/health
 
 | 条件 | 建议 |
 |------|------|
+| **实施 / 试运行** | [§〇 `package` 现场包](#〇实施环境部署流程推荐) |
 | 已有 K8s / Docker 运维能力 | 优先 [production-deploy.md](production-deploy.md) |
-| 院内标准为 Windows Server、无容器平台 | 使用本文原生部署 |
+| 院内标准为 Windows Server、无容器平台 | 本文原生部署 + NSSM |
 | 仅开发调试 | [local-dev-deploy.md](local-dev-deploy.md) |
 
 同一套业务 JAR 与 Flyway 脚本；差异主要在进程托管、反向代理与运维习惯。

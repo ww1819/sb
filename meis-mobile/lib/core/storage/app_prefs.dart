@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../constants/app_constants.dart';
 import '../models/auth_user.dart';
 import '../models/server_config.dart';
 
@@ -31,7 +32,7 @@ class AppPrefs {
     return ServerConfig(
       mode: modeRaw == 'ethernet' ? SetupMode.ethernet : SetupMode.lan,
       host: _prefs.getString(PrefsKeys.serverHost) ?? '',
-      port: _prefs.getString(PrefsKeys.serverPort) ?? '8080',
+      port: _prefs.getString(PrefsKeys.serverPort) ?? AppConstants.defaultPort,
       hospitalName: _prefs.getString(PrefsKeys.hospitalName),
       completed: _prefs.getBool(PrefsKeys.setupCompleted) ?? false,
     );

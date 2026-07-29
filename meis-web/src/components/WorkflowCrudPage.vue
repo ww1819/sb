@@ -166,6 +166,7 @@ async function loadRow(row: Record<string, unknown>) {
   } else {
     form.value = { ...row }
   }
+  if (!form.value) return
   if (!Array.isArray(form.value.items)) form.value.items = []
   fillMissingItemNextDue(form.value)
   visible.value = true

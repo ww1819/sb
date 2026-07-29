@@ -54,6 +54,7 @@
           :items="items"
           :replace-items="replaceItems"
           :visible="detailVisible"
+          :reload="reloadMaster"
         />
       </template>
       <template v-if="master">

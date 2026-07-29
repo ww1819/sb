@@ -4,7 +4,8 @@ class AppConstants {
   static const appName = 'MEIS';
   static const appSubtitle = '医院设备管理系统';
 
-  static const defaultPort = '8080';
+  /// Nginx 对外入口端口（反代到 Gateway）。直连网关时可手动改为 8080。
+  static const defaultPort = '5174';
   static const defaultTenantCode = 'demo';
 
   static const connectTimeout = Duration(seconds: 5);

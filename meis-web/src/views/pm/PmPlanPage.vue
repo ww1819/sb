@@ -245,19 +245,19 @@ function openBackfill(form: Record<string, unknown>, reload?: () => void) {
 }
 
 async function approve(form: Record<string, unknown>, reload?: () => void) {
-  await http.post(`/pm/plan/${form.id}/approve`, { action: 'approve', approved_by: auth.user?.id })
+  await http.post(`/pm/plan/${form.id}/approve`, { action: 'approve', approved_by: auth.user?.userId })
   ElMessage.success('审核通过')
   reload?.()
 }
 
 async function reject(form: Record<string, unknown>, reload?: () => void) {
-  await http.post(`/pm/plan/${form.id}/approve`, { action: 'reject', approved_by: auth.user?.id })
+  await http.post(`/pm/plan/${form.id}/approve`, { action: 'reject', approved_by: auth.user?.userId })
   ElMessage.success('已驳回')
   reload?.()
 }
 
 async function genExec(form: Record<string, unknown>, reload?: () => void, planItemIds?: string[]) {
-  const body: Record<string, unknown> = { created_by: auth.user?.id, client: 'web' }
+  const body: Record<string, unknown> = { created_by: auth.user?.userId, client: 'web' }
   if (planItemIds?.length) body.plan_item_ids = planItemIds
   const { data } = await http.post(`/pm/plan/${form.id}/generate-execution`, body)
   const no = data.data?.execution_no

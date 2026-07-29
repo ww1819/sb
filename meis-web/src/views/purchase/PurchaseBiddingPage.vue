@@ -120,7 +120,7 @@
                     :disabled="bidReadonly"
                     placeholder="请选择供应商"
                     style="width: 100%"
-                    @change="(v) => onSupplierChange(row, v ? String(v) : null)"
+                    @change="(v: string | number | boolean | undefined) => onSupplierChange(row, v ? String(v) : null)"
                   >
                     <el-option
                       v-for="s in supplierOptions"
@@ -168,7 +168,7 @@
                     <el-upload
                       v-if="!bidReadonly"
                       :show-file-list="false"
-                      :http-request="(opt) => onBidUpload(row, opt)"
+                      :http-request="(opt: UploadRequestOptions) => onBidUpload(row, opt)"
                     >
                       <el-button link type="primary" :loading="row._uploading">上传</el-button>
                     </el-upload>

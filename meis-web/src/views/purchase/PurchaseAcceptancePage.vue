@@ -363,9 +363,9 @@ function confirmContractRef() {
     return
   }
   form.devices = contractRefSelected.value.map((row) => {
-    const quantity = row.quantity ?? ''
-    const unitPrice = row.unit_price ?? ''
-    let amount: string | number = row.amount ?? ''
+    const quantity = (row.quantity ?? '') as string | number
+    const unitPrice = (row.unit_price ?? '') as string | number
+    let amount: string | number = (row.amount ?? '') as string | number
     if ((amount === '' || amount == null) && quantity !== '' && unitPrice !== '') {
       const q = Number(quantity)
       const p = Number(unitPrice)

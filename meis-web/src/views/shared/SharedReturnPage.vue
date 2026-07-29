@@ -34,7 +34,7 @@ const form = ref<Record<string, unknown> | null>(null)
 const formFields = getSchema('shared_device_return').filter((f) => !f.readonly)
 
 function openCreate() {
-  form.value = { applicant_id: auth.user?.id, return_date: new Date().toISOString().slice(0, 10) }
+  form.value = { applicant_id: auth.user?.userId, return_date: new Date().toISOString().slice(0, 10) }
   visible.value = true
 }
 

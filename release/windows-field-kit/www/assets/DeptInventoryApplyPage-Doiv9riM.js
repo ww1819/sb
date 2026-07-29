@@ -1,0 +1,1 @@
+import{F as e}from"./FeaturePlaceholderPage-D4mIaZL0.js";import{d as t,o,A as r}from"./index-Dr59-LAb.js";import"./SystemPageCard-DQ-RFZwI.js";const l=t({__name:"DeptInventoryApplyPage",setup(a){return(n,p)=>(o(),r(e,{title:"科室盘点申请",subtitle:"资产管理 / 科室盘点",description:"科室盘点申请功能开发中",hint:"菜单已开通（AST-UI-07）；完整业务见待开发池 BACKLOG-AST-07"}))}});export{l as default};

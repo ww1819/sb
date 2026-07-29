@@ -170,7 +170,9 @@ function onNodeClick(data: TreeNode) {
 }
 
 /** 同级手风琴：展开一个时收起同父节点下其它已展开兄弟（含其子孙） */
-function onNodeExpand(_data: TreeNode, node: { parent?: { childNodes?: Array<{ expanded?: boolean; childNodes?: unknown[] }> }; childNodes?: unknown[] }) {
+type TreeUiNode = { expanded?: boolean; childNodes?: TreeUiNode[] }
+
+function onNodeExpand(_data: TreeNode, node: TreeUiNode & { parent?: { childNodes?: TreeUiNode[] } }) {
   const siblings = node.parent?.childNodes
   if (!siblings?.length) return
   for (const sibling of siblings) {
@@ -179,7 +181,7 @@ function onNodeExpand(_data: TreeNode, node: { parent?: { childNodes?: Array<{ e
   }
 }
 
-function collapseTreeNode(node: { expanded?: boolean; childNodes?: Array<{ expanded?: boolean; childNodes?: unknown[] }> }) {
+function collapseTreeNode(node: TreeUiNode) {
   node.expanded = false
   for (const child of node.childNodes ?? []) {
     collapseTreeNode(child)

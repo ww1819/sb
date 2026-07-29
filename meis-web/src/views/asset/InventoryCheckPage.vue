@@ -137,7 +137,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage, ElMessageBox, type ElTable } from 'element-plus'
+import { ElMessage, ElMessageBox, type TableInstance } from 'element-plus'
 import http from '@/api/http'
 import CrudPage from '@/components/CrudPage.vue'
 import AppModal from '@/components/AppModal.vue'
@@ -167,7 +167,7 @@ const reprintVisible = ref(false)
 const reprintCheckId = ref('')
 const reprintItems = ref<Record<string, unknown>[]>([])
 const reprintSelected = ref<Record<string, unknown>[]>([])
-const reprintTableRef = ref<InstanceType<typeof ElTable> | null>(null)
+const reprintTableRef = ref<TableInstance | null>(null)
 
 const modalTitle = computed(() => {
   if (!master.value?.id) return '资产盘点 新增'

@@ -67,9 +67,25 @@ WHERE p.id = r.business_id
   AND p.approved_by IS NULL
   AND r.approver_id IS NOT NULL;
 
-UPDATE inventory_check
-SET audit_status = 'approved'
-WHERE approved_by IS NOT NULL AND COALESCE(audit_status, 'pending') = 'pending';
+-- 盘点：有审核人则回填审核状态（列可能尚未补齐时跳过）
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = current_schema()
+      AND table_name = 'inventory_check'
+      AND column_name = 'approved_by'
+  ) AND EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = current_schema()
+      AND table_name = 'inventory_check'
+      AND column_name = 'audit_status'
+  ) THEN
+    UPDATE inventory_check
+    SET audit_status = 'approved'
+    WHERE approved_by IS NOT NULL AND COALESCE(audit_status, 'pending') = 'pending';
+  END IF;
+END $$;
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('audit_status', 'pending', '待审核', 'pending', 1),
 ('audit_status', 'approved', '已审核', 'approved', 2)

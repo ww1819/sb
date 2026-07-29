@@ -101,14 +101,14 @@ export function buildTrafficWayOption(): EChartsOption {
       {
         name: '交通方式',
         type: 'pie',
-        clockWise: false,
+        clockwise: false,
         radius: ['42%', '44%'],
         avoidLabelOverlap: true,
         label: {
           show: true,
           position: 'outside',
           color: '#4b5563',
-          formatter: (params: { name?: string; value?: number | string }) => {
+          formatter: (params) => {
             if (!params.name) return ''
             const value = Number(params.value) || 0
             const percent = total ? ((value / total) * 100).toFixed(0) : '0'

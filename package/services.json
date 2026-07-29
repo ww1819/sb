@@ -1,0 +1,17 @@
+[
+  { "name": "meis-tenant", "port": 8082, "core": true, "order": 1, "label": "租户/迁库" },
+  { "name": "meis-auth", "port": 8081, "core": true, "order": 2, "label": "认证" },
+  { "name": "meis-system", "port": 8083, "core": true, "order": 3, "label": "系统" },
+  { "name": "meis-purchase", "port": 8084, "core": false, "order": 4, "label": "采购" },
+  { "name": "meis-asset", "port": 8085, "core": false, "order": 5, "label": "资产/库房" },
+  { "name": "meis-repair", "port": 8086, "core": false, "order": 6, "label": "维修" },
+  { "name": "meis-maintain", "port": 8087, "core": false, "order": 7, "label": "保养运维" },
+  { "name": "meis-qc", "port": 8088, "core": false, "order": 8, "label": "质控" },
+  { "name": "meis-maintenance-contract", "port": 8089, "core": false, "order": 9, "label": "维保合同" },
+  { "name": "meis-special", "port": 8090, "core": false, "order": 10, "label": "特种设备" },
+  { "name": "meis-analytics", "port": 8091, "core": false, "order": 11, "label": "分析看板" },
+  { "name": "meis-file", "port": 8092, "core": true, "order": 12, "label": "文件" },
+  { "name": "meis-notification", "port": 8093, "core": false, "order": 13, "label": "通知" },
+  { "name": "meis-integration", "port": 8094, "core": false, "order": 14, "label": "集成" },
+  { "name": "meis-gateway", "port": 8080, "core": true, "order": 99, "label": "网关" }
+]

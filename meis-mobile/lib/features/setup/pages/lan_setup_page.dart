@@ -85,7 +85,7 @@ class _LanSetupPageState extends ConsumerState<LanSetupPage> {
               ),
               const SizedBox(height: 8),
               Text(
-                '请填写 MEIS 网关所在电脑的局域网 IP 和端口（默认 8080）',
+                '请填写服务器 IP 与 Nginx 端口（默认 ${AppConstants.defaultPort}，经 Nginx 访问 /api；若直连 Gateway 可填 8080）',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
               ),
               const SizedBox(height: 24),

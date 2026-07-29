@@ -288,7 +288,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
-import { ElMessage, type ElTable } from 'element-plus'
+import { ElMessage, type TableInstance } from 'element-plus'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
 import PageFilterBar from '@/components/system/PageFilterBar.vue'
@@ -313,7 +313,7 @@ const page = ref(1)
 const size = ref(20)
 const total = ref(0)
 const keyword = ref('')
-const tableRef = ref<InstanceType<typeof ElTable> | null>(null)
+const tableRef = ref<TableInstance | null>(null)
 const selectedRowMap = ref<Map<string, Record<string, unknown>>>(new Map())
 
 const reviewVisible = ref(false)
@@ -327,7 +327,7 @@ const bargainSubmitting = ref(false)
 const bargainItemId = ref('')
 const bargainDeptName = ref('')
 const bargainItems = ref<Record<string, unknown>[]>([])
-const bargainTableRef = ref<InstanceType<typeof ElTable> | null>(null)
+const bargainTableRef = ref<TableInstance | null>(null)
 const bargainForm = reactive({
   dept_name: '',
   device_name: '',

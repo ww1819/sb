@@ -1929,6 +1929,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 |------|------|------|----------|
 | 2.139 | 2026-07-28 11:25:00 | — | PLT-OPS-02：平台端服务状态监控（聚合 API + 仅平台管理员） |
 | 2.138 | 2026-07-28 11:10:00 | — | PLT-OPS-01：生产服务监测文档 `production-monitoring.md` + `scripts/health-check.ps1` |
+| 2.138 | 2026-07-29 10:40:00 | — | windows-production-deploy：新增「〇、实施环境部署流程」（打包.bat→拷 package→启动运维.bat） |
 | 2.137 | 2026-07-27 23:50:00 | — | PLT-DEP-01：Windows Server 生产部署文档 `windows-production-deploy.md` |
 | 2.136 | 2026-07-27 14:50:00 | — | MOB-UI-01 第③批落地：其余页双端对齐；BACKLOG-MOB-13 已完成 |
 | 2.135 | 2026-07-27 14:40:00 | — | MOB-UI-01 第②批落地：报修/运维/盘点等高频页双端简洁化 |
@@ -1968,6 +1969,9 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | 2.101 | 2026-07-23 15:15:00 | — | OPS.16.9：执行单列表审核；展示执行人/时间/途径；有已执行明细禁删 |
 | 2.100 | 2026-07-23 14:35:00 | — | OPS.16.8：计划/执行列表增加只读「查看」 |
 | 2.99 | 2026-07-23 14:20:00 | — | OPS.15.4.1：巡检计划 blankToNull→String 编译失败导致打包后端 reactor 中断、meis-qc JAR 缺失 |
+| 2.99c | 2026-07-28 14:50:00 | — | package 现场包：打包.bat 收集 jars + 启动运维.bat/HTML 齐套检查与启停 |
+| 2.99b | 2026-07-28 14:40:00 | — | 现场交付：`pack-windows-field-kit.ps1` 打精简包（JAR+www+运维脚本）；勿交付完整 scripts |
+| 2.99 | 2026-07-28 14:35:00 | — | 实施运维面板：`scripts/ops-panel.ps1` + HTML（localhost:5098，口令启停 JAR）；写入 windows-production-deploy §6.2.1 |
 | 2.98 | 2026-07-23 12:40:00 | — | OPS.16.7：计划列表增加「生成执行」列（仅已审核） |
 | 2.97 | 2026-07-23 12:30:00 | — | OPS.16.6：明细自动算下次到期；已审核禁头表编删；列表拆审核/设备明细/编辑/删除；软删明细可恢复 |
 | 2.96 | 2026-07-23 12:10:00 | — | OPS.16.5：计划明细 last_done_date/next_due_date 绑 ?::date，修复 varchar→date 报错 |
@@ -5654,10 +5658,10 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 | **形态** | 原生部署（JDK + PostgreSQL + Memurai + MinIO + JAR + Nginx/IIS）；不强制 Docker |
 | **独立文档** | [windows-production-deploy.md](windows-production-deploy.md) |
 | **关联** | [local-dev-deploy.md](local-dev-deploy.md)、[production-deploy.md](production-deploy.md) |
-| **要点摘要** | 启动顺序（tenant 先迁库）；MinIO **9100**（避 Eloam 9000）；NSSM/WinSW 服务化；HTTPS；改默认口令与 JWT |
+| **要点摘要** | **实施首选** `package\`：开发机 `打包.bat` → 整包拷贝 → 实施机 `启动运维.bat`（:5098）；启动顺序 tenant 先迁库；MinIO **9100**；正式再 NSSM + HTTPS |
 | **不做** | 本文不替代 Linux/K8s 方案；不改业务代码；部署步骤不写入本需求文件 |
 
-**状态**：已完成（正文仅在独立文档维护）。
+**状态**：已完成（正文仅在独立文档维护；2026-07-29 补充实施环境快速流程）。
 
 ### PLT-OPS-01 生产服务运行状态监测（已完成·2026-07-28）
 
