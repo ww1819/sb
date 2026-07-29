@@ -400,14 +400,15 @@ const activeCharts = computed(() => {
   })
 })
 
-/** 资产分布紧挨「新增设备」右侧同排；无新增设备时跟在图表区末尾整行 */
+/** 资产分布：与维修趋势换位后，跟在 origin 后与品牌并排；否则跟新增设备 */
 const assetDistAfterKey = computed(() => {
   const keys = profile.value.charts
+  if (keys.includes('origin') && keys.includes('brand')) return 'origin'
   if (keys.includes('newDevice')) return 'newDevice'
   return keys[keys.length - 1] ?? ''
 })
 
-const assetDistSpan = computed(() => (profile.value.charts.includes('newDevice') ? 12 : 24))
+const assetDistSpan = computed(() => 12)
 
 watch(() => layoutStore.themeRevision, () => {
   // trigger chart option rebuild via activeCharts dependency
