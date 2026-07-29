@@ -36,6 +36,7 @@ alwaysApply: true
 - **主从单据**：禁止只存主表丢明细（约定包 §6.1）
 - **姓名冗余（约定包 §3 / §6.3 / 附录 W.5）**：写 `created/updated/deleted_by` 或业务责任人 UUID 时须同事务写姓名快照；新表配套 `*_by_name` / `{role}_name`；优先 `SoftDeleteSupport`，禁止新增只写 UUID 的入口
 - **单据冗余（约定包 §6.2 / 附录 W.6）**：新主从单据明细/子表须冗余业务单号；有 `*_id` 时冗余编码/名称；按需冗余头字段快照，禁止整表头拷贝；状态机字段默认不下沉
+- **多端途径（约定包 §5.10）**：多端写须加 `*_channel` 并写库+展示；Web 追加移动端时须同批历史 NULL 回填为 `web`（§5.10.6），未发生动作勿盲填
 
 发现缺口当场修补后再结束。
 
@@ -49,4 +50,4 @@ alwaysApply: true
 - 需求已足够明确且无风险时：可简要确认要点 → 写入文档 → 开发。
 - 有疑问仍须先对齐再动手。
 - 技术约定索引见附录 **Q.6**；约定沉淀增量见 **Q.7 / Q.8**。
-- 跨项目可复用约定全集见 `docs/reusable-engineering-conventions.md`（当前 v1.7）。
+- 跨项目可复用约定全集见 `docs/reusable-engineering-conventions.md`（当前 v1.26）。
