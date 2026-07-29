@@ -47,7 +47,11 @@ public class ReportController {
         data.put("brandTop10", brandTop);
         data.put("deptValue", deptValue);
         data.put("deviceByDept", deviceByDept);
-        data.put("deviceStatus", jdbc.queryForList("SELECT device_status, COUNT(*) AS count FROM medical_device GROUP BY device_status"));
+        data.put("deviceStatus", jdbc.queryForList(
+                "SELECT m.device_status, COUNT(*) AS count FROM medical_device m "
+                        + "WHERE 1=1" + mdNotDel
+                        + " AND COALESCE(m.device_status, '') <> 'returned' "
+                        + "GROUP BY m.device_status ORDER BY count DESC"));
         String catRootNotDel = SoftDeleteSupport.notDeletedClause(jdbc, "medical_device_category", "root");
         data.put("deviceCategory", jdbc.queryForList(
                 "SELECT COALESCE(root.category_name, '未分类') AS category_name, COUNT(*) AS count "
@@ -60,7 +64,14 @@ public class ReportController {
                         + " WHERE 1=1" + mdNotDel
                         + " GROUP BY COALESCE(root.category_name, '未分类') "
                         + "ORDER BY count DESC LIMIT 8"));
-        data.put("usageRate", jdbc.queryForList("SELECT device_status, ROUND(COUNT(*)::numeric / NULLIF((SELECT COUNT(*) FROM medical_device),0) * 100, 2) AS rate FROM medical_device GROUP BY device_status"));
+        data.put("usageRate", jdbc.queryForList(
+                "SELECT m.device_status, "
+                        + "ROUND(COUNT(*)::numeric / NULLIF((SELECT COUNT(*) FROM medical_device m2 WHERE 1=1"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "m2")
+                        + " AND COALESCE(m2.device_status,'') <> 'returned'),0) * 100, 2) AS rate "
+                        + "FROM medical_device m WHERE 1=1" + mdNotDel
+                        + " AND COALESCE(m.device_status, '') <> 'returned' "
+                        + "GROUP BY m.device_status"));
         data.put("importDomestic", jdbc.queryForList("SELECT COALESCE(country_of_origin,'未知') AS country, COUNT(*) AS count FROM medical_device GROUP BY country_of_origin"));
         data.put("ageDistribution", jdbc.queryForList("SELECT CASE WHEN purchase_date > CURRENT_DATE - INTERVAL '3 years' THEN '3年内' WHEN purchase_date > CURRENT_DATE - INTERVAL '5 years' THEN '3-5年' ELSE '5年以上' END AS age_group, COUNT(*) FROM medical_device GROUP BY 1"));
         data.put("newDevices", jdbc.queryForList("SELECT TO_CHAR(created_at,'YYYY-MM') AS month, COUNT(*) AS count FROM medical_device WHERE created_at > NOW() - INTERVAL '12 months' GROUP BY 1 ORDER BY 1"));

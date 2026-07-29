@@ -36,7 +36,7 @@ export function buildAssetDistributionOption(raw: DeptCountItem[]): EChartsOptio
     color: CHART_COLORS,
     title: {
       text: '资产分布',
-      left: '34%',
+      left: '41%',
       top: '46%',
       textAlign: 'center',
       textStyle: {
@@ -88,7 +88,7 @@ export function buildAssetDistributionOption(raw: DeptCountItem[]): EChartsOptio
         name: '资产分布',
         type: 'pie',
         radius: ['42%', '68%'],
-        center: ['35%', '50%'],
+        center: ['42%', '46%'],
         avoidLabelOverlap: true,
         itemStyle: {
           borderRadius: 6,

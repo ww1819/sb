@@ -77,7 +77,7 @@
               <el-col :xs="24" :lg="chart.span">
                 <ChartCard :title="chart.title" :option="chart.option" :height="chart.height" />
               </el-col>
-              <el-col v-if="chart.key === assetDistAfterKey" :xs="24" :lg="24">
+              <el-col v-if="chart.key === assetDistAfterKey" :xs="24" :lg="assetDistSpan">
                 <AssetDistributionChart :items="deviceByDept" />
               </el-col>
             </template>
@@ -143,14 +143,18 @@ import {
   buildLineOption,
   buildMultiKpiGaugeOption,
   buildPieOption,
-  buildRosePieOption
+  buildRosePieOption,
+  CHART_COLORS,
+  type MultiKpiRing
 } from '@/composables/useChartTheme'
+import { useDict } from '@/composables/useDict'
 
 const router = useRouter()
 const auth = useAuthStore()
 const tabs = useTabsStore()
 const layoutStore = useLayoutStore()
 const { profile } = useDashboardProfile()
+const { loadDict, resolveDictLabel, cacheVersion } = useDict()
 
 const QUICK_ENTRY_COLORS = [
   { color: '#1677ff', bgColor: 'rgba(22, 119, 255, 0.08)' },
@@ -285,20 +289,29 @@ const emptyBar: EChartsOption = buildBarOption([], [])
 const emptyPie: EChartsOption = buildPieOption([])
 const emptyRose: EChartsOption = buildRosePieOption([])
 
-/** DASH-UI-04：示意多环 KPI（对齐 Highcharts Multiple KPI gauge） */
-function buildKpiGaugeDemo(): EChartsOption {
-  return buildMultiKpiGaugeOption(
-    [
-      { name: 'KPI A', value: 75, color: '#2CAFFE', trackColor: '#D6EEFF' },
-      { name: 'KPI B', value: 60, color: '#544FC5', trackColor: '#E8E7F8' },
-      { name: 'KPI C', value: 85, color: '#00E272', trackColor: '#D6FCE9' }
-    ],
-    'Conversion',
-    '80%'
-  )
+const GAUGE_TRACK_COLORS = ['#D6E7FF', '#D6F5F5', '#E8DFF5', '#FFE8D1', '#D9F5D6', '#FCDCEC']
+
+/** 设备状态 → 同心 KPI 环（占比） */
+function buildDeviceStatusGauge(
+  rows: { device_status: string; count: number }[]
+): EChartsOption {
+  const total = rows.reduce((sum, r) => sum + (Number(r.count) || 0), 0)
+  if (!total) return emptyPie
+  const rings: MultiKpiRing[] = rows.slice(0, 5).map((r, i) => {
+    const count = Number(r.count) || 0
+    const pct = Math.round((count / total) * 1000) / 10
+    return {
+      name: resolveDictLabel('device_status', r.device_status) ?? String(r.device_status ?? '未知'),
+      value: pct,
+      color: CHART_COLORS[i % CHART_COLORS.length],
+      trackColor: GAUGE_TRACK_COLORS[i % GAUGE_TRACK_COLORS.length]
+    }
+  })
+  return buildMultiKpiGaugeOption(rings, '设备总数', String(total))
 }
 
 function chartOptions() {
+  void cacheVersion.value
   const trend = (stats.value.repairTrend as { month: string; count: number }[]) ?? []
   const brands = (stats.value.brandTop10 as { brand: string; count: number }[]) ?? []
   const status = (stats.value.deviceStatus as { device_status: string; count: number }[]) ?? []
@@ -323,12 +336,7 @@ function chartOptions() {
           brands.map((b) => b.count),
           '设备数'
         ),
-    status: !status.length
-      ? emptyPie
-      : buildPieOption(
-          status.map((s) => ({ name: s.device_status, value: s.count })),
-          '设备状态'
-        ),
+    status: buildDeviceStatusGauge(status),
     category: !category.length
       ? emptyRose
       : buildRosePieOption(
@@ -348,7 +356,6 @@ function chartOptions() {
           nd.map((n) => n.count),
           '新增'
         ),
-    kpiGauge: buildKpiGaugeDemo(),
     deptValue: !dept.length
       ? emptyBar
       : buildBarOption(
@@ -366,7 +373,6 @@ const chartMeta: Record<DashboardChartKey, { title: string; height: string; wide
   category: { title: '设备分类', height: '300px' },
   origin: { title: '国产/进口', height: '300px' },
   newDevice: { title: '新增设备', height: '300px', wide: true },
-  kpiGauge: { title: 'Multiple KPI gauge', height: '300px', wide: true },
   deptValue: { title: '科室资产价值', height: '320px', wide: true }
 }
 
@@ -376,32 +382,32 @@ const activeCharts = computed(() => {
   const keys = profile.value.charts
   const triplePies =
     keys.includes('status') && keys.includes('category') && keys.includes('origin')
-  const newDevicePair = keys.includes('newDevice') && keys.includes('kpiGauge')
   return keys.map((key, index) => {
     const meta = chartMeta[key]
     const isWide = meta.wide ?? false
     const isLastOdd = keys.length % 2 === 1 && index === keys.length - 1
     const isTriplePie =
       triplePies && (key === 'status' || key === 'category' || key === 'origin')
-    const isNewDevicePair =
-      newDevicePair && (key === 'newDevice' || key === 'kpiGauge')
+    /** 新增设备与资产分布并排，固定半宽 */
+    const isNewDevice = key === 'newDevice'
     return {
       key,
       title: meta.title,
       height: meta.height,
       option: options[key],
-      span: isTriplePie ? 8 : isNewDevicePair ? 12 : isLastOdd ? 24 : isWide ? 12 : 12
+      span: isTriplePie ? 8 : isNewDevice ? 12 : isLastOdd ? 24 : isWide ? 12 : 12
     }
   })
 })
 
-/** 资产分布插在「新增设备」行之后（有 KPI 配对时跟在 kpiGauge 后，避免拆开并排） */
+/** 资产分布紧挨「新增设备」右侧同排；无新增设备时跟在图表区末尾整行 */
 const assetDistAfterKey = computed(() => {
   const keys = profile.value.charts
-  if (keys.includes('newDevice') && keys.includes('kpiGauge')) return 'kpiGauge'
   if (keys.includes('newDevice')) return 'newDevice'
   return keys[keys.length - 1] ?? ''
 })
+
+const assetDistSpan = computed(() => (profile.value.charts.includes('newDevice') ? 12 : 24))
 
 watch(() => layoutStore.themeRevision, () => {
   // trigger chart option rebuild via activeCharts dependency
@@ -427,7 +433,8 @@ onMounted(async () => {
     menuReq.catch(() => ({ data: { data: [] } })),
     user?.userType === 'platform'
       ? Promise.resolve({ data: { data: {} } })
-      : http.get('/system/users/me/preferences').catch(() => ({ data: { data: {} } }))
+      : http.get('/system/users/me/preferences').catch(() => ({ data: { data: {} } })),
+    loadDict('device_status').catch(() => [])
   ])
   stats.value = dash.data.data ?? {}
   todos.value = todoRes.data.data ?? []

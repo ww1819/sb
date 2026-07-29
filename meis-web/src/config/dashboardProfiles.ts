@@ -25,7 +25,6 @@ export type DashboardChartKey =
   | 'category'
   | 'origin'
   | 'newDevice'
-  | 'kpiGauge'
   | 'deptValue'
 
 export interface DashboardKpiConfig {
@@ -90,7 +89,7 @@ export const DASHBOARD_PROFILES: Record<DashboardProfile, DashboardProfileConfig
     subtitle: '全院设备运营概览',
     kpis: kpi('deviceCount', 'openWorkorders', 'activeMaintenancePlans', 'pendingApprovals'),
     quickPaths: ['/repair/workorder', '/asset/outbound', '/asset/inventory', '/purchase/plan'],
-    charts: ['status', 'category', 'origin', 'trend', 'brand', 'newDevice', 'kpiGauge'],
+    charts: ['status', 'category', 'origin', 'trend', 'brand', 'newDevice'],
     showTodos: true,
     showMessages: true
   },

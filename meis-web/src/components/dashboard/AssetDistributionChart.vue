@@ -115,7 +115,7 @@ onUnmounted(() => {
 
 .asset-dist-chart {
   width: 100%;
-  height: 380px;
+  height: 300px;
 }
 
 .asset-dist-empty {
