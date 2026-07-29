@@ -66,7 +66,7 @@ class _MetrologyHubPageState extends ConsumerState<MetrologyHubPage> {
     if (planId == null) return;
     setState(() => generating = true);
     try {
-      final data = await api.postData('/metrology/plan/$planId/generate-execution', {});
+      final data = await api.postData('/metrology/plan/$planId/generate-execution', {'client': 'app'});
       if (data is! Map) throw ApiException('生成执行单失败');
       final execId = data['id']?.toString() ?? data['execution_id']?.toString();
       if (execId == null) throw ApiException('未返回执行单 id');

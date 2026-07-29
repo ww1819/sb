@@ -2056,6 +2056,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+| 2.149 | 2026-07-29 11:10:00 | — | MOB-CHANNEL-01：多端途径补齐（借还/报修/计量/不良/盘点）+ Web 列表展示 |
 | 2.148 | 2026-07-29 11:00:00 | — | MOB-PWR-02 落地：移动端基站维护+监测记录；标签侧补监测记录；基站途径列 |
 | 2.147 | 2026-07-29 10:50:00 | — | MOB-PWR-02 定稿：移动端基站维护+监测记录；MOB-PWR-01 补标签监测记录；BACKLOG-PWR-01 |
 | 2.146 | 2026-07-29 10:35:00 | — | MOB-PWR-01 落地：App/小程序电流标签维护；by-code；一设备一标签；create/update_channel |
@@ -3409,6 +3410,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 移动端公用设备借调 | [MOB-SHR-01](#mob-shr-01-定稿2026-07-28) |
 | 移动端电流标签维护 | [MOB-PWR-01](#mob-pwr-01-移动端电流监测标签维护定稿2026-07-29) |
 | 移动端电流基站维护 | [MOB-PWR-02](#mob-pwr-02-移动端电流监测基站维护定稿2026-07-29) |
+| 多端操作途径补齐 | [MOB-CHANNEL-01](#mob-channel-01-多端操作途径补齐定稿2026-07-29) |
 | 列表勾选 / 批量作用域 | [附录 V](#附录-v列表勾选跨页缓存与批量作用域2026-07-15) |
 | 列表筛选多选 / 分类模糊拆分 | [PLT-UI-02](#plt-ui-02-定稿2026-07-22)、约定包 §5.5 |
 | 业务冗余字段（device / 人员姓名 / **单据下沉**） | [附录 W](#附录-w业务冗余字段约定2026-07-15)（含 **W.5** / **W.6**）、约定包 §6.2 |
@@ -6027,5 +6029,41 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 - 小程序：`station-hub` / `station-form` / `readings`
 - Web：基站途径列 + `client=web`；编码编辑锁定
 - 入池：BACKLOG-PWR-01（标签↔基站绑定策略）
+
+**状态**：已完成。
+
+### MOB-CHANNEL-01 多端操作途径补齐（定稿·2026-07-29）
+
+> 来源：用户要求检查移动端途径遗漏，并在 Web 列表/明细展示多端途径。
+
+#### 1. 移动端写入口补 `client`
+
+| 模块 | 端 | 补齐动作 |
+|------|----|----------|
+| 报修 | App/MP | submit / withdraw / delete 传 client |
+| 公用借还 | App/MP | 保存/提交/审核/驳回/借出 传 client |
+| 计量 | App | generate / start / complete 传 client |
+| 盘点 | App | 明细 patch、离线同步 传 client |
+| 不良事件 | MP | 上报传 client |
+
+#### 2. 后端落库
+
+| 表 | 补齐 |
+|----|------|
+| `shared_device_loan` / `shared_device_return` | 迁库 + `create/update/submit/confirm_channel` 写入 |
+| `metrology_execution` / `_item` | start/complete/generate 写途径 |
+| `adverse_event` | save 写 create/update_channel |
+| 公共 | `SoftDeleteSupport.applyChannels` |
+
+#### 3. Web 列表/详情展示
+
+凡已有多端写能力的主表：途径列 **`list: true`**（制单/修改/提交/确认/审核/删除等适用列），便于向客户展示 App/小程序能力。含：报修、盘点、计量、不良事件、公用借还、电流标签/基站。
+
+#### 4. 验收
+
+- [ ] App/小程序借调全流程后，Web 借调列表可见非 web 途径
+- [ ] 报修移动端提交/删除后，列表显示提交/删除途径
+- [ ] 计量 App 执行后，执行单/明细可见途径
+- [ ] 不良事件小程序上报后，列表可见制单途径
 
 **状态**：已完成。

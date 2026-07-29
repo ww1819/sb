@@ -351,7 +351,8 @@ async function save(andSubmit: boolean) {
       loan_end: loanEnd.value,
       reason: reason.value,
       applicant_id: auth.user?.userId,
-      status: status.value || 'draft'
+      status: status.value || 'draft',
+      client: 'mp'
     }
     if (loanId.value) body.id = loanId.value
     const saved = await http.post<Record<string, unknown>>('/shared/loan', body)
@@ -359,7 +360,7 @@ async function save(andSubmit: boolean) {
     loanNo.value = String(saved?.loan_no || loanNo.value)
     status.value = String(saved?.status || status.value || 'draft')
     if (andSubmit && loanId.value) {
-      await http.post(`/shared/loan/${loanId.value}/submit`, { applicantId: auth.user?.userId })
+      await http.post(`/shared/loan/${loanId.value}/submit`, { applicantId: auth.user?.userId, client: 'mp' })
       uni.showToast({ title: '已提交', icon: 'success' })
     } else {
       uni.showToast({ title: '已保存', icon: 'success' })

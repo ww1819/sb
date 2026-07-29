@@ -124,7 +124,7 @@ class _RepairPageState extends ConsumerState<RepairPage> {
     );
     if (ok != true) return;
     try {
-      await ref.read(apiServiceProvider).postData('/repair/workorder/$id/submit');
+      await ref.read(apiServiceProvider).postData('/repair/workorder/$id/submit', {'client': 'app'});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已提交')));
       }
@@ -152,7 +152,10 @@ class _RepairPageState extends ConsumerState<RepairPage> {
     );
     if (ok != true) return;
     try {
-      await ref.read(apiServiceProvider).postData('/repair/workorder/$id/withdraw', {'remark': '用户撤回'});
+      await ref.read(apiServiceProvider).postData('/repair/workorder/$id/withdraw', {
+        'remark': '用户撤回',
+        'client': 'app',
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已撤回为草稿')));
       }
@@ -180,7 +183,7 @@ class _RepairPageState extends ConsumerState<RepairPage> {
     );
     if (ok != true) return;
     try {
-      await ref.read(apiServiceProvider).deleteData('/repair/workorder/$id');
+      await ref.read(apiServiceProvider).deleteData('/repair/workorder/$id', query: {'client': 'app'});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已删除')));
       }

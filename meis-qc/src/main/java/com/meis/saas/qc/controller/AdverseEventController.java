@@ -147,6 +147,8 @@ public class AdverseEventController {
                     body.get("report_time"), body.get("event_type"), body.get("severity_level"),
                     body.get("event_description"), body.get("cause_analysis"), body.get("impact_description"),
                     body.get("photos"), body.get("remark"));
+            SoftDeleteSupport.applyChannels(jdbc, "adverse_event", id, body,
+                    "create_channel", "update_channel");
         } else {
             jdbc.update("""
                 UPDATE adverse_event SET device_id=?::uuid, device_code=?, device_name=?,
@@ -159,6 +161,7 @@ public class AdverseEventController {
                     body.get("report_time"), body.get("event_type"), body.get("severity_level"),
                     body.get("event_description"), body.get("cause_analysis"), body.get("impact_description"),
                     body.get("photos"), body.get("remark"), id);
+            SoftDeleteSupport.applyChannels(jdbc, "adverse_event", id, body, "update_channel");
         }
         return get(id);
     }

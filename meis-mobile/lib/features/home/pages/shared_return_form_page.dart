@@ -145,6 +145,7 @@ class _SharedReturnFormPageState extends ConsumerState<SharedReturnFormPage> {
         'return_date': _fmtDate(returnDate),
         'condition_desc': conditionCtrl.text.trim(),
         'applicant_id': userId,
+        'client': 'app',
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('归还申请已提交')));

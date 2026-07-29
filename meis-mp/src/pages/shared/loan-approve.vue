@@ -94,7 +94,7 @@ async function approve(r: Record<string, unknown>) {
   })
   if (!ok) return
   try {
-    await http.post(`/shared/loan/${r.id}/approve`)
+    await http.post(`/shared/loan/${r.id}/approve`, { client: 'mp' })
     uni.showToast({ title: '已通过', icon: 'success' })
     await load()
   } catch (e: unknown) {
@@ -112,7 +112,7 @@ async function reject(r: Record<string, unknown>) {
   })
   if (!ok) return
   try {
-    await http.post(`/shared/loan/${r.id}/reject`)
+    await http.post(`/shared/loan/${r.id}/reject`, { client: 'mp' })
     uni.showToast({ title: '已驳回', icon: 'success' })
     await load()
   } catch (e: unknown) {

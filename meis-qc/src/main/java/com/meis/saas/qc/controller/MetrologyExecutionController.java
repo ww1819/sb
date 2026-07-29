@@ -89,6 +89,7 @@ public class MetrologyExecutionController {
                 WHERE id=?::uuid AND status IN ('pending','draft')
                 """, executorId, id);
         jdbc.update("UPDATE metrology_execution_item SET status='in_progress', updated_at=NOW() WHERE execution_id=?::uuid AND status='pending'", id);
+        SoftDeleteSupport.applyChannels(jdbc, "metrology_execution", id, body, "update_channel");
         return get(id);
     }
 
@@ -111,6 +112,8 @@ public class MetrologyExecutionController {
                 WHERE id=?::uuid
                 """, body.getOrDefault("overall_result", "pass"), body.get("certificate_no"),
                 body.get("certificate_url"), body.get("cost"), body.get("remark"), itemId);
+        SoftDeleteSupport.applyChannels(jdbc, "metrology_execution_item", itemId, body,
+                "execution_channel", "update_channel");
         var execRows = jdbc.queryForList(
                 "SELECT execution_id FROM metrology_execution_item WHERE id = ?::uuid "
                         + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_execution_item", null), itemId);
@@ -122,6 +125,7 @@ public class MetrologyExecutionController {
                     Long.class, execId);
             if (pending == 0) {
                 jdbc.update("UPDATE metrology_execution SET status='completed', execute_end_time=NOW(), updated_at=NOW() WHERE id=?::uuid", execId);
+                SoftDeleteSupport.applyChannels(jdbc, "metrology_execution", execId, body, "update_channel");
                 updatePlansAfterComplete(execId);
                 syncLegacyRecord(itemId);
             }

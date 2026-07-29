@@ -158,7 +158,8 @@ async function submit() {
       loan_id: loan.value.id,
       return_date: returnDate.value,
       condition_desc: conditionDesc.value,
-      applicant_id: auth.user?.userId
+      applicant_id: auth.user?.userId,
+      client: 'mp'
     })
     uni.showToast({ title: '已提交', icon: 'success' })
     setTimeout(() => uni.navigateBack(), 500)

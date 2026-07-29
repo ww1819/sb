@@ -345,7 +345,7 @@ async function saveAndAskSubmit() {
       })
     })
     if (doSubmit) {
-      const done = await http.post<{ wo_no?: string }>(`/repair/workorder/${id}/submit`)
+      const done = await http.post<{ wo_no?: string }>(`/repair/workorder/${id}/submit`, { client: 'mp' })
       await requestSubscribe('repair_submit')
       uni.showModal({
         title: '报修成功',

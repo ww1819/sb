@@ -91,6 +91,8 @@ public class SharedReturnController {
                 body.get("loan_id"), loan.get(0).get("device_id"), body.get("return_date"),
                 body.get("condition_desc"), body.get("applicant_id"),
                 "pending", "pending");
+        SoftDeleteSupport.applyChannels(jdbc, "shared_device_return", id, body,
+                "create_channel", "submit_channel", "update_channel");
         return get(id);
     }
 
@@ -101,6 +103,8 @@ public class SharedReturnController {
         UUID applicantId = body.get("applicantId") != null
                 ? UUID.fromString(body.get("applicantId").toString())
                 : (TenantContext.getUserId() != null ? UUID.fromString(TenantContext.getUserId()) : null);
+        SoftDeleteSupport.applyChannels(jdbc, "shared_device_return", id, body,
+                "submit_channel", "update_channel");
         approvalService.submit("shared_device_return", id, ret.get("return_no").toString(),
                 "公用设备归还 " + ret.get("return_no"), applicantId, 0);
         return get(id);
@@ -109,7 +113,8 @@ public class SharedReturnController {
     @PostMapping("/{id}/approve")
     @Transactional
     @OperationLog(module = "shared", description = "审批归还")
-    public Result<Map<String, Object>> approve(@PathVariable UUID id) {
+    public Result<Map<String, Object>> approve(@PathVariable UUID id,
+            @RequestBody(required = false) Map<String, Object> body) {
         var ret = loadReturn(id);
         String userId = TenantContext.getUserId();
         UUID approver = userId != null ? UUID.fromString(userId) : null;
@@ -119,17 +124,21 @@ public class SharedReturnController {
             UPDATE shared_device_return SET status='approved', approval_status='approved',
             approved_by=?::uuid, approved_by_name=?, approved_at=NOW(), updated_at=NOW() WHERE id=?::uuid
             """, approver, approverName, id);
+        SoftDeleteSupport.applyChannels(jdbc, "shared_device_return", id, body,
+                "confirm_channel", "update_channel");
         completeReturn(ret, billingEnd);
         return get(id);
     }
 
     @PostMapping("/{id}/reject")
     @OperationLog(module = "shared", description = "驳回归还")
-    public Result<Map<String, Object>> reject(@PathVariable UUID id) {
+    public Result<Map<String, Object>> reject(@PathVariable UUID id,
+            @RequestBody(required = false) Map<String, Object> body) {
         jdbc.update("""
             UPDATE shared_device_return SET status='rejected', approval_status='rejected', updated_at=NOW()
             WHERE id=?::uuid
             """, id);
+        SoftDeleteSupport.applyChannels(jdbc, "shared_device_return", id, body, "update_channel");
         return get(id);
     }
 

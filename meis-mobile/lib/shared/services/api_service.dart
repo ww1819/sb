@@ -172,9 +172,9 @@ class ApiService {
     }
   }
 
-  Future<void> deleteData(String path) async {
+  Future<void> deleteData(String path, {Map<String, dynamic>? query}) async {
     try {
-      final res = await dio.delete<Map<String, dynamic>>(path);
+      final res = await dio.delete<Map<String, dynamic>>(path, queryParameters: query);
       _unwrap(res.data);
     } on DioException catch (e) {
       await _handleUnauthorized(e);

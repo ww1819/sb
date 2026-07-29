@@ -103,9 +103,10 @@ class _MetrologyExecDetailPageState extends ConsumerState<MetrologyExecDetailPag
     try {
       final st = exec?['status']?.toString();
       if (st == 'draft' || st == 'pending') {
-        await api.postData('/metrology/execution/${widget.executionId}/start', {});
+        await api.postData('/metrology/execution/${widget.executionId}/start', {'client': 'app'});
       }
       await api.postData('/metrology/execution/item/${widget.itemId}/complete', {
+        'client': 'app',
         'overall_result': overall,
         'certificate_no': certCtrl.text.trim().isEmpty ? null : certCtrl.text.trim(),
         'remark': remarkCtrl.text.trim().isEmpty ? null : remarkCtrl.text.trim(),

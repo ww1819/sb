@@ -153,7 +153,7 @@ async function submitRow(r: Record<string, unknown>) {
   })
   if (!ok) return
   try {
-    await http.post(`/repair/workorder/${r.id}/submit`)
+    await http.post(`/repair/workorder/${r.id}/submit`, { client: 'mp' })
     uni.showToast({ title: '已提交', icon: 'success' })
     await load()
   } catch (e: unknown) {
@@ -189,7 +189,7 @@ async function deleteRow(r: Record<string, unknown>) {
   })
   if (!ok) return
   try {
-    await http.delete(`/repair/workorder/${r.id}`)
+    await http.delete(`/repair/workorder/${r.id}?client=mp`)
     uni.showToast({ title: '已删除', icon: 'success' })
     await load()
   } catch (e: unknown) {

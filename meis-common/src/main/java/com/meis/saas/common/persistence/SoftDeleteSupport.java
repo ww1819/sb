@@ -187,8 +187,43 @@ public final class SoftDeleteSupport {
 
     /** 从请求体取 client 并追加 update_channel（有列才写）。 */
     public static void appendUpdateChannelFromBody(JdbcTemplate jdbc, String table, List<String> sets,
-                                                   List<Object> args, Map<String, Object> body) {
+            List<Object> args, Map<String, Object> body) {
         appendUpdateChannel(jdbc, table, sets, args, com.meis.saas.common.ops.OpsClientChannel.of(body));
+    }
+
+    /**
+     * 按动作写入途径列（create_channel / update_channel / submit_channel / confirm_channel 等）。
+     * 表无对应列则跳过；{@code body} 可空（默认 web）。
+     */
+    public static void applyChannels(JdbcTemplate jdbc, String table, UUID id, Map<String, Object> body,
+            String... channelColumns) {
+        if (id == null || channelColumns == null || channelColumns.length == 0) {
+            return;
+        }
+        String channel = com.meis.saas.common.ops.OpsClientChannel.of(body);
+        List<String> sets = new ArrayList<>();
+        List<Object> args = new ArrayList<>();
+        Set<String> cols = TableColumnCache.columns(jdbc, table);
+        for (String col : channelColumns) {
+            if (col == null || col.isBlank() || !cols.contains(col)) {
+                continue;
+            }
+            sets.add(col + " = ?");
+            args.add(channel);
+        }
+        if (sets.isEmpty()) {
+            return;
+        }
+        args.add(id);
+        jdbc.update("UPDATE " + table + " SET " + String.join(", ", sets) + " WHERE id = ?::uuid", args.toArray());
+    }
+
+    public static void applyChannels(JdbcTemplate jdbc, String table, String id, Map<String, Object> body,
+            String... channelColumns) {
+        if (id == null || id.isBlank()) {
+            return;
+        }
+        applyChannels(jdbc, table, UUID.fromString(id), body, channelColumns);
     }
 
     /**
