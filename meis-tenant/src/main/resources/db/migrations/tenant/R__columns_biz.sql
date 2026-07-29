@@ -1278,3 +1278,15 @@ COMMENT ON COLUMN repair_workorder.create_channel IS '制单途径 web/app/mp（
 COMMENT ON COLUMN inventory_check.create_channel IS '制单途径 web/app/mp（OPS.16.29）';
 COMMENT ON COLUMN metrology_execution.create_channel IS '制单途径 web/app/mp（OPS.16.29）';
 COMMENT ON COLUMN adverse_event.create_channel IS '制单途径 web/app/mp（OPS.16.29）';
+
+-- MOB-PWR-01 电流标签多端途径
+ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+COMMENT ON COLUMN power_tag.create_channel IS '制单途径 web/app/mp（MOB-PWR-01）';
+COMMENT ON COLUMN power_tag.update_channel IS '修改途径 web/app/mp（MOB-PWR-01）';
+
+-- MOB-PWR-02 基站多端途径
+ALTER TABLE power_base_station ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE power_base_station ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+COMMENT ON COLUMN power_base_station.create_channel IS '制单途径 web/app/mp（MOB-PWR-02）';
+COMMENT ON COLUMN power_base_station.update_channel IS '修改途径 web/app/mp（MOB-PWR-02）';

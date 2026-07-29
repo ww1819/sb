@@ -1457,6 +1457,8 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'protocol_type', label: '协议类型', dictType: 'power_protocol_type', list: true },
     { prop: 'status', label: '状态', dictType: 'power_station_status', list: true },
     { prop: 'is_active', label: '启用', type: 'boolean', list: true },
+    { prop: 'create_channel', label: '制单途径', dictType: 'execution_channel', list: true, readonly: true, form: true, width: 90 },
+    { prop: 'update_channel', label: '修改途径', dictType: 'execution_channel', list: true, readonly: true, form: true, width: 90 },
     { prop: 'remark', label: '备注', type: 'textarea' }
   ],
   power_tag: [
@@ -1477,6 +1479,8 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'rated_power', label: '额定功率(W)', type: 'number', list: true },
     { prop: 'install_date', label: '安装日期', type: 'date', list: true },
     { prop: 'is_active', label: '启用', type: 'boolean', list: true },
+    { prop: 'create_channel', label: '制单途径', dictType: 'execution_channel', list: true, readonly: true, form: true, width: 90 },
+    { prop: 'update_channel', label: '修改途径', dictType: 'execution_channel', list: true, readonly: true, form: true, width: 90 },
     { prop: 'remark', label: '备注', type: 'textarea' }
   ],
   power_device_status: [

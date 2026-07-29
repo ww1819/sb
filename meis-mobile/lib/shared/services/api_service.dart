@@ -209,8 +209,12 @@ class ApiService {
 
   dynamic _unwrap(Map<String, dynamic>? body) {
     if (body == null) throw ApiException('空响应');
-    if (body['code'] != 0 && body['code'] != 200) {
-      throw ApiException(body['message']?.toString() ?? '请求失败');
+    final code = body['code'];
+    if (code != 0 && code != 200) {
+      throw ApiException(
+        body['message']?.toString() ?? '请求失败',
+        statusCode: code is int ? code : int.tryParse(code?.toString() ?? ''),
+      );
     }
     return body['data'];
   }
