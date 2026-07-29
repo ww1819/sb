@@ -329,7 +329,9 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
         'dept_id': device['dept_id'],
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已提交纳入申请，待 Web 确认')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('已提交纳入申请，待 Web 确认（申请途径：App）')),
+        );
       }
     } on ApiException catch (e) {
       if (mounted) {

@@ -128,7 +128,8 @@ CREATE TABLE sys_user (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     permissions JSONB,
-    permission_mode VARCHAR(20) DEFAULT 'synced'
+    permission_mode VARCHAR(20) DEFAULT 'synced',
+    preferences JSONB NOT NULL DEFAULT '{}'::jsonb
 );
 COMMENT ON TABLE sys_user IS '用户表';
 COMMENT ON COLUMN sys_user.id IS '主键';
@@ -149,6 +150,7 @@ COMMENT ON COLUMN sys_user.created_at IS '创建时间';
 COMMENT ON COLUMN sys_user.updated_at IS '更新时间';
 COMMENT ON COLUMN sys_user.permissions IS '权限JSON';
 COMMENT ON COLUMN sys_user.permission_mode IS '权限模式（synced/custom）';
+COMMENT ON COLUMN sys_user.preferences IS '用户UI偏好JSON（如快捷入口）';
 
 -- 1.5 角色表
 CREATE TABLE sys_role (
@@ -236,6 +238,8 @@ COMMENT ON COLUMN sys_entity_change_log.snapshot_json IS '精简快照 JSON';
 COMMENT ON COLUMN sys_entity_change_log.operator_id IS '操作人ID';
 COMMENT ON COLUMN sys_entity_change_log.operator_name IS '操作人姓名';
 COMMENT ON COLUMN sys_entity_change_log.remark IS '备注';
+ALTER TABLE sys_entity_change_log ADD COLUMN IF NOT EXISTS client VARCHAR(20);
+COMMENT ON COLUMN sys_entity_change_log.client IS '操作端 web/app/mp（OPS.16.30）';
 
 -- 1.8 单据变更/事件流水（附录 OPS.6）
 CREATE TABLE sys_doc_change_log (
@@ -2017,6 +2021,7 @@ CREATE TABLE IF NOT EXISTS ops_plan_include_request (
     reject_reason TEXT,
     create_channel VARCHAR(20),
     confirm_channel VARCHAR(20),
+    update_channel VARCHAR(20),
     applicant_id UUID REFERENCES sys_user(id),
     applicant_name VARCHAR(100),
     approved_by UUID REFERENCES sys_user(id),
@@ -2040,6 +2045,7 @@ COMMENT ON COLUMN ops_plan_include_request.module IS 'maintain/inspect/pm';
 COMMENT ON COLUMN ops_plan_include_request.status IS 'pending/approved/rejected';
 COMMENT ON COLUMN ops_plan_include_request.create_channel IS '申请途径 web/app/mp（OPS.16.28）';
 COMMENT ON COLUMN ops_plan_include_request.confirm_channel IS '确认途径（通过/驳回）web/app/mp（OPS.16.28）';
+COMMENT ON COLUMN ops_plan_include_request.update_channel IS '修改途径 web/app/mp（OPS.16.29）';
 CREATE INDEX IF NOT EXISTS idx_ops_plan_include_plan ON ops_plan_include_request(module, plan_id, status);
 CREATE INDEX IF NOT EXISTS idx_ops_plan_include_device ON ops_plan_include_request(module, device_id, status);
 
@@ -2129,6 +2135,7 @@ CREATE TABLE maintenance_execution (
     submit_channel VARCHAR(20),
     audit_channel VARCHAR(20),
     delete_channel VARCHAR(20),
+    update_channel VARCHAR(20),
     execution_kind VARCHAR(20) DEFAULT 'due',
     backfill_next_due_date DATE,
     cycle_type VARCHAR(20),
@@ -2147,6 +2154,7 @@ COMMENT ON COLUMN maintenance_execution.create_channel IS '制单途径 web/app/
 COMMENT ON COLUMN maintenance_execution.submit_channel IS '提交途径 web/app/mp（OPS.16.10）';
 COMMENT ON COLUMN maintenance_execution.audit_channel IS '审核途径 web/app/mp（OPS.16.10）';
 COMMENT ON COLUMN maintenance_execution.delete_channel IS '删除途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN maintenance_execution.update_channel IS '修改途径 web/app/mp（OPS.16.29）';
 COMMENT ON COLUMN maintenance_execution.execution_kind IS 'due=到期执行 backfill=执行补录（OPS.16.12）';
 COMMENT ON COLUMN maintenance_execution.backfill_next_due_date IS '补录可选下次到期（OPS.16.12）';
 COMMENT ON COLUMN maintenance_execution.cycle_type IS '周期类型（OPS.16.15 直开快照）';
@@ -2174,6 +2182,7 @@ CREATE TABLE maintenance_execution_item (
     signature_url VARCHAR(500),
     execution_channel VARCHAR(20),
     confirm_channel VARCHAR(20),
+    update_channel VARCHAR(20),
     confirmed_by UUID,
     confirmed_by_name VARCHAR(100),
     confirmed_at TIMESTAMP WITH TIME ZONE,
@@ -2185,6 +2194,7 @@ CREATE TABLE maintenance_execution_item (
 COMMENT ON TABLE maintenance_execution_item IS '保养执行明细（按设备）';
 COMMENT ON COLUMN maintenance_execution_item.execution_channel IS '执行途径 web/app/mp（OPS.16.10）';
 COMMENT ON COLUMN maintenance_execution_item.confirm_channel IS '确认途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN maintenance_execution_item.update_channel IS '修改途径 web/app/mp（OPS.16.29）';
 COMMENT ON COLUMN maintenance_execution_item.confirmed_by IS '确认人（OPS.16.14）';
 COMMENT ON COLUMN maintenance_execution_item.confirmed_by_name IS '确认人姓名快照（OPS.16.14）';
 COMMENT ON COLUMN maintenance_execution_item.confirmed_at IS '确认时间（OPS.16.14）';
@@ -3082,6 +3092,7 @@ CREATE TABLE pm_execution (
     submit_channel VARCHAR(20),
     audit_channel VARCHAR(20),
     delete_channel VARCHAR(20),
+    update_channel VARCHAR(20),
     execution_kind VARCHAR(20) DEFAULT 'due',
     backfill_next_due_date DATE,
     cycle_type VARCHAR(20),
@@ -3100,6 +3111,7 @@ COMMENT ON COLUMN pm_execution.create_channel IS '制单途径 web/app/mp（OPS.
 COMMENT ON COLUMN pm_execution.submit_channel IS '提交途径 web/app/mp（OPS.16.10）';
 COMMENT ON COLUMN pm_execution.audit_channel IS '审核途径 web/app/mp（OPS.16.10）';
 COMMENT ON COLUMN pm_execution.delete_channel IS '删除途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN pm_execution.update_channel IS '修改途径 web/app/mp（OPS.16.29）';
 COMMENT ON COLUMN pm_execution.execution_kind IS 'due=到期执行 backfill=执行补录（OPS.16.12）';
 COMMENT ON COLUMN pm_execution.backfill_next_due_date IS '补录可选下次到期（OPS.16.12）';
 COMMENT ON COLUMN pm_execution.cycle_type IS '周期类型（OPS.16.15）';
@@ -3127,6 +3139,7 @@ CREATE TABLE pm_execution_item (
     signature_url VARCHAR(500),
     execution_channel VARCHAR(20),
     confirm_channel VARCHAR(20),
+    update_channel VARCHAR(20),
     confirmed_by UUID,
     confirmed_by_name VARCHAR(100),
     confirmed_at TIMESTAMP WITH TIME ZONE,
@@ -3138,6 +3151,7 @@ CREATE TABLE pm_execution_item (
 COMMENT ON TABLE pm_execution_item IS '预防性维护执行明细';
 COMMENT ON COLUMN pm_execution_item.execution_channel IS '执行途径 web/app/mp（OPS.16.10）';
 COMMENT ON COLUMN pm_execution_item.confirm_channel IS '确认途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN pm_execution_item.update_channel IS '修改途径 web/app/mp（OPS.16.29）';
 COMMENT ON COLUMN pm_execution_item.confirmed_by IS '确认人（OPS.16.14）';
 COMMENT ON COLUMN pm_execution_item.confirmed_by_name IS '确认人姓名快照（OPS.16.14）';
 COMMENT ON COLUMN pm_execution_item.confirmed_at IS '确认时间（OPS.16.14）';
@@ -3948,6 +3962,7 @@ CREATE TABLE IF NOT EXISTS inspection_execution (
     submit_channel VARCHAR(20),
     audit_channel VARCHAR(20),
     delete_channel VARCHAR(20),
+    update_channel VARCHAR(20),
     execution_kind VARCHAR(20) DEFAULT 'due',
     backfill_next_due_date DATE,
     cycle_type VARCHAR(20),
@@ -3966,6 +3981,7 @@ COMMENT ON COLUMN inspection_execution.create_channel IS '制单途径 web/app/m
 COMMENT ON COLUMN inspection_execution.submit_channel IS '提交途径 web/app/mp（OPS.16.10）';
 COMMENT ON COLUMN inspection_execution.audit_channel IS '审核途径 web/app/mp（OPS.16.10）';
 COMMENT ON COLUMN inspection_execution.delete_channel IS '删除途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN inspection_execution.update_channel IS '修改途径 web/app/mp（OPS.16.29）';
 COMMENT ON COLUMN inspection_execution.execution_kind IS 'due=到期执行 backfill=执行补录（OPS.16.12）';
 COMMENT ON COLUMN inspection_execution.backfill_next_due_date IS '补录可选下次到期（OPS.16.12）';
 COMMENT ON COLUMN inspection_execution.cycle_type IS '周期类型（OPS.16.15）';
@@ -3993,6 +4009,7 @@ CREATE TABLE IF NOT EXISTS inspection_execution_item (
     signature_url VARCHAR(500),
     execution_channel VARCHAR(20),
     confirm_channel VARCHAR(20),
+    update_channel VARCHAR(20),
     confirmed_by UUID,
     confirmed_by_name VARCHAR(100),
     confirmed_at TIMESTAMP WITH TIME ZONE,
@@ -4004,6 +4021,7 @@ CREATE TABLE IF NOT EXISTS inspection_execution_item (
 COMMENT ON TABLE inspection_execution_item IS '巡检执行明细（按设备）';
 COMMENT ON COLUMN inspection_execution_item.execution_channel IS '执行途径 web/app/mp（OPS.16.10）';
 COMMENT ON COLUMN inspection_execution_item.confirm_channel IS '确认途径 web/app/mp（OPS.16.10）';
+COMMENT ON COLUMN inspection_execution_item.update_channel IS '修改途径 web/app/mp（OPS.16.29）';
 COMMENT ON COLUMN inspection_execution_item.confirmed_by IS '确认人（OPS.16.14）';
 COMMENT ON COLUMN inspection_execution_item.confirmed_by_name IS '确认人姓名快照（OPS.16.14）';
 COMMENT ON COLUMN inspection_execution_item.confirmed_at IS '确认时间（OPS.16.14）';

@@ -5,7 +5,9 @@ import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.ops.OpsClientChannel;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
+import com.meis.saas.common.persistence.TableColumnCache;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,22 @@ public class InventoryCheckController {
             "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
 
     private final JdbcTemplate jdbc;
+
+    /** AST-UI-14：按设备查盘点参与记录 */
+    @GetMapping("/by-device/{deviceId}")
+    public Result<List<Map<String, Object>>> byDevice(@PathVariable UUID deviceId) {
+        return Result.ok(jdbc.queryForList("""
+                SELECT c.check_no, c.check_name, c.check_type, c.status, c.audit_status,
+                       c.dept_id, dept.dept_name, i.check_date, i.is_found, i.is_matched,
+                       i.actual_location, i.condition_status
+                FROM inventory_check_item i
+                INNER JOIN inventory_check c ON c.id = i.check_id
+                LEFT JOIN department dept ON dept.id = c.dept_id
+                WHERE i.device_id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check_item", "i")
+                + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check", "c")
+                + " ORDER BY COALESCE(i.check_date, c.created_at) DESC NULLS LAST", deviceId));
+    }
 
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(PageQuery query,
@@ -237,13 +255,30 @@ public class InventoryCheckController {
             throw new BizException(400, "该设备不在本盘点单明细中");
         }
         String userId = TenantContext.getUserId();
-        jdbc.update("""
-                UPDATE inventory_check_item SET is_found = true,
-                actual_location = COALESCE(?, actual_location),
-                check_date = NOW(),
-                checker_id = COALESCE(?::uuid, checker_id)
-                WHERE check_id = ?::uuid AND device_id = ?::uuid
-                """, body.get("actual_location"), userId, id, deviceId);
+        String channel = OpsClientChannel.of(body);
+        if (TableColumnCache.hasColumn(jdbc, "inventory_check_item", "update_channel")
+                && TableColumnCache.hasColumn(jdbc, "inventory_check_item", "confirm_channel")) {
+            jdbc.update("""
+                    UPDATE inventory_check_item SET is_found = true,
+                    actual_location = COALESCE(?, actual_location),
+                    check_date = NOW(),
+                    checker_id = COALESCE(?::uuid, checker_id),
+                    update_channel = ?, confirm_channel = COALESCE(confirm_channel, ?)
+                    WHERE check_id = ?::uuid AND device_id = ?::uuid
+                    """, body.get("actual_location"), userId, channel, channel, id, deviceId);
+        } else {
+            jdbc.update("""
+                    UPDATE inventory_check_item SET is_found = true,
+                    actual_location = COALESCE(?, actual_location),
+                    check_date = NOW(),
+                    checker_id = COALESCE(?::uuid, checker_id)
+                    WHERE check_id = ?::uuid AND device_id = ?::uuid
+                    """, body.get("actual_location"), userId, id, deviceId);
+        }
+        if (TableColumnCache.hasColumn(jdbc, "inventory_check", "update_channel")) {
+            jdbc.update("UPDATE inventory_check SET update_channel = ?, updated_at = NOW() WHERE id = ?::uuid",
+                    channel, id);
+        }
         refreshCheckedCount(id);
         return get(id);
     }
@@ -281,6 +316,7 @@ public class InventoryCheckController {
             args.add(body.get("actual_location"));
         }
         if (sets.isEmpty()) throw new BizException(400, "无更新字段");
+        SoftDeleteSupport.appendUpdateChannelFromBody(jdbc, "inventory_check_item", sets, args, body);
         sets.add("row_version = COALESCE(row_version,1) + 1");
         sets.add("updated_at = NOW()");
         args.add(itemId);
@@ -289,6 +325,10 @@ public class InventoryCheckController {
         int n = jdbc.update("UPDATE inventory_check_item SET " + String.join(", ", sets)
                 + " WHERE id = ?::uuid AND check_id = ?::uuid AND COALESCE(row_version,1)=?", args.toArray());
         if (n == 0) throw new BizException(409, "明细已被他人修改，请刷新后重试");
+        if (TableColumnCache.hasColumn(jdbc, "inventory_check", "update_channel")) {
+            jdbc.update("UPDATE inventory_check SET update_channel = ?, updated_at = NOW() WHERE id = ?::uuid",
+                    OpsClientChannel.of(body), id);
+        }
         refreshCheckedCount(id);
         return get(id);
     }

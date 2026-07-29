@@ -160,6 +160,7 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
     try {
       final payload = Map<String, dynamic>.from(body);
       if (row['row_version'] != null) payload['row_version'] = row['row_version'];
+      payload['client'] = 'app';
       await ref.read(apiServiceProvider).patchData(
             '/asset/inventory/${widget.checkId}/items/$itemId',
             payload,
@@ -199,7 +200,7 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
     try {
       await ref.read(apiServiceProvider).postData(
         '/asset/inventory/${widget.checkId}/scan',
-        {'device_code': code},
+        {'device_code': code, 'client': 'app'},
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('已盘到：$code')));

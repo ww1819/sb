@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../shared/utils/permission_util.dart';
 import '../../../shared/widgets/meis_nav_tile.dart';
 import '../../../shared/widgets/meis_section_label.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -16,7 +17,10 @@ import 'message_page.dart';
 import 'metrology_hub_page.dart';
 import 'my_repairs_page.dart';
 import 'pm_page.dart';
+import 'power_station_hub_page.dart';
+import 'power_tag_hub_page.dart';
 import 'repair_page.dart';
+import 'shared_hub_page.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -150,6 +154,27 @@ class HomePage extends ConsumerWidget {
                 subtitle: '现场补打记录与预览',
                 onTap: () => _push(context, const LabelReprintPage()),
               ),
+              if (hasAnyMenu(user, SharedHubPage.menuCodes))
+                MeisNavTile(
+                  icon: Icons.devices_other_outlined,
+                  title: '设备调配',
+                  subtitle: '公用设备借调 / 归还',
+                  onTap: () => _push(context, const SharedHubPage()),
+                ),
+              if (hasMenu(user, 'power_tag'))
+                MeisNavTile(
+                  icon: Icons.electrical_services_outlined,
+                  title: '电流标签',
+                  subtitle: '扫码查询 / 维护 / 改绑',
+                  onTap: () => _push(context, const PowerTagHubPage()),
+                ),
+              if (hasMenu(user, 'power_station'))
+                MeisNavTile(
+                  icon: Icons.router_outlined,
+                  title: '电流基站',
+                  subtitle: '查询维护 / 监测记录',
+                  onTap: () => _push(context, const PowerStationHubPage()),
+                ),
               const SizedBox(height: AppSpacing.md),
               const MeisSectionLabel('运维执行'),
               MeisNavTile(

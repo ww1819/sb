@@ -7,6 +7,7 @@ import com.meis.saas.common.asset.SparePartDeleteGuard;
 import com.meis.saas.common.audit.EntityChangeLogService;
 import com.meis.saas.common.code.DailyBizNoSupport;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.ops.OpsClientChannel;
 import com.meis.saas.common.ops.OpsExecutionItemSupport;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.persistence.TableColumnCache;
@@ -304,16 +305,20 @@ public abstract class GenericTableController {
         applyCategoryHierarchyDefaults(table, body);
         SoftDeleteSupport.applyInsertAudit(jdbc(), table, body);
         var cols = TableColumnCache.columns(jdbc(), table);
+        String clientHint = body.get("client") == null ? null : String.valueOf(body.get("client"));
+        body.keySet().removeIf(k -> !cols.contains(k));
         var softDeletedId = SoftDeleteSupport.findSoftDeletedId(jdbc(), table, body);
         if (softDeletedId.isPresent()) {
             String existingId = softDeletedId.get();
             Map<String, Object> before = loadTracked(table, existingId);
             body.put("id", existingId);
             SoftDeleteSupport.prepareRestore(body, cols);
+            if (clientHint != null) body.put("client", clientHint);
             executeUpdate(table, existingId, body);
+            body.remove("client");
             Map<String, Object> after = loadTracked(table, existingId);
             if (changeLogService != null) {
-                changeLogService.recordUpdate(table, existingId, before, after);
+                changeLogService.recordUpdate(table, existingId, before, after, clientHint);
             }
             return Result.ok(body);
         }
@@ -324,7 +329,7 @@ public abstract class GenericTableController {
         String vals = String.join(",", body.keySet().stream().map(GenericTableController::placeholder).toList());
         jdbc().update("INSERT INTO " + table + " (" + colNames + ") VALUES (" + vals + ")", body.values().toArray());
         if (changeLogService != null) {
-            changeLogService.recordCreate(table, body.get("id"), body);
+            changeLogService.recordCreate(table, body.get("id"), body, clientHint);
         }
         return Result.ok(body);
     }
@@ -347,11 +352,12 @@ public abstract class GenericTableController {
         normalizeJsonbFields(body);
         applyCategoryHierarchyDefaults(table, body);
         if (body.isEmpty()) return Result.ok();
+        String client = OpsClientChannel.of(body);
         Map<String, Object> before = loadTracked(table, id);
         executeUpdate(table, id, body);
         Map<String, Object> after = loadTracked(table, id);
         if (changeLogService != null) {
-            changeLogService.recordUpdate(table, id, before, after);
+            changeLogService.recordUpdate(table, id, before, after, client);
         }
         return Result.ok();
     }
@@ -441,7 +447,7 @@ public abstract class GenericTableController {
             throw new BizException(404, "not found");
         }
         if (changeLogService != null && before != null) {
-            changeLogService.recordDelete(table, id, before);
+            changeLogService.recordDelete(table, id, before, client);
         }
         return Result.ok();
     }
@@ -652,7 +658,11 @@ public abstract class GenericTableController {
             sets.add(k + " = " + placeholder(k));
             args.add(v);
         });
+        boolean hasBusinessSets = !sets.isEmpty();
         SoftDeleteSupport.appendUpdateAuditSets(jdbc(), cols, sets, args);
+        if (hasBusinessSets) {
+            SoftDeleteSupport.appendUpdateChannelFromBody(jdbc(), table, sets, args, body);
+        }
         if (sets.isEmpty()) return;
         args.add(id);
         jdbc().update("UPDATE " + table + " SET " + String.join(",", sets) + " WHERE id = ?::uuid", args.toArray());

@@ -137,9 +137,25 @@ export function buildPieOption(
         center: ['50%', '44%'],
         avoidLabelOverlap: true,
         itemStyle: { borderRadius: 6, borderColor: isDarkTheme() ? '#1d1d1d' : '#fff', borderWidth: 2 },
-        label: { show: false },
+        label: {
+          show: true,
+          formatter: (params: { name?: string; percent?: number }) => {
+            if (!params?.name) return ''
+            return `${params.name}\n${Number(params.percent ?? 0).toFixed(1)}%`
+          },
+          fontSize: 11,
+          color: isDarkTheme() ? '#cfd3dc' : '#606266'
+        },
+        labelLine: {
+          show: true,
+          length: 14,
+          length2: 10,
+          lineStyle: { color: isDarkTheme() ? '#6b7280' : '#94a3b8' }
+        },
         emphasis: {
-          label: { show: true, fontSize: 13, fontWeight: 600 }
+          scale: true,
+          scaleSize: 6,
+          label: { show: true, fontSize: 12, fontWeight: 600 }
         },
         data
       }
@@ -195,12 +211,16 @@ export function buildRosePieOption(
         label: {
           show: true,
           color: dark ? '#cfd3dc' : '#606266',
-          fontSize: 11
+          fontSize: 11,
+          formatter: (params: { name?: string; percent?: number }) => {
+            if (!params?.name) return ''
+            return `${params.name}\n${Number(params.percent ?? 0).toFixed(1)}%`
+          }
         },
         labelLine: {
           show: true,
-          length: 12,
-          length2: 8,
+          length: 14,
+          length2: 10,
           lineStyle: { width: 1 }
         },
         data
@@ -284,6 +304,19 @@ export function buildMultiKpiGaugeOption(
       borderWidth: 1,
       textStyle: { color: dark ? '#e5eaf3' : '#303133', fontSize: 12 },
       extraCssText: 'box-shadow: 0 4px 12px rgba(0, 21, 41, 0.12); border-radius: 6px; z-index: 9999;'
+    },
+    legend: {
+      bottom: 0,
+      icon: 'circle',
+      itemWidth: 8,
+      itemHeight: 8,
+      itemGap: 14,
+      textStyle: { color: dark ? '#a3a6ad' : '#606266', fontSize: 12 },
+      data: rings.map((r) => ({ name: r.name, itemStyle: { color: r.color } })),
+      formatter: (name: string) => {
+        const ring = rings.find((r) => r.name === name)
+        return ring ? `${name} ${ring.value}%` : name
+      }
     },
     series,
     graphic: [

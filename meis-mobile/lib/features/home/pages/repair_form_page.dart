@@ -163,6 +163,7 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
       'reporter_id': user?.userId,
       'report_dept_id': device!['dept_id'],
       'report_method': 'app',
+      'client': 'app',
       'fault_description': faultCtrl.text.trim(),
       'urgency_level': urgency,
       'fault_type_id': faultTypeId,
@@ -364,7 +365,7 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
         ),
       );
       if (submit == true && workorderId != null) {
-        await api.postData('/repair/workorder/$workorderId/submit');
+        await api.postData('/repair/workorder/$workorderId/submit', {'client': 'app'});
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已提交')));
           Navigator.pop(context, true);

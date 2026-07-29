@@ -24,11 +24,21 @@
             <span>日常办公</span>
             <el-badge v-if="todos.length" :value="todos.length" class="tab-badge" />
           </template>
-          <el-row :gutter="16">
+          <el-row :gutter="16" class="workspace-panels">
             <el-col :xs="24" :lg="profile.showTodos ? 14 : 24">
               <el-card shadow="never" class="panel-card">
                 <template #header>
-                  <div class="panel-header">快捷入口</div>
+                  <div class="panel-header panel-header--with-action">
+                    <span>快捷入口</span>
+                    <el-button
+                      class="panel-header-action"
+                      text
+                      type="primary"
+                      :icon="Setting"
+                      title="设置快捷入口"
+                      @click="settingsOpen = true"
+                    />
+                  </div>
                 </template>
                 <QuickEntryGrid :items="quickEntries" @navigate="go" />
               </el-card>
@@ -58,20 +68,19 @@
               </ProgressCircle>
             </div>
           </el-card>
-          <TrafficWayChart />
         </el-tab-pane>
 
         <el-tab-pane v-if="activeCharts.length" name="charts" lazy>
           <template #label>数据分析</template>
           <el-row :gutter="16" class="charts-row">
-            <el-col
-              v-for="chart in activeCharts"
-              :key="chart.key"
-              :xs="24"
-              :lg="chart.span"
-            >
-              <ChartCard :title="chart.title" :option="chart.option" :height="chart.height" />
-            </el-col>
+            <template v-for="chart in activeCharts" :key="chart.key">
+              <el-col :xs="24" :lg="chart.span">
+                <ChartCard :title="chart.title" :option="chart.option" :height="chart.height" />
+              </el-col>
+              <el-col v-if="chart.key === assetDistAfterKey" :xs="24" :lg="assetDistSpan">
+                <AssetDistributionChart :items="deviceByDept" />
+              </el-col>
+            </template>
           </el-row>
         </el-tab-pane>
 
@@ -95,37 +104,66 @@
         </el-tab-pane>
       </el-tabs>
     </div>
+
+    <QuickEntrySettingsDialog
+      v-model="settingsOpen"
+      :modules="navModules"
+      :selected-paths="displayQuickPaths"
+      @saved="onQuickEntrySaved"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch, type Component } from 'vue'
 import { useRouter } from 'vue-router'
 import type { EChartsOption } from 'echarts'
 import type { TabPaneName } from 'element-plus'
+import { Menu, Setting } from '@element-plus/icons-vue'
 import http from '@/api/http'
+import { useAuthStore } from '@/stores/auth'
 import { useTabsStore } from '@/stores/tabs'
 import { useLayoutStore } from '@/stores/layout'
 import { useDashboardProfile } from '@/composables/useDashboardProfile'
 import { ALL_QUICK_ENTRIES, type DashboardChartKey } from '@/config/dashboardProfiles'
 import StatCard from '@/components/dashboard/StatCard.vue'
 import ChartCard from '@/components/dashboard/ChartCard.vue'
-import QuickEntryGrid from '@/components/dashboard/QuickEntryGrid.vue'
+import QuickEntryGrid, { type QuickEntryItem } from '@/components/dashboard/QuickEntryGrid.vue'
+import QuickEntrySettingsDialog from '@/components/dashboard/QuickEntrySettingsDialog.vue'
 import FeedList from '@/components/dashboard/FeedList.vue'
 import ProgressCircle, { type ProgressCircleVariant } from '@/components/ProgressCircle.vue'
-import TrafficWayChart from '@/components/dashboard/TrafficWayChart.vue'
+import AssetDistributionChart from '@/components/dashboard/AssetDistributionChart.vue'
+import {
+  flattenMenus,
+  normalizeNavModules,
+  type NavModule
+} from '@/utils/menuNav'
 import {
   buildBarOption,
   buildLineOption,
   buildMultiKpiGaugeOption,
   buildPieOption,
-  buildRosePieOption
+  buildRosePieOption,
+  CHART_COLORS,
+  type MultiKpiRing
 } from '@/composables/useChartTheme'
+import { useDict } from '@/composables/useDict'
 
 const router = useRouter()
+const auth = useAuthStore()
 const tabs = useTabsStore()
 const layoutStore = useLayoutStore()
 const { profile } = useDashboardProfile()
+const { loadDict, resolveDictLabel, cacheVersion } = useDict()
+
+const QUICK_ENTRY_COLORS = [
+  { color: '#1677ff', bgColor: 'rgba(22, 119, 255, 0.08)' },
+  { color: '#13c2c2', bgColor: 'rgba(19, 194, 194, 0.08)' },
+  { color: '#722ed1', bgColor: 'rgba(114, 46, 209, 0.08)' },
+  { color: '#fa8c16', bgColor: 'rgba(250, 140, 22, 0.08)' },
+  { color: '#52c41a', bgColor: 'rgba(82, 196, 26, 0.08)' },
+  { color: '#fa541c', bgColor: 'rgba(250, 84, 28, 0.08)' }
+]
 
 const progressCircleDemo: { variant: ProgressCircleVariant; label: string; value: number }[] = [
   { variant: 'default', label: 'Default', value: 62 },
@@ -139,6 +177,23 @@ const stats = ref<Record<string, unknown>>({})
 const todos = ref<Record<string, unknown>[]>([])
 const messages = ref<Record<string, unknown>[]>([])
 const activeTab = ref('workspace')
+const settingsOpen = ref(false)
+const navModules = ref<NavModule[]>([])
+/** null = 未配置，走角色默认；数组 = 已保存（可为空） */
+const savedQuickPaths = ref<string[] | null>(null)
+
+const deviceByDept = computed(() => {
+  const raw = stats.value.deviceByDept
+  if (!Array.isArray(raw)) return []
+  return raw.map((row) => {
+    const r = row as Record<string, unknown>
+    return {
+      dept_name: String(r.dept_name ?? '未分配'),
+      count: Number(r.count) || 0
+    }
+  })
+})
+
 /** 日常办公 / 数据分析 / 消息中心自动轮播；鼠标悬停在 Tab 区域时暂停（DASH-UI-01） */
 const TAB_ROTATE_MS = 5000
 const tabHoverPaused = ref(false)
@@ -185,9 +240,44 @@ watch(rotatableTabs, (names) => {
 
 const kpiSpan = computed(() => (profile.value.kpis.length === 3 ? 8 : 6))
 
-const quickEntries = computed(() => {
-  const paths = new Set(profile.value.quickPaths)
-  return ALL_QUICK_ENTRIES.filter((item) => paths.has(item.path))
+const allowedMenuByPath = computed(() => {
+  const map = new Map<string, { title: string; moduleTitle: string }>()
+  for (const item of flattenMenus(navModules.value)) {
+    if (!item.path) continue
+    map.set(item.path, { title: item.title, moduleTitle: item.moduleTitle })
+  }
+  return map
+})
+
+const displayQuickPaths = computed(() => {
+  const allowed = allowedMenuByPath.value
+  const source =
+    savedQuickPaths.value != null ? savedQuickPaths.value : profile.value.quickPaths
+  return source.filter((p) => allowed.has(p))
+})
+
+const presetByPath = new Map(ALL_QUICK_ENTRIES.map((e) => [e.path, e]))
+
+function colorForPath(path: string) {
+  let hash = 0
+  for (let i = 0; i < path.length; i++) hash = (hash * 31 + path.charCodeAt(i)) | 0
+  return QUICK_ENTRY_COLORS[Math.abs(hash) % QUICK_ENTRY_COLORS.length]
+}
+
+const quickEntries = computed<QuickEntryItem[]>(() => {
+  return displayQuickPaths.value.map((path) => {
+    const preset = presetByPath.get(path)
+    const menu = allowedMenuByPath.value.get(path)
+    const palette = colorForPath(path)
+    return {
+      label: menu?.title ?? preset?.label ?? path,
+      desc: preset?.desc,
+      path,
+      icon: (preset?.icon ?? Menu) as Component,
+      color: preset?.color ?? palette.color,
+      bgColor: preset?.bgColor ?? palette.bgColor
+    }
+  })
 })
 
 const unreadCount = computed(() =>
@@ -199,20 +289,29 @@ const emptyBar: EChartsOption = buildBarOption([], [])
 const emptyPie: EChartsOption = buildPieOption([])
 const emptyRose: EChartsOption = buildRosePieOption([])
 
-/** DASH-UI-04：示意多环 KPI（对齐 Highcharts Multiple KPI gauge） */
-function buildKpiGaugeDemo(): EChartsOption {
-  return buildMultiKpiGaugeOption(
-    [
-      { name: 'KPI A', value: 75, color: '#2CAFFE', trackColor: '#D6EEFF' },
-      { name: 'KPI B', value: 60, color: '#544FC5', trackColor: '#E8E7F8' },
-      { name: 'KPI C', value: 85, color: '#00E272', trackColor: '#D6FCE9' }
-    ],
-    'Conversion',
-    '80%'
-  )
+const GAUGE_TRACK_COLORS = ['#D6E7FF', '#D6F5F5', '#E8DFF5', '#FFE8D1', '#D9F5D6', '#FCDCEC']
+
+/** 设备状态 → 同心 KPI 环（占比） */
+function buildDeviceStatusGauge(
+  rows: { device_status: string; count: number }[]
+): EChartsOption {
+  const total = rows.reduce((sum, r) => sum + (Number(r.count) || 0), 0)
+  if (!total) return emptyPie
+  const rings: MultiKpiRing[] = rows.slice(0, 5).map((r, i) => {
+    const count = Number(r.count) || 0
+    const pct = Math.round((count / total) * 1000) / 10
+    return {
+      name: resolveDictLabel('device_status', r.device_status) ?? String(r.device_status ?? '未知'),
+      value: pct,
+      color: CHART_COLORS[i % CHART_COLORS.length],
+      trackColor: GAUGE_TRACK_COLORS[i % GAUGE_TRACK_COLORS.length]
+    }
+  })
+  return buildMultiKpiGaugeOption(rings, '设备总数', String(total))
 }
 
 function chartOptions() {
+  void cacheVersion.value
   const trend = (stats.value.repairTrend as { month: string; count: number }[]) ?? []
   const brands = (stats.value.brandTop10 as { brand: string; count: number }[]) ?? []
   const status = (stats.value.deviceStatus as { device_status: string; count: number }[]) ?? []
@@ -237,12 +336,7 @@ function chartOptions() {
           brands.map((b) => b.count),
           '设备数'
         ),
-    status: !status.length
-      ? emptyPie
-      : buildPieOption(
-          status.map((s) => ({ name: s.device_status, value: s.count })),
-          '设备状态'
-        ),
+    status: buildDeviceStatusGauge(status),
     category: !category.length
       ? emptyRose
       : buildRosePieOption(
@@ -262,7 +356,6 @@ function chartOptions() {
           nd.map((n) => n.count),
           '新增'
         ),
-    kpiGauge: buildKpiGaugeDemo(),
     deptValue: !dept.length
       ? emptyBar
       : buildBarOption(
@@ -280,7 +373,6 @@ const chartMeta: Record<DashboardChartKey, { title: string; height: string; wide
   category: { title: '设备分类', height: '300px' },
   origin: { title: '国产/进口', height: '300px' },
   newDevice: { title: '新增设备', height: '300px', wide: true },
-  kpiGauge: { title: 'Multiple KPI gauge', height: '300px', wide: true },
   deptValue: { title: '科室资产价值', height: '320px', wide: true }
 }
 
@@ -290,44 +382,76 @@ const activeCharts = computed(() => {
   const keys = profile.value.charts
   const triplePies =
     keys.includes('status') && keys.includes('category') && keys.includes('origin')
-  const newDevicePair = keys.includes('newDevice') && keys.includes('kpiGauge')
   return keys.map((key, index) => {
     const meta = chartMeta[key]
     const isWide = meta.wide ?? false
     const isLastOdd = keys.length % 2 === 1 && index === keys.length - 1
     const isTriplePie =
       triplePies && (key === 'status' || key === 'category' || key === 'origin')
-    const isNewDevicePair =
-      newDevicePair && (key === 'newDevice' || key === 'kpiGauge')
+    /** 新增设备与资产分布并排，固定半宽 */
+    const isNewDevice = key === 'newDevice'
     return {
       key,
       title: meta.title,
       height: meta.height,
       option: options[key],
-      span: isTriplePie ? 8 : isNewDevicePair ? 12 : isLastOdd ? 24 : isWide ? 12 : 12
+      span: isTriplePie ? 8 : isNewDevice ? 12 : isLastOdd ? 24 : isWide ? 12 : 12
     }
   })
 })
+
+/** 资产分布紧挨「新增设备」右侧同排；无新增设备时跟在图表区末尾整行 */
+const assetDistAfterKey = computed(() => {
+  const keys = profile.value.charts
+  if (keys.includes('newDevice')) return 'newDevice'
+  return keys[keys.length - 1] ?? ''
+})
+
+const assetDistSpan = computed(() => (profile.value.charts.includes('newDevice') ? 12 : 24))
 
 watch(() => layoutStore.themeRevision, () => {
   // trigger chart option rebuild via activeCharts dependency
 })
 
 onMounted(async () => {
-  const [dash, todoRes, msgRes] = await Promise.all([
+  const user = auth.user
+  const menuReq =
+    user?.userType === 'platform'
+      ? http.get('/system/menus/platform-nav')
+      : http.get('/system/menus/effective', {
+          params: {
+            tenantId: user?.tenantId,
+            schema: user?.schemaName,
+            userId: user?.userId
+          }
+        })
+
+  const [dash, todoRes, msgRes, menuRes, prefRes] = await Promise.all([
     http.get('/analytics/dashboard'),
     http.get('/analytics/dashboard/todos'),
-    http.get('/notification/messages')
+    http.get('/notification/messages'),
+    menuReq.catch(() => ({ data: { data: [] } })),
+    user?.userType === 'platform'
+      ? Promise.resolve({ data: { data: {} } })
+      : http.get('/system/users/me/preferences').catch(() => ({ data: { data: {} } })),
+    loadDict('device_status').catch(() => [])
   ])
   stats.value = dash.data.data ?? {}
   todos.value = todoRes.data.data ?? []
   messages.value = msgRes.data.data ?? []
+  navModules.value = normalizeNavModules(menuRes.data?.data ?? [])
+  const rawPaths = prefRes.data?.data?.quickEntryPaths
+  savedQuickPaths.value = Array.isArray(rawPaths) ? (rawPaths as string[]) : null
   startTabRotate()
 })
 
 onUnmounted(() => {
   stopTabRotate()
 })
+
+function onQuickEntrySaved(paths: string[]) {
+  savedQuickPaths.value = paths
+}
 
 function onTabChange(name: TabPaneName) {
   if (name === 'charts') {
@@ -398,8 +522,29 @@ function numVal(v: unknown) {
   box-shadow: var(--meis-card-shadow);
 }
 
-.panel-card--fill {
-  min-height: 240px;
+/* 快捷入口 / 待办事项同行等高 */
+.workspace-panels > .el-col {
+  display: flex;
+}
+
+.workspace-panels .panel-card {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-panels .panel-card :deep(.el-card__body) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-card--fill :deep(.feed-list) {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .panel-card :deep(.el-card__header) {
@@ -413,6 +558,18 @@ function numVal(v: unknown) {
   font-size: 14px;
   font-weight: 600;
   color: var(--meis-text-primary);
+}
+
+.panel-header--with-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.panel-header-action {
+  margin: -4px -8px -4px 0;
+  padding: 4px 8px;
 }
 
 .panel-header::before {

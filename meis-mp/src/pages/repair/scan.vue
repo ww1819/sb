@@ -314,6 +314,7 @@ function buildBody() {
     reporter_id: auth.user?.userId,
     report_dept_id: device.value!.dept_id,
     report_method: 'miniprogram',
+    client: 'mp',
     fault_description: faultDescription.value.trim(),
     urgency_level: urgencyOptions[urgencyIndex.value].value,
     fault_type_id: ft?.id ?? null,
@@ -344,7 +345,7 @@ async function saveAndAskSubmit() {
       })
     })
     if (doSubmit) {
-      const done = await http.post<{ wo_no?: string }>(`/repair/workorder/${id}/submit`)
+      const done = await http.post<{ wo_no?: string }>(`/repair/workorder/${id}/submit`, { client: 'mp' })
       await requestSubscribe('repair_submit')
       uni.showModal({
         title: '报修成功',

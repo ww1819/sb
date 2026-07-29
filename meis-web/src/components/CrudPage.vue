@@ -297,6 +297,7 @@ const emit = defineEmits<{
   deleted: [row: Record<string, unknown>]
   saved: [payload: Record<string, unknown>]
   imported: []
+  'selection-change': [count: number]
 }>()
 const slots = useSlots()
 const { loadDict, preloadDictTypes } = useDict()
@@ -339,9 +340,14 @@ const {
   selectedCount,
   syncFromTable,
   selectedIds,
+  setSelectedIds,
+  applyToCurrentPage,
   clear: clearSelection,
   clearAll
 } = useCrossPageSelection()
+
+/** 程序化回显勾选时跳过 selection-change 的增量同步，避免冲掉跨页 id */
+const applyingSelection = ref(false)
 
 const tableHeight = useSystemTableHeight()
 
@@ -528,6 +534,11 @@ async function load() {
     const { data } = await http.get(url, { params })
     rows.value = data.data?.records ?? []
     total.value = data.data?.total ?? 0
+    await nextTick()
+    applyingSelection.value = true
+    applyToCurrentPage(tableRef.value, rows.value)
+    await nextTick()
+    applyingSelection.value = false
   } finally {
     loading.value = false
   }
@@ -693,11 +704,24 @@ async function remove(row: Record<string, unknown>) {
 
 function onSelectionChange(selection: Record<string, unknown>[]) {
   selectedRows.value = selection
-  syncFromTable(selection)
+  if (applyingSelection.value) return
+  syncFromTable(selection, rows.value)
+  emit('selection-change', selectedCount.value)
 }
 
 function onClearSelection() {
   clearAll(tableRef.value)
+  emit('selection-change', 0)
+}
+
+async function selectAllByIds(ids: string[]) {
+  setSelectedIds(ids)
+  applyingSelection.value = true
+  applyToCurrentPage(tableRef.value, rows.value)
+  await nextTick()
+  applyingSelection.value = false
+  selectedRows.value = rows.value.filter((r) => ids.includes(String(r.id ?? '')))
+  emit('selection-change', selectedCount.value)
 }
 
 function buildFilterQueryParams(): Record<string, string> {
@@ -811,7 +835,17 @@ function getSelectedRows() {
   return selectedRows.value
 }
 
-defineExpose({ load, remove, getSelectedRows, selectedCount, selectedIds, getFilterQueryParams: buildFilterQueryParams })
+defineExpose({
+  load,
+  remove,
+  getSelectedRows,
+  selectedCount,
+  selectedIds,
+  getFilterQueryParams: buildFilterQueryParams,
+  clearSelection: onClearSelection,
+  selectAllByIds,
+  total
+})
 </script>
 
 <style scoped>

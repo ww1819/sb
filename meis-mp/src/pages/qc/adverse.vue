@@ -153,7 +153,8 @@ async function submit() {
       severity_level: severityOptions[severityIndex.value]?.value || 'medium',
       event_description: description.value.trim(),
       remark: remark.value.trim() || null,
-      reporter_id: auth.user?.userId
+      reporter_id: auth.user?.userId,
+      client: 'mp'
     })
     uni.showToast({ title: '已上报', icon: 'success' })
     setTimeout(() => uni.navigateBack(), 800)

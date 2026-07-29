@@ -5,6 +5,7 @@ import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.ops.OpsClientChannel;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.persistence.TableColumnCache;
 import com.meis.saas.common.result.Result;
@@ -285,11 +286,16 @@ public class RepairWorkorderController {
             @RequestParam(required = false) String assignedUserId,
             @RequestParam(required = false) String assignment,
             @RequestParam(required = false) String reportTimeFrom,
-            @RequestParam(required = false) String reportTimeTo) {
+            @RequestParam(required = false) String reportTimeTo,
+            @RequestParam(required = false) UUID deviceId) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder", null));
         List<Object> args = new ArrayList<>();
 
+        if (deviceId != null) {
+            where.append(" AND device_id = ?::uuid ");
+            args.add(deviceId);
+        }
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
             String kw = "%" + query.getKeyword().trim() + "%";
             where.append("""
@@ -557,9 +563,13 @@ public class RepairWorkorderController {
                     body.getOrDefault("urgency_level", "normal"),
                     blankToNull(body.get("fault_type_id")), blankToNull(body.get("remark")), "draft");
         }
+        String createChannel = OpsClientChannel.of(body);
+        if (TableColumnCache.hasColumn(jdbc, "repair_workorder", "create_channel")) {
+            jdbc.update("UPDATE repair_workorder SET create_channel = ? WHERE id = ?::uuid", createChannel, id);
+        }
         Map<String, Object> row = requireWo(id);
         addEvent(id, "created", null, "draft", null, null, null, null, null, "保存草稿", null);
-        changeLog.recordCreate("repair_workorder", id, row);
+        changeLog.recordCreate("repair_workorder", id, row, createChannel);
         return Result.ok(row);
     }
 
@@ -604,33 +614,44 @@ public class RepairWorkorderController {
             }
         }
         if (sets.isEmpty()) return Result.ok(before);
+        SoftDeleteSupport.appendUpdateChannelFromBody(jdbc, "repair_workorder", sets, args, body);
         sets.add("updated_at = NOW()");
         args.add(id);
         jdbc.update("UPDATE repair_workorder SET " + String.join(", ", sets) + " WHERE id = ?::uuid", args.toArray());
         Map<String, Object> after = requireWo(id);
         addEvent(id, "update", "draft", "draft", null, null, null, null, null, "修改草稿", null);
-        changeLog.recordUpdate("repair_workorder", id, before, after);
+        changeLog.recordUpdate("repair_workorder", id, before, after, OpsClientChannel.of(body));
         return Result.ok(after);
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/submit")
     @Transactional
     @OperationLog(module = "repair", description = "提交报修")
-    public Result<Map<String, Object>> submit(@PathVariable UUID id) {
+    public Result<Map<String, Object>> submit(@PathVariable UUID id,
+                                              @RequestBody(required = false) Map<String, Object> body) {
         Map<String, Object> before = requireWo(id);
         if (!"draft".equals(str(before.get("status")))) {
             throw new BizException(400, "仅未提交草稿可提交");
         }
         assertDeviceAvailable(before.get("device_id"), id);
-        jdbc.update("""
-            UPDATE repair_workorder SET status = 'reported',
-            report_time = COALESCE(report_time, NOW()), updated_at = NOW()
-            WHERE id = ?::uuid
-            """, id);
+        String channel = OpsClientChannel.of(body);
+        if (TableColumnCache.hasColumn(jdbc, "repair_workorder", "submit_channel")) {
+            jdbc.update("""
+                UPDATE repair_workorder SET status = 'reported',
+                report_time = COALESCE(report_time, NOW()), submit_channel = ?, updated_at = NOW()
+                WHERE id = ?::uuid
+                """, channel, id);
+        } else {
+            jdbc.update("""
+                UPDATE repair_workorder SET status = 'reported',
+                report_time = COALESCE(report_time, NOW()), updated_at = NOW()
+                WHERE id = ?::uuid
+                """, id);
+        }
         syncDeviceStatus(before.get("device_id"), "maintenance");
         Map<String, Object> after = requireWo(id);
         addEvent(id, "submit", "draft", "reported", null, null, null, null, null, "提交报修", null);
-        changeLog.recordAction("repair_workorder", id, "submit", before, after, "提交报修");
+        changeLog.recordAction("repair_workorder", id, "submit", before, after, "提交报修", channel);
         return Result.ok(after);
     }
 
@@ -649,21 +670,21 @@ public class RepairWorkorderController {
         String remark = body != null ? str(body.get("remark")) : "撤回报修";
         if (remark.isBlank()) remark = "撤回报修";
         addEvent(id, "withdraw", "reported", "draft", null, null, null, null, null, remark, null);
-        changeLog.recordAction("repair_workorder", id, "withdraw", before, after, remark);
+        changeLog.recordAction("repair_workorder", id, "withdraw", before, after, remark, OpsClientChannel.of(body));
         return Result.ok(after);
     }
 
     @DeleteMapping("/{id:" + UUID_PATH + "}")
     @Transactional
     @OperationLog(module = "repair", description = "删除报修草稿")
-    public Result<Void> delete(@PathVariable UUID id) {
+    public Result<Void> delete(@PathVariable UUID id, @RequestParam(required = false) String client) {
         Map<String, Object> before = requireWo(id);
         if (!"draft".equals(str(before.get("status")))) {
             throw new BizException(400, "仅未提交的报修单可删除");
         }
         addEvent(id, "delete", "draft", "draft", null, null, null, null, null, "删除草稿", null);
-        changeLog.recordDelete("repair_workorder", id, before);
-        SoftDeleteSupport.softDelete(jdbc, "repair_workorder", id.toString());
+        changeLog.recordDelete("repair_workorder", id, before, client);
+        SoftDeleteSupport.softDelete(jdbc, "repair_workorder", id.toString(), client);
         return Result.ok();
     }
 
@@ -1026,6 +1047,10 @@ public class RepairWorkorderController {
             syncDeviceStatus(wo.get("device_id"), "maintenance");
             segmentService.openSystemSegment(id, "verify_rejected", wo.get("assigned_user_id"), comment, comment);
         }
+        if (TableColumnCache.hasColumn(jdbc, "repair_workorder", "confirm_channel")) {
+            jdbc.update("UPDATE repair_workorder SET confirm_channel = ?, updated_at = NOW() WHERE id = ?::uuid",
+                    OpsClientChannel.of(body), id);
+        }
         return Result.ok(loadWorkorder(id));
     }
 
@@ -1095,7 +1120,7 @@ public class RepairWorkorderController {
         addEvent(id, "cancel", current, "cancelled", str(wo.get("repair_sub_status")), null,
                 null, null, null, remark, null);
         syncDeviceStatus(wo.get("device_id"), "normal");
-        changeLog.recordAction("repair_workorder", id, "cancel", wo, requireWo(id), remark);
+        changeLog.recordAction("repair_workorder", id, "cancel", wo, requireWo(id), remark, OpsClientChannel.of(body));
         return Result.ok(loadWorkorder(id));
     }
 

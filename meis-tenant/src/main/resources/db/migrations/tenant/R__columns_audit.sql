@@ -1288,3 +1288,7 @@ BEGIN
         );
     END LOOP;
 END $ensure_audit_by_names$;
+
+-- OPS.16.30 实体变更记录操作端
+ALTER TABLE sys_entity_change_log ADD COLUMN IF NOT EXISTS client VARCHAR(20);
+COMMENT ON COLUMN sys_entity_change_log.client IS '操作端 web/app/mp（OPS.16.30）';

@@ -843,3 +843,163 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('ops_execution_kind', 'due', '到期执行', 'due', 1),
 ('ops_execution_kind', 'backfill', '执行补录', 'backfill', 2)
 ON CONFLICT (dict_type, dict_code) DO UPDATE SET dict_label = EXCLUDED.dict_label, dict_value = EXCLUDED.dict_value, sort_order = EXCLUDED.sort_order;
+
+-- ========== MOB-CHANNEL-02：历史途径 NULL 回填为 web（仅已发生动作）==========
+-- 规则见约定包 §5.10.6：create 一律补；其它动作列仅在有业务证据时补，避免未发生动作显示途径。
+DO $$
+DECLARE
+  r RECORD;
+  has_col BOOLEAN;
+  cond TEXT;
+  sql TEXT;
+BEGIN
+  FOR r IN
+    SELECT c.table_name, c.column_name
+    FROM information_schema.columns c
+    JOIN information_schema.tables t
+      ON t.table_schema = c.table_schema AND t.table_name = c.table_name
+    WHERE c.table_schema = current_schema()
+      AND t.table_type = 'BASE TABLE'
+      AND c.column_name LIKE '%\_channel' ESCAPE '\'
+      AND c.data_type IN ('character varying', 'text', 'varchar')
+  LOOP
+    cond := NULL;
+
+    IF r.column_name = 'create_channel' THEN
+      cond := 'TRUE';
+
+    ELSIF r.column_name = 'delete_channel' THEN
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = r.table_name AND column_name = 'is_deleted'
+      ) INTO has_col;
+      IF has_col THEN
+        cond := 'COALESCE(is_deleted, 0) = 1';
+      ELSE
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = current_schema() AND table_name = r.table_name AND column_name = 'deleted_at'
+        ) INTO has_col;
+        IF has_col THEN
+          cond := 'deleted_at IS NOT NULL';
+        END IF;
+      END IF;
+
+    ELSIF r.column_name = 'update_channel' THEN
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = r.table_name AND column_name = 'updated_by'
+      ) INTO has_col;
+      IF has_col THEN
+        cond := 'updated_by IS NOT NULL';
+      ELSE
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns x
+          WHERE x.table_schema = current_schema() AND x.table_name = r.table_name AND x.column_name = 'updated_at'
+        ) AND EXISTS (
+          SELECT 1 FROM information_schema.columns x
+          WHERE x.table_schema = current_schema() AND x.table_name = r.table_name AND x.column_name = 'created_at'
+        ) INTO has_col;
+        IF has_col THEN
+          cond := 'updated_at IS NOT NULL AND created_at IS NOT NULL AND updated_at > created_at + INTERVAL ''2 seconds''';
+        END IF;
+      END IF;
+
+    ELSIF r.column_name = 'submit_channel' THEN
+      cond := NULL;
+      SELECT string_agg(q.frag, ' OR ')
+      INTO cond
+      FROM (
+        SELECT 'submitter_id IS NOT NULL' AS frag
+        WHERE EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = r.table_name AND column_name = 'submitter_id')
+        UNION ALL
+        SELECT 'NULLIF(TRIM(submitter_name), '''') IS NOT NULL'
+        WHERE EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = r.table_name AND column_name = 'submitter_name')
+        UNION ALL
+        SELECT 'submitted_at IS NOT NULL'
+        WHERE EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = r.table_name AND column_name = 'submitted_at')
+        UNION ALL
+        SELECT 'status IS NOT NULL AND status NOT IN (''draft'', ''planning'', ''reported'', ''open'', ''pending_create'')'
+        WHERE EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = r.table_name AND column_name = 'status')
+      ) q;
+      -- shared return 无 draft 状态，pending 已算提交后
+      IF r.table_name IN ('shared_device_loan', 'shared_device_return') THEN
+        cond := 'status IS NOT NULL AND status <> ''draft''';
+      END IF;
+
+    ELSIF r.column_name = 'audit_channel' THEN
+      SELECT string_agg(q.frag, ' OR ')
+      INTO cond
+      FROM (
+        SELECT 'auditor_id IS NOT NULL' AS frag
+        WHERE EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = r.table_name AND column_name = 'auditor_id')
+        UNION ALL
+        SELECT 'NULLIF(TRIM(auditor_name), '''') IS NOT NULL'
+        WHERE EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = r.table_name AND column_name = 'auditor_name')
+        UNION ALL
+        SELECT 'audited_at IS NOT NULL'
+        WHERE EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = r.table_name AND column_name = 'audited_at')
+        UNION ALL
+        SELECT 'approved_by IS NOT NULL'
+        WHERE EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = r.table_name AND column_name = 'approved_by')
+        UNION ALL
+        SELECT 'NULLIF(TRIM(approved_by_name), '''') IS NOT NULL'
+        WHERE EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = r.table_name AND column_name = 'approved_by_name')
+        UNION ALL
+        SELECT 'approved_at IS NOT NULL'
+        WHERE EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = r.table_name AND column_name = 'approved_at')
+        UNION ALL
+        SELECT 'audit_status IS NOT NULL AND audit_status NOT IN (''pending'', ''draft'')'
+        WHERE EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = r.table_name AND column_name = 'audit_status')
+        UNION ALL
+        SELECT 'approval_status IS NOT NULL AND approval_status NOT IN (''pending'', ''draft'')'
+        WHERE EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = r.table_name AND column_name = 'approval_status')
+      ) q;
+
+    ELSIF r.column_name = 'confirm_channel' THEN
+      SELECT string_agg(q.frag, ' OR ')
+      INTO cond
+      FROM (
+        SELECT 'confirmed_by IS NOT NULL' AS frag
+        WHERE EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = r.table_name AND column_name = 'confirmed_by')
+        UNION ALL
+        SELECT 'NULLIF(TRIM(confirmed_by_name), '''') IS NOT NULL'
+        WHERE EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = r.table_name AND column_name = 'confirmed_by_name')
+        UNION ALL
+        SELECT 'confirmed_at IS NOT NULL'
+        WHERE EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = r.table_name AND column_name = 'confirmed_at')
+        UNION ALL
+        SELECT 'status IS NOT NULL AND status IN (''confirmed'', ''approved'', ''on_loan'', ''returned'', ''completed'', ''closed'', ''done'', ''rejected'')'
+        WHERE EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = r.table_name AND column_name = 'status')
+      ) q;
+
+    ELSIF r.column_name = 'execution_channel' THEN
+      SELECT string_agg(q.frag, ' OR ')
+      INTO cond
+      FROM (
+        SELECT 'end_time IS NOT NULL' AS frag
+        WHERE EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = r.table_name AND column_name = 'end_time')
+        UNION ALL
+        SELECT 'execute_end_time IS NOT NULL'
+        WHERE EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = r.table_name AND column_name = 'execute_end_time')
+        UNION ALL
+        SELECT 'status IS NOT NULL AND status NOT IN (''pending'', ''open'', ''draft'', ''waiting'', ''todo'')'
+        WHERE EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = r.table_name AND column_name = 'status')
+      ) q;
+
+    ELSE
+      -- 未知 *\_channel：有行即视为历史 web 制单类字段，一律补（保守避免空白）
+      cond := 'TRUE';
+    END IF;
+
+    IF cond IS NULL OR cond = '' THEN
+      CONTINUE;
+    END IF;
+
+    sql := format(
+      'UPDATE %I SET %I = ''web'' WHERE %I IS NULL AND (%s)',
+      r.table_name, r.column_name, r.column_name, cond
+    );
+    EXECUTE sql;
+  END LOOP;
+END $$;

@@ -67,7 +67,13 @@ const readingTitle = ref('监测记录')
 const readingListUrl = ref('')
 
 const formTitle = computed(() => (record.value?.id ? '编辑基站' : '新增基站'))
-const formFields = computed(() => getSchema('power_base_station').filter((f) => !f.readonly))
+const formFields = computed(() => {
+  const fields = getSchema('power_base_station').filter((f) => !f.readonly)
+  if (record.value?.id) {
+    return fields.map((f) => (f.prop === 'station_code' ? { ...f, readonly: true } : f))
+  }
+  return fields
+})
 
 function openCreate() {
   record.value = { is_active: true, protocol_type: 'mqtt', status: 'online' }
@@ -100,10 +106,14 @@ function openReadings(row: Record<string, unknown>) {
 
 async function save() {
   if (!record.value) return
-  const { data } = await http.post('/power/station', record.value)
-  record.value = data.data
-  formVisible.value = false
-  ElMessage.success('保存成功')
-  crudRef.value?.load()
+  try {
+    const { data } = await http.post('/power/station', { ...record.value, client: 'web' })
+    record.value = data.data
+    formVisible.value = false
+    ElMessage.success('保存成功')
+    crudRef.value?.load()
+  } catch {
+    // 错误由 http 拦截器提示
+  }
 }
 </script>

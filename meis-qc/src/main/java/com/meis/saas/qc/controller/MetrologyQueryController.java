@@ -22,11 +22,16 @@ public class MetrologyQueryController {
             PageQuery query,
             @RequestParam(required = false) String deviceCode,
             @RequestParam(required = false) String resultStatus,
-            @RequestParam(required = false) String dept_id) {
+            @RequestParam(required = false) String dept_id,
+            @RequestParam(required = false) UUID deviceId) {
         StringBuilder where = new StringBuilder(" WHERE ei.status = 'completed' ");
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "metrology_execution_item", "ei"));
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "metrology_execution", "e"));
         List<Object> args = new ArrayList<>();
+        if (deviceId != null) {
+            where.append(" AND ei.device_id = ?::uuid ");
+            args.add(deviceId);
+        }
         if (deviceCode != null && !deviceCode.isBlank()) {
             where.append(" AND ei.device_code ILIKE ? ");
             args.add("%" + deviceCode.trim() + "%");

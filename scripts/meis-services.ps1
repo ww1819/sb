@@ -1288,6 +1288,152 @@ function Start-MeisFrontendWithBuild {
     return Start-MeisFrontend
 }
 
+function Get-MeisMobilePidFile {
+    return (Join-Path $script:MeisRoot 'logs\meis-mobile-dev.pid')
+}
+
+function Get-MeisMobileRelatedProcessIds {
+    $ids = [System.Collections.Generic.HashSet[int]]::new()
+    $pidFile = Get-MeisMobilePidFile
+    if (Test-Path $pidFile) {
+        $saved = Get-Content $pidFile -ErrorAction SilentlyContinue
+        if ($saved -match '^\d+$') {
+            $procId = [int]$saved
+            if (Get-Process -Id $procId -ErrorAction SilentlyContinue) {
+                [void]$ids.Add($procId)
+            }
+        }
+    }
+    Get-Process -Name 'meis_mobile' -ErrorAction SilentlyContinue | ForEach-Object {
+        [void]$ids.Add($_.Id)
+    }
+    Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.Name -match '^(dart\.exe|flutter\.exe|cmd\.exe)$' -and
+            $_.CommandLine -and
+            ($_.CommandLine -match 'meis-mobile' -or $_.CommandLine -match 'meis_mobile')
+        } |
+        ForEach-Object { [void]$ids.Add([int]$_.ProcessId) }
+    return @($ids)
+}
+
+function Test-MeisMobileRunning {
+    $ids = @(Get-MeisMobileRelatedProcessIds)
+    if ($ids.Count -gt 0) { return $true }
+    if (Get-Process -Name 'meis_mobile' -ErrorAction SilentlyContinue) { return $true }
+    return $false
+}
+
+function Get-MeisMobileStatus {
+    $meta = Get-MeisServiceMetaEntry 'meis-mobile'
+    $running = Test-MeisMobileRunning
+    $procId = $null
+    $pidFile = Get-MeisMobilePidFile
+    if (Test-Path $pidFile) {
+        $saved = Get-Content $pidFile -ErrorAction SilentlyContinue
+        if ($saved -match '^\d+$') {
+            $candidate = [int]$saved
+            if (Get-Process -Id $candidate -ErrorAction SilentlyContinue) {
+                $procId = $candidate
+            }
+        }
+    }
+    if (-not $procId) {
+        $app = Get-Process -Name 'meis_mobile' -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($app) { $procId = $app.Id }
+    }
+    return [ordered]@{
+        name     = 'meis-mobile'
+        labelZh  = $meta.labelZh
+        descZh   = $meta.descZh
+        platform = 'windows'
+        running  = $running
+        pid      = $procId
+        url      = $null
+    }
+}
+
+function Stop-MeisMobile {
+    $killed = 0
+    $ids = @(Get-MeisMobileRelatedProcessIds)
+    foreach ($procId in $ids) {
+        & taskkill.exe /F /T /PID $procId 2>$null | Out-Null
+        if ($LASTEXITCODE -eq 0) { $killed++ }
+        Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
+    }
+    Get-Process -Name 'meis_mobile' -ErrorAction SilentlyContinue | ForEach-Object {
+        & taskkill.exe /F /T /PID $_.Id 2>$null | Out-Null
+        Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+        $killed++
+    }
+    Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.Name -eq 'dart.exe' -and
+            $_.CommandLine -and
+            ($_.CommandLine -match 'meis-mobile' -or $_.CommandLine -match 'meis_mobile')
+        } |
+        ForEach-Object {
+            & taskkill.exe /F /T /PID $_.ProcessId 2>$null | Out-Null
+            Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+            $killed++
+        }
+    $pidFile = Get-MeisMobilePidFile
+    if (Test-Path $pidFile) {
+        Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+    }
+    return $killed
+}
+
+function Start-MeisMobile {
+    if (Test-MeisMobileRunning) {
+        return @{ ok = $true; message = 'already running (meis-mobile / flutter)' }
+    }
+    $mobileDir = Join-Path $script:MeisRoot 'meis-mobile'
+    if (-not (Test-Path (Join-Path $mobileDir 'pubspec.yaml'))) {
+        throw "meis-mobile not found: $mobileDir"
+    }
+    . (Join-Path $PSScriptRoot 'mobile-env.ps1')
+    if (-not (Test-Path (Join-Path $mobileDir 'windows'))) {
+        Add-MeisPanelEvent 'meis-mobile: windows/ missing, running setup-mobile.ps1'
+        & (Join-Path $PSScriptRoot 'setup-mobile.ps1')
+        if (-not (Test-Path (Join-Path $mobileDir 'windows'))) {
+            throw 'meis-mobile windows/ still missing after setup-mobile.ps1'
+        }
+    }
+    $logDir = Join-Path $script:MeisRoot 'logs'
+    if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
+    $stdout = Join-Path $logDir 'meis-mobile.dev.out.log'
+    $stderr = Join-Path $logDir 'meis-mobile.dev.err.log'
+    $flutterBat = $script:FlutterBat
+    if (-not $flutterBat -or -not (Test-Path -LiteralPath $flutterBat)) {
+        throw 'Flutter not found (mobile-env.ps1). Set FLUTTER_ROOT or add flutter to PATH.'
+    }
+    $proc = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', ('"' + $flutterBat + '" run -d windows')) -WorkingDirectory $mobileDir `
+        -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+    Set-Content (Get-MeisMobilePidFile) $proc.Id
+
+    $deadline = (Get-Date).AddSeconds(180)
+    while ((Get-Date) -lt $deadline) {
+        if (Get-Process -Name 'meis_mobile' -ErrorAction SilentlyContinue) {
+            return @{ ok = $true; message = 'meis_mobile running (Windows)' }
+        }
+        if (-not (Get-Process -Id $proc.Id -ErrorAction SilentlyContinue)) {
+            throw "flutter run exited early - see $stderr"
+        }
+        Start-Sleep -Seconds 2
+    }
+    if (Test-MeisMobileRunning) {
+        return @{ ok = $true; message = 'flutter run started (compiling or waiting for window)' }
+    }
+    return @{ ok = $true; message = "flutter run started (pid $($proc.Id)); first build may take minutes - see $stdout" }
+}
+
+function Restart-MeisMobile {
+    Stop-MeisMobile | Out-Null
+    Start-Sleep -Seconds 2
+    return Start-MeisMobile
+}
+
 function Get-MeisServiceLogTail {
     param(
         [Parameter(Mandatory = $true)][string]$ServiceName,
@@ -1419,7 +1565,15 @@ function Get-MeisPanelLogEntries {
         $entries += Read-MeisLogFileEntries -ServiceName 'meis-web' -LogPath $feOut -Stream 'stdout' -Lines $Lines
     }
 
-    if ($ServiceName -ne 'meis-web') {
+    $includeMobile = (Test-MeisServiceInWatchList -Name 'meis-mobile' -Watched $Watched) -and (Test-MeisServiceInFilterList -Name 'meis-mobile' -Filtered $Filtered)
+    if ($includeMobile -and ($ServiceName -eq 'all' -or $ServiceName -eq 'meis-mobile' -or $null -ne $Filtered)) {
+        $mobErr = Join-Path $logDir 'meis-mobile.dev.err.log'
+        $mobOut = Join-Path $logDir 'meis-mobile.dev.out.log'
+        $entries += Read-MeisLogFileEntries -ServiceName 'meis-mobile' -LogPath $mobErr -Stream 'stderr' -Lines $Lines
+        $entries += Read-MeisLogFileEntries -ServiceName 'meis-mobile' -LogPath $mobOut -Stream 'stdout' -Lines $Lines
+    }
+
+    if ($ServiceName -ne 'meis-web' -and $ServiceName -ne 'meis-mobile') {
         $targets = if ($ServiceName -eq 'all' -or $null -ne $Filtered) { $script:MeisServices } else { @(Get-MeisServiceDefinition $ServiceName) }
         foreach ($s in $targets) {
             $name = $s.name
@@ -1450,8 +1604,10 @@ function Get-MeisPanelLogEntries {
 function Get-MeisPanelLogServices {
     $panelMeta = Get-MeisServiceMetaEntry 'panel'
     $webMeta = Get-MeisServiceMetaEntry 'meis-web'
+    $mobileMeta = Get-MeisServiceMetaEntry 'meis-mobile'
     $list = @([ordered]@{ name = 'panel'; labelZh = $panelMeta.labelZh })
     $list += [ordered]@{ name = 'meis-web'; labelZh = $webMeta.labelZh }
+    $list += [ordered]@{ name = 'meis-mobile'; labelZh = $mobileMeta.labelZh }
     foreach ($s in $script:MeisServices) {
         $m = Get-MeisServiceMetaEntry $s.name
         $list += [ordered]@{ name = $s.name; labelZh = $m.labelZh }

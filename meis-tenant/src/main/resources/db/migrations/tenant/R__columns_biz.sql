@@ -925,6 +925,10 @@ ALTER TABLE sys_user ADD COLUMN IF NOT EXISTS wx_openid VARCHAR(64);
 COMMENT ON COLUMN sys_user.wx_openid IS 'WeChat mini-program openid for subscribe message';
 CREATE UNIQUE INDEX IF NOT EXISTS uk_sys_user_wx_openid ON sys_user (wx_openid) WHERE wx_openid IS NOT NULL AND wx_openid <> '';
 
+-- ---------- DASH-UI-06: 用户 UI 偏好（快捷入口等，与 RBAC permissions 分离） ----------
+ALTER TABLE sys_user ADD COLUMN IF NOT EXISTS preferences JSONB NOT NULL DEFAULT '{}'::jsonb;
+COMMENT ON COLUMN sys_user.preferences IS '用户 UI 偏好 JSON；如 quickEntryPaths 快捷入口 path 列表';
+
 -- ---------- 附录 W.6 / BACKLOG-PLT-W03：明细业务单号与主数据冗余（2026-07-22） ----------
 ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS entry_no VARCHAR(30);
 ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS device_code VARCHAR(50);
@@ -1216,3 +1220,93 @@ COMMENT ON COLUMN pm_execution.execution_kind IS 'due=到期执行 backfill=执�
 COMMENT ON COLUMN pm_execution.backfill_next_due_date IS '补录可选下次到期（OPS.16.12）';
 COMMENT ON COLUMN inspection_execution.execution_kind IS 'due=到期执行 backfill=执行补录（OPS.16.12）';
 COMMENT ON COLUMN inspection_execution.backfill_next_due_date IS '补录可选下次到期（OPS.16.12）';
+
+-- OPS.16.29 修改途径 update_channel（最后一次修改端 web/app/mp）
+ALTER TABLE maintenance_execution ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE pm_execution ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE inspection_execution ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE pm_execution_item ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE inspection_execution_item ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE ops_plan_include_request ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+COMMENT ON COLUMN maintenance_execution.update_channel IS '修改途径 web/app/mp（OPS.16.29）';
+COMMENT ON COLUMN pm_execution.update_channel IS '修改途径 web/app/mp（OPS.16.29）';
+COMMENT ON COLUMN inspection_execution.update_channel IS '修改途径 web/app/mp（OPS.16.29）';
+COMMENT ON COLUMN maintenance_execution_item.update_channel IS '修改途径 web/app/mp（OPS.16.29）';
+COMMENT ON COLUMN pm_execution_item.update_channel IS '修改途径 web/app/mp（OPS.16.29）';
+COMMENT ON COLUMN inspection_execution_item.update_channel IS '修改途径 web/app/mp（OPS.16.29）';
+COMMENT ON COLUMN ops_plan_include_request.update_channel IS '修改途径 web/app/mp（OPS.16.29）';
+
+
+-- OPS.16.29 多端业务补列（报修/盘点/计量/不良事件 + 执行明细删除途径）
+ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS delete_channel VARCHAR(20);
+ALTER TABLE pm_execution_item ADD COLUMN IF NOT EXISTS delete_channel VARCHAR(20);
+ALTER TABLE inspection_execution_item ADD COLUMN IF NOT EXISTS delete_channel VARCHAR(20);
+
+ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS submit_channel VARCHAR(20);
+ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS confirm_channel VARCHAR(20);
+ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS delete_channel VARCHAR(20);
+ALTER TABLE repair_workorder ADD COLUMN IF NOT EXISTS audit_channel VARCHAR(20);
+
+ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS submit_channel VARCHAR(20);
+ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS confirm_channel VARCHAR(20);
+ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS delete_channel VARCHAR(20);
+ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS audit_channel VARCHAR(20);
+ALTER TABLE inventory_check_item ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE inventory_check_item ADD COLUMN IF NOT EXISTS confirm_channel VARCHAR(20);
+
+ALTER TABLE metrology_execution ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE metrology_execution ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE metrology_execution ADD COLUMN IF NOT EXISTS submit_channel VARCHAR(20);
+ALTER TABLE metrology_execution ADD COLUMN IF NOT EXISTS confirm_channel VARCHAR(20);
+ALTER TABLE metrology_execution ADD COLUMN IF NOT EXISTS delete_channel VARCHAR(20);
+ALTER TABLE metrology_execution ADD COLUMN IF NOT EXISTS audit_channel VARCHAR(20);
+ALTER TABLE metrology_execution_item ADD COLUMN IF NOT EXISTS execution_channel VARCHAR(20);
+ALTER TABLE metrology_execution_item ADD COLUMN IF NOT EXISTS confirm_channel VARCHAR(20);
+ALTER TABLE metrology_execution_item ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+
+ALTER TABLE adverse_event ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE adverse_event ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE adverse_event ADD COLUMN IF NOT EXISTS submit_channel VARCHAR(20);
+ALTER TABLE adverse_event ADD COLUMN IF NOT EXISTS confirm_channel VARCHAR(20);
+ALTER TABLE adverse_event ADD COLUMN IF NOT EXISTS delete_channel VARCHAR(20);
+ALTER TABLE adverse_event ADD COLUMN IF NOT EXISTS audit_channel VARCHAR(20);
+
+COMMENT ON COLUMN repair_workorder.create_channel IS '制单途径 web/app/mp（OPS.16.29）';
+COMMENT ON COLUMN inventory_check.create_channel IS '制单途径 web/app/mp（OPS.16.29）';
+COMMENT ON COLUMN metrology_execution.create_channel IS '制单途径 web/app/mp（OPS.16.29）';
+COMMENT ON COLUMN adverse_event.create_channel IS '制单途径 web/app/mp（OPS.16.29）';
+
+-- MOB-PWR-01 电流标签多端途径
+ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE power_tag ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+COMMENT ON COLUMN power_tag.create_channel IS '制单途径 web/app/mp（MOB-PWR-01）';
+COMMENT ON COLUMN power_tag.update_channel IS '修改途径 web/app/mp（MOB-PWR-01）';
+
+-- MOB-PWR-02 基站多端途径
+ALTER TABLE power_base_station ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE power_base_station ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+COMMENT ON COLUMN power_base_station.create_channel IS '制单途径 web/app/mp（MOB-PWR-02）';
+COMMENT ON COLUMN power_base_station.update_channel IS '修改途径 web/app/mp（MOB-PWR-02）';
+
+-- OPS.16.29 / MOB-CHANNEL-01 公用借还多端途径
+ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS submit_channel VARCHAR(20);
+ALTER TABLE shared_device_loan ADD COLUMN IF NOT EXISTS confirm_channel VARCHAR(20);
+ALTER TABLE shared_device_return ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE shared_device_return ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE shared_device_return ADD COLUMN IF NOT EXISTS submit_channel VARCHAR(20);
+ALTER TABLE shared_device_return ADD COLUMN IF NOT EXISTS confirm_channel VARCHAR(20);
+COMMENT ON COLUMN shared_device_loan.create_channel IS '制单途径 web/app/mp';
+COMMENT ON COLUMN shared_device_loan.update_channel IS '修改途径 web/app/mp';
+COMMENT ON COLUMN shared_device_loan.submit_channel IS '提交途径 web/app/mp';
+COMMENT ON COLUMN shared_device_loan.confirm_channel IS '审核/借出途径 web/app/mp';
+COMMENT ON COLUMN shared_device_return.create_channel IS '制单途径 web/app/mp';
+COMMENT ON COLUMN shared_device_return.update_channel IS '修改途径 web/app/mp';
+COMMENT ON COLUMN shared_device_return.submit_channel IS '提交途径 web/app/mp';
+COMMENT ON COLUMN shared_device_return.confirm_channel IS '审核途径 web/app/mp';

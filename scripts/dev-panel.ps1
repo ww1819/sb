@@ -570,6 +570,42 @@ function Start-PanelFrontendBackgroundJob {
     return @{ ok = $true; message = ('meis-web ' + $verb + ' in background') }
 }
 
+function Start-PanelMobileBackgroundJob {
+    param(
+        [Parameter(Mandatory = $true)][ValidateSet('start', 'restart')]
+        [string]$Action
+    )
+    $scriptsDir = $PSScriptRoot
+    $root = $script:MeisRoot
+    $jobLabel = 'mobile-' + $Action
+    $job = Start-Job -ScriptBlock {
+        param($ActionName, $ScriptsDir, $Root)
+        Set-Location $Root
+        . (Join-Path $ScriptsDir 'meis-services.ps1')
+        try {
+            switch ($ActionName) {
+                'start' {
+                    Start-MeisMobile | Out-Null
+                }
+                'restart' {
+                    Stop-MeisMobile | Out-Null
+                    Start-Sleep -Seconds 2
+                    Start-MeisMobile | Out-Null
+                }
+            }
+        } catch {
+            Add-MeisPanelEvent (('MOBILE ' + $ActionName.ToUpper() + ' FAILED: ' + $_.Exception.Message))
+            throw
+        }
+    } -ArgumentList $Action, $scriptsDir, $root
+    $script:PanelBackgroundJobs[$jobLabel] = $job
+    $verb = switch ($Action) {
+        'start' { 'starting Flutter App' }
+        'restart' { 'restarting Flutter App' }
+    }
+    return @{ ok = $true; message = ('meis-mobile ' + $verb + ' in background') }
+}
+
 function Invoke-PanelAction {
     param(
         [scriptblock]$Action,
@@ -721,6 +757,7 @@ function Handle-PanelRequest {
             backgroundJobs = $backgroundJobs
             autoHotReload = [bool]$script:PanelAutoHotReloadEnabled
             frontend = Get-PanelFrontendStatus
+            mobile = Get-MeisMobileStatus
             coreServices = @($script:MeisCoreServiceNames)
             libraries = @(Get-PanelLibraryStatusList)
             services = @(Get-PanelServiceStatusList)
@@ -831,6 +868,23 @@ function Handle-PanelRequest {
             if ([string]::IsNullOrWhiteSpace($mode)) { $mode = 'typecheck' }
             Add-MeisPanelEvent ('BUILD frontend (background, mode=' + $mode + ')')
             $r = Start-PanelFrontendBackgroundJob -Action 'build' -BuildMode $mode
+            Write-JsonResponse -Response $res -Data $r
+            return
+        }
+        if ($path -eq '/api/mobile/start') {
+            Add-MeisPanelEvent 'START meis-mobile Flutter App (background)'
+            $r = Start-PanelMobileBackgroundJob -Action 'start'
+            Write-JsonResponse -Response $res -Data $r
+            return
+        }
+        if ($path -eq '/api/mobile/stop') {
+            $r = Invoke-PanelAction { Stop-MeisMobile; @{ message = 'mobile stopped' } } -EventMessage 'STOP meis-mobile'
+            Write-JsonResponse -Response $res -Data $r
+            return
+        }
+        if ($path -eq '/api/mobile/restart') {
+            Add-MeisPanelEvent 'RESTART meis-mobile Flutter App (background)'
+            $r = Start-PanelMobileBackgroundJob -Action 'restart'
             Write-JsonResponse -Response $res -Data $r
             return
         }

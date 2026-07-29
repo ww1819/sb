@@ -10,7 +10,10 @@ import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.rbac.PermissionService;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.postgresql.util.PGobject;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +32,9 @@ public class UserController {
     private final MeisCacheEviction cacheEviction;
     private final EntityChangeLogService changeLog;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    private static final int QUICK_ENTRY_MAX = 45;
 
     private static final String USER_LIST_COLS =
             "u.id, u.username, u.real_name, u.employee_no, u.phone, u.email, u.dept_id, u.role_ids,"
@@ -276,6 +282,150 @@ public class UserController {
         return Result.ok();
     }
 
+    /** DASH-UI-06：当前登录用户 UI 偏好 */
+    @GetMapping("/me/preferences")
+    public Result<Map<String, Object>> myPreferences() {
+        UUID userId = requireCurrentUserId();
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT preferences FROM sys_user WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", null),
+                userId);
+        if (rows.isEmpty()) throw new BizException(404, "user not found");
+        Map<String, Object> prefs = parsePreferences(rows.get(0).get("preferences"));
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("quickEntryPaths", prefs.get("quickEntryPaths"));
+        return Result.ok(result);
+    }
+
+    /** DASH-UI-06/07：保存快捷入口（仅本人；path 须属有效菜单；最多 45） */
+    @PutMapping("/me/preferences/quick-entry")
+    @OperationLog(module = "system", description = "保存快捷入口")
+    public Result<Map<String, Object>> saveQuickEntry(
+            @RequestHeader(value = "X-Tenant-Id", required = false) String tenantId,
+            @RequestBody Map<String, Object> body) {
+        UUID userId = requireCurrentUserId();
+        if (tenantId == null || tenantId.isBlank()) tenantId = TenantContext.getTenantId();
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new BizException(400, "缺少租户信息");
+        }
+
+        List<String> paths = normalizeQuickEntryPaths(body.get("paths"));
+        if (paths.size() > QUICK_ENTRY_MAX) {
+            throw new BizException(400, "快捷入口最多选择 " + QUICK_ENTRY_MAX + " 项");
+        }
+
+        Set<String> allowedPaths = currentUserAllowedMenuPaths(tenantId, userId);
+        for (String path : paths) {
+            if (!allowedPaths.contains(path)) {
+                throw new BizException(400, "无权限设置菜单快捷入口：" + path);
+            }
+        }
+
+        try {
+            String pathsJson = objectMapper.writeValueAsString(paths);
+            jdbc.update(
+                    "UPDATE sys_user SET preferences = jsonb_set(COALESCE(preferences, '{}'::jsonb), '{quickEntryPaths}', ?::jsonb, true),"
+                            + " updated_at = NOW() WHERE id = ?::uuid",
+                    pathsJson, userId);
+        } catch (BizException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BizException(500, "保存快捷入口失败");
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("quickEntryPaths", paths);
+        return Result.ok(result);
+    }
+
+    private UUID requireCurrentUserId() {
+        String raw = TenantContext.getUserId();
+        if (raw == null || raw.isBlank()) {
+            throw new BizException(401, "未登录");
+        }
+        try {
+            return UUID.fromString(raw);
+        } catch (IllegalArgumentException e) {
+            throw new BizException(401, "无效用户");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Set<String> currentUserAllowedMenuPaths(String tenantId, UUID userId) {
+        List<Map<String, Object>> users = jdbc.queryForList(
+                "SELECT permissions, role_ids FROM sys_user WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", null),
+                userId);
+        if (users.isEmpty()) throw new BizException(404, "user not found");
+        Map<String, Object> user = users.get(0);
+        Map<String, Object> perms = permissionService.resolveUserEffectivePermissions(
+                tenantId,
+                TenantContext.getSchemaName(),
+                userId.toString(),
+                user.get("permissions"),
+                allRoleIds(user.get("role_ids")));
+        List<String> menuCodes = (List<String>) perms.getOrDefault("menus", List.of());
+        if (menuCodes.isEmpty()) return Set.of();
+
+        String placeholders = String.join(",", Collections.nCopies(menuCodes.size(), "?"));
+        List<Object> args = new ArrayList<>(menuCodes);
+        List<Map<String, Object>> menus = jdbc.queryForList(
+                "SELECT path FROM public.sys_menu WHERE is_active = true AND menu_type = 'menu'"
+                        + " AND path IS NOT NULL AND btrim(path::text) <> ''"
+                        + " AND menu_code IN (" + placeholders + ")",
+                args.toArray());
+        Set<String> paths = new LinkedHashSet<>();
+        for (Map<String, Object> m : menus) {
+            Object path = m.get("path");
+            if (path != null && !path.toString().isBlank()) {
+                paths.add(path.toString().trim());
+            }
+        }
+        return paths;
+    }
+
+    private List<String> normalizeQuickEntryPaths(Object raw) {
+        if (raw == null) return List.of();
+        if (!(raw instanceof List<?> list)) {
+            throw new BizException(400, "paths 须为数组");
+        }
+        LinkedHashSet<String> ordered = new LinkedHashSet<>();
+        for (Object o : list) {
+            if (o == null) continue;
+            String path = String.valueOf(o).trim();
+            if (path.isEmpty()) continue;
+            if (!path.startsWith("/")) {
+                throw new BizException(400, "无效菜单路径：" + path);
+            }
+            ordered.add(path);
+        }
+        return new ArrayList<>(ordered);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parsePreferences(Object raw) {
+        if (raw == null) return new LinkedHashMap<>();
+        try {
+            if (raw instanceof PGobject pg && pg.getValue() != null) {
+                return objectMapper.readValue(pg.getValue(), new TypeReference<>() {});
+            }
+            if (raw instanceof String s) {
+                if (s.isBlank()) return new LinkedHashMap<>();
+                return objectMapper.readValue(s, new TypeReference<>() {});
+            }
+            if (raw instanceof Map<?, ?> m) {
+                Map<String, Object> copy = new LinkedHashMap<>();
+                for (Map.Entry<?, ?> e : m.entrySet()) {
+                    if (e.getKey() != null) copy.put(String.valueOf(e.getKey()), e.getValue());
+                }
+                return copy;
+            }
+            return objectMapper.convertValue(raw, new TypeReference<>() {});
+        } catch (Exception e) {
+            return new LinkedHashMap<>();
+        }
+    }
+
     private void copyRolePermissions(UUID userId, UUID roleId) {
         List<Map<String, Object>> roles = jdbc.queryForList(
                 "SELECT permissions FROM sys_role WHERE id = ?::uuid "
@@ -392,6 +542,31 @@ public class UserController {
             return ids;
         }
         return List.of();
+    }
+
+    private UUID[] allRoleIds(Object raw) {
+        if (raw == null) return new UUID[0];
+        if (raw instanceof UUID[] uuids) return uuids;
+        if (raw instanceof Array arr) {
+            try {
+                Object[] objs = (Object[]) arr.getArray();
+                UUID[] ids = new UUID[objs.length];
+                for (int i = 0; i < objs.length; i++) {
+                    ids[i] = UUID.fromString(objs[i].toString());
+                }
+                return ids;
+            } catch (Exception e) {
+                return new UUID[0];
+            }
+        }
+        if (raw instanceof Object[] objs) {
+            UUID[] ids = new UUID[objs.length];
+            for (int i = 0; i < objs.length; i++) {
+                ids[i] = UUID.fromString(objs[i].toString());
+            }
+            return ids;
+        }
+        return new UUID[0];
     }
 
     private UUID[] toRoleIds(Object raw) {

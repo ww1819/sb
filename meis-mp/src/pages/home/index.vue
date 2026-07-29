@@ -92,6 +92,48 @@
         </view>
         <text class="tile-arrow">›</text>
       </view>
+
+      <view
+        v-if="showShared"
+        class="tile"
+        hover-class="tile--pressed"
+        :hover-stay-time="80"
+        @click="go('/pages/shared/hub')"
+      >
+        <view class="tile-body">
+          <text class="tile-title">设备调配</text>
+          <text class="tile-desc">公用设备借调、借出与归还</text>
+        </view>
+        <text class="tile-arrow">›</text>
+      </view>
+
+      <view
+        v-if="showPowerTag"
+        class="tile"
+        hover-class="tile--pressed"
+        :hover-stay-time="80"
+        @click="go('/pages/power/hub')"
+      >
+        <view class="tile-body">
+          <text class="tile-title">电流标签</text>
+          <text class="tile-desc">扫码查询、维护与改绑</text>
+        </view>
+        <text class="tile-arrow">›</text>
+      </view>
+
+      <view
+        v-if="showPowerStation"
+        class="tile"
+        hover-class="tile--pressed"
+        :hover-stay-time="80"
+        @click="go('/pages/power/station-hub')"
+      >
+        <view class="tile-body">
+          <text class="tile-title">电流基站</text>
+          <text class="tile-desc">查询维护、查看监测记录</text>
+        </view>
+        <text class="tile-arrow">›</text>
+      </view>
     </view>
 
     <view class="section">
@@ -122,9 +164,11 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useAuthStore } from '@/stores/auth'
 import type { OpsModule } from '@/config/ops'
+import { hasMenu } from '@/utils/permission'
 
 const auth = useAuthStore()
 
@@ -133,6 +177,17 @@ const opsTiles: { module: OpsModule; title: string; desc: string }[] = [
   { module: 'inspect', title: '巡检执行', desc: '扫码执行巡检任务，可直开' },
   { module: 'pm', title: '预防性维护', desc: '扫码执行 PM 任务，可直开' }
 ]
+
+const showShared = computed(
+  () =>
+    hasMenu(auth.user, 'shared_loan') ||
+    hasMenu(auth.user, 'shared_loan_approve') ||
+    hasMenu(auth.user, 'shared_return') ||
+    hasMenu(auth.user, 'shared_return_approve')
+)
+
+const showPowerTag = computed(() => hasMenu(auth.user, 'power_tag'))
+const showPowerStation = computed(() => hasMenu(auth.user, 'power_station'))
 
 onShow(() => {
   auth.restore()

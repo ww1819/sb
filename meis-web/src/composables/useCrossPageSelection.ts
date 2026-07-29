@@ -10,12 +10,41 @@ export function useCrossPageSelection(rowKey = 'id') {
   const selectedIdSet = ref(new Set<string>())
   const selectedCount = ref(0)
 
-  function syncFromTable(selection: Record<string, unknown>[]) {
-    // selection-change 在 reserve-selection 下包含跨页已选行
-    const next = new Set<string>()
+  /** 全量替换（来自「全选全部查询结果」） */
+  function setSelectedIds(ids: string[]) {
+    selectedIdSet.value = new Set(ids.map(String).filter(Boolean))
+    selectedCount.value = selectedIdSet.value.size
+  }
+
+  /**
+   * 按当页增量同步：只更新当前页 id 的勾选状态，保留其它页已缓存 id。
+   * 支持「全选查询结果」后翻页仍保持 id 集合。
+   */
+  function syncFromTable(selection: Record<string, unknown>[], pageRows?: Record<string, unknown>[]) {
+    if (!pageRows) {
+      const next = new Set<string>()
+      for (const row of selection) {
+        const id = row[rowKey]
+        if (id != null) next.add(String(id))
+      }
+      selectedIdSet.value = next
+      selectedCount.value = next.size
+      return
+    }
+    const pageIds = new Set(
+      pageRows.map((r) => r[rowKey]).filter((id) => id != null).map((id) => String(id))
+    )
+    const selectedOnPage = new Set<string>()
     for (const row of selection) {
       const id = row[rowKey]
-      if (id != null) next.add(String(id))
+      if (id == null) continue
+      const sid = String(id)
+      if (pageIds.has(sid)) selectedOnPage.add(sid)
+    }
+    const next = new Set(selectedIdSet.value)
+    for (const id of pageIds) {
+      if (selectedOnPage.has(id)) next.add(id)
+      else next.delete(id)
     }
     selectedIdSet.value = next
     selectedCount.value = next.size
@@ -41,6 +70,19 @@ export function useCrossPageSelection(rowKey = 'id') {
     }
   }
 
+  /** 按缓存 id 回显当前页勾选 */
+  function applyToCurrentPage(
+    tableRef: ElTableLike | null | undefined,
+    pageRows: Record<string, unknown>[]
+  ) {
+    if (!tableRef?.toggleRowSelection) return
+    for (const row of pageRows) {
+      const id = row[rowKey]
+      if (id == null) continue
+      tableRef.toggleRowSelection(row, selectedIdSet.value.has(String(id)))
+    }
+  }
+
   function clearAll(tableRef: ElTableLike | null | undefined) {
     clear()
     tableRef?.clearSelection?.()
@@ -51,8 +93,10 @@ export function useCrossPageSelection(rowKey = 'id') {
     selectedCount,
     syncFromTable,
     selectedIds,
+    setSelectedIds,
     clear,
     selectCurrentPage,
+    applyToCurrentPage,
     clearAll
   }
 }

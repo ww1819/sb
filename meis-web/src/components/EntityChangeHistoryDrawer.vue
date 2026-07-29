@@ -8,6 +8,9 @@
         <template #default="{ row }">{{ actionLabel(row.action) }}</template>
       </el-table-column>
       <el-table-column prop="operator_name" label="操作人" width="100" show-overflow-tooltip />
+      <el-table-column label="途径" width="80">
+        <template #default="{ row }">{{ channelLabel(row.client) }}</template>
+      </el-table-column>
       <el-table-column prop="fieldLabel" label="变更字段" min-width="120" show-overflow-tooltip />
       <el-table-column prop="oldText" label="改动前" min-width="140" show-overflow-tooltip>
         <template #default="{ row }">
@@ -63,6 +66,7 @@ type DisplayRow = {
   created_at?: unknown
   action?: unknown
   operator_name?: unknown
+  client?: unknown
   remark?: unknown
   fieldLabel: string
   oldText: string
@@ -123,6 +127,7 @@ const displayRows = computed(() => {
           created_at: row.created_at,
           action: row.action,
           operator_name: row.operator_name,
+          client: row.client,
           remark: row.remark,
           fieldLabel: resolveLabel(f.field, f.label),
           oldText: formatPlainValue(f.field, f.oldValue ?? f.old_value),
@@ -135,6 +140,7 @@ const displayRows = computed(() => {
         created_at: row.created_at,
         action: row.action,
         operator_name: row.operator_name,
+        client: row.client,
         remark: row.remark,
         fieldLabel: '—',
         oldText: '—',
@@ -212,6 +218,13 @@ function actionLabel(a: unknown) {
     cancel: '取消'
   }
   return m[String(a)] ?? String(a ?? '')
+}
+
+function channelLabel(v: unknown) {
+  const k = String(v ?? '').trim().toLowerCase()
+  if (!k) return '—'
+  const m: Record<string, string> = { web: 'Web', app: 'App', mp: '小程序' }
+  return m[k] ?? String(v)
 }
 
 function fieldList(row: Record<string, unknown>): FieldChange[] {

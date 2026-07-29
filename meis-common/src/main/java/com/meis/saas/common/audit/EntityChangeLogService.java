@@ -91,32 +91,50 @@ public class EntityChangeLogService {
     }
 
     public void recordCreate(String entityType, Object entityId, Map<String, Object> after) {
+        recordCreate(entityType, entityId, after, null);
+    }
+
+    public void recordCreate(String entityType, Object entityId, Map<String, Object> after, String client) {
         if (!tracks(entityType)) return;
         List<Map<String, Object>> fields = diff(null, sanitize(after));
-        write(entityType, entityId, "create", fields, null, null);
+        write(entityType, entityId, "create", fields, null, null, client);
     }
 
     public void recordUpdate(String entityType, Object entityId,
                              Map<String, Object> before, Map<String, Object> after) {
+        recordUpdate(entityType, entityId, before, after, null);
+    }
+
+    public void recordUpdate(String entityType, Object entityId,
+                             Map<String, Object> before, Map<String, Object> after, String client) {
         if (!tracks(entityType)) return;
         List<Map<String, Object>> fields = diff(sanitize(before), sanitize(after));
         if (fields.isEmpty()) return;
-        write(entityType, entityId, "update", fields, null, null);
+        write(entityType, entityId, "update", fields, null, null, client);
     }
 
     public void recordDelete(String entityType, Object entityId, Map<String, Object> before) {
+        recordDelete(entityType, entityId, before, null);
+    }
+
+    public void recordDelete(String entityType, Object entityId, Map<String, Object> before, String client) {
         if (!tracks(entityType)) return;
         Map<String, Object> snap = compactSnapshot(entityType, sanitize(before));
-        write(entityType, entityId, "delete", List.of(), snap, null);
+        write(entityType, entityId, "delete", List.of(), snap, null, client);
     }
 
     /** submit / withdraw 等业务动作：diff + 精简快照 */
     public void recordAction(String entityType, Object entityId, String action,
                              Map<String, Object> before, Map<String, Object> after, String remark) {
+        recordAction(entityType, entityId, action, before, after, remark, null);
+    }
+
+    public void recordAction(String entityType, Object entityId, String action,
+                             Map<String, Object> before, Map<String, Object> after, String remark, String client) {
         if (!tracks(entityType)) return;
         List<Map<String, Object>> fields = diff(sanitize(before), sanitize(after));
         Map<String, Object> snap = compactSnapshot(entityType, sanitize(after != null ? after : before));
-        write(entityType, entityId, action, fields, snap, remark);
+        write(entityType, entityId, action, fields, snap, remark, client);
     }
 
     public Map<String, Object> loadRow(String table, Object id) {
@@ -128,7 +146,7 @@ public class EntityChangeLogService {
 
     private void write(String entityType, Object entityId, String action,
                        List<Map<String, Object>> changedFields,
-                       Map<String, Object> snapshot, String remark) {
+                       Map<String, Object> snapshot, String remark, String client) {
         try {
             if ("public".equals(TenantContext.getSchemaName())) return;
             String userId = TenantContext.getUserId();
@@ -138,20 +156,40 @@ public class EntityChangeLogService {
                         "SELECT COALESCE(real_name, username) AS name FROM sys_user WHERE id = ?::uuid", userId);
                 if (!u.isEmpty()) operatorName = String.valueOf(u.get(0).get("name"));
             }
-            jdbc.update("""
-                    INSERT INTO sys_entity_change_log
-                    (id, entity_type, entity_id, action, changed_fields, snapshot_json, operator_id, operator_name, remark)
-                    VALUES (?::uuid, ?, ?::uuid, ?, ?::jsonb, ?::jsonb, ?::uuid, ?, ?)
-                    """,
-                    UUID.randomUUID(),
-                    entityType,
-                    String.valueOf(entityId),
-                    action,
-                    mapper.writeValueAsString(changedFields != null ? changedFields : List.of()),
-                    snapshot == null ? null : mapper.writeValueAsString(snapshot),
-                    userId,
-                    operatorName,
-                    remark);
+            String channel = com.meis.saas.common.ops.OpsClientChannel.normalize(client);
+            var cols = com.meis.saas.common.persistence.TableColumnCache.columns(jdbc, "sys_entity_change_log");
+            if (cols.contains("client")) {
+                jdbc.update("""
+                        INSERT INTO sys_entity_change_log
+                        (id, entity_type, entity_id, action, changed_fields, snapshot_json, operator_id, operator_name, remark, client)
+                        VALUES (?::uuid, ?, ?::uuid, ?, ?::jsonb, ?::jsonb, ?::uuid, ?, ?, ?)
+                        """,
+                        UUID.randomUUID(),
+                        entityType,
+                        String.valueOf(entityId),
+                        action,
+                        mapper.writeValueAsString(changedFields != null ? changedFields : List.of()),
+                        snapshot == null ? null : mapper.writeValueAsString(snapshot),
+                        userId,
+                        operatorName,
+                        remark,
+                        channel);
+            } else {
+                jdbc.update("""
+                        INSERT INTO sys_entity_change_log
+                        (id, entity_type, entity_id, action, changed_fields, snapshot_json, operator_id, operator_name, remark)
+                        VALUES (?::uuid, ?, ?::uuid, ?, ?::jsonb, ?::jsonb, ?::uuid, ?, ?)
+                        """,
+                        UUID.randomUUID(),
+                        entityType,
+                        String.valueOf(entityId),
+                        action,
+                        mapper.writeValueAsString(changedFields != null ? changedFields : List.of()),
+                        snapshot == null ? null : mapper.writeValueAsString(snapshot),
+                        userId,
+                        operatorName,
+                        remark);
+            }
         } catch (Exception ignored) {
             // 审计失败不阻断主业务
         }

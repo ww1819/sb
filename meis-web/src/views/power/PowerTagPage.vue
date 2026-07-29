@@ -92,7 +92,14 @@ const bindLogVisible = ref(false)
 const activeTagId = ref<string>()
 
 const formTitle = computed(() => (record.value?.id ? '编辑标签' : '新增标签'))
-const formFields = computed(() => getSchema('power_tag').filter((f) => !f.readonly))
+const formFields = computed(() => {
+  const fields = getSchema('power_tag').filter((f) => !f.readonly)
+  // MOB-PWR-01：已有标签编码不可改
+  if (record.value?.id) {
+    return fields.map((f) => (f.prop === 'tag_code' ? { ...f, readonly: true } : f))
+  }
+  return fields
+})
 
 function openCreate() {
   record.value = { is_active: true }
@@ -162,7 +169,8 @@ function buildSavePayload(rec: Record<string, unknown>) {
     rated_power: rec.rated_power,
     install_date: rec.install_date,
     is_active: rec.is_active ?? true,
-    remark: rec.remark
+    remark: rec.remark,
+    client: 'web'
   }
 }
 
@@ -182,11 +190,15 @@ async function save() {
     ElMessage.warning('标签名称请勿与标签编码相同，请填写便于识别的名称')
     return
   }
-  const { data } = await http.post('/power/tag', buildSavePayload(record.value))
-  record.value = data.data
-  formVisible.value = false
-  ElMessage.success('保存成功')
-  crudRef.value?.load()
+  try {
+    const { data } = await http.post('/power/tag', buildSavePayload(record.value))
+    record.value = data.data
+    formVisible.value = false
+    ElMessage.success('保存成功')
+    crudRef.value?.load()
+  } catch {
+    // 错误提示由 http 拦截器处理（含一设备一标签等业务校验）
+  }
 }
 
 defineExpose({ openCreate })

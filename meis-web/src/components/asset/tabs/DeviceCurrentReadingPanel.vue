@@ -27,7 +27,7 @@
         <template #default="{ row }">{{ fmt(row.read_at) }}</template>
       </el-table-column>
       <template #empty>
-        <PageEmpty description="暂无电流度数" :image-size="72" />
+        <PageEmpty description="暂无电流读数" :image-size="72" />
       </template>
     </el-table>
   </div>

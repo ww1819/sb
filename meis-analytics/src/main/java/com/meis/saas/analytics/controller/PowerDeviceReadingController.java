@@ -6,6 +6,7 @@ import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -23,6 +25,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PowerDeviceReadingController {
     private final PowerReadingQueryService readingQuery;
+    private final JdbcTemplate jdbc;
 
     @GetMapping("/{deviceId}/readings/page")
     public Result<PageResult<Map<String, Object>>> readingsPage(
@@ -40,5 +43,19 @@ public class PowerDeviceReadingController {
                 ? readAtToTime
                 : (readAtTo != null ? readAtTo.atTime(LocalTime.MAX) : null);
         return Result.ok(readingQuery.pageByDevice(deviceId, query, from, to, sortOrder));
+    }
+
+    /** AST-UI-14：按设备查电流标签绑定记录 */
+    @GetMapping("/{deviceId}/bind-log")
+    public Result<List<Map<String, Object>>> bindLog(@PathVariable UUID deviceId) {
+        return Result.ok(jdbc.queryForList("""
+                SELECT l.id, l.tag_id, t.tag_code, t.tag_name,
+                       l.device_id, l.device_code, l.device_name,
+                       l.bound_at, l.unbound_at, l.operator_id, l.remark
+                FROM power_tag_bind_log l
+                LEFT JOIN power_tag t ON t.id = l.tag_id
+                WHERE l.device_id = ?::uuid
+                ORDER BY l.bound_at DESC
+                """, deviceId));
     }
 }
