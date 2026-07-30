@@ -14,11 +14,17 @@ MEIS package 现场包
    → 覆盖 jars\ 中对应 JAR
    → 另输出 package\update\（仅变更 JAR，给实施增量覆盖）
    → 不重打前端；前端有改请再跑完整打包（或去掉 SKIP_FRONTEND）
+4. App APK：双击 打包apk.bat
+   → 构建 meis-mobile release APK，拷到 package\apk\
+   → 需本机 Flutter；env.txt 可设 FLUTTER_ROOT（如 E:\flutter）
+   → 需 Android SDK；没有则先双击 安装AndroidSDK.bat（或装 Android Studio 后设 ANDROID_HOME）
 
 说明：
 - meis-common / meis-api / 根 pom 有变更时，更新打包会重打全部业务 JAR
 - 无指纹时必须先完整打包（或 pack-update.ps1 -ForceAll）
 - 旧名 打包.bat 会转调 完整打包.bat
+- 首次打 APK 前需已有 meis-mobile\android（可先跑 scripts\setup-mobile.bat）
+- 打 APK 前需 Android SDK（安装AndroidSDK.bat 或 Android Studio）
 
 【交付实施】
 

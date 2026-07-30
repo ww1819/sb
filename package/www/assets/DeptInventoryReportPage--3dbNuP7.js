@@ -1,0 +1,1 @@
+import{F as e}from"./FeaturePlaceholderPage-DJrfOkPe.js";import{d as t,o,A as r}from"./index-BFMcFZ_r.js";import"./SystemPageCard-CGOWGj-_.js";const m=t({__name:"DeptInventoryReportPage",setup(a){return(n,p)=>(o(),r(e,{title:"设备盘点报表",subtitle:"资产管理 / 科室盘点",description:"设备盘点报表功能开发中",hint:"菜单已开通（AST-UI-07）；完整业务见待开发池 BACKLOG-AST-07"}))}});export{m as default};

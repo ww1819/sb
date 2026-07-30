@@ -55,3 +55,10 @@ meis-mobile/windows/flutter/generated_plugin_registrant.h
 meis-mobile/windows/flutter/generated_plugin_registrant.cc
 meis-mobile/windows/flutter/generated_plugins.cmake
 meis-mp/src/manifest.json
+
+# Flutter pub cache relocated onto workspace drive (pack-apk.bat)
+.pub-cache/
+
+# JVM heap dumps (do not commit)
+*.hprof
+

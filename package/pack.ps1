@@ -72,7 +72,7 @@ if (Test-Path $paths.UpdateDir) {
 }
 
 Write-Host ''
-Write-Host "JARs: $ok / $($serviceNames.Count) -> package\jars\" -ForegroundColor Cyan
+Write-Host "JARs: $ok / $($serviceNames.Count) -> package\jars" -ForegroundColor Cyan
 Write-Host "Fingerprint saved: $($paths.FingerprintFile)" -ForegroundColor DarkGray
 if ($fail.Count -gt 0) {
     Write-Host ("Missing: " + ($fail -join ', ')) -ForegroundColor Red
