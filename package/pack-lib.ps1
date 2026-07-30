@@ -10,6 +10,7 @@ function Get-MeisPackagePaths {
         Root            = Split-Path $pkgDir -Parent
         JarsDir         = Join-Path $pkgDir 'jars'
         UpdateDir       = Join-Path $pkgDir 'update'
+        WwwDir          = Join-Path $pkgDir 'www'
         LogsDir         = Join-Path $pkgDir 'logs'
         ServicesFile    = Join-Path $pkgDir 'services.json'
         FingerprintFile = Join-Path (Join-Path $pkgDir 'jars') '.pack-fingerprint.json'

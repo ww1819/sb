@@ -4,8 +4,9 @@ cd /d "%~dp0"
 title MEIS 完整打包
 echo ========================================
 echo   MEIS package - 完整打包
-echo   编译并收集全部 JAR -^> jars\
+echo   JAR -^> jars\  +  前端 -^> www\
 echo   请先配置 env.txt（JAVA_HOME / MAVEN_HOME）
+echo   前端需 Node/npm；仅打 JAR 可设 SKIP_FRONTEND_BUILD=1
 echo ========================================
 echo.
 
@@ -24,5 +25,5 @@ if %ERR% neq 0 (
   pause
   exit /b %ERR%
 )
-echo 完整打包成功。可将整个 package 文件夹拷到实施机。
+echo 完整打包成功。jars\ + www\ 已就绪，可将整个 package 拷到实施机。
 pause

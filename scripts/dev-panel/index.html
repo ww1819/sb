@@ -622,6 +622,7 @@
       <button class="warn" onclick="act('backend/restart-all')">重启全部后端</button>
       <button class="danger" onclick="confirmClean()" title="mvn clean，清除全部模块 target（classes/JAR），之后需重新打包">整体 Clean</button>
       <button class="primary" onclick="act('build/backend')" title="mvn package -DskipTests，打包全部微服务 JAR">打包后端</button>
+      <button class="primary" onclick="actFieldPack()" title="等同 package\打包.bat：JAR→jars\ + meis-web→www\（配置见 services-meta.json）">生产构建</button>
       <button onclick="act('build/install')" title="mvn install -DskipTests，安装到本地仓库">Maven Install</button>
       <button onclick="refresh()">刷新状态</button>
       <button class="danger" onclick="shutdownPanel()" title="关闭面板进程并释放 5099 端口，不影响已启动的前后端服务">关闭面板</button>
@@ -1081,10 +1082,23 @@
       'clean-package': { label: '清理重建', hint: 'clean + package' }
     }
 
-    const FRONTEND_BUILD_ACTIONS = {
+    /** 默认回落；优先用 services-meta.json → /api/status.frontend.buildActions */
+    let FRONTEND_BUILD_ACTIONS = {
       install: { label: '依赖安装', hint: 'npm install，package.json 变更后' },
       typecheck: { label: '类型检查', hint: 'vue-tsc，不启动服务' },
-      build: { label: '生产构建', hint: 'vite build，验证生产包' }
+      'vite-build': { label: 'Vite 构建', hint: '仅 meis-web npm run build' },
+      'field-pack': { label: '生产构建', hint: '等同 package\\打包.bat：jars\\ + www\\' }
+    }
+
+    function applyFrontendBuildActionsFromStatus(fe) {
+      const list = fe && Array.isArray(fe.buildActions) ? fe.buildActions : null
+      if (!list || !list.length) return
+      const next = {}
+      list.forEach((a) => {
+        if (!a || !a.mode) return
+        next[a.mode] = { label: a.labelZh || a.mode, hint: a.hintZh || '' }
+      })
+      if (Object.keys(next).length) FRONTEND_BUILD_ACTIONS = next
     }
 
     let frontendPendingUntil = 0
@@ -1203,7 +1217,7 @@
         ? '<div class="build-mode-hint" style="color:var(--warn)">构建中…</div>'
         : (fe?.httpUp
           ? '<div class="build-mode-hint" style="color:var(--ok)">开发服已运行：保存代码自动热更新（HMR），日常无需构建</div>'
-          : '<div class="build-mode-hint">启动开发服后改代码自动热更新；下列按钮仅用于安装依赖 / 类型检查 / 生产包验证</div>')
+          : '<div class="build-mode-hint">启动开发服后改代码自动热更新；「生产构建」等同 package\\打包.bat（jars+www）</div>')
       return `
         <div class="build-opts">
           <span class="build-section-label">仅构建，不启停</span>
@@ -1698,7 +1712,26 @@
         showToast('meis-web: 正在' + label + '…', true)
         const data = await api('/api/frontend/build?mode=' + encodeURIComponent(mode), 'POST', 30000)
         showToast('meis-web: ' + label + ' 已提交后台，请稍候刷新状态', data.ok !== false)
-        markBuildPending('meis-web', mode === 'install' ? 300 : 180)
+        const wait = mode === 'field-pack' ? 600 : (mode === 'install' ? 300 : 180)
+        markBuildPending('meis-web', wait)
+        pollServiceStatus()
+      } catch (e) {
+        showToast(e.message, false)
+      } finally {
+        releaseBusy()
+      }
+    }
+
+    async function actFieldPack() {
+      if (!tryAcquireBusy()) return
+      try {
+        if (!confirm('生产构建将执行与 package\\打包.bat 相同流程：\n· Maven 打包全部 JAR → package\\jars\\\n· meis-web 生产构建 → package\\www\\\n\n可能耗时数分钟，确认继续？')) {
+          return
+        }
+        showToast('正在提交生产构建（现场包）…', true)
+        const data = await api('/api/build/field-pack', 'POST', 30000)
+        showToast('生产构建已提交后台，完成后请查看 package\\jars 与 package\\www', data.ok !== false)
+        markBuildPending('meis-web', 600)
         pollServiceStatus()
       } catch (e) {
         showToast(e.message, false)
@@ -1912,7 +1945,8 @@
       const buildLabels = {
         'reactor-clean': '整体 Clean',
         'maven-install': 'Maven Install',
-        'build-backend': '打包后端'
+        'build-backend': '打包后端',
+        'field-pack': '生产构建'
       }
       const buildHint = bg.length
         ? bg.map(j => buildLabels[j] || j).join('、') + ' 进行中…'
@@ -1933,6 +1967,7 @@
 
     function renderFrontend(fe) {
       if (!fe) return
+      applyFrontendBuildActionsFromStatus(fe)
       const feWatch = isLogWatched(fe.name)
       document.getElementById('frontend-row').innerHTML = `
         <tr>

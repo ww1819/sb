@@ -16,26 +16,26 @@
 适合：院内试运行 / 实施验收 / 短期演示。目标是 **少步骤、可双击、可拷走**。
 
 ```text
-┌──────────────┐     拷贝 package\（或仅 update\）   ┌──────────────────┐
-│  开发 / 构建机 │  ─────────────────────────────►  │  实施 / 现场机    │
-│ 完整打包.bat   │     首次整包 / 日常增量 JAR        │ 双击 启动运维.bat │
-│ 更新打包.bat   │                                  │ → :5098 启停服务  │
-└──────────────┘                                  └──────────────────┘
+┌──────────────┐   拷贝 package\（或 update\ / www） ┌──────────────────┐
+│  开发 / 构建机 │  ────────────────────────────────► │  实施 / 现场机    │
+│ 完整打包.bat   │  首次 jars+www；日常增量 JAR         │ 双击 启动运维.bat │
+│ 更新打包.bat   │                                    │ → :5098 启停服务  │
+└──────────────┘                                    └──────────────────┘
 ```
 
 ### 〇.1 流程总览
 
 | 步骤 | 在哪做 | 做什么 |
 |------|--------|--------|
-| 1 | 开发机 | 配置 `package\env.txt`（JDK / Maven） |
-| 2 | 开发机 | **首次**：双击 `完整打包.bat` → 全部 JAR 写入 `jars\` |
+| 1 | 开发机 | 配置 `package\env.txt`（JDK / Maven；前端需 Node/npm） |
+| 2 | 开发机 | **首次**：双击 `完整打包.bat` → JAR → `jars\`，前端 → `www\` |
 | 2b | 开发机 | **日常**：双击 `更新打包.bat` → 只打有代码变更的 JAR，并生成 `update\` |
-| 3 | — | **首次**整份 `package` 拷到实施机；**增量**只拷 `update\` 内 JAR 覆盖现场 `jars\` |
+| 3 | — | **首次**整份 `package` 拷到实施机；**增量**只拷 `update\` 覆盖现场 `jars\`（前端有改另拷 `www\`） |
 | 4 | 实施机 | 安装 JDK 17、PostgreSQL、Redis（Memurai）、MinIO（见 〇.3） |
 | 5 | 实施机 | 改实施机上的 `package\env.txt`（JAVA_HOME、数据库等） |
 | 6 | 实施机 | 双击 `启动运维.bat` → 浏览器 `http://localhost:5098` |
 | 7 | 实施机 | 齐套检查 →「启动核心」或「启动全部」→ 冒烟验证 |
-| 8 | 实施机 | （可选）Nginx 托管前端 + `/api` 反代；App 填 Nginx 端口 |
+| 8 | 实施机 | Nginx 托管前端：`root` 指向 `package\www`（或拷到 `D:\meis\www`）+ `/api` 反代；App 填 Nginx 端口 |
 
 > **禁止**直接双击打开 `index.html`（无法启动 Java）。  
 > **禁止**把运维口 `5098` 暴露到院内网 / 公网。
@@ -49,13 +49,15 @@
 |----|------|
 | `JAVA_HOME` | JDK 17 根目录（内含 `bin\java.exe`） |
 | `MAVEN_HOME` | Maven 根目录（内含 `bin\mvn.cmd`），或改用 `MAVEN_CMD=` 指向 `mvn.cmd` |
+| Node / npm | 本机 PATH 有 `npm`，或 `NODE_HOME` / `NPM_CMD`；用于 `meis-web` 生产构建 |
+| `SKIP_FRONTEND_BUILD` | 默认 `0`；设为 `1` 则只打 JAR、不跑前端（`pack.ps1 -SkipFrontend` 同效） |
 
 3. 选择打包方式：
 
 | 脚本 | 何时用 | 结果 |
 |------|--------|------|
-| **`完整打包.bat`** | 首次交付、大版本、共享库大改、指纹丢失 | 全量 `clean package`，`jars\` 齐套，写入指纹基线；清空 `update\` |
-| **`更新打包.bat`** | 日常只改了部分业务模块 | 对比 `jars\.pack-fingerprint.json`，**只编译有变更的模块**；覆盖 `jars\` 对应 JAR，并写出 `package\update\`（仅变更 JAR + 说明） |
+| **`完整打包.bat`** | 首次交付、大版本、共享库大改、指纹丢失、前端有改 | 全量 `clean package` → `jars\`；`npm run build` → `www\`；写入指纹基线；清空 `update\` |
+| **`更新打包.bat`** | 日常只改了部分业务模块 | 对比指纹，**只编译有变更的模块**；覆盖 `jars\`；写出 `update\`（**不重打前端**） |
 
 变更判定（更新打包）：
 
@@ -68,8 +70,9 @@
 
 | 场景 | 拷什么 |
 |------|--------|
-| 首次 / 完整 | **整个 `package` 目录** |
-| 增量更新 | 仅 `package\update\` 里的 `*.jar`，覆盖实施机 `package\jars\` |
+| 首次 / 完整 | **整个 `package` 目录**（含 `jars\` + `www\`） |
+| 增量（仅后端） | 仅 `package\update\` 里的 `*.jar`，覆盖实施机 `package\jars\` |
+| 增量（含前端） | 再覆盖 `www\`，或整包拷贝 |
 
 建议整包拷贝前可删体积大的运行日志（可选）：
 
@@ -78,7 +81,7 @@ package\logs\*.log
 package\logs\jobs\
 ```
 
-**不要删**：`jars\`、`*.bat`、`*.ps1`、`index.html`、`services.json`、`env.txt` / `env.example.txt`。  
+**不要删**：`jars\`、`www\`、`*.bat`、`*.ps1`、`index.html`、`services.json`、`env.txt` / `env.example.txt`。  
 旧名 `打包.bat` 仍可用，会转调 `完整打包.bat`。
 
 ### 〇.3 实施机：中间件前置
@@ -167,7 +170,7 @@ Invoke-RestMethod -Method POST http://127.0.0.1:8080/api/auth/login `
 
 | 项 | 建议 |
 |----|------|
-| 静态页 | Nginx `root` 指向 `meis-web` 的 `dist`（需另拷前端构建产物） |
+| 静态页 | Nginx `root` 指向现场包 **`package\www`**（开发机 `打包.bat` 生成；等同 `meis-web/dist`） |
 | API | `location /api/` → `http://127.0.0.1:8080` |
 | 临时对外端口 | 若暂用 **5174** 对外，须在 Nginx 配置 `listen 5174` 且带 `/api` 反代 |
 | Flutter App | 服务器 IP + 端口 **5174**（走 Nginx）；直连 Gateway 才填 **8080** |
@@ -324,18 +327,19 @@ minio.exe server D:\meis\minio-data --address ":9100" --console-address ":9101"
 
 ```text
 package\
-  完整打包.bat      ← 开发机：全量编译 → jars\ + 指纹基线
-  更新打包.bat      ← 开发机：仅变更模块 → jars\ 覆盖 + update\ 增量
+  完整打包.bat      ← 开发机：全量 JAR → jars\ + 前端 → www\ + 指纹基线
+  更新打包.bat      ← 开发机：仅变更模块 → jars\ 覆盖 + update\ 增量（不含前端）
   启动运维.bat      ← 实施机：打开本机运维页 :5098
-  env.txt           ← 各机各自配置（模板见 env.example.txt）
+  env.txt           ← 各机各自配置（模板见 env.example.txt；含 SKIP_FRONTEND_BUILD）
   jars\             ← 全部后端 JAR（实施运行用）
+  www\              ← meis-web 生产静态页（Nginx root）
   update\           ← 最近一次「更新打包」的变更 JAR（可只拷这一目录）
   index.html + ops-helper.ps1 / 运维助手.ps1
   services.json     ← 服务名 / 端口 / 启停顺序
 ```
 
-开发机：首次 `完整打包.bat`，日常 `更新打包.bat`。  
-实施机：改 `env.txt` → 双击 `启动运维.bat` → 齐套检查并启停。
+开发机：首次 `完整打包.bat`，日常 `更新打包.bat`（前端有改再完整打包）。  
+实施机：改 `env.txt` → 双击 `启动运维.bat` → 齐套检查并启停；Nginx 指向 `www\`。
 
 > 纯双击 HTML **不能**启动 Java；必须先开「启动运维.bat」。
 

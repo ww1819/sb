@@ -98,16 +98,17 @@ export function buildAssetDistributionOption(raw: DeptCountItem[]): EChartsOptio
         label: {
           show: true,
           color: '#4b5563',
-          formatter: (params: { name?: string; value?: number | string; percent?: number }) => {
-            if (!params.name) return ''
-            const value = Number(params.value) || 0
+          formatter: (params: unknown) => {
+            const p = params as { name?: string; value?: number | string | null; percent?: number }
+            if (!p.name) return ''
+            const value = Number(p.value) || 0
             const percent =
-              params.percent != null
-                ? Number(params.percent).toFixed(1)
+              p.percent != null
+                ? Number(p.percent).toFixed(1)
                 : total
                   ? ((value / total) * 100).toFixed(1)
                   : '0.0'
-            return `${params.name}\n${value}台 · ${percent}%`
+            return `${p.name}\n${value}台 · ${percent}%`
           }
         },
         labelLine: {

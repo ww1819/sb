@@ -5,7 +5,13 @@
   },
   "meis-web": {
     "labelZh": "前端 Web",
-    "descZh": "Vue 管理界面，Vite 热更新开发服务"
+    "descZh": "Vue 管理界面，Vite 热更新开发服务",
+    "buildActions": [
+      { "mode": "install", "labelZh": "依赖安装", "hintZh": "npm install，package.json 变更后" },
+      { "mode": "typecheck", "labelZh": "类型检查", "hintZh": "vue-tsc，不启动服务" },
+      { "mode": "vite-build", "labelZh": "Vite 构建", "hintZh": "仅 meis-web npm run build，验证生产包" },
+      { "mode": "field-pack", "labelZh": "生产构建", "hintZh": "等同 package\\打包.bat：后端 JAR→jars\\ + 前端→www\\" }
+    ]
   },
   "meis-common": {
     "labelZh": "公共库",

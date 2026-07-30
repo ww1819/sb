@@ -75,10 +75,14 @@ function Get-MeisServiceMetaMap {
     $raw = Get-Content $metaPath -Raw -Encoding UTF8
     $script:MeisServiceMetaCache = @{}
     foreach ($prop in ($raw | ConvertFrom-Json).PSObject.Properties) {
-        $script:MeisServiceMetaCache[$prop.Name] = @{
+        $entry = @{
             labelZh = [string]$prop.Value.labelZh
             descZh  = [string]$prop.Value.descZh
         }
+        if ($null -ne $prop.Value.buildActions) {
+            $entry.buildActions = @($prop.Value.buildActions)
+        }
+        $script:MeisServiceMetaCache[$prop.Name] = $entry
     }
     return $script:MeisServiceMetaCache
 }
@@ -90,6 +94,35 @@ function Get-MeisServiceMetaEntry {
         return $map[$ServiceName]
     }
     return @{ labelZh = $ServiceName; descZh = '' }
+}
+
+function Get-MeisFrontendBuildActions {
+    $meta = Get-MeisServiceMetaEntry 'meis-web'
+    if ($meta.buildActions -and @($meta.buildActions).Count -gt 0) {
+        return @($meta.buildActions)
+    }
+    return @(
+        @{ mode = 'install'; labelZh = '依赖安装'; hintZh = 'npm install' },
+        @{ mode = 'typecheck'; labelZh = '类型检查'; hintZh = 'vue-tsc' },
+        @{ mode = 'vite-build'; labelZh = 'Vite 构建'; hintZh = 'npm run build' },
+        @{ mode = 'field-pack'; labelZh = '生产构建'; hintZh = '等同 package\打包.bat' }
+    )
+}
+
+function Invoke-MeisPackageFieldPack {
+    $packPs1 = Join-Path $script:MeisRoot 'package\pack.ps1'
+    if (-not (Test-Path $packPs1)) {
+        throw "Missing package\pack.ps1: $packPs1"
+    }
+    $envFile = Join-Path $script:MeisRoot 'package\env.txt'
+    if (-not (Test-Path $envFile)) {
+        throw 'Missing package\env.txt. Copy package\env.example.txt to env.txt first.'
+    }
+    & $packPs1
+    if ($LASTEXITCODE -ne 0) {
+        throw "package\pack.ps1 failed, exit=$LASTEXITCODE"
+    }
+    return @{ ok = $true; message = 'package field-pack OK (jars\ + www\)' }
 }
 
 $script:MeisFrontendPort = 5173
@@ -1213,13 +1246,21 @@ function Get-MeisServiceStatusList {
 
 function Get-MeisFrontendStatus {
     $meta = Get-MeisServiceMetaEntry 'meis-web'
+    $actions = @(Get-MeisFrontendBuildActions | ForEach-Object {
+        [ordered]@{
+            mode    = [string]$_.mode
+            labelZh = [string]$_.labelZh
+            hintZh  = [string]$_.hintZh
+        }
+    })
     return [ordered]@{
-        name    = 'meis-web'
-        labelZh = $meta.labelZh
-        descZh  = $meta.descZh
-        port    = $script:MeisFrontendPort
-        httpUp  = Test-MeisPortListening -Port $script:MeisFrontendPort
-        url     = "http://localhost:$($script:MeisFrontendPort)"
+        name         = 'meis-web'
+        labelZh      = $meta.labelZh
+        descZh       = $meta.descZh
+        port         = $script:MeisFrontendPort
+        httpUp       = Test-MeisPortListening -Port $script:MeisFrontendPort
+        url          = "http://localhost:$($script:MeisFrontendPort)"
+        buildActions = $actions
     }
 }
 
