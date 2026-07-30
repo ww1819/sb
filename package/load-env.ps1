@@ -75,7 +75,52 @@ function Resolve-MeisPackageNpm {
             if (Test-Path $cmd) { return $cmd }
         }
     }
+    # Prefer npm.cmd — npm.ps1 runs in PowerShell and inherits Cursor/VS Code debugger attach
+    $cmdPath = Get-Command npm.cmd -ErrorAction SilentlyContinue
+    if ($cmdPath) { return $cmdPath.Source }
     $inPath = Get-Command npm -ErrorAction SilentlyContinue
-    if ($inPath) { return $inPath.Source }
+    if ($inPath) {
+        $src = [string]$inPath.Source
+        if ($src -like '*.ps1') {
+            $asCmd = [System.IO.Path]::ChangeExtension($src, '.cmd')
+            if (Test-Path $asCmd) { return $asCmd }
+        }
+        return $src
+    }
     throw 'npm not found. Install Node.js LTS, or set NODE_HOME / NPM_CMD in package\env.txt'
+}
+
+# Run npm via cmd.exe with debugger env stripped (avoids Cursor/VS Code auto-attach).
+function Invoke-MeisPackageNpm {
+    param(
+        [Parameter(Mandatory = $true)][string]$WorkingDirectory,
+        [Parameter(Mandatory = $true)][string[]]$Arguments
+    )
+    $npm = Resolve-MeisPackageNpm
+    if ($npm -like '*.ps1') {
+        $asCmd = [System.IO.Path]::ChangeExtension($npm, '.cmd')
+        if (Test-Path $asCmd) { $npm = $asCmd }
+    }
+    $argLine = ($Arguments | ForEach-Object {
+        $a = [string]$_
+        if ($a -match '[\s"]') { '"' + ($a -replace '"', '""') + '"' } else { $a }
+    }) -join ' '
+    Write-Host "  npm (isolated): $npm $argLine" -ForegroundColor DarkGray
+
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = "$env:SystemRoot\System32\cmd.exe"
+    # Clear debugger vars inside cmd so npm/node children never see them
+    $psi.Arguments = "/d /s /c `"set NODE_OPTIONS=& set VSCODE_INSPECTOR_OPTIONS=& set NODE_DEBUG=& set NODE_DEBUG_OPTION=& `"$npm`" $argLine`""
+    $psi.WorkingDirectory = $WorkingDirectory
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $false
+    foreach ($key in @('NODE_OPTIONS', 'VSCODE_INSPECTOR_OPTIONS', 'NODE_DEBUG', 'NODE_DEBUG_OPTION')) {
+        try { $psi.EnvironmentVariables[$key] = '' } catch { }
+    }
+    $proc = [System.Diagnostics.Process]::Start($psi)
+    if (-not $proc) { throw "Failed to start npm: $npm" }
+    $proc.WaitForExit()
+    if ($proc.ExitCode -ne 0) {
+        throw "npm failed, exit=$($proc.ExitCode) ($npm $argLine)"
+    }
 }

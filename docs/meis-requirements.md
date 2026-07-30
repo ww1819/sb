@@ -6237,7 +6237,8 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 | 方案 | 定稿 |
 |------|------|
 | 复杂超时/杀进程/阻塞检测 | **不做**（过度；失败已有非 0 退出码） |
-| 构建前剥离 `NODE_OPTIONS` 的 `--inspect*` | **做**（`pack.ps1` 轻量防护，避免调试会话干扰生产构建） |
-| 使用方式 | 生产打包优先「运行」；即使用调试启动，也会清 inspect |
+| 仅清 `NODE_OPTIONS` | **不够**（Cursor 仍会通过 `VSCODE_INSPECTOR_OPTIONS` / auto-attach / `npm.ps1` 挂调试器） |
+| 隔离执行 | **做**：`Invoke-MeisPackageNpm` 用 `cmd.exe` + `npm.cmd`，清空 inspect 相关环境后再跑 |
+| 使用方式 | 生产打包可用 F5；优先「以非调试运行」(Ctrl+F5) 更干净 |
 
 **状态**：已完成（文档 + `pack.ps1` 清 inspect）。

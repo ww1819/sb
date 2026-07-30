@@ -43,7 +43,7 @@
             "type": "node-terminal",
             "name": "生产打包 (package)",
             "request": "launch",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File package\\pack.ps1",
+            "command": "cmd /c \"set NODE_OPTIONS=& set VSCODE_INSPECTOR_OPTIONS=& powershell -NoProfile -ExecutionPolicy Bypass -File package\\pack.ps1\"",
             "cwd": "${workspaceFolder}"
         },
         {
