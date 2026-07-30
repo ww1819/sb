@@ -22,6 +22,7 @@
                 <el-form-item label-width="0">
                   <el-button type="primary" @click="onFundSearch">查询</el-button>
                   <el-button @click="onFundReset">重置</el-button>
+                  <el-button @click="onFundExport">导出</el-button>
                 </el-form-item>
               </el-col>
             </el-row>
@@ -30,7 +31,31 @@
       </div>
 
       <div class="table-wrap">
-        <div class="section-bar">折旧到期汇总-资产折旧汇总(资金)</div>
+        <div class="section-bar section-bar--with-help">
+          <span>折旧到期汇总-资产折旧汇总(资金)</span>
+          <el-popover
+            placement="bottom-start"
+            :width="420"
+            trigger="hover"
+            :show-after="150"
+            popper-class="depr-fund-formula-popper"
+          >
+            <template #reference>
+              <el-button class="section-help-btn" circle size="small" title="数据来源公式解析">
+                <span class="section-help-mark">?</span>
+              </el-button>
+            </template>
+            <div class="formula-popover">
+              <div class="formula-popover-title">数据来源公式解析</div>
+              <ul class="formula-list">
+                <li>期初数据 = 上期期末（第一次统计时为 0）</li>
+                <li>本期增加 = 启用日期为上期至本期并且已启用折旧的资产统计</li>
+                <li>本期减少 = 停用日期为本期并且已启用折旧的资产统计</li>
+                <li>期末数据 = 期初数据 + 本期增加 − 本期减少</li>
+              </ul>
+            </div>
+          </el-popover>
+        </div>
         <el-table
           :data="pagedFundRows"
           border
@@ -135,23 +160,37 @@
         >
           <el-table-column type="index" label="序号" width="64" align="center" :index="gradeIndexMethod" />
           <el-table-column
-            prop="grade_name"
-            label="资产分级"
-            min-width="160"
-            show-overflow-tooltip
-            sortable="custom"
-          />
-          <el-table-column
-            prop="total_amount"
-            label="资产金额合计(元)"
-            min-width="150"
+            prop="original_value"
+            label="原值(元)"
+            min-width="140"
             align="right"
             sortable="custom"
           />
           <el-table-column
-            prop="total_depr"
-            label="累计折旧合计(元)"
-            min-width="150"
+            prop="period_depr"
+            label="本期折旧(元)"
+            min-width="140"
+            align="right"
+            sortable="custom"
+          />
+          <el-table-column
+            prop="accum_depr"
+            label="累计折旧(元)"
+            min-width="140"
+            align="right"
+            sortable="custom"
+          />
+          <el-table-column
+            prop="net_value"
+            label="净值(元)"
+            min-width="140"
+            align="right"
+            sortable="custom"
+          />
+          <el-table-column
+            prop="accrue_original"
+            label="计提原值(元)"
+            min-width="140"
             align="right"
             sortable="custom"
           />
@@ -186,8 +225,8 @@
           <el-form :model="statusFilters" class="filter-form" label-width="100px" @submit.prevent>
             <el-row :gutter="16">
               <el-col :xs="24" :sm="12" :md="8">
-                <el-form-item label="折旧状态">
-                  <el-input v-model="statusFilters.statusName" clearable placeholder="折旧状态搜索" />
+                <el-form-item label="使用状态">
+                  <el-input v-model="statusFilters.useStatus" clearable placeholder="使用状态搜索" />
                 </el-form-item>
               </el-col>
               <el-col :xs="24" :sm="12" :md="8" class="filter-actions">
@@ -214,23 +253,42 @@
         >
           <el-table-column type="index" label="序号" width="64" align="center" :index="statusIndexMethod" />
           <el-table-column
-            prop="status_name"
-            label="折旧状态"
-            min-width="160"
+            prop="dept_code"
+            label="科室编码"
+            min-width="120"
+            sortable="custom"
+          />
+          <el-table-column
+            prop="dept_name"
+            label="科室名称"
+            min-width="140"
             show-overflow-tooltip
             sortable="custom"
           />
           <el-table-column
-            prop="total_amount"
-            label="资产金额合计(元)"
-            min-width="150"
+            prop="use_status"
+            label="使用状态"
+            min-width="110"
+            sortable="custom"
+          />
+          <el-table-column
+            prop="original_value"
+            label="原值(元)"
+            min-width="140"
             align="right"
             sortable="custom"
           />
           <el-table-column
-            prop="total_depr"
-            label="累计折旧合计(元)"
-            min-width="150"
+            prop="accum_depr"
+            label="累计折旧(元)"
+            min-width="140"
+            align="right"
+            sortable="custom"
+          />
+          <el-table-column
+            prop="net_value"
+            label="净值(元)"
+            min-width="140"
             align="right"
             sortable="custom"
           />
@@ -261,12 +319,13 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 
 const activeTab = ref<'fund' | 'grade' | 'status'>('fund')
 
 const fundFilters = reactive({ fundSource: '' })
 const gradeFilters = reactive({ gradeName: '' })
-const statusFilters = reactive({ statusName: '' })
+const statusFilters = reactive({ useStatus: '' })
 
 type FundRow = {
   fund_source: string
@@ -283,21 +342,46 @@ type FundRow = {
   _totalAmount: number
 }
 
-type AggRow = {
-  key: string
-  total_amount: string
-  total_depr: string
+type GradeRow = {
+  original_value: string
+  period_depr: string
+  accum_depr: string
+  net_value: string
+  accrue_original: string
   _count: number
-  _amount: number
-  _depr: number
+  _original: number
+  _period_depr: number
+  _accum: number
+  _net: number
+  _accrue: number
 }
 
-type GradeRow = AggRow & { grade_name: string }
-type StatusRow = AggRow & { status_name: string }
+type StatusRow = {
+  dept_code: string
+  dept_name: string
+  use_status: string
+  original_value: string
+  accum_depr: string
+  net_value: string
+  _count: number
+  _original: number
+  _accum: number
+  _net: number
+}
 
 const MOCK_FUND_SOURCES = ['财政拨款', '自筹资金', '科研经费', '捐赠资金', '其他']
+const MOCK_DEPTS = [
+  { code: 'KS001', name: '放射科' },
+  { code: 'KS002', name: '检验科' },
+  { code: 'KS003', name: '手术室' },
+  { code: 'KS004', name: 'ICU' },
+  { code: 'KS005', name: '急诊科' },
+  { code: 'KS006', name: '心内科' },
+  { code: 'KS007', name: '骨科' },
+  { code: 'KS008', name: '儿科' }
+]
+const MOCK_USE_STATUSES = ['在用', '闲置', '维修中', '已报废']
 const MOCK_GRADES = ['房屋及建筑物', '专用设备', '一般设备', '交通运输设备', '其他固定资产']
-const MOCK_STATUSES = ['正常折旧', '即将到期', '已到期', '已提足']
 
 function formatMoney(n: number) {
   return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -335,35 +419,49 @@ function buildMockFundRows(count = 50): FundRow[] {
 }
 
 function buildMockGradeRows(): GradeRow[] {
-  return MOCK_GRADES.map((name, i) => {
-    const amount = 800000 + i * 320000 + ((i + 1) * 45821) % 200000
-    const depr = Math.round(amount * (0.28 + i * 0.05))
+  return MOCK_GRADES.map((_, i) => {
+    const original = 800000 + i * 320000 + ((i + 1) * 45821) % 200000
+    const periodDepr = Math.round(original * (0.02 + i * 0.005))
+    const accum = Math.round(original * (0.28 + i * 0.05))
+    const net = original - accum
+    const accrue = Math.round(original * (0.85 + (i % 3) * 0.04))
     return {
-      key: name,
-      grade_name: name,
-      total_amount: formatMoney(amount),
-      total_depr: formatMoney(depr),
+      original_value: formatMoney(original),
+      period_depr: formatMoney(periodDepr),
+      accum_depr: formatMoney(accum),
+      net_value: formatMoney(net),
+      accrue_original: formatMoney(accrue),
       _count: 8 + i * 3,
-      _amount: amount,
-      _depr: depr
+      _original: original,
+      _period_depr: periodDepr,
+      _accum: accum,
+      _net: net,
+      _accrue: accrue
     }
   })
 }
 
-function buildMockStatusRows(): StatusRow[] {
-  return MOCK_STATUSES.map((name, i) => {
-    const amount = 600000 + i * 410000 + ((i + 2) * 29173) % 180000
-    const depr = Math.round(amount * (0.2 + i * 0.12))
-    return {
-      key: name,
-      status_name: name,
-      total_amount: formatMoney(amount),
-      total_depr: formatMoney(depr),
-      _count: 10 + i * 5,
-      _amount: amount,
-      _depr: depr
-    }
-  })
+function buildMockStatusRows(count = 40): StatusRow[] {
+  const rows: StatusRow[] = []
+  for (let i = 1; i <= count; i++) {
+    const dept = MOCK_DEPTS[(i - 1) % MOCK_DEPTS.length]
+    const original = 120000 + ((i * 17359) % 880000)
+    const accum = Math.round(original * (0.18 + (i % 50) / 100))
+    const net = original - accum
+    rows.push({
+      dept_code: dept.code,
+      dept_name: dept.name,
+      use_status: MOCK_USE_STATUSES[(i - 1) % MOCK_USE_STATUSES.length],
+      original_value: formatMoney(original),
+      accum_depr: formatMoney(accum),
+      net_value: formatMoney(net),
+      _count: 1,
+      _original: original,
+      _accum: accum,
+      _net: net
+    })
+  }
+  return rows
 }
 
 const allFundRows = ref<FundRow[]>(buildMockFundRows(50))
@@ -423,37 +521,32 @@ const fundSummary = computed(() => {
   }
 })
 
-function sortAggRows<T extends AggRow>(
-  rows: T[],
-  sort: { prop: string; order: 'ascending' | 'descending' | null },
-  nameProp: keyof T
-) {
-  const list = [...rows]
-  const { prop, order } = sort
-  if (!prop || !order) return list
+const sortedGradeRows = computed(() => {
+  const rows = [...allGradeRows.value]
+  const { prop, order } = gradeSort.value
+  if (!prop || !order) return rows
   const factor = order === 'ascending' ? 1 : -1
-  list.sort((a, b) => {
-    if (prop === 'total_amount') return (a._amount - b._amount) * factor
-    if (prop === 'total_depr') return (a._depr - b._depr) * factor
-    const av = String(a[nameProp] ?? '')
-    const bv = String(b[nameProp] ?? '')
-    return av.localeCompare(bv, 'zh-CN') * factor
-  })
-  return list
-}
-
-const sortedGradeRows = computed(() =>
-  sortAggRows(allGradeRows.value, gradeSort.value, 'grade_name')
-)
+  const numKey: Record<string, keyof GradeRow> = {
+    original_value: '_original',
+    period_depr: '_period_depr',
+    accum_depr: '_accum',
+    net_value: '_net',
+    accrue_original: '_accrue'
+  }
+  const field = numKey[prop]
+  if (!field) return rows
+  rows.sort((a, b) => (Number(a[field]) - Number(b[field])) * factor)
+  return rows
+})
 const pagedGradeRows = computed(() => {
   const start = (gradePage.value - 1) * gradePageSize.value
   return sortedGradeRows.value.slice(start, start + gradePageSize.value)
 })
 const gradeSummary = computed(() => {
   const totalQty = allGradeRows.value.reduce((s, r) => s + r._count, 0)
-  const totalAmount = allGradeRows.value.reduce((s, r) => s + r._amount, 0)
+  const totalAmount = allGradeRows.value.reduce((s, r) => s + r._original, 0)
   const pageQty = pagedGradeRows.value.reduce((s, r) => s + r._count, 0)
-  const pageAmount = pagedGradeRows.value.reduce((s, r) => s + r._amount, 0)
+  const pageAmount = pagedGradeRows.value.reduce((s, r) => s + r._original, 0)
   return {
     totalQty,
     totalAmount: formatMoney(totalAmount),
@@ -462,18 +555,37 @@ const gradeSummary = computed(() => {
   }
 })
 
-const sortedStatusRows = computed(() =>
-  sortAggRows(allStatusRows.value, statusSort.value, 'status_name')
-)
+const sortedStatusRows = computed(() => {
+  const rows = [...allStatusRows.value]
+  const { prop, order } = statusSort.value
+  if (!prop || !order) return rows
+  const factor = order === 'ascending' ? 1 : -1
+  const numKey: Record<string, keyof StatusRow> = {
+    original_value: '_original',
+    accum_depr: '_accum',
+    net_value: '_net'
+  }
+  const field = numKey[prop]
+  if (field) {
+    rows.sort((a, b) => (Number(a[field]) - Number(b[field])) * factor)
+    return rows
+  }
+  rows.sort((a, b) => {
+    const av = String((a as Record<string, unknown>)[prop] ?? '')
+    const bv = String((b as Record<string, unknown>)[prop] ?? '')
+    return av.localeCompare(bv, 'zh-CN') * factor
+  })
+  return rows
+})
 const pagedStatusRows = computed(() => {
   const start = (statusPage.value - 1) * statusPageSize.value
   return sortedStatusRows.value.slice(start, start + statusPageSize.value)
 })
 const statusSummary = computed(() => {
-  const totalQty = allStatusRows.value.reduce((s, r) => s + r._count, 0)
-  const totalAmount = allStatusRows.value.reduce((s, r) => s + r._amount, 0)
-  const pageQty = pagedStatusRows.value.reduce((s, r) => s + r._count, 0)
-  const pageAmount = pagedStatusRows.value.reduce((s, r) => s + r._amount, 0)
+  const totalQty = allStatusRows.value.length
+  const totalAmount = allStatusRows.value.reduce((s, r) => s + r._original, 0)
+  const pageQty = pagedStatusRows.value.length
+  const pageAmount = pagedStatusRows.value.reduce((s, r) => s + r._original, 0)
   return {
     totalQty,
     totalAmount: formatMoney(totalAmount),
@@ -512,6 +624,74 @@ function onFundReset() {
   fundFilters.fundSource = ''
   fundPage.value = 1
 }
+
+function formatExportDate(d = new Date()) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}${m}${day}`
+}
+
+function escapeHtml(s: string) {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function downloadExcelHtml(htmlTable: string, filenameWithoutExt: string) {
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8" /></head><body>${htmlTable}</body></html>`
+  const blob = new Blob([`\uFEFF${html}`], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${filenameWithoutExt}.xls`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function onFundExport() {
+  const rows = allFundRows.value
+  if (!rows.length) {
+    ElMessage.warning('暂无数据可导出')
+    return
+  }
+  const body = rows
+    .map(
+      (r, i) => `<tr>
+      <td>${i + 1}</td>
+      <td>${escapeHtml(r.fund_source)}</td>
+      <td>${escapeHtml(r.amount1)}</td><td>${escapeHtml(r.depr1)}</td>
+      <td>${escapeHtml(r.amount2)}</td><td>${escapeHtml(r.depr2)}</td>
+      <td>${escapeHtml(r.amount3)}</td><td>${escapeHtml(r.depr3)}</td>
+      <td>${escapeHtml(r.amount4)}</td><td>${escapeHtml(r.depr4)}</td>
+    </tr>`
+    )
+    .join('')
+  const table = `<table border="1">
+    <thead>
+      <tr>
+        <th rowspan="2">序号</th>
+        <th rowspan="2">资金来源</th>
+        <th colspan="2">期初</th>
+        <th colspan="2">本期增加</th>
+        <th colspan="2">本期减少</th>
+        <th colspan="2">期末</th>
+      </tr>
+      <tr>
+        <th>资产金额(元)</th><th>累计折旧(元)</th>
+        <th>资产金额(元)</th><th>累计折旧(元)</th>
+        <th>资产金额(元)</th><th>累计折旧(元)</th>
+        <th>资产金额(元)</th><th>累计折旧(元)</th>
+      </tr>
+    </thead>
+    <tbody>${body}</tbody>
+  </table>`
+  const filename = `资产折旧汇总(资金)${formatExportDate()}`
+  downloadExcelHtml(table, filename)
+  ElMessage.success(`已导出 ${rows.length} 条`)
+}
 function onGradeSearch() {
   gradePage.value = 1
 }
@@ -523,7 +703,7 @@ function onStatusSearch() {
   statusPage.value = 1
 }
 function onStatusReset() {
-  statusFilters.statusName = ''
+  statusFilters.useStatus = ''
   statusPage.value = 1
 }
 </script>
@@ -569,6 +749,51 @@ function onStatusReset() {
   color: var(--el-text-color-primary, #303133);
   background: transparent;
   border-bottom: 1px solid #d0d7de;
+}
+
+.section-bar--with-help {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-help-btn {
+  width: 22px !important;
+  height: 22px !important;
+  min-height: 22px !important;
+  padding: 0 !important;
+  border-color: #909399;
+  color: #606266;
+}
+
+.section-help-mark {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.formula-popover-title {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #f56c6c;
+}
+
+.formula-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.formula-list li {
+  margin-bottom: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #f56c6c;
+}
+
+.formula-list li:last-child {
+  margin-bottom: 0;
 }
 
 .query-box > .section-bar {
