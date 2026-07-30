@@ -5,7 +5,8 @@
         <el-date-picker
           v-model="form.planned_date"
           type="date"
-          value-format="YYYY-MM-DD"
+          :value-format="DATE_FMT"
+          :format="DATE_FMT"
           style="width: 100%"
           @change="onPlannedDateChange"
         />
@@ -14,7 +15,8 @@
         <el-date-picker
           v-model="form.execute_start_time"
           type="datetime"
-          value-format="YYYY-MM-DDTHH:mm:ss"
+          :value-format="DATETIME_FMT"
+          :format="DATETIME_FMT"
           style="width: 100%"
         />
       </el-form-item>
@@ -22,7 +24,8 @@
         <el-date-picker
           v-model="form.execute_end_time"
           type="datetime"
-          value-format="YYYY-MM-DDTHH:mm:ss"
+          :value-format="DATETIME_FMT"
+          :format="DATETIME_FMT"
           style="width: 100%"
         />
       </el-form-item>
@@ -32,7 +35,8 @@
           <el-date-picker
             v-model="form.next_due_date"
             type="date"
-            value-format="YYYY-MM-DD"
+            :value-format="DATE_FMT"
+            :format="DATE_FMT"
             style="flex: 1"
             :disabled="!form.update_next_due"
             placeholder="不勾选则不变更计划下次到期"
@@ -52,6 +56,7 @@ import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/api/http'
 import { calcItemNextDueDate } from '@/utils/cycleDays'
+import { DATE_FMT, DATETIME_FMT } from '@/utils/datetime'
 
 const visible = ref(false)
 const saving = ref(false)
@@ -78,8 +83,8 @@ function todayStr() {
 /** 执行日期 → 起止默认全天 */
 function applyDayBounds(date: string) {
   if (!date) return
-  form.execute_start_time = `${date}T00:00:00`
-  form.execute_end_time = `${date}T23:59:59`
+  form.execute_start_time = `${date} 00:00:00`
+  form.execute_end_time = `${date} 23:59:59`
 }
 
 function fillNextDueFromPlan() {

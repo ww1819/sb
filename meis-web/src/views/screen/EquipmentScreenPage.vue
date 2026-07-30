@@ -223,6 +223,7 @@ import http from '@/api/http'
 import ChartCard from '@/components/dashboard/ChartCard.vue'
 import { useLayoutStore } from '@/stores/layout'
 import { useAuthStore } from '@/stores/auth'
+import { formatDisplayDate, formatDisplayDateTime } from '@/utils/datetime'
 
 const layoutStore = useLayoutStore()
 const authStore = useAuthStore()
@@ -457,15 +458,11 @@ function formatEnergy(v: unknown) {
 }
 
 function formatTime(v: unknown) {
-  if (!v) return '—'
-  const d = new Date(String(v))
-  if (Number.isNaN(d.getTime())) return String(v).slice(0, 16)
-  return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
+  return formatDisplayDateTime(v)
 }
 
 function formatDate(v: unknown) {
-  if (!v) return '—'
-  return String(v).slice(0, 10)
+  return formatDisplayDate(v)
 }
 
 function statusLabel(s: unknown) {

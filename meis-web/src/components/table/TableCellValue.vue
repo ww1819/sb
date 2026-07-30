@@ -27,6 +27,7 @@ import {
   isNumericField,
   isStatusField
 } from '@/utils/tableCell'
+import { formatDisplayDate, formatDisplayDateTime } from '@/utils/datetime'
 import { resolveRefLabel, labelCacheVersion } from '@/composables/useRefLabelMap'
 import { useDict } from '@/composables/useDict'
 import { openFilePreview } from '@/composables/useFilePreview'
@@ -95,11 +96,8 @@ const displayText = computed(() => {
     if (label) return label
   }
   if (props.field.type === 'date' || props.field.type === 'datetime') {
-    const s = String(props.value)
-    if (props.field.type === 'date') {
-      const m = s.match(/^(\d{4}-\d{2}-\d{2})/)
-      if (m) return m[1]
-    }
+    if (props.field.type === 'date') return formatDisplayDate(props.value)
+    return formatDisplayDateTime(props.value)
   }
   return formatStatusLabel(props.value, props.field.prop)
 })
