@@ -1,0 +1,68 @@
+// Force China Maven mirrors for any google()/mavenCentral() repos declared by Flutter plugins.
+// Applied via GRADLE_OPTS=-I (see package/pack-apk.ps1).
+
+def rewriteMavenUrl(java.net.URI uri) {
+    def u = uri.toString()
+    // Flutter engine Maven (embedding / arm_* / x86_*)
+    if (u.contains('storage.googleapis.com/download.flutter.io') || u.contains('download.flutter.io')) {
+        if (!u.contains('storage.flutter-io.cn')) {
+            return java.net.URI.create('https://storage.flutter-io.cn/download.flutter.io')
+        }
+        return null
+    }
+    if (u.contains('dl.google.com') || u.contains('maven.google.com')) {
+        return java.net.URI.create('https://maven.aliyun.com/repository/google')
+    }
+    if (u.contains('repo.maven.apache.org') || u.contains('repo1.maven.org') || u.contains('central.maven.org')) {
+        return java.net.URI.create('https://maven.aliyun.com/repository/central')
+    }
+    if (u.contains('plugins.gradle.org')) {
+        return java.net.URI.create('https://maven.aliyun.com/repository/gradle-plugin')
+    }
+    return null
+}
+
+def rewriteRepos(RepositoryHandler repos) {
+    repos.withType(MavenArtifactRepository).configureEach { repo ->
+        def replacement = rewriteMavenUrl(repo.url)
+        if (replacement != null) {
+            println "[meis-mirror] ${repo.url} -> ${replacement}"
+            repo.setUrl(replacement)
+        }
+    }
+}
+
+settingsEvaluated { settings ->
+    settings.pluginManagement.repositories.withType(MavenArtifactRepository).configureEach { repo ->
+        def replacement = rewriteMavenUrl(repo.url)
+        if (replacement != null) {
+            println "[meis-mirror] pluginManagement ${repo.url} -> ${replacement}"
+            repo.setUrl(replacement)
+        }
+    }
+    try {
+        settings.dependencyResolutionManagement.repositories.withType(MavenArtifactRepository).configureEach { repo ->
+            def replacement = rewriteMavenUrl(repo.url)
+            if (replacement != null) {
+                println "[meis-mirror] dependencyResolution ${repo.url} -> ${replacement}"
+                repo.setUrl(replacement)
+            }
+        }
+    } catch (Throwable ignored) {
+    }
+}
+
+gradle.beforeProject { project ->
+    project.buildscript.repositories.withType(MavenArtifactRepository).configureEach { repo ->
+        def replacement = rewriteMavenUrl(repo.url)
+        if (replacement != null) {
+            repo.setUrl(replacement)
+        }
+    }
+    project.repositories.withType(MavenArtifactRepository).configureEach { repo ->
+        def replacement = rewriteMavenUrl(repo.url)
+        if (replacement != null) {
+            repo.setUrl(replacement)
+        }
+    }
+}
