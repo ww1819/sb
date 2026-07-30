@@ -671,6 +671,7 @@ function buildTitleMap(list: NavModule[]) {
   map.set('/tenant/list', '租户列表')
 
   map.set('/analytics/reports', '统计报表')
+  map.set('/analytics/fee-manual', '费用手工登记')
   map.set('/analytics/asset-usage', '资产使用率统计')
   map.set('/analytics/value-structure', '价值结构分析表')
   map.set('/analytics/depr-due', '折旧到期汇总')
@@ -678,8 +679,8 @@ function buildTitleMap(list: NavModule[]) {
   map.set('/analytics/depr-ratio', '折旧明细比例')
   map.set('/analytics/depr-detail', '折旧详情')
   map.set('/analytics/asset-change', '资产增减统计')
-  map.set('/analytics/asset-occupy', '资产占用统计')
-  map.set('/analytics/asset-transfer', '资产异动统计')
+  map.set('/analytics/asset-occupy', '资产在用统计')
+  map.set('/analytics/asset-transfer', '资产移动统计表')
 
   map.set('/dashboard', '工作台')
 

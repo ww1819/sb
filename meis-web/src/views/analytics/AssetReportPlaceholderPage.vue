@@ -20,8 +20,8 @@ const TITLES: Record<string, string> = {
   '/analytics/depr-ratio': '折旧明细比例',
   '/analytics/depr-detail': '折旧详情',
   '/analytics/asset-change': '资产增减统计',
-  '/analytics/asset-occupy': '资产占用统计',
-  '/analytics/asset-transfer': '资产异动统计'
+  '/analytics/asset-occupy': '资产在用统计',
+  '/analytics/asset-transfer': '资产移动统计表'
 }
 
 const route = useRoute()
