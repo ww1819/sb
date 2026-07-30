@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/utils/camera_permission.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_section_label.dart';
 import '../../../shared/widgets/meis_status_chip.dart';
@@ -127,8 +127,8 @@ class _OpsExecDetailPageState extends ConsumerState<OpsExecDetailPage> {
 
   Future<String?> uploadImage(ImageSource source) async {
     if (source == ImageSource.camera) {
-      final cam = await Permission.camera.request();
-      if (!cam.isGranted) return null;
+      final ok = await ensureCameraPermission(context, usage: '拍照上传');
+      if (!ok || !mounted) return null;
     }
     final file = await ImagePicker().pickImage(source: source, imageQuality: 85);
     if (file == null) return null;

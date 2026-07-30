@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -170,13 +169,6 @@ class _SharedLoanFormPageState extends ConsumerState<SharedLoanFormPage> {
   }
 
   Future<void> openScan() async {
-    final cam = await Permission.camera.request();
-    if (!cam.isGranted) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('需要相机权限才能扫码')));
-      }
-      return;
-    }
     if (!mounted) return;
     final code = await Navigator.push<String>(
       context,
