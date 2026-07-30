@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/utils/datetime_format.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_section_label.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -41,12 +42,7 @@ class _SharedReturnFormPageState extends ConsumerState<SharedReturnFormPage> {
     super.dispose();
   }
 
-  String _fmtDate(DateTime? d) {
-    if (d == null) return '';
-    final m = d.month.toString().padLeft(2, '0');
-    final day = d.day.toString().padLeft(2, '0');
-    return '${d.year}-$m-$day';
-  }
+  String _fmtDate(DateTime? d) => d == null ? '' : formatDate(d);
 
   Future<void> loadOnLoan() async {
     setState(() => loadingLoans = true);

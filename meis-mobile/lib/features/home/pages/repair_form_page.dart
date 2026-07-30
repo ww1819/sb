@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/storage/app_prefs.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/repair_draft_store.dart';
+import '../../../shared/utils/camera_permission.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import 'repair_scan_page.dart';
 
@@ -269,13 +269,6 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
   }
 
   Future<void> openScan() async {
-    final cam = await Permission.camera.request();
-    if (!cam.isGranted) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('需要相机权限才能扫码')));
-      }
-      return;
-    }
     if (!mounted) return;
     final code = await Navigator.push<String>(
       context,
@@ -300,8 +293,8 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
       return;
     }
     if (source == ImageSource.camera) {
-      final cam = await Permission.camera.request();
-      if (!cam.isGranted) return;
+      final ok = await ensureCameraPermission(context, usage: '拍照上传故障图片');
+      if (!ok || !mounted) return;
     }
     final picker = ImagePicker();
     final file = await picker.pickImage(source: source, imageQuality: 85);

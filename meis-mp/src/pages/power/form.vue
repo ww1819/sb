@@ -52,6 +52,7 @@ import { computed, reactive, ref } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { http } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
+import { toDateParam } from '@/utils/datetime'
 
 const auth = useAuthStore()
 const saving = ref(false)
@@ -118,7 +119,7 @@ async function loadTag(id: string) {
     form.station_id = m.station_id != null ? String(m.station_id) : null
     form.station_name = m.station_name != null ? String(m.station_name) : null
     form.rated_power = m.rated_power != null ? String(m.rated_power) : ''
-    form.install_date = m.install_date ? String(m.install_date).slice(0, 10) : null
+    form.install_date = m.install_date ? toDateParam(m.install_date) || null : null
     form.is_active = m.is_active === true || m.is_active === 'true'
     form.remark = m.remark != null ? String(m.remark) : ''
     form.device_id = m.device_id != null ? String(m.device_id) : null

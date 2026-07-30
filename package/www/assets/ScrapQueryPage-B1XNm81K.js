@@ -1,1 +1,0 @@
-import{F as e}from"./FeaturePlaceholderPage-CZXkJ9HP.js";import{d as t,o as r,A as o}from"./index-Dve33j3G.js";import"./SystemPageCard-DGQcU--P.js";const m=t({__name:"ScrapQueryPage",setup(a){return(c,n)=>(r(),o(e,{title:"报废查询",subtitle:"资产管理 / 报废管理",description:"报废查询功能开发中",hint:"菜单已开通（AST-UI-10）；完整查询能力见待开发池 BACKLOG-AST-10"}))}});export{m as default};

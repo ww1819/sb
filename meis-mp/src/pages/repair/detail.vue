@@ -13,7 +13,7 @@
         <text class="section">进度</text>
         <view v-for="(m, i) in milestones" :key="i" class="line">
           <text class="line-title">{{ m.title || m.name || m.event_type }}</text>
-          <text class="line-meta">{{ m.at || m.time || m.created_at || '' }}</text>
+          <text class="line-meta">{{ formatDisplayDateTime(m.at || m.time || m.created_at) }}</text>
         </view>
         <view v-if="!milestones.length" class="empty-sm">暂无时间线</view>
       </view>
@@ -37,6 +37,7 @@ import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { http } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
+import { formatDisplayDateTime } from '@/utils/datetime'
 
 const auth = useAuthStore()
 const id = ref('')

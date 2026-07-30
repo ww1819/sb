@@ -3,8 +3,20 @@
     <template #filter>
       <el-input v-model="filters.module" clearable placeholder="模块" style="width:140px" />
       <el-input v-model="filters.userId" clearable placeholder="用户ID" style="width:200px" />
-      <el-date-picker v-model="filters.startDate" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="开始时间" />
-      <el-date-picker v-model="filters.endDate" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="结束时间" />
+      <el-date-picker
+        v-model="filters.startDate"
+        type="datetime"
+        :value-format="DATETIME_FMT"
+        :format="DATETIME_FMT"
+        placeholder="开始时间"
+      />
+      <el-date-picker
+        v-model="filters.endDate"
+        type="datetime"
+        :value-format="DATETIME_FMT"
+        :format="DATETIME_FMT"
+        placeholder="结束时间"
+      />
       <el-button type="primary" @click="search">查询</el-button>
       <el-button @click="resetFilters">重置</el-button>
     </template>
@@ -38,6 +50,7 @@ import SystemPageCard from '@/components/system/SystemPageCard.vue'
 import AppModal from '@/components/AppModal.vue'
 import { fetchPage, usePagedList } from '@/composables/usePagedList'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
+import { DATETIME_FMT, formatDisplayDateTime } from '@/utils/datetime'
 
 const tableHeight = useSystemTableHeight()
 
@@ -69,11 +82,7 @@ function showDetail(row: any) {
 }
 
 function formatTime(v: string) {
-  if (!v) return '-'
-  const d = new Date(v)
-  if (Number.isNaN(d.getTime())) return v
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  return formatDisplayDateTime(v)
 }
 </script>
 

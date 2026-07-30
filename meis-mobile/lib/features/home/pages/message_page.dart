@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/utils/datetime_format.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_status_chip.dart';
 import 'my_repairs_page.dart';
@@ -143,7 +144,7 @@ class _MessagePageState extends ConsumerState<MessagePage> {
                                     ],
                                     const SizedBox(height: 4),
                                     Text(
-                                      m['created_at']?.toString() ?? '',
+                                      formatDisplayDateTime(m['created_at']),
                                       style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
                                     ),
                                   ],

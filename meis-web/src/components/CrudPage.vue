@@ -505,13 +505,13 @@ async function load() {
     if (props.config.listMode) params.mode = props.config.listMode
     for (const f of props.config.listFilters ?? []) {
       const v = filterValues[f.key]
-      if (f.type === 'daterange') {
+      if (f.type === 'daterange' || f.type === 'datetimerange') {
         const range = v as string[] | undefined
         if (Array.isArray(range) && range[0]) params[`${f.key}From`] = range[0]
         if (Array.isArray(range) && range[1]) params[`${f.key}To`] = range[1]
         continue
       }
-      if (f.type === 'date') {
+      if (f.type === 'date' || f.type === 'datetime') {
         if (v !== undefined && v !== null && v !== '') params[f.key] = v as string
         continue
       }
@@ -735,10 +735,14 @@ function buildFilterQueryParams(): Record<string, string> {
   if (props.config.listMode) params.mode = props.config.listMode
   for (const f of props.config.listFilters ?? []) {
     const v = filterValues[f.key]
-    if (f.type === 'daterange') {
+    if (f.type === 'daterange' || f.type === 'datetimerange') {
       const range = v as string[] | undefined
       if (Array.isArray(range) && range[0]) params[`${f.key}From`] = range[0]
       if (Array.isArray(range) && range[1]) params[`${f.key}To`] = range[1]
+      continue
+    }
+    if (f.type === 'date' || f.type === 'datetime') {
+      if (v !== undefined && v !== null && v !== '') params[f.key] = String(v)
       continue
     }
     if (f.multiple && Array.isArray(v) && v.length) {

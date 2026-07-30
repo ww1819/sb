@@ -26,9 +26,21 @@
     :model-value="modelValue"
     type="date"
     :placeholder="filter.label"
-    value-format="YYYY-MM-DD"
+    :value-format="DATE_FMT"
+    :format="DATE_FMT"
     clearable
     class="filter-item filter-date"
+    @update:model-value="onChange"
+  />
+  <el-date-picker
+    v-else-if="filter.type === 'datetime'"
+    :model-value="modelValue"
+    type="datetime"
+    :placeholder="filter.label"
+    :value-format="DATETIME_FMT"
+    :format="DATETIME_FMT"
+    clearable
+    class="filter-item filter-datetime"
     @update:model-value="onChange"
   />
   <el-date-picker
@@ -38,8 +50,21 @@
     :range-separator="rangeSeparator"
     :start-placeholder="startPlaceholder"
     :end-placeholder="endPlaceholder"
-    value-format="YYYY-MM-DD"
+    :value-format="DATE_FMT"
+    :format="DATE_FMT"
     class="filter-item filter-daterange"
+    @update:model-value="onChange"
+  />
+  <el-date-picker
+    v-else-if="filter.type === 'datetimerange'"
+    :model-value="modelValue"
+    type="datetimerange"
+    :range-separator="rangeSeparator"
+    :start-placeholder="startPlaceholder"
+    :end-placeholder="endPlaceholder"
+    :value-format="DATETIME_FMT"
+    :format="DATETIME_FMT"
+    class="filter-item filter-datetimerange"
     @update:model-value="onChange"
   />
   <el-select
@@ -68,6 +93,7 @@
 <script setup lang="ts">
 import RefSelect from '@/components/form/RefSelect.vue'
 import type { ListFilter } from '@/config/pageRegistry'
+import { DATE_FMT, DATETIME_FMT } from '@/utils/datetime'
 
 const props = withDefaults(
   defineProps<{

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/utils/datetime_format.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_status_chip.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -199,7 +200,7 @@ class _SharedLoanListPageState extends ConsumerState<SharedLoanListPage> {
           ),
           const SizedBox(height: 4),
           Text(
-            '借入科室：${_text(row, 'to_dept_name')} · ${_text(row, 'loan_start')} ~ ${_text(row, 'loan_end')}',
+            '借入科室：${_text(row, 'to_dept_name')} · ${formatDisplayDate(row['loan_start'])} ~ ${formatDisplayDate(row['loan_end'])}',
             style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.35),
           ),
           const Divider(height: 16),

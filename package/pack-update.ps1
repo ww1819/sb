@@ -26,13 +26,13 @@ $env:JAVA_HOME = $jdk
 $env:MEIS_JAVA_HOME = $jdk
 $env:Path = "$jdk\bin;" + $env:Path
 Write-Host "JAVA_HOME=$jdk" -ForegroundColor Cyan
-Write-Host 'Mode: UPDATE (更新打包 — 仅代码有变更的模块)' -ForegroundColor Cyan
+Write-Host 'Mode: UPDATE (incremental JARs only)' -ForegroundColor Cyan
 
 $prev = Read-MeisPackFingerprint $paths.FingerprintFile
 if (-not $prev -and -not $ForceAll) {
     Write-Host ''
-    Write-Host '没有打包指纹（jars\.pack-fingerprint.json）。' -ForegroundColor Yellow
-    Write-Host '请先双击「完整打包.bat」建立基线；或对本脚本使用 -ForceAll。' -ForegroundColor Yellow
+    Write-Host 'No pack fingerprint (jars\.pack-fingerprint.json).' -ForegroundColor Yellow
+    Write-Host 'Run 完整打包.bat first to create baseline, or use -ForceAll.' -ForegroundColor Yellow
     exit 2
 }
 
@@ -70,7 +70,7 @@ if ($sharedChanged -or $ForceAll) {
     Write-Host 'Shared lib / root POM changed -> rebuild ALL service JARs' -ForegroundColor Yellow
     foreach ($s in $serviceNames) { [void]$changedServices.Add($s) }
     if ($changedShared.Count -gt 0) {
-        Write-Host ("  shared: " + ($changedShared -join ', ')) -ForegroundColor Yellow
+        Write-Host ('  shared: ' + ($changedShared -join ', ')) -ForegroundColor Yellow
     }
 } else {
     foreach ($s in $serviceNames) {
@@ -92,13 +92,13 @@ if ($sharedChanged -or $ForceAll) {
 
 if ($changedServices.Count -eq 0) {
     Write-Host ''
-    Write-Host '没有需要更新的 JAR，跳过编译。' -ForegroundColor Green
-    Write-Host '若确认有改动仍未检出：先完整打包，或检查是否改了未纳入指纹的文件。' -ForegroundColor DarkGray
+    Write-Host 'No JARs need update; skip compile.' -ForegroundColor Green
+    Write-Host 'If you expected changes: run full pack, or check files outside src/pom.' -ForegroundColor DarkGray
     exit 0
 }
 
 Write-Host ''
-Write-Host ("Will build $($changedServices.Count) module(s): " + ($changedServices -join ', ')) -ForegroundColor Cyan
+Write-Host ('Will build ' + $changedServices.Count + ' module(s): ' + ($changedServices -join ', ')) -ForegroundColor Cyan
 
 $mvn = Resolve-MeisPackageMaven
 Write-Host "MAVEN=$mvn" -ForegroundColor Cyan
@@ -150,28 +150,31 @@ foreach ($m in ($shared + $serviceNames | Select-Object -Unique)) {
 Save-MeisPackFingerprint -Path $paths.FingerprintFile -ModuleHashes $merged -RootPomHash $rootPomNow -Mode 'update'
 
 $changedList = @($changedServices | ForEach-Object { Get-MeisJarName $_ })
-$readme = @"
-MEIS 增量更新包
-==============
-生成时间: $((Get-Date).ToString('yyyy-MM-dd HH:mm:ss'))
-变更 JAR 数: $($changedList.Count)
-
-实施机操作:
-1. 停掉对应服务（或运维页「停止」）
-2. 将本目录下 *.jar 覆盖到实施机 package\jars\
-3. 按顺序先启 meis-tenant（若在列表中），再启其余 / 网关
-4. 冒烟: 登录、相关功能
-
-变更列表:
-$($changedList | ForEach-Object { "  - $_" } | Out-String)
-"@
-Set-Content -Path (Join-Path $paths.UpdateDir 'README.txt') -Value $readme.TrimEnd() -Encoding UTF8
-Set-Content -Path (Join-Path $paths.UpdateDir 'CHANGED.txt') -Value ($changedList -join "`r`n") -Encoding UTF8
+$jarLines = @($changedList | ForEach-Object { '  - ' + $_ })
+$when = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+$readmeLines = @(
+    'MEIS incremental update',
+    '======================',
+    ('Generated: ' + $when),
+    ('Changed JAR count: ' + $changedList.Count),
+    '',
+    'On field PC:',
+    '1. Stop related services (ops page)',
+    '2. Copy *.jar from this folder over field package\jars',
+    '3. Start meis-tenant first if listed, then others / gateway',
+    '4. Smoke test: login and related features',
+    '',
+    'Changed:'
+) + $jarLines
+$readmePath = Join-Path $paths.UpdateDir 'README.txt'
+$changedPath = Join-Path $paths.UpdateDir 'CHANGED.txt'
+Set-Content -Path $readmePath -Value $readmeLines -Encoding UTF8
+Set-Content -Path $changedPath -Value $changedList -Encoding UTF8
 
 Write-Host ''
-Write-Host "Done: $ok / $($changedServices.Count) updated -> package\jars\ + package\update\" -ForegroundColor Cyan
-Write-Host "交付实施: 只需拷贝 package\update\ 内 JAR 覆盖现场 jars\" -ForegroundColor Green
+Write-Host ("Done: $ok / $($changedServices.Count) updated -> package\jars + package\update") -ForegroundColor Cyan
+Write-Host 'Deliver: copy package\update JARs onto field jars folder' -ForegroundColor Green
 if ($fail.Count -gt 0) {
-    Write-Host ("Missing: " + ($fail -join ', ')) -ForegroundColor Red
+    Write-Host ('Missing: ' + ($fail -join ', ')) -ForegroundColor Red
     exit 1
 }

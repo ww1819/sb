@@ -19,7 +19,7 @@ export interface ListFilter {
   key: string
   label: string
   dictType?: string
-  type?: 'select' | 'number' | 'date' | 'daterange'
+  type?: 'select' | 'number' | 'date' | 'datetime' | 'daterange' | 'datetimerange'
   /** 字典多选（如状态） */
   multiple?: boolean
   /** 外键下拉（RefSelect） */

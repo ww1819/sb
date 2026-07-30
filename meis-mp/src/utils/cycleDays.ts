@@ -1,3 +1,5 @@
+import { formatDate } from './datetime'
+
 const UNIT_DAYS: Record<string, number> = {
   day: 1,
   week: 7,
@@ -15,9 +17,6 @@ export function calcCycleDays(cycleType: unknown, cycleValue: unknown): number |
 }
 
 export function todayYmd(): string {
-  const n = new Date()
-  const y = n.getFullYear()
-  const m = String(n.getMonth() + 1).padStart(2, '0')
-  const d = String(n.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
+  return formatDate(new Date())
 }
+

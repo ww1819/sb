@@ -72,6 +72,7 @@ import ImageListField from '@/components/form/ImageListField.vue'
 import RepairDevicePickerField from '@/components/repair/RepairDevicePickerField.vue'
 import AssetDevicePickerField from '@/components/form/AssetDevicePickerField.vue'
 import PowerStationPickerField from '@/components/form/PowerStationPickerField.vue'
+import { DATE_FMT, DATETIME_FMT } from '@/utils/datetime'
 
 const props = defineProps<{ field: FieldSchema; modelValue: unknown; model?: Record<string, unknown> }>()
 const emit = defineEmits<{ 'update:modelValue': [v: unknown] }>()
@@ -189,8 +190,18 @@ const attrs = computed(() => {
   if (props.field.type === 'textarea') {
     return { ...base, type: 'textarea', rows: props.field.rows ?? 3, style: 'width:100%' }
   }
-  if (props.field.type === 'date') return { ...base, type: 'date', valueFormat: 'YYYY-MM-DD', style: 'width:100%' }
-  if (props.field.type === 'datetime') return { ...base, type: 'datetime', valueFormat: 'YYYY-MM-DD HH:mm:ss', style: 'width:100%' }
+  if (props.field.type === 'date') {
+    return { ...base, type: 'date', valueFormat: DATE_FMT, format: DATE_FMT, style: 'width:100%' }
+  }
+  if (props.field.type === 'datetime') {
+    return {
+      ...base,
+      type: 'datetime',
+      valueFormat: DATETIME_FMT,
+      format: DATETIME_FMT,
+      style: 'width:100%'
+    }
+  }
   if (props.field.type === 'number') {
     return { ...base, controls: false, style: 'width:100%' }
   }

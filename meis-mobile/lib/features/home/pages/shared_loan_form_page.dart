@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/utils/datetime_format.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_section_label.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -116,21 +116,9 @@ class _SharedLoanFormPageState extends ConsumerState<SharedLoanFormPage> {
     }
   }
 
-  DateTime? _parseDate(dynamic v) {
-    if (v == null) return null;
-    final s = v.toString();
-    if (s.length >= 10) {
-      return DateTime.tryParse(s.substring(0, 10));
-    }
-    return DateTime.tryParse(s);
-  }
+  DateTime? _parseDate(dynamic v) => tryParseDate(v);
 
-  String _fmtDate(DateTime? d) {
-    if (d == null) return '';
-    final m = d.month.toString().padLeft(2, '0');
-    final day = d.day.toString().padLeft(2, '0');
-    return '${d.year}-$m-$day';
-  }
+  String _fmtDate(DateTime? d) => d == null ? '' : formatDate(d);
 
   bool _isSharedFlag(dynamic v) {
     if (v == true || v == 1) return true;
@@ -170,13 +158,6 @@ class _SharedLoanFormPageState extends ConsumerState<SharedLoanFormPage> {
   }
 
   Future<void> openScan() async {
-    final cam = await Permission.camera.request();
-    if (!cam.isGranted) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('需要相机权限才能扫码')));
-      }
-      return;
-    }
     if (!mounted) return;
     final code = await Navigator.push<String>(
       context,

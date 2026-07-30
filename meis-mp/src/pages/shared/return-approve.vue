@@ -13,7 +13,7 @@
         <text class="meta">{{ r.device_name || '—' }} · {{ statusLabel(r.status) }}</text>
         <text class="desc">
           借调 {{ r.loan_no || '—' }}
-          <text v-if="r.return_date"> · {{ String(r.return_date).slice(0, 10) }}</text>
+          <text v-if="r.return_date"> · {{ formatDisplayDate(r.return_date) }}</text>
           <text v-if="r.applicant_name"> · {{ r.applicant_name }}</text>
         </text>
         <text v-if="r.condition_desc" class="desc">状况：{{ r.condition_desc }}</text>
@@ -31,6 +31,7 @@ import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { http } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
+import { formatDisplayDate } from '@/utils/datetime'
 
 const auth = useAuthStore()
 const rows = ref<Record<string, unknown>[]>([])

@@ -29,6 +29,20 @@ node_modules/
 dist/
 *.tsbuildinfo
 
+# Field package build outputs (pack.ps1 / 完整打包)
+# www：目录内 .gitignore 忽略构建产物，仅保留占位规则（同 jars/apk）
+package/www/*
+!package/www/.gitignore
+package/update/
+package/logs/
+
+# Local package env (secrets / machine paths); keep env.example.txt
+package/env.txt
+
+# Scratch / debug dumps at repo root
+/tmp-*.txt
+/tmp-*.json
+
 # Local IDE / editor (machine-specific)
 .vscode/extensions.json
 .vscode/launch.json
@@ -55,3 +69,10 @@ meis-mobile/windows/flutter/generated_plugin_registrant.h
 meis-mobile/windows/flutter/generated_plugin_registrant.cc
 meis-mobile/windows/flutter/generated_plugins.cmake
 meis-mp/src/manifest.json
+
+# Flutter pub cache relocated onto workspace drive (pack-apk.bat)
+.pub-cache/
+
+# JVM heap dumps (do not commit)
+*.hprof
+

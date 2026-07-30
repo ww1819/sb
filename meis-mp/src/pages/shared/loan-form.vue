@@ -94,6 +94,7 @@ import { computed, reactive, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { http } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
+import { formatDate, toDateParam } from '@/utils/datetime'
 
 const auth = useAuthStore()
 
@@ -136,10 +137,7 @@ function statusLabel(s: unknown) {
 }
 
 function todayYmd() {
-  const d = new Date()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${d.getFullYear()}-${m}-${day}`
+  return formatDate(new Date())
 }
 
 function asRecords(data: unknown): Record<string, unknown>[] {
@@ -183,8 +181,8 @@ async function loadLoan(id: string) {
     toDeptId.value = String(data.to_dept_id || '')
     toDeptName.value = String(data.to_dept_name || '')
     fromDeptName.value = String(data.from_dept_name || '')
-    loanStart.value = String(data.loan_start || '').slice(0, 10)
-    loanEnd.value = String(data.loan_end || '').slice(0, 10)
+    loanStart.value = toDateParam(data.loan_start) || todayYmd()
+    loanEnd.value = toDateParam(data.loan_end) || todayYmd()
     reason.value = String(data.reason || '')
     if (data.device_id) {
       device.value = {

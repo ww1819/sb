@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/utils/datetime_format.dart';
 import '../../../shared/widgets/meis_section_label.dart';
 import '../../auth/providers/auth_provider.dart';
 
@@ -111,14 +112,7 @@ class _PowerTagFormPageState extends ConsumerState<PowerTagFormPage> {
     }
   }
 
-  DateTime? _parseDate(dynamic v) {
-    if (v == null) return null;
-    final s = v.toString();
-    if (s.length >= 10) {
-      return DateTime.tryParse(s.substring(0, 10));
-    }
-    return DateTime.tryParse(s);
-  }
+  DateTime? _parseDate(dynamic v) => tryParseDate(v);
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
@@ -200,11 +194,7 @@ class _PowerTagFormPageState extends ConsumerState<PowerTagFormPage> {
         'rated_power': ratedPowerCtrl.text.trim().isEmpty
             ? null
             : num.tryParse(ratedPowerCtrl.text.trim()),
-        'install_date': installDate == null
-            ? null
-            : '${installDate!.year.toString().padLeft(4, '0')}-'
-                '${installDate!.month.toString().padLeft(2, '0')}-'
-                '${installDate!.day.toString().padLeft(2, '0')}',
+        'install_date': installDate == null ? null : formatDate(installDate!),
         'is_active': isActive,
         'remark': remarkCtrl.text.trim().isEmpty ? null : remarkCtrl.text.trim(),
         'client': 'app',
@@ -282,9 +272,7 @@ class _PowerTagFormPageState extends ConsumerState<PowerTagFormPage> {
                   contentPadding: EdgeInsets.zero,
                   title: const Text('安装日期'),
                   subtitle: Text(
-                    installDate == null
-                        ? '未设置'
-                        : '${installDate!.year}-${installDate!.month.toString().padLeft(2, '0')}-${installDate!.day.toString().padLeft(2, '0')}',
+                    installDate == null ? '未设置' : formatDate(installDate!),
                     style: const TextStyle(color: AppColors.textSecondary),
                   ),
                   trailing: const Icon(Icons.calendar_today_outlined),

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/utils/datetime_format.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_section_label.dart';
 import 'ops_exec_detail_page.dart';
@@ -298,7 +299,7 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
                   itemCount: plans.length,
                   itemBuilder: (_, i) {
                     final p = plans[i];
-                    final due = p['next_due_date']?.toString() ?? '—';
+                    final due = formatDisplayDate(p['next_due_date']);
                     final dept = p['dept_name']?.toString() ?? '';
                     final cycle = p['cycle_days'] != null ? '${p['cycle_days']}天' : '';
                     return ListTile(
@@ -448,10 +449,7 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
     return u * value;
   }
 
-  String _today() {
-    final n = DateTime.now();
-    return '${n.year.toString().padLeft(4, '0')}-${n.month.toString().padLeft(2, '0')}-${n.day.toString().padLeft(2, '0')}';
-  }
+  String _today() => formatDate(DateTime.now());
 
   Future<void> createAdHoc(Map<String, dynamic> device) async {
     final api = ref.read(apiServiceProvider);
@@ -591,8 +589,7 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
                       );
                       if (picked != null) {
                         setLocal(() {
-                          plannedDate =
-                              '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+                          plannedDate = formatDate(picked);
                         });
                       }
                     },
@@ -747,7 +744,7 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '${d['device_code'] ?? ''} · ${d['plan_no'] ?? ''} · ${d['next_due_date'] ?? ''}',
+                                    '${d['device_code'] ?? ''} · ${d['plan_no'] ?? ''} · ${formatDisplayDate(d['next_due_date'])}',
                                     style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                                   ),
                                 ],

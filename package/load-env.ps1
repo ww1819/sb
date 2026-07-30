@@ -29,15 +29,31 @@ function Import-MeisPackageEnv {
 }
 
 function Resolve-MeisPackageJavaHome {
+    $tried = New-Object System.Collections.Generic.List[string]
     foreach ($c in @(
         $env:MEIS_JAVA_HOME,
         $env:JAVA_HOME
     )) {
         if (-not $c) { continue }
+        [void]$tried.Add($c)
         $java = Join-Path $c 'bin\java.exe'
-        if (Test-Path $java) { return $c }
+        if (Test-Path -LiteralPath $java) { return $c }
     }
-    throw 'JDK not found. Set JAVA_HOME in package\env.txt'
+    # Common installs (only if env.txt path missing/wrong)
+    foreach ($c in @(
+        'C:\Program Files\Java\jdk-17',
+        'C:\Program Files\Eclipse Adoptium\jdk-17.0.14+7',
+        'C:\Program Files\Microsoft\jdk-17.0.14-hotspot'
+    )) {
+        [void]$tried.Add($c)
+        $java = Join-Path $c 'bin\java.exe'
+        if (Test-Path -LiteralPath $java) {
+            Write-Host "WARN: using fallback JDK: $c (fix JAVA_HOME in package\env.txt)" -ForegroundColor Yellow
+            return $c
+        }
+    }
+    $hint = if ($tried.Count -gt 0) { ' Tried: ' + ($tried -join ' | ') } else { ' JAVA_HOME is empty.' }
+    throw ('JDK not found. Set JAVA_HOME in package\env.txt to a folder that contains bin\java.exe.' + $hint)
 }
 
 function Resolve-MeisPackageMaven {
@@ -60,6 +76,107 @@ function Resolve-MeisPackageMaven {
 function Resolve-MeisPackageJavaExe {
     $home = Resolve-MeisPackageJavaHome
     return (Join-Path $home 'bin\java.exe')
+}
+
+function Test-MeisAndroidSdkRoot([string]$SdkRoot) {
+    if (-not $SdkRoot) { return $false }
+    $sdkRoot = $SdkRoot.Trim().Trim('"').Trim("'")
+    if (-not (Test-Path -LiteralPath $sdkRoot)) { return $false }
+    # platform-tools or platforms indicates a usable SDK tree
+    if (Test-Path -LiteralPath (Join-Path $sdkRoot 'platform-tools')) { return $true }
+    if (Test-Path -LiteralPath (Join-Path $sdkRoot 'platforms')) { return $true }
+    if (Test-Path -LiteralPath (Join-Path $sdkRoot 'cmdline-tools')) { return $true }
+    return $false
+}
+
+function Resolve-MeisAndroidSdkHome {
+    $tried = New-Object System.Collections.Generic.List[string]
+    foreach ($c in @(
+            $env:ANDROID_HOME,
+            $env:ANDROID_SDK_ROOT,
+            $env:MEIS_ANDROID_HOME
+        )) {
+        if (-not $c) { continue }
+        $c = $c.Trim().Trim('"').Trim("'")
+        [void]$tried.Add($c)
+        if (Test-MeisAndroidSdkRoot $c) { return $c }
+    }
+    foreach ($c in @(
+            (Join-Path $env:LOCALAPPDATA 'Android\Sdk'),
+            (Join-Path $env:USERPROFILE 'AppData\Local\Android\Sdk'),
+            'C:\Android\Sdk',
+            'D:\Android\Sdk',
+            'E:\Android\Sdk'
+        )) {
+        [void]$tried.Add($c)
+        if (Test-MeisAndroidSdkRoot $c) { return $c }
+    }
+    $hint = if ($tried.Count -gt 0) { ' Tried: ' + ($tried -join ' | ') } else { '' }
+    throw ('Android SDK not found. Run package\安装AndroidSDK.bat once, or set ANDROID_HOME in package\env.txt.' + $hint)
+}
+
+function Write-MeisAndroidLocalProperties {
+    param(
+        [Parameter(Mandatory = $true)][string]$MobileDir,
+        [Parameter(Mandatory = $true)][string]$SdkRoot,
+        [string]$FlutterRoot = ''
+    )
+    $lp = Join-Path $MobileDir 'android\local.properties'
+    $dir = Split-Path $lp -Parent
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    # Forward slashes work with Gradle on Windows and avoid escape issues
+    $sdkProp = ($SdkRoot -replace '\\', '/')
+    $lines = @("sdk.dir=$sdkProp")
+    if ($FlutterRoot) {
+        $flProp = ($FlutterRoot -replace '\\', '/')
+        $lines += "flutter.sdk=$flProp"
+    }
+    Set-Content -Path $lp -Value $lines -Encoding ASCII
+}
+
+function Set-MeisAndroidGradleJavaHome {
+    param(
+        [Parameter(Mandatory = $true)][string]$MobileDir,
+        [Parameter(Mandatory = $true)][string]$JdkHome
+    )
+    $props = Join-Path $MobileDir 'android\gradle.properties'
+    if (-not (Test-Path -LiteralPath $props)) {
+        throw "Missing gradle.properties: $props"
+    }
+    $javaHomeProp = ($JdkHome -replace '\\', '/')
+    $raw = Get-Content $props -Encoding UTF8
+    $found = $false
+    $out = foreach ($line in $raw) {
+        if ($line -match '^\s*org\.gradle\.java\.home\s*=') {
+            $found = $true
+            "org.gradle.java.home=$javaHomeProp"
+        } else {
+            $line
+        }
+    }
+    if (-not $found) {
+        $out = @($out) + @('', "# Force JDK 17+ for Gradle (system JAVA_HOME may still be 8)", "org.gradle.java.home=$javaHomeProp")
+    }
+    Set-Content -Path $props -Value $out -Encoding UTF8
+}
+
+# Strip accidental quotes / whitespace from Flutter China mirror URLs (common Windows env mistake).
+function Set-MeisFlutterMirrorEnv {
+    param(
+        [string]$Name,
+        [string]$Default
+    )
+    $v = [Environment]::GetEnvironmentVariable($Name, 'Process')
+    if (-not $v) { $v = [Environment]::GetEnvironmentVariable($Name, 'User') }
+    if (-not $v) { $v = [Environment]::GetEnvironmentVariable($Name, 'Machine') }
+    if ($v) {
+        $v = $v.Trim().Trim('"').Trim("'").Trim()
+    }
+    if (-not $v -or $v -notmatch '^https?://') {
+        $v = $Default
+    }
+    Set-Item -Path "Env:$Name" -Value $v
+    return $v
 }
 
 function Resolve-MeisPackageNpm {

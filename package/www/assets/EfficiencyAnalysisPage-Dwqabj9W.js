@@ -1,1 +1,0 @@
-import{F as e}from"./FeaturePlaceholderPage-CZXkJ9HP.js";import{d as t,o,A as a}from"./index-Dve33j3G.js";import"./SystemPageCard-DGQcU--P.js";const l=t({__name:"EfficiencyAnalysisPage",setup(r){return(i,n)=>(o(),a(e,{title:"效率分析",subtitle:"数据决策",description:"效率分析功能开发中",hint:"菜单已开通（ANA-UI-01）；完整能力见待开发池 BACKLOG-ANA-01"}))}});export{l as default};
