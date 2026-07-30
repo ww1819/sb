@@ -16,11 +16,11 @@
 适合：院内试运行 / 实施验收 / 短期演示。目标是 **少步骤、可双击、可拷走**。
 
 ```text
-┌──────────────┐     拷贝整个 package\      ┌──────────────────┐
-│  开发 / 构建机 │  ─────────────────────►  │  实施 / 现场机    │
-│ 双击 打包.bat  │                          │ 双击 启动运维.bat │
-│ → jars\ 齐套  │                          │ → :5098 启停服务  │
-└──────────────┘                          └──────────────────┘
+┌──────────────┐     拷贝 package\（或仅 update\）   ┌──────────────────┐
+│  开发 / 构建机 │  ─────────────────────────────►  │  实施 / 现场机    │
+│ 完整打包.bat   │     首次整包 / 日常增量 JAR        │ 双击 启动运维.bat │
+│ 更新打包.bat   │                                  │ → :5098 启停服务  │
+└──────────────┘                                  └──────────────────┘
 ```
 
 ### 〇.1 流程总览
@@ -28,8 +28,9 @@
 | 步骤 | 在哪做 | 做什么 |
 |------|--------|--------|
 | 1 | 开发机 | 配置 `package\env.txt`（JDK / Maven） |
-| 2 | 开发机 | 双击 `package\打包.bat`，生成 `package\jars\` |
-| 3 | — | **整份** `package` 文件夹拷到实施机（U 盘 / 共享盘均可） |
+| 2 | 开发机 | **首次**：双击 `完整打包.bat` → 全部 JAR 写入 `jars\` |
+| 2b | 开发机 | **日常**：双击 `更新打包.bat` → 只打有代码变更的 JAR，并生成 `update\` |
+| 3 | — | **首次**整份 `package` 拷到实施机；**增量**只拷 `update\` 内 JAR 覆盖现场 `jars\` |
 | 4 | 实施机 | 安装 JDK 17、PostgreSQL、Redis（Memurai）、MinIO（见 〇.3） |
 | 5 | 实施机 | 改实施机上的 `package\env.txt`（JAVA_HOME、数据库等） |
 | 6 | 实施机 | 双击 `启动运维.bat` → 浏览器 `http://localhost:5098` |
@@ -49,20 +50,36 @@
 | `JAVA_HOME` | JDK 17 根目录（内含 `bin\java.exe`） |
 | `MAVEN_HOME` | Maven 根目录（内含 `bin\mvn.cmd`），或改用 `MAVEN_CMD=` 指向 `mvn.cmd` |
 
-3. **双击 `打包.bat`**，等待窗口提示 Build OK。  
-   - 成功后 `package\jars\` 下应有全部 `meis-*-1.0.0-SNAPSHOT.jar`（与 `services.json` 一致）。  
-   - 失败时看窗口报错；常见原因：JDK/Maven 路径错误、某模块编译失败。
+3. 选择打包方式：
 
-4. 将 **整个 `package` 目录** 复制到实施环境（不要只拷 `jars`，运维页与脚本要一起带走）。
+| 脚本 | 何时用 | 结果 |
+|------|--------|------|
+| **`完整打包.bat`** | 首次交付、大版本、共享库大改、指纹丢失 | 全量 `clean package`，`jars\` 齐套，写入指纹基线；清空 `update\` |
+| **`更新打包.bat`** | 日常只改了部分业务模块 | 对比 `jars\.pack-fingerprint.json`，**只编译有变更的模块**；覆盖 `jars\` 对应 JAR，并写出 `package\update\`（仅变更 JAR + 说明） |
 
-建议拷贝前可删掉体积大且无用的运行日志（可选）：
+变更判定（更新打包）：
+
+- 比对各模块 `src/**` + `pom.xml` 内容指纹（相对上次成功打包）
+- `jars\` 中缺某个 JAR → 视为需打
+- **`meis-common` / `meis-api` / 根 `pom.xml` 有变更** → 重打 **全部** 业务 JAR（依赖面大）
+- 无指纹文件时：提示先跑完整打包（exit 2）
+
+4. 交付：
+
+| 场景 | 拷什么 |
+|------|--------|
+| 首次 / 完整 | **整个 `package` 目录** |
+| 增量更新 | 仅 `package\update\` 里的 `*.jar`，覆盖实施机 `package\jars\` |
+
+建议整包拷贝前可删体积大的运行日志（可选）：
 
 ```text
 package\logs\*.log
 package\logs\jobs\
 ```
 
-**不要删**：`jars\`、`*.bat`、`*.ps1`、`index.html`、`services.json`、`env.txt` / `env.example.txt`。
+**不要删**：`jars\`、`*.bat`、`*.ps1`、`index.html`、`services.json`、`env.txt` / `env.example.txt`。  
+旧名 `打包.bat` 仍可用，会转调 `完整打包.bat`。
 
 ### 〇.3 实施机：中间件前置
 
@@ -109,7 +126,7 @@ MINIO_ENDPOINT=http://127.0.0.1:9100
 1. **双击 `启动运维.bat`**（或 `start-ops.bat`）。
 2. 浏览器自动打开（或手动访问）`http://localhost:5098/`。
 3. 页面上：
-   - 先看 **JAR 齐套**：缺包则回到开发机重新 `打包.bat` 再拷 `jars\`。
+   - 先看 **JAR 齐套**：缺包则回到开发机重新 `完整打包.bat`（或补打后拷 `update\`）。
    - 填运维口令（与 `OPS_TOKEN` 一致）。
    - 建议顺序：**启动核心**（含 tenant → auth → … → gateway）→ 业务需要再 **启动全部**。
 4. 关闭运维窗口 **不会**停掉已启动的业务 JAR；要停服务用页面上的停止，或结束对应 `java.exe`。
@@ -160,7 +177,7 @@ Invoke-RestMethod -Method POST http://127.0.0.1:8080/api/auth/login `
 
 ### 〇.8 实施检查清单
 
-- [ ] 开发机 `打包.bat` 成功，`jars\` 齐全  
+- [ ] 开发机 `完整打包.bat` 成功，`jars\` 齐全（或增量已覆盖）  
 - [ ] 整份 `package` 已拷到实施机  
 - [ ] 实施机 JDK / PG / Redis / MinIO 就绪  
 - [ ] `env.txt` 的 `JAVA_HOME`、库密码、MinIO 地址正确  
@@ -171,9 +188,9 @@ Invoke-RestMethod -Method POST http://127.0.0.1:8080/api/auth/login `
 
 ### 〇.9 升级现场包
 
-1. 开发机重新 `打包.bat`。  
-2. 实施机运维页 **停止全部**（或停相关服务）。  
-3. 用新 `jars\` 覆盖旧包（建议先备份旧 `jars`）。  
+1. 开发机：小改动用 **`更新打包.bat`**，大改/首次用 **`完整打包.bat`**。  
+2. 实施机运维页 **停止**相关服务（或停止全部）。  
+3. **完整**：用新 `jars\` 覆盖（建议先备份）；**增量**：用 `update\` 内 JAR 覆盖现场 `jars\` 同名文件。  
 4. 再 `启动运维.bat` → 先启 **meis-tenant**（确认迁库）→ 再启其余。  
 5. 冒烟：登录、台账、上传（若启用 MinIO）。
 
@@ -307,15 +324,17 @@ minio.exe server D:\meis\minio-data --address ":9100" --console-address ":9101"
 
 ```text
 package\
-  打包.bat          ← 开发机：编译并收集全部 JAR → jars\
+  完整打包.bat      ← 开发机：全量编译 → jars\ + 指纹基线
+  更新打包.bat      ← 开发机：仅变更模块 → jars\ 覆盖 + update\ 增量
   启动运维.bat      ← 实施机：打开本机运维页 :5098
   env.txt           ← 各机各自配置（模板见 env.example.txt）
-  jars\             ← 全部后端 JAR
+  jars\             ← 全部后端 JAR（实施运行用）
+  update\           ← 最近一次「更新打包」的变更 JAR（可只拷这一目录）
   index.html + ops-helper.ps1 / 运维助手.ps1
   services.json     ← 服务名 / 端口 / 启停顺序
 ```
 
-开发机：双击 `打包.bat` → 拷走整个 `package`。  
+开发机：首次 `完整打包.bat`，日常 `更新打包.bat`。  
 实施机：改 `env.txt` → 双击 `启动运维.bat` → 齐套检查并启停。
 
 > 纯双击 HTML **不能**启动 Java；必须先开「启动运维.bat」。
@@ -597,7 +616,9 @@ powershell -File scripts\restore-db.ps1
 | 服务「启动后消失」 | 用桌面会话跑 jar 会随注销退出 → 改为 NSSM/WinSW |
 | `meis-tenant` 立即退出 | 查看 `package\logs\`；Flyway 失败会主动退出 |
 | 运维页打不开 | 须先双击 `启动运维.bat`，勿只开 HTML；确认 `OPS_PORT` |
-| `打包.bat` 失败 | 检查 `env.txt` 的 `JAVA_HOME` / `MAVEN_HOME`；看 Maven 编译日志 |
+| `打包.bat` / `完整打包.bat` 失败 | 检查 `env.txt` 的 `JAVA_HOME` / `MAVEN_HOME`；看 Maven 编译日志 |
+| `更新打包.bat` 提示无指纹 | 先跑一次 `完整打包.bat` 建立基线 |
+| `更新打包` 未检出改动 | 确认改的是模块 `src/` 或 `pom.xml`；共享库改动会触发全量业务重打 |
 | 前端白屏 | `try_files` / IIS Rewrite 是否回写 `index.html`；API 域名 CORS/证书 |
 
 ### 健康检查与日常监测

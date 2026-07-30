@@ -2102,6 +2102,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | 2.140 | 2026-07-28 17:10:00 | — | DEV-PANEL-MOB + OPS.16.29：面板 App 启停；多端途径含修改途径并强化约定 |
 | 2.139 | 2026-07-28 11:25:00 | — | PLT-OPS-02：平台端服务状态监控（聚合 API + 仅平台管理员） |
 | 2.138 | 2026-07-28 11:10:00 | — | PLT-OPS-01：生产服务监测文档 `production-monitoring.md` + `scripts/health-check.ps1` |
+| 2.139 | 2026-07-30 09:45:00 | — | package：完整打包.bat + 更新打包.bat（指纹增量，仅打变更 JAR → update\） |
 | 2.138 | 2026-07-29 10:40:00 | — | windows-production-deploy：新增「〇、实施环境部署流程」（打包.bat→拷 package→启动运维.bat） |
 | 2.137 | 2026-07-27 23:50:00 | — | PLT-DEP-01：Windows Server 生产部署文档 `windows-production-deploy.md` |
 | 2.136 | 2026-07-27 14:50:00 | — | MOB-UI-01 第③批落地：其余页双端对齐；BACKLOG-MOB-13 已完成 |
@@ -5848,7 +5849,7 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 | **形态** | 原生部署（JDK + PostgreSQL + Memurai + MinIO + JAR + Nginx/IIS）；不强制 Docker |
 | **独立文档** | [windows-production-deploy.md](windows-production-deploy.md) |
 | **关联** | [local-dev-deploy.md](local-dev-deploy.md)、[production-deploy.md](production-deploy.md) |
-| **要点摘要** | **实施首选** `package\`：开发机 `打包.bat` → 整包拷贝 → 实施机 `启动运维.bat`（:5098）；启动顺序 tenant 先迁库；MinIO **9100**；正式再 NSSM + HTTPS |
+| **要点摘要** | **实施首选** `package\`：`完整打包.bat` / `更新打包.bat`（增量 `update\`）→ 拷贝 → `启动运维.bat`（:5098）；tenant 先迁库；MinIO **9100**；正式再 NSSM + HTTPS |
 | **不做** | 本文不替代 Linux/K8s 方案；不改业务代码；部署步骤不写入本需求文件 |
 
 **状态**：已完成（正文仅在独立文档维护；2026-07-29 补充实施环境快速流程）。

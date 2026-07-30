@@ -1,39 +1,37 @@
-# Build all backend JARs and copy into package\jars\
+# Full build: all backend JARs -> package\jars\
 # Configure paths in package\env.txt (see env.example.txt)
 param(
     [switch]$SkipBuild
 )
 
 $ErrorActionPreference = 'Stop'
-$pkgDir = $PSScriptRoot
-$root = Split-Path $pkgDir -Parent
-$jarsDir = Join-Path $pkgDir 'jars'
-$logsDir = Join-Path $pkgDir 'logs'
-$servicesFile = Join-Path $pkgDir 'services.json'
+$script:MeisPkgDir = $PSScriptRoot
+. (Join-Path $PSScriptRoot 'pack-lib.ps1')
+. (Join-Path $PSScriptRoot 'load-env.ps1')
 
-. (Join-Path $pkgDir 'load-env.ps1')
-Import-MeisPackageEnv -EnvFile (Join-Path $pkgDir 'env.txt')
+$paths = Get-MeisPackagePaths
+Import-MeisPackageEnv -EnvFile (Join-Path $paths.PkgDir 'env.txt')
 
-if (-not (Test-Path $servicesFile)) {
-    throw "Missing services.json: $servicesFile"
-}
-$services = Get-Content $servicesFile -Raw -Encoding UTF8 | ConvertFrom-Json
+$services = Get-MeisServices $paths.ServicesFile
+$serviceNames = @($services | ForEach-Object { $_.name })
+$shared = Get-MeisSharedModules
 
-New-Item -ItemType Directory -Path $jarsDir -Force | Out-Null
-New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
+New-Item -ItemType Directory -Path $paths.JarsDir -Force | Out-Null
+New-Item -ItemType Directory -Path $paths.LogsDir -Force | Out-Null
 
 $jdk = Resolve-MeisPackageJavaHome
 $env:JAVA_HOME = $jdk
 $env:MEIS_JAVA_HOME = $jdk
 $env:Path = "$jdk\bin;" + $env:Path
 Write-Host "JAVA_HOME=$jdk" -ForegroundColor Cyan
+Write-Host 'Mode: FULL (完整打包)' -ForegroundColor Cyan
 
 if (-not $SkipBuild) {
     $mvn = Resolve-MeisPackageMaven
     Write-Host "MAVEN=$mvn" -ForegroundColor Cyan
-    $mods = ($services | ForEach-Object { $_.name }) -join ','
+    $mods = $serviceNames -join ','
     Write-Host "Building: mvn -pl $mods -am clean package -DskipTests" -ForegroundColor Cyan
-    Push-Location $root
+    Push-Location $paths.Root
     try {
         & $mvn -pl $mods -am clean package -DskipTests
         if ($LASTEXITCODE -ne 0) {
@@ -48,25 +46,35 @@ if (-not $SkipBuild) {
 
 $ok = 0
 $fail = @()
-foreach ($s in $services) {
-    $jarName = "$($s.name)-1.0.0-SNAPSHOT.jar"
-    $src = Join-Path $root "$($s.name)\target\$jarName"
-    $dest = Join-Path $jarsDir $jarName
-    if (-not (Test-Path $src)) {
+foreach ($name in $serviceNames) {
+    if (Copy-MeisServiceJar -Root $paths.Root -JarsDir $paths.JarsDir -ServiceName $name) {
+        $ok++
+    } else {
+        $jarName = Get-MeisJarName $name
         $fail += $jarName
-        Write-Host "  MISSING $src" -ForegroundColor Red
-        continue
+        Write-Host "  MISSING $($paths.Root)\$name\target\$jarName" -ForegroundColor Red
     }
-    Copy-Item $src $dest -Force
-    $kb = [math]::Round((Get-Item $dest).Length / 1KB)
-    Write-Host "  OK $jarName ($kb KB)" -ForegroundColor Green
-    $ok++
+}
+
+# Refresh fingerprints for shared + all services + root pom
+$hashes = @{}
+foreach ($m in ($shared + $serviceNames | Select-Object -Unique)) {
+    $hashes[$m] = Get-MeisModuleFingerprint (Join-Path $paths.Root $m)
+}
+$rootPomHash = Get-MeisRootPomFingerprint $paths.Root
+Save-MeisPackFingerprint -Path $paths.FingerprintFile -ModuleHashes $hashes -RootPomHash $rootPomHash -Mode 'full'
+
+# Clear stale incremental update folder (full pack supersedes)
+if (Test-Path $paths.UpdateDir) {
+    Remove-Item $paths.UpdateDir -Recurse -Force
+    Write-Host 'Cleared package\update\ (full pack)' -ForegroundColor DarkGray
 }
 
 Write-Host ''
-Write-Host "Done: $ok / $($services.Count) JARs -> package\jars\" -ForegroundColor Cyan
+Write-Host "Done: $ok / $($serviceNames.Count) JARs -> package\jars\" -ForegroundColor Cyan
+Write-Host "Fingerprint saved: $($paths.FingerprintFile)" -ForegroundColor DarkGray
 if ($fail.Count -gt 0) {
     Write-Host ("Missing: " + ($fail -join ', ')) -ForegroundColor Red
     exit 1
 }
-Write-Host 'Next: run package\start-ops.bat (or 启动运维.bat), then open the browser page.' -ForegroundColor DarkGray
+Write-Host 'Next: copy whole package\ to field PC, then 启动运维.bat' -ForegroundColor DarkGray
