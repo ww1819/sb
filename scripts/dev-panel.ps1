@@ -375,7 +375,7 @@ function Sync-PanelBackgroundJobs {
         }
         Remove-Job $job -Force -ErrorAction SilentlyContinue
         $script:PanelBackgroundJobs.Remove($label) | Out-Null
-        if ($label -like 'frontend-build-*') {
+        if ($label -like 'frontend-build-*' -or $label -eq 'field-pack') {
             $script:PanelBuildPending.Remove('meis-web') | Out-Null
         }
     }
@@ -384,7 +384,7 @@ function Sync-PanelBackgroundJobs {
 
 function Test-PanelFrontendBuildRunning {
     foreach ($label in @($script:PanelBackgroundJobs.Keys)) {
-        if ($label -notlike 'frontend-build-*') { continue }
+        if ($label -notlike 'frontend-build-*' -and $label -ne 'field-pack') { continue }
         $job = $script:PanelBackgroundJobs[$label]
         if ($null -ne $job -and $job.State -eq 'Running') {
             return $true
@@ -396,38 +396,51 @@ function Test-PanelFrontendBuildRunning {
 function Start-PanelBackgroundJob {
     param(
         [Parameter(Mandatory = $true)][string]$Label,
-        [Parameter(Mandatory = $true)][ValidateSet('start-all', 'start-core', 'start-debug-all', 'start-debug-core', 'restart-all', 'stop-all', 'build-backend', 'build-install', 'build-compile', 'build-clean')]
+        [Parameter(Mandatory = $true)][ValidateSet('start-all', 'start-core', 'start-debug-all', 'start-debug-core', 'restart-all', 'stop-all', 'build-backend', 'build-install', 'build-compile', 'build-clean', 'build-field-pack')]
         [string]$Action
     )
     $scriptsDir = $PSScriptRoot
     $root = $script:MeisRoot
+    if ($Action -eq 'build-field-pack') {
+        $script:PanelBuildPending['meis-web'] = Get-Date
+    }
     $job = Start-Job -ScriptBlock {
         param($ActionName, $ScriptsDir, $Root)
         Set-Location $Root
         . (Join-Path $ScriptsDir 'meis-services.ps1')
-        switch ($ActionName) {
-            'start-all' { Start-MeisServices -Profile 'dev' }
-            'start-core' { Start-MeisServices -Profile 'dev' -CoreOnly }
-            'start-debug-all' { Start-MeisServices -Profile 'dev' -EnableJdwp }
-            'start-debug-core' { Start-MeisServices -Profile 'dev' -CoreOnly -EnableJdwp }
-            'restart-all' {
-                Stop-MeisServices
-                Start-Sleep -Seconds 2
-                Start-MeisServices -Profile 'dev'
+        try {
+            switch ($ActionName) {
+                'start-all' { Start-MeisServices -Profile 'dev' }
+                'start-core' { Start-MeisServices -Profile 'dev' -CoreOnly }
+                'start-debug-all' { Start-MeisServices -Profile 'dev' -EnableJdwp }
+                'start-debug-core' { Start-MeisServices -Profile 'dev' -CoreOnly -EnableJdwp }
+                'restart-all' {
+                    Stop-MeisServices
+                    Start-Sleep -Seconds 2
+                    Start-MeisServices -Profile 'dev'
+                }
+                'stop-all' { Stop-MeisServices | Out-Null }
+                'build-clean' {
+                    Invoke-MeisMavenReactor -Goal clean -Quiet | Out-Null
+                }
+                'build-compile' {
+                    Invoke-MeisMavenReactor -Goal compile -Quiet | Out-Null
+                }
+                'build-backend' {
+                    Invoke-MeisMavenReactor -Goal package -Quiet | Out-Null
+                }
+                'build-install' {
+                    Invoke-MeisMavenReactor -Goal install | Out-Null
+                }
+                'build-field-pack' {
+                    Invoke-MeisPackageFieldPack | Out-Null
+                }
             }
-            'stop-all' { Stop-MeisServices | Out-Null }
-            'build-clean' {
-                Invoke-MeisMavenReactor -Goal clean -Quiet | Out-Null
+        } catch {
+            if ($ActionName -eq 'build-field-pack') {
+                Add-MeisPanelEvent ('FIELD-PACK FAILED: ' + $_.Exception.Message)
             }
-            'build-compile' {
-                Invoke-MeisMavenReactor -Goal compile -Quiet | Out-Null
-            }
-            'build-backend' {
-                Invoke-MeisMavenReactor -Goal package -Quiet | Out-Null
-            }
-            'build-install' {
-                Invoke-MeisMavenReactor -Goal install | Out-Null
-            }
+            throw
         }
     } -ArgumentList $Action, $scriptsDir, $root
     $script:PanelBackgroundJobs[$Label] = $job
@@ -547,6 +560,12 @@ function Start-PanelFrontendBackgroundJob {
                         }
                         'build' {
                             Build-MeisFrontendProject -Build | Out-Null
+                        }
+                        'vite-build' {
+                            Build-MeisFrontendProject -Build | Out-Null
+                        }
+                        'field-pack' {
+                            Invoke-MeisPackageFieldPack | Out-Null
                         }
                         default {
                             throw ('Unknown frontend build mode: ' + $Mode)
@@ -866,8 +885,17 @@ function Handle-PanelRequest {
         if ($path -eq '/api/frontend/build') {
             $mode = [string]$req.QueryString.Get('mode')
             if ([string]::IsNullOrWhiteSpace($mode)) { $mode = 'typecheck' }
+            if ($mode -eq 'build') { $mode = 'vite-build' }
             Add-MeisPanelEvent ('BUILD frontend (background, mode=' + $mode + ')')
             $r = Start-PanelFrontendBackgroundJob -Action 'build' -BuildMode $mode
+            Write-JsonResponse -Response $res -Data $r
+            return
+        }
+        if ($path -eq '/api/build/field-pack') {
+            Add-MeisPanelEvent 'FIELD-PACK (background, same as package\打包.bat)'
+            Clear-PanelBuildPending
+            $script:PanelBuildPending['meis-web'] = Get-Date
+            $r = Start-PanelBackgroundJob -Label 'field-pack' -Action 'build-field-pack'
             Write-JsonResponse -Response $res -Data $r
             return
         }

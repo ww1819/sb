@@ -19,7 +19,7 @@
 ┌──────────────┐     拷贝整个 package\      ┌──────────────────┐
 │  开发 / 构建机 │  ─────────────────────►  │  实施 / 现场机    │
 │ 双击 打包.bat  │                          │ 双击 启动运维.bat │
-│ → jars\ 齐套  │                          │ → :5098 启停服务  │
+│ → jars\+www\ │                          │ → :5098 启停服务  │
 └──────────────┘                          └──────────────────┘
 ```
 
@@ -27,14 +27,14 @@
 
 | 步骤 | 在哪做 | 做什么 |
 |------|--------|--------|
-| 1 | 开发机 | 配置 `package\env.txt`（JDK / Maven） |
-| 2 | 开发机 | 双击 `package\打包.bat`，生成 `package\jars\` |
+| 1 | 开发机 | 配置 `package\env.txt`（JDK / Maven；前端需 Node/npm） |
+| 2 | 开发机 | 双击 `package\打包.bat`，生成 `package\jars\` + `package\www\` |
 | 3 | — | **整份** `package` 文件夹拷到实施机（U 盘 / 共享盘均可） |
 | 4 | 实施机 | 安装 JDK 17、PostgreSQL、Redis（Memurai）、MinIO（见 〇.3） |
 | 5 | 实施机 | 改实施机上的 `package\env.txt`（JAVA_HOME、数据库等） |
 | 6 | 实施机 | 双击 `启动运维.bat` → 浏览器 `http://localhost:5098` |
 | 7 | 实施机 | 齐套检查 →「启动核心」或「启动全部」→ 冒烟验证 |
-| 8 | 实施机 | （可选）Nginx 托管前端 + `/api` 反代；App 填 Nginx 端口 |
+| 8 | 实施机 | Nginx 托管前端：`root` 指向 `package\www`（或拷到 `D:\meis\www`）+ `/api` 反代；App 填 Nginx 端口 |
 
 > **禁止**直接双击打开 `index.html`（无法启动 Java）。  
 > **禁止**把运维口 `5098` 暴露到院内网 / 公网。
@@ -48,12 +48,14 @@
 |----|------|
 | `JAVA_HOME` | JDK 17 根目录（内含 `bin\java.exe`） |
 | `MAVEN_HOME` | Maven 根目录（内含 `bin\mvn.cmd`），或改用 `MAVEN_CMD=` 指向 `mvn.cmd` |
+| Node / npm | 本机 PATH 有 `npm`，或 `NODE_HOME` / `NPM_CMD`；用于 `meis-web` 生产构建 |
+| `SKIP_FRONTEND_BUILD` | 默认 `0`；设为 `1` 则只打 JAR、不跑前端（`pack.ps1 -SkipFrontend` 同效） |
 
 3. **双击 `打包.bat`**，等待窗口提示 Build OK。  
-   - 成功后 `package\jars\` 下应有全部 `meis-*-1.0.0-SNAPSHOT.jar`（与 `services.json` 一致）。  
-   - 失败时看窗口报错；常见原因：JDK/Maven 路径错误、某模块编译失败。
+   - 成功后：`package\jars\` 齐全（与 `services.json` 一致）；`package\www\` 为 `meis-web` 生产静态页（含 `index.html`）。  
+   - 失败时看窗口报错；常见原因：JDK/Maven/Node 路径错误、某模块编译失败、前端 `vue-tsc`/`vite build` 报错。
 
-4. 将 **整个 `package` 目录** 复制到实施环境（不要只拷 `jars`，运维页与脚本要一起带走）。
+4. 将 **整个 `package` 目录** 复制到实施环境（不要只拷 `jars`，运维页、`www` 与脚本要一起带走）。
 
 建议拷贝前可删掉体积大且无用的运行日志（可选）：
 
@@ -62,7 +64,7 @@ package\logs\*.log
 package\logs\jobs\
 ```
 
-**不要删**：`jars\`、`*.bat`、`*.ps1`、`index.html`、`services.json`、`env.txt` / `env.example.txt`。
+**不要删**：`jars\`、`www\`、`*.bat`、`*.ps1`、`index.html`、`services.json`、`env.txt` / `env.example.txt`。
 
 ### 〇.3 实施机：中间件前置
 
@@ -109,7 +111,7 @@ MINIO_ENDPOINT=http://127.0.0.1:9100
 1. **双击 `启动运维.bat`**（或 `start-ops.bat`）。
 2. 浏览器自动打开（或手动访问）`http://localhost:5098/`。
 3. 页面上：
-   - 先看 **JAR 齐套**：缺包则回到开发机重新 `打包.bat` 再拷 `jars\`。
+   - 先看 **JAR 齐套** 与 **`www\index.html`**：缺则回到开发机重新 `打包.bat` 再拷 `jars\` / `www\`。
    - 填运维口令（与 `OPS_TOKEN` 一致）。
    - 建议顺序：**启动核心**（含 tenant → auth → … → gateway）→ 业务需要再 **启动全部**。
 4. 关闭运维窗口 **不会**停掉已启动的业务 JAR；要停服务用页面上的停止，或结束对应 `java.exe`。
@@ -150,7 +152,7 @@ Invoke-RestMethod -Method POST http://127.0.0.1:8080/api/auth/login `
 
 | 项 | 建议 |
 |----|------|
-| 静态页 | Nginx `root` 指向 `meis-web` 的 `dist`（需另拷前端构建产物） |
+| 静态页 | Nginx `root` 指向现场包 **`package\www`**（开发机 `打包.bat` 生成；等同 `meis-web/dist`） |
 | API | `location /api/` → `http://127.0.0.1:8080` |
 | 临时对外端口 | 若暂用 **5174** 对外，须在 Nginx 配置 `listen 5174` 且带 `/api` 反代 |
 | Flutter App | 服务器 IP + 端口 **5174**（走 Nginx）；直连 Gateway 才填 **8080** |
@@ -160,7 +162,7 @@ Invoke-RestMethod -Method POST http://127.0.0.1:8080/api/auth/login `
 
 ### 〇.8 实施检查清单
 
-- [ ] 开发机 `打包.bat` 成功，`jars\` 齐全  
+- [ ] 开发机 `打包.bat` 成功，`jars\` 齐全且 `www\index.html` 存在  
 - [ ] 整份 `package` 已拷到实施机  
 - [ ] 实施机 JDK / PG / Redis / MinIO 就绪  
 - [ ] `env.txt` 的 `JAVA_HOME`、库密码、MinIO 地址正确  
@@ -307,7 +309,7 @@ minio.exe server D:\meis\minio-data --address ":9100" --console-address ":9101"
 
 ```text
 package\
-  打包.bat          ← 开发机：编译并收集全部 JAR → jars\
+  打包.bat          ← 开发机：JAR → jars\ + meis-web 生产构建 → www\
   启动运维.bat      ← 实施机：打开本机运维页 :5098
   env.txt           ← 各机各自配置（模板见 env.example.txt）
   jars\             ← 全部后端 JAR

@@ -61,3 +61,21 @@ function Resolve-MeisPackageJavaExe {
     $home = Resolve-MeisPackageJavaHome
     return (Join-Path $home 'bin\java.exe')
 }
+
+function Resolve-MeisPackageNpm {
+    if ($env:NPM_CMD -and (Test-Path $env:NPM_CMD)) {
+        return $env:NPM_CMD
+    }
+    foreach ($c in @($env:NODE_HOME, $env:MEIS_NODE_HOME)) {
+        if (-not $c) { continue }
+        foreach ($name in @('npm.cmd', 'npm.exe')) {
+            $cmd = Join-Path $c $name
+            if (Test-Path $cmd) { return $cmd }
+            $cmd = Join-Path $c "bin\$name"
+            if (Test-Path $cmd) { return $cmd }
+        }
+    }
+    $inPath = Get-Command npm -ErrorAction SilentlyContinue
+    if ($inPath) { return $inPath.Source }
+    throw 'npm not found. Install Node.js LTS, or set NODE_HOME / NPM_CMD in package\env.txt'
+}

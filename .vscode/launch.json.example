@@ -1,0 +1,64 @@
+{
+    "version": "0.2.0",
+    "inputs": [
+        {
+            "id": "jdwpPort",
+            "type": "pickString",
+            "description": "JDWP 端口（请先在开发面板对目标服务点击「调试」）",
+            "options": [
+                { "label": "meis-gateway :5800", "value": "5800" },
+                { "label": "meis-auth :5801", "value": "5801" },
+                { "label": "meis-tenant :5802", "value": "5802" },
+                { "label": "meis-system :5803", "value": "5803" },
+                { "label": "meis-purchase :5804", "value": "5804" },
+                { "label": "meis-asset :5805", "value": "5805" },
+                { "label": "meis-repair :5806", "value": "5806" },
+                { "label": "meis-maintain :5807", "value": "5807" },
+                { "label": "meis-qc :5808", "value": "5808" },
+                { "label": "meis-maintenance-contract :5809", "value": "5809" },
+                { "label": "meis-special :5810", "value": "5810" },
+                { "label": "meis-analytics :5811", "value": "5811" },
+                { "label": "meis-file :5812", "value": "5812" },
+                { "label": "meis-notification :5813", "value": "5813" },
+                { "label": "meis-integration :5814", "value": "5814" }
+            ]
+        }
+    ],
+    "configurations": [
+        {
+            "type": "node-terminal",
+            "name": "开发控制面板",
+            "request": "launch",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\dev-panel.ps1",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "node-terminal",
+            "name": "关闭开发控制面板",
+            "request": "launch",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\stop-dev-panel.ps1",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "node-terminal",
+            "name": "生产打包 (package)",
+            "request": "launch",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File package\\pack.ps1",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "java",
+            "name": "Attach Java 调试",
+            "request": "attach",
+            "hostName": "localhost",
+            "port": "${input:jdwpPort}"
+        },
+        {
+            "type": "node-terminal",
+            "name": "停止全部服务",
+            "request": "launch",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\stop-debug.ps1",
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

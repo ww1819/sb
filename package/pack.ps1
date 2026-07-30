@@ -1,13 +1,15 @@
-# Build all backend JARs and copy into package\jars\
+# Build backend JARs + meis-web production dist into package\
 # Configure paths in package\env.txt (see env.example.txt)
 param(
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    [switch]$SkipFrontend
 )
 
 $ErrorActionPreference = 'Stop'
 $pkgDir = $PSScriptRoot
 $root = Split-Path $pkgDir -Parent
 $jarsDir = Join-Path $pkgDir 'jars'
+$wwwDir = Join-Path $pkgDir 'www'
 $logsDir = Join-Path $pkgDir 'logs'
 $servicesFile = Join-Path $pkgDir 'services.json'
 
@@ -64,9 +66,65 @@ foreach ($s in $services) {
 }
 
 Write-Host ''
-Write-Host "Done: $ok / $($services.Count) JARs -> package\jars\" -ForegroundColor Cyan
+Write-Host "JARs: $ok / $($services.Count) -> package\jars\" -ForegroundColor Cyan
 if ($fail.Count -gt 0) {
     Write-Host ("Missing: " + ($fail -join ', ')) -ForegroundColor Red
     exit 1
 }
-Write-Host 'Next: run package\start-ops.bat (or 启动运维.bat), then open the browser page.' -ForegroundColor DarkGray
+
+# --- Frontend production build (meis-web -> package\www) ---
+$skipFe = $SkipFrontend -or ($env:SKIP_FRONTEND_BUILD -eq '1') -or ($env:SKIP_FRONTEND_BUILD -eq 'true')
+$webDir = Join-Path $root 'meis-web'
+$distDir = Join-Path $webDir 'dist'
+
+if ($skipFe) {
+    Write-Host 'SkipFrontend: leave package\www unchanged (or copy existing dist if present)' -ForegroundColor Yellow
+    if ((Test-Path $distDir) -and (Test-Path (Join-Path $distDir 'index.html'))) {
+        if (Test-Path $wwwDir) { Remove-Item $wwwDir -Recurse -Force }
+        New-Item -ItemType Directory -Path $wwwDir -Force | Out-Null
+        Copy-Item (Join-Path $distDir '*') $wwwDir -Recurse -Force
+        Write-Host "  Copied existing meis-web\dist -> package\www" -ForegroundColor Green
+    } elseif (-not (Test-Path (Join-Path $wwwDir 'index.html'))) {
+        Write-Host '  WARN: no package\www and no meis-web\dist; field Nginx will need frontend separately' -ForegroundColor Yellow
+    }
+} else {
+    if (-not (Test-Path (Join-Path $webDir 'package.json'))) {
+        throw "meis-web not found: $webDir"
+    }
+    $npm = Resolve-MeisPackageNpm
+    Write-Host "NPM=$npm" -ForegroundColor Cyan
+    Write-Host 'Building meis-web production (npm run build)...' -ForegroundColor Cyan
+    # VS Code/Cursor 「调试启动」会给子进程注入 --inspect；生产构建勿挂调试器
+    if ($env:NODE_OPTIONS -and ($env:NODE_OPTIONS -match '--inspect|--debug')) {
+        $cleaned = (($env:NODE_OPTIONS -split '\s+') | Where-Object {
+            $_ -and ($_ -notmatch '^--inspect') -and ($_ -notmatch '^--debug')
+        }) -join ' '
+        Write-Host '  Cleared NODE_OPTIONS inspect/debug flags for production build' -ForegroundColor DarkGray
+        if ($cleaned) { $env:NODE_OPTIONS = $cleaned }
+        else { Remove-Item Env:NODE_OPTIONS -ErrorAction SilentlyContinue }
+    }
+    Push-Location $webDir
+    try {
+        if (-not (Test-Path 'node_modules')) {
+            Write-Host '  npm install (node_modules missing)...' -ForegroundColor DarkGray
+            & $npm install
+            if ($LASTEXITCODE -ne 0) { throw "npm install failed, exit=$LASTEXITCODE" }
+        }
+        & $npm run build
+        if ($LASTEXITCODE -ne 0) { throw "npm run build failed, exit=$LASTEXITCODE" }
+    } finally {
+        Pop-Location
+    }
+    if (-not (Test-Path (Join-Path $distDir 'index.html'))) {
+        throw "meis-web build OK but dist\index.html missing: $distDir"
+    }
+    if (Test-Path $wwwDir) { Remove-Item $wwwDir -Recurse -Force }
+    New-Item -ItemType Directory -Path $wwwDir -Force | Out-Null
+    Copy-Item (Join-Path $distDir '*') $wwwDir -Recurse -Force
+    $files = @(Get-ChildItem $wwwDir -Recurse -File).Count
+    Write-Host "  OK frontend -> package\www ($files files)" -ForegroundColor Green
+}
+
+Write-Host ''
+Write-Host 'Done. Next: run package\start-ops.bat (or 启动运维.bat), then open the browser page.' -ForegroundColor DarkGray
+Write-Host 'Frontend static: package\www (Nginx root / copy to D:\meis\www)' -ForegroundColor DarkGray

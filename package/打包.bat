@@ -3,8 +3,9 @@ chcp 65001 >nul
 cd /d "%~dp0"
 title MEIS package build
 echo ========================================
-echo   MEIS package - build JARs
+echo   MEIS package - JARs + frontend www
 echo   Edit env.txt for JAVA_HOME / MAVEN_HOME
+echo   (Node/npm needed for meis-web build)
 echo ========================================
 echo.
 
@@ -23,5 +24,6 @@ if %ERR% neq 0 (
   pause
   exit /b %ERR%
 )
-echo Build OK. Copy the whole package folder to the field PC.
+echo Build OK. JARs in package\jars\ ; frontend in package\www\
+echo Copy the whole package folder to the field PC.
 pause

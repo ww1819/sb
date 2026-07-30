@@ -230,7 +230,7 @@ onMounted(async () => {
       warehouse_name: String(r.warehouse_name ?? '')
     })
   )
-  statusOptions.value = st.filter((o) => o.value !== 'returned')
+  statusOptions.value = st.filter((o: { value: string }) => o.value !== 'returned')
   riskOptions.value = rk
 })
 

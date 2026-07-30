@@ -2120,6 +2120,10 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | 2.146 | 2026-07-28 22:30:00 | — | DASH-UI-07：快捷入口 4×3 视口+自动/手动翻页；上限 12→45（修订 DASH-UI-06） |
 | 2.145 | 2026-07-28 21:45:45 | — | DASH-UI-06：快捷入口用户自选（sys_user.preferences.quickEntryPaths，侧栏有效菜单，上限 12） |
 =======
+| 2.154 | 2026-07-30 09:45:00 | — | PKG-WEB-04：生产打包失败非阻塞；pack.ps1 清 NODE_OPTIONS inspect |
+| 2.153 | 2026-07-30 09:40:00 | — | PKG-WEB-03：VS Code launch.json 增加「生产打包 (package)」 |
+| 2.152 | 2026-07-30 09:35:00 | — | PKG-WEB-02：开发面板配置+「生产构建」按钮，等同 package\打包.bat |
+| 2.151 | 2026-07-30 09:30:00 | — | PKG-WEB-01：package 现场包打包加入 meis-web 生产构建 → www\ |
 | 2.150 | 2026-07-29 11:25:00 | — | MOB-CHANNEL-02：历史途径 NULL→web 回填 + 删除途径列表显 + 约定 §5.10.6 |
 | 2.149 | 2026-07-29 11:10:00 | — | MOB-CHANNEL-01：多端途径补齐（借还/报修/计量/不良/盘点）+ Web 列表展示 |
 | 2.148 | 2026-07-29 11:00:00 | — | MOB-PWR-02 落地：移动端基站维护+监测记录；标签侧补监测记录；基站途径列 |
@@ -3005,7 +3009,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | **mtime 缓存** | 热加载成功后清除该模块 mtime 缓存，避免 5s 内误报待编译/JAR 落后 |
 | **后端热加载** | 默认需手动「热加载」；可勾选 **保存即热加载**（附录 L.6，仅调试中服务） |
 | **前端日常开发** | Vite 开发服（`:5173`）自带 HMR，**改 `.vue`/`.ts` 无需点构建** |
-| **前端构建按钮** | 仅用于 `npm install`、类型检查、`vite build` 生产包验证；与日常热更新无关 |
+| **前端构建按钮** | 配置见 `services-meta.json` → `meis-web.buildActions`：`install` / `typecheck` / `vite-build`；**生产构建**=`field-pack`（等同 `package\打包.bat`，见 PKG-WEB-02） |
 
 **状态**：已实施（筛选与自动热加载见 L.6）。
 
@@ -3482,6 +3486,10 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 移动端电流基站维护 | [MOB-PWR-02](#mob-pwr-02-移动端电流监测基站维护定稿2026-07-29) |
 | 多端操作途径补齐 | [MOB-CHANNEL-01](#mob-channel-01-多端操作途径补齐定稿2026-07-29) |
 | 历史途径回填 / 追加多端约定 | [MOB-CHANNEL-02](#mob-channel-02-历史途径回填--展示齐套--约定-5106定稿2026-07-29)、约定包 §5.10.6 |
+| 现场包前端生产构建 | [PKG-WEB-01](#pkg-web-01-现场包加入前端生产构建定稿2026-07-30) |
+| 开发面板生产构建 | [PKG-WEB-02](#pkg-web-02-开发面板生产构建--现场打包定稿2026-07-30) |
+| VS Code 生产打包 launch | [PKG-WEB-03](#pkg-web-03-vs-code-launch-生产打包定稿2026-07-30) |
+| 生产打包失败/调试器说明 | [PKG-WEB-04](#pkg-web-04-生产打包前端阻塞说明定稿2026-07-30) |
 | 列表勾选 / 批量作用域 | [附录 V](#附录-v列表勾选跨页缓存与批量作用域2026-07-15) |
 | 列表筛选多选 / 分类模糊拆分 | [PLT-UI-02](#plt-ui-02-定稿2026-07-22)、约定包 §5.5 |
 | 业务冗余字段（device / 人员姓名 / **单据下沉**） | [附录 W](#附录-w业务冗余字段约定2026-07-15)（含 **W.5** / **W.6**）、约定包 §6.2 |
@@ -6170,3 +6178,66 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 - [ ] 新追加多端功能时对照 §5.10.4 清单
 
 **状态**：已完成。
+
+### PKG-WEB-01 现场包加入前端生产构建（定稿·2026-07-30）
+
+> 来源：请在配置里添加前端的生产构建。
+
+| 项 | 定稿 |
+|----|------|
+| **范围** | `package\` 现场包打包配置（`pack.ps1` / `打包.bat` / `env.example.txt`） |
+| **行为** | 打包时除 Maven JAR → `jars\` 外，默认执行 `meis-web` 的 `npm run build`，产物拷到 **`package\www\`** |
+| **配置** | `NODE_HOME` / `NPM_CMD`（可选，PATH 有 npm 即可）；`SKIP_FRONTEND_BUILD=1` 或 `-SkipFrontend` 可跳过 |
+| **实施** | Nginx `root` 指向 `package\www`（或拷到 `D:\meis\www`）；文档见 `windows-production-deploy.md` §〇 |
+
+**状态**：已完成。
+
+### PKG-WEB-02 开发面板「生产构建」= 现场打包（定稿·2026-07-30）
+
+> 来源：将生产构建添加到配置文件；在开发工具前端执行，效果与 `打包.bat` 一致（不必直接调 bat）。
+
+| 项 | 定稿 |
+|----|------|
+| **配置** | `scripts/dev-panel/services-meta.json` → `meis-web.buildActions`（含 `field-pack` 标签「生产构建」） |
+| **面板入口** | 顶栏「生产构建」+ 前端行构建按钮「生产构建」 |
+| **实现** | 后台调用 `package\pack.ps1`（与 `打包.bat` 同脚本），产物 `jars\` + `www\` |
+| **其它按钮** | `install` / `typecheck` / `vite-build`（仅前端 Vite，不等于现场包） |
+
+**状态**：已完成。重启开发面板（:5099）后生效。
+
+### PKG-WEB-03 VS Code launch 生产打包（定稿·2026-07-30）
+
+> 来源：将生产打包也添加到 debug 配置（VS Code `launch.json`）。
+
+| 项 | 定稿 |
+|----|------|
+| **配置名** | `生产打包 (package)` |
+| **命令** | `package\pack.ps1`（与 `打包.bat` / 开发面板「生产构建」相同） |
+| **产物** | `package\jars\` + `package\www\` |
+| **前置** | 已有 `package\env.txt`（含 JAVA_HOME / MAVEN_HOME；前端需 npm） |
+| **仓库** | 本机 `.vscode/launch.json`（gitignore）；团队模板 `.vscode/launch.json.example`（可提交，新环境复制为 `launch.json`） |
+
+**状态**：已完成。运行和调试 → 选择「生产打包 (package)」→ 启动。
+
+### PKG-WEB-04 生产打包「前端阻塞」说明（定稿·2026-07-30）
+
+> 来源：生产打包是否需要前端构建被阻塞的处理机制？刚才是否因被阻塞失败？
+
+#### 1. 结论：刚才不是被阻塞
+
+| 现象 | 含义 |
+|------|------|
+| `Found 3 errors`（vue-tsc） | **真正失败原因**：类型检查未通过，构建主动退出 |
+| `Debugger attached` / `Waiting for the debugger to disconnect` | 用 VS Code/Cursor **调试方式**启动时，调试器挂到 npm 子进程的附带日志，**不是**卡死根因 |
+
+已修的 3 处 TS 错误见当时改动（`replaceAll` / echarts formatter / filter 类型）。
+
+#### 2. 要不要加「阻塞处理」？
+
+| 方案 | 定稿 |
+|------|------|
+| 复杂超时/杀进程/阻塞检测 | **不做**（过度；失败已有非 0 退出码） |
+| 构建前剥离 `NODE_OPTIONS` 的 `--inspect*` | **做**（`pack.ps1` 轻量防护，避免调试会话干扰生产构建） |
+| 使用方式 | 生产打包优先「运行」；即使用调试启动，也会清 inspect |
+
+**状态**：已完成（文档 + `pack.ps1` 清 inspect）。

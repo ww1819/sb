@@ -63,7 +63,7 @@ async function load() {
   if (!props.loadUrl || !props.deviceId) return
   loading.value = true
   try {
-    const url = props.loadUrl.replaceAll('{deviceId}', props.deviceId)
+    const url = props.loadUrl.split('{deviceId}').join(props.deviceId)
     const { data } = await http.get(url, {
       params: {
         page: 1,
