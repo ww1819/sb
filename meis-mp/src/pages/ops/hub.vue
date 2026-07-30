@@ -17,7 +17,7 @@
     >
       <text class="due-title">{{ row.device_name || row.device_code || '设备' }}</text>
       <text class="due-meta">
-        {{ row.device_code || '' }} · {{ row.plan_no || '' }} · 到期 {{ formatDate(row.next_due_date) }}
+        {{ row.device_code || '' }} · {{ row.plan_no || '' }} · 到期 {{ formatDisplayDate(row.next_due_date) }}
       </text>
     </view>
 
@@ -88,6 +88,7 @@ import { http } from '@/api/http'
 import { OPS_MODULES, type OpsModule, type OpsModuleConfig } from '@/config/ops'
 import { useAuthStore } from '@/stores/auth'
 import { calcCycleDays, todayYmd } from '@/utils/cycleDays'
+import { formatDisplayDate, toDateParam } from '@/utils/datetime'
 
 const auth = useAuthStore()
 const moduleKey = ref<OpsModule>('maintain')
@@ -146,9 +147,8 @@ onShow(() => {
   loadDue()
 })
 
-function formatDate(v: unknown) {
-  if (!v) return '—'
-  return String(v).slice(0, 10)
+function onPlannedDateChange(e: { detail: { value: string } }) {
+  adhoc.plannedDate = toDateParam(e.detail.value) || todayYmd()
 }
 
 function closePicker() {
@@ -294,7 +294,7 @@ async function applyInclude(device: Record<string, unknown>) {
           p.type_label,
           p.dept_name,
           p.cycle_days != null ? `${p.cycle_days}天` : '',
-          p.next_due_date ? `到期 ${formatDate(p.next_due_date)}` : '',
+          p.next_due_date ? `到期 ${formatDisplayDate(p.next_due_date)}` : '',
           p.item_count != null ? `明细 ${p.item_count}` : ''
         ]
           .filter(Boolean)
@@ -483,10 +483,6 @@ function pickLevel() {
 function onCycleTypeChange(e: { detail: { value: string } }) {
   const idx = Number(e.detail.value)
   adhoc.cycleType = cycleTypes[idx] || 'month'
-}
-
-function onPlannedDateChange(e: { detail: { value: string } }) {
-  adhoc.plannedDate = e.detail.value || todayYmd()
 }
 
 function closeAdhoc() {

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/utils/datetime_format.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_section_label.dart';
 import 'metrology_exec_detail_page.dart';
@@ -156,7 +157,7 @@ class _MetrologyHubPageState extends ConsumerState<MetrologyHubPage> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '${p['device_code'] ?? '—'} · ${p['next_due_date'] ?? '—'}',
+                                    '${p['device_code'] ?? '—'} · ${formatDisplayDate(p['next_due_date'])}',
                                     style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                                   ),
                                 ],

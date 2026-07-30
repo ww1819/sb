@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/utils/datetime_format.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_status_chip.dart';
 import 'shared_return_form_page.dart';
@@ -127,7 +128,7 @@ class _SharedReturnListPageState extends ConsumerState<SharedReturnListPage> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '借调单：${_text(row, 'loan_no')} · 归还日：${_text(row, 'return_date')}',
+                                '借调单：${_text(row, 'loan_no')} · 归还日：${formatDisplayDate(row['return_date'])}',
                                 style: const TextStyle(
                                   fontSize: 12,
                                   color: AppColors.textSecondary,

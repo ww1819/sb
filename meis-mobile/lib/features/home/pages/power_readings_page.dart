@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/utils/datetime_format.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_section_label.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -45,17 +46,7 @@ class _PowerReadingsPageState extends ConsumerState<PowerReadingsPage> {
     Future.microtask(_load);
   }
 
-  String _fmt(DateTime d) {
-    String p(int n) => n.toString().padLeft(2, '0');
-    return '${d.year}-${p(d.month)}-${p(d.day)} ${p(d.hour)}:${p(d.minute)}:${p(d.second)}';
-  }
-
-  String _fmtCell(dynamic v) {
-    if (v == null) return '—';
-    final s = v.toString();
-    if (s.length >= 19) return s.substring(0, 19).replaceFirst('T', ' ');
-    return s;
-  }
+  String _fmt(DateTime d) => formatDateTime(d);
 
   Future<void> _pickFrom() async {
     final d = await showDatePicker(
@@ -192,7 +183,7 @@ class _PowerReadingsPageState extends ConsumerState<PowerReadingsPage> {
                                   style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
                                 ),
                                 Text(
-                                  '读取 ${_fmtCell(r['read_at'])} · 入库 ${_fmtCell(r['created_at'])}',
+                                  '读取 ${formatDisplayDateTime(r['read_at'])} · 入库 ${formatDisplayDateTime(r['created_at'])}',
                                   style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
                                 ),
                               ],

@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/repair_draft_store.dart';
+import '../../../shared/utils/datetime_format.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_section_label.dart';
 import '../../../shared/widgets/meis_status_chip.dart';
@@ -257,7 +258,7 @@ class _RepairPageState extends ConsumerState<RepairPage> {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        '更新：${d['updated_at'] ?? '—'}',
+                                        '更新：${formatDisplayDateTime(d['updated_at'])}',
                                         style: const TextStyle(
                                           fontSize: 12,
                                           color: AppColors.textSecondary,

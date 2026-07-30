@@ -62,6 +62,7 @@ import { computed, reactive, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { http } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
+import { formatDate } from '@/utils/datetime'
 
 const auth = useAuthStore()
 const loan = ref<Record<string, unknown> | null>(null)
@@ -78,10 +79,7 @@ const picker = reactive({
 const canSave = computed(() => !!(loan.value?.id && returnDate.value))
 
 function todayYmd() {
-  const d = new Date()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${d.getFullYear()}-${m}-${day}`
+  return formatDate(new Date())
 }
 
 function asRecords(data: unknown): Record<string, unknown>[] {

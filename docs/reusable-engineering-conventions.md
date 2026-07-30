@@ -4,7 +4,7 @@
 > **来源**：`docs/meis-requirements.md` 附录 Q / C / D / E / F / G / H / I / R / S / T 等。  
 > **用法**：新系统可整份复制后，按「落地映射」改路径与模块名；MEIS 专属细节见文末附录。
 
-**版本**：1.27（2026-07-30）
+**版本**：1.28（2026-07-30）
 
 ---
 
@@ -386,17 +386,18 @@ USB 外设（如文档高拍仪）**勿**由浏览器直连硬件；经厂商本
 
 落地映射：MEIS PLT-CAM-01（新良田 Eloam `ws://127.0.0.1:9000`）。开发机注意：Eloam 与对象存储（MinIO）**勿共占 9000**；MEIS 本地 MinIO 默认 API **9100**。
 
-### 5.12 日期与时间格式（Web）
+### 5.12 日期与时间格式（多端）
 
 | 项 | 要求 |
 |----|------|
-| **日期** | 展示与入参统一 `yyyy-MM-dd`（Element Plus：`YYYY-MM-DD`） |
+| **日期** | 展示与入参统一 `yyyy-MM-dd`（Web Element Plus：`YYYY-MM-DD`） |
 | **时间** | 展示与入参统一 `yyyy-MM-dd HH:mm:ss`（24 小时；对应口语/Oracle 的 `hh:mi:ss` 分钟写法） |
-| **禁止** | 查询/表单控件勿默认产出带 `T` 的 ISO 字符串作为业务入参（如 `YYYY-MM-DDTHH:mm:ss`） |
+| **禁止** | 业务入参勿默认产出带 `T` 的 ISO 字符串（如 `YYYY-MM-DDTHH:mm:ss`）；本地缓存/同步元数据除外 |
 | **列表展示** | ISO/带时区字符串须格式化为上述两种；空值「—」 |
-| **查询条件** | `date` / `datetime` / `daterange` / `datetimerange` 控件的 `format` 与 `value-format` 一致；区间入参 `xxxFrom` / `xxxTo` |
+| **查询条件** | 日期/时间控件的展示格式与入参一致；区间入参 `xxxFrom` / `xxxTo` |
+| **端覆盖** | Web / App（Flutter）/ 微信小程序同一套格式；各端集中工具函数，禁止页面内散落拼接 |
 
-落地映射：MEIS PLT-DT-01、`meis-web/src/utils/datetime.ts`。
+落地映射：MEIS PLT-DT-01；`meis-web/src/utils/datetime.ts`、`meis-mobile/lib/shared/utils/datetime_format.dart`、`meis-mp/src/utils/datetime.ts`。
 
 ---
 
@@ -594,7 +595,7 @@ USB 外设（如文档高拍仪）**勿**由浏览器直连硬件；经厂商本
 | 维修列表功能分列 | 附录 U.14.2 | `WorkorderListPage`（handle/verify 取消操作列、功能分列） |
 | 运维计划操作分列 / 已审核明细 | OPS.16.6–16.16、约定包 §5.7 / §5.8 / **§5.9** / **§5.10** | 三计划操作分列；明细执行/确认/删除；纳入申请+Web确认；编辑/执行分离；全确认即可审核；头表流式紧凑；途径齐套展示；追加多端须加列+历史 web 回填（§5.10.6） |
 | 本机外设高拍仪 | PLT-CAM-01 / **02**、约定包 **§5.11** | `cameraVendors`；`CameraDebugPage`（系统管理）；设备档案高拍仪；通用上传入口 |
-| Web 日期时间格式 | PLT-DT-01、约定包 **§5.12** | `meis-web/src/utils/datetime.ts`；`TableCellValue` / `FieldRenderer` / `CrudListFilterField` |
+| 多端日期时间格式 | PLT-DT-01、约定包 **§5.12** | `meis-web/src/utils/datetime.ts`；`meis-mobile/.../datetime_format.dart`；`meis-mp/src/utils/datetime.ts`；列表/表单/筛选 |
 | 变更记录/快照 | 附录 T（含 T.5） | `EntityChangeLogService` |
 | 主从保存 | 第 4 章 PLT-X-05 | 出入库/计划等专用保存 |
 | 业务冗余字段 | 附录 W（含 W.5 / **W.6**）、约定包 §6.2 / §6.3 | 设备/主数据 code+name；单据号下沉明细；人员姓名快照 |

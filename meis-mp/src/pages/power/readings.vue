@@ -39,6 +39,7 @@ import { computed, ref } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { http } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
+import { formatDateTime, formatDisplayDateTime, toDateTimeParam, DATETIME_FMT } from '@/utils/datetime'
 
 type Row = Record<string, unknown>
 
@@ -70,23 +71,13 @@ onLoad((q) => {
   uni.setNavigationBarTitle({ title })
   const now = new Date()
   const hourAgo = new Date(now.getTime() - 60 * 60 * 1000)
-  to.value = fmtDate(now)
-  from.value = fmtDate(hourAgo)
+  to.value = formatDateTime(now)
+  from.value = formatDateTime(hourAgo)
   load()
 })
 
-function pad(n: number) {
-  return n < 10 ? `0${n}` : String(n)
-}
-
-function fmtDate(d: Date) {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-}
-
 function fmt(v: unknown) {
-  if (v == null) return '—'
-  const s = String(v)
-  return s.length >= 19 ? s.slice(0, 19).replace('T', ' ') : s
+  return formatDisplayDateTime(v)
 }
 
 function pickFrom() {
@@ -94,11 +85,11 @@ function pickFrom() {
   uni.showModal({
     title: '开始时间',
     editable: true,
-    placeholderText: 'YYYY-MM-DD HH:mm:ss',
+    placeholderText: DATETIME_FMT,
     content: from.value,
     success: (r) => {
       if (r.confirm && r.content) {
-        from.value = r.content.trim()
+        from.value = toDateTimeParam(r.content.trim()) || r.content.trim()
       }
     }
   })
@@ -108,11 +99,11 @@ function pickTo() {
   uni.showModal({
     title: '结束时间',
     editable: true,
-    placeholderText: 'YYYY-MM-DD HH:mm:ss',
+    placeholderText: DATETIME_FMT,
     content: to.value,
     success: (r) => {
       if (r.confirm && r.content) {
-        to.value = r.content.trim()
+        to.value = toDateTimeParam(r.content.trim()) || r.content.trim()
       }
     }
   })

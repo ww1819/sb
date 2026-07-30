@@ -2154,6 +2154,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+| 2.165 | 2026-07-30 14:55:00 | — | PLT-DT-01 扩至 App/小程序：统一日期时间工具与展示入参 |
 | 2.164 | 2026-07-30 14:50:00 | — | PLT-DT-01：Web 日期/时间统一格式 + 查询控件入参；约定包 §5.12 |
 | 2.163 | 2026-07-30 10:00:00 | — | 合并冲突：完整/更新打包 + PKG-WEB 前端 www 同包保留 |
 | 2.162 | 2026-07-30 09:45:00 | — | package：完整打包.bat + 更新打包.bat（指纹增量 → update\） |
@@ -3538,7 +3539,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 生产打包失败/调试器说明 | [PKG-WEB-04](#pkg-web-04-生产打包前端阻塞说明定稿2026-07-30) |
 | 安卓扫码相机权限 | [MOB-SCAN-01](#mob-scan-01-安卓扫码相机无预览定稿2026-07-30) |
 | App 相机扫码全量排查 | [MOB-SCAN-02](#mob-scan-02-app-相机扫码入口全量排查定稿2026-07-30) |
-| Web 日期时间格式 | [PLT-DT-01](#plt-dt-01-web-日期时间显示与查询入参定稿2026-07-30)、约定包 §5.12 |
+| 多端日期时间格式 | [PLT-DT-01](#plt-dt-01-多端日期时间显示与查询入参定稿2026-07-30)、约定包 §5.12 |
 | 列表勾选 / 批量作用域 | [附录 V](#附录-v列表勾选跨页缓存与批量作用域2026-07-15) |
 | 列表筛选多选 / 分类模糊拆分 | [PLT-UI-02](#plt-ui-02-定稿2026-07-22)、约定包 §5.5 |
 | 业务冗余字段（device / 人员姓名 / **单据下沉**） | [附录 W](#附录-w业务冗余字段约定2026-07-15)（含 **W.5** / **W.6**）、约定包 §6.2 |
@@ -6354,39 +6355,43 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 
 **状态**：已完成。
 
-### PLT-DT-01 Web 日期时间显示与查询入参（定稿·2026-07-30）
+### PLT-DT-01 多端日期时间显示与查询入参（定稿·2026-07-30）
 
-> 来源：Web 端日期/时间展示与查询条件格式统一。
+> 来源：Web / App / 微信小程序日期与时间展示、查询与入参格式统一。
 
-#### 1. 格式（强制）
+#### 1. 格式（强制，三端一致）
 
-| 类型 | 展示 / 入参 | Element Plus |
-|------|-------------|--------------|
+| 类型 | 展示 / 入参 | Web（Element Plus） |
+|------|-------------|---------------------|
 | **日期** | `yyyy-MM-dd` | `YYYY-MM-DD` |
 | **时间** | `yyyy-MM-dd HH:mm:ss`（24 小时；`mi`=分） | `YYYY-MM-DD HH:mm:ss` |
 
-- 禁止业务入参使用带 `T` 的 ISO（如 `YYYY-MM-DDTHH:mm:ss`）。
+- 禁止业务入参使用带 `T` 的 ISO（如 `YYYY-MM-DDTHH:mm:ss`）；本地离线缓存/同步元数据可用 ISO。
 - 列表/详情中后端返回的 ISO/带时区字符串，须格式化为上表；空值「—」。
 
 #### 2. 查询条件
 
 | 控件类型 | 控件 | 入参 |
 |----------|------|------|
-| `date` | `format`=`value-format`=`YYYY-MM-DD` | 原样 `key` |
-| `datetime` | `format`=`value-format`=`YYYY-MM-DD HH:mm:ss` | 原样 `key` |
-| `daterange` | 同上日期 | `keyFrom` / `keyTo` |
-| `datetimerange` | 同上时间 | `keyFrom` / `keyTo` |
+| `date` | 展示与值均为日期格式 | 原样 `key` |
+| `datetime` | 展示与值均为时间格式 | 原样 `key` |
+| `daterange` / 日期区间 | 同上日期 | `keyFrom` / `keyTo` |
+| `datetimerange` / 时间区间 | 同上时间 | `keyFrom` / `keyTo` |
 
 #### 3. 落地
 
-- 工具：`meis-web/src/utils/datetime.ts`
-- 列表单元格、表单 `FieldRenderer`、通用筛选 `CrudListFilterField` / `CrudPage`
-- 约定包 **§5.12**（v1.27）
+| 端 | 工具 |
+|----|------|
+| Web | `meis-web/src/utils/datetime.ts`；`TableCellValue` / `FieldRenderer` / `CrudListFilterField` |
+| App | `meis-mobile/lib/shared/utils/datetime_format.dart` |
+| 小程序 | `meis-mp/src/utils/datetime.ts`（`cycleDays.todayYmd` 复用） |
+
+- 约定包 **§5.12**（v1.28）
 
 #### 4. 验收
 
-- [ ] 列表 date/datetime 列为 `yyyy-MM-dd` / `yyyy-MM-dd HH:mm:ss`
-- [ ] 查询日期/时间控件展示与提交值一致（无 `T`）
+- [ ] Web / App / 小程序列表日期、时间为规范格式（无 `T`、无本地化杂乱串）
+- [ ] 查询/表单入参与展示一致
 - [ ] 区间筛选 `From`/`To` 入参格式正确
 
 **状态**：已完成。
