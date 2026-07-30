@@ -657,6 +657,27 @@ function onFundExport() {
     ElMessage.warning('暂无数据可导出')
     return
   }
+  const parseMoney = (s: string) => Number(String(s).replace(/,/g, '')) || 0
+  const sum = {
+    amount1: 0,
+    depr1: 0,
+    amount2: 0,
+    depr2: 0,
+    amount3: 0,
+    depr3: 0,
+    amount4: 0,
+    depr4: 0
+  }
+  for (const r of rows) {
+    sum.amount1 += parseMoney(r.amount1)
+    sum.depr1 += parseMoney(r.depr1)
+    sum.amount2 += parseMoney(r.amount2)
+    sum.depr2 += parseMoney(r.depr2)
+    sum.amount3 += parseMoney(r.amount3)
+    sum.depr3 += parseMoney(r.depr3)
+    sum.amount4 += parseMoney(r.amount4)
+    sum.depr4 += parseMoney(r.depr4)
+  }
   const body = rows
     .map(
       (r, i) => `<tr>
@@ -669,6 +690,18 @@ function onFundExport() {
     </tr>`
     )
     .join('')
+  const totalRow = `<tr>
+      <td><b></b></td>
+      <td><b>合计</b></td>
+      <td><b>${escapeHtml(formatMoney(sum.amount1))}</b></td>
+      <td><b>${escapeHtml(formatMoney(sum.depr1))}</b></td>
+      <td><b>${escapeHtml(formatMoney(sum.amount2))}</b></td>
+      <td><b>${escapeHtml(formatMoney(sum.depr2))}</b></td>
+      <td><b>${escapeHtml(formatMoney(sum.amount3))}</b></td>
+      <td><b>${escapeHtml(formatMoney(sum.depr3))}</b></td>
+      <td><b>${escapeHtml(formatMoney(sum.amount4))}</b></td>
+      <td><b>${escapeHtml(formatMoney(sum.depr4))}</b></td>
+    </tr>`
   const table = `<table border="1">
     <thead>
       <tr>
@@ -686,7 +719,7 @@ function onFundExport() {
         <th>资产金额(元)</th><th>累计折旧(元)</th>
       </tr>
     </thead>
-    <tbody>${body}</tbody>
+    <tbody>${body}${totalRow}</tbody>
   </table>`
   const filename = `资产折旧汇总(资金)${formatExportDate()}`
   downloadExcelHtml(table, filename)
