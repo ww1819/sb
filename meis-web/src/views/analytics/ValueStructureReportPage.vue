@@ -529,7 +529,7 @@ function onSummaryReset() {
   justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
-  background: #fff7e6;
+  background: #d6ebf8;
   border-top: 1px solid #d0d7de;
 }
 
