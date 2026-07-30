@@ -47,33 +47,32 @@
 
       <div class="table-wrap">
         <div class="section-bar">折旧明细比例-明细表</div>
-        <div class="table-scroll-area">
-          <el-table
-            :data="pagedDetailRows"
-            border
-            stripe
-            class="detail-table detail-table--wide"
-            empty-text="暂无数据（前端样式示意，未接后台）"
-            @sort-change="onDetailSortChange"
-          >
-            <el-table-column type="index" label="序号" width="64" align="center" :index="detailIndexMethod" />
-            <el-table-column prop="device_code" label="设备编号" width="130" sortable="custom" />
-            <el-table-column prop="asset_name" label="资产名称" width="160" show-overflow-tooltip sortable="custom" />
-            <el-table-column prop="specification" label="规格/型号" width="140" show-overflow-tooltip />
-            <el-table-column prop="unit" label="单位" width="70" align="center" />
-            <el-table-column prop="use_dept" label="使用科室" width="120" show-overflow-tooltip sortable="custom" />
-            <el-table-column prop="monthly_rate" label="月折旧率(%)" width="130" align="right" sortable="custom" />
-            <el-table-column prop="monthly_amount" label="月折旧金额（元）" width="168" align="right" sortable="custom" />
-            <el-table-column prop="original_value" label="原值（元）" width="140" align="right" sortable="custom" />
-            <el-table-column prop="accum_depr" label="累计折旧金额（元）" width="172" align="right" />
-            <el-table-column prop="net_value" label="净值（元）" width="140" align="right" />
-            <el-table-column prop="purchase_date" label="购入日期" width="120" align="center" />
-            <el-table-column prop="depr_dept" label="折旧科室" width="120" show-overflow-tooltip />
-            <el-table-column prop="depr_ratio" label="折旧比例" width="100" align="right" />
-            <el-table-column prop="depr_months" label="已折旧月份" width="110" align="right" />
-            <el-table-column prop="storage_place" label="存放地点" width="140" show-overflow-tooltip />
-          </el-table>
-        </div>
+        <el-table
+          :data="pagedDetailRows"
+          border
+          stripe
+          height="100%"
+          class="detail-table"
+          empty-text="暂无数据（前端样式示意，未接后台）"
+          @sort-change="onDetailSortChange"
+        >
+          <el-table-column type="index" label="序号" width="64" align="center" :index="detailIndexMethod" />
+          <el-table-column prop="device_code" label="设备编号" min-width="130" sortable="custom" />
+          <el-table-column prop="asset_name" label="资产名称" min-width="160" show-overflow-tooltip sortable="custom" />
+          <el-table-column prop="specification" label="规格/型号" min-width="140" show-overflow-tooltip />
+          <el-table-column prop="unit" label="单位" width="70" align="center" />
+          <el-table-column prop="use_dept" label="使用科室" min-width="120" show-overflow-tooltip sortable="custom" />
+          <el-table-column prop="monthly_rate" label="月折旧率(%)" min-width="130" align="right" sortable="custom" />
+          <el-table-column prop="monthly_amount" label="月折旧金额（元）" min-width="168" align="right" sortable="custom" />
+          <el-table-column prop="original_value" label="原值（元）" min-width="140" align="right" sortable="custom" />
+          <el-table-column prop="accum_depr" label="累计折旧金额（元）" min-width="172" align="right" />
+          <el-table-column prop="net_value" label="净值（元）" min-width="140" align="right" />
+          <el-table-column prop="purchase_date" label="购入日期" min-width="120" align="center" />
+          <el-table-column prop="depr_dept" label="折旧科室" min-width="120" show-overflow-tooltip />
+          <el-table-column prop="depr_ratio" label="折旧比例" min-width="100" align="right" />
+          <el-table-column prop="depr_months" label="已折旧月份" min-width="110" align="right" />
+          <el-table-column prop="storage_place" label="存放地点" min-width="140" show-overflow-tooltip />
+        </el-table>
         <div class="table-footer">
           <div class="table-footer-summary">
             <span>合计：</span>
@@ -617,44 +616,49 @@ function onSummaryExport() {
   flex-shrink: 0;
 }
 
-/* 横向滚动挂在合计栏上方；加粗滚动条便于拖动 */
-.table-scroll-area {
+.table-wrap :deep(.detail-table) {
   flex: 1;
-  min-height: 0;
-  overflow-x: auto;
-  overflow-y: auto;
-  border-bottom: 1px solid #d0d7de;
-  scrollbar-width: auto;
-  scrollbar-color: #a8abb2 #ebeef5;
 }
 
-.table-scroll-area::-webkit-scrollbar {
-  height: 14px;
-  width: 14px;
+/* 横向滚动条固定在合计栏正上方，略粗于全局便于拖动 */
+.table-wrap :deep(.el-scrollbar__bar.is-horizontal) {
+  height: 8px !important;
+  left: 2px !important;
+  right: 2px !important;
+  bottom: 2px !important;
 }
 
-.table-scroll-area::-webkit-scrollbar-track {
+.table-wrap :deep(.el-scrollbar__bar.is-horizontal .el-scrollbar__thumb) {
+  background-color: #c0c4cc;
+  border-radius: 4px;
+  opacity: 1;
+}
+
+.table-wrap :deep(.el-scrollbar__bar.is-horizontal .el-scrollbar__thumb:hover) {
+  background-color: #a8abb2;
+}
+
+.table-wrap :deep(.el-table__body-wrapper) {
+  scrollbar-width: thin;
+  scrollbar-color: #c0c4cc #ebeef5;
+}
+
+.table-wrap :deep(.el-table__body-wrapper)::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.table-wrap :deep(.el-table__body-wrapper)::-webkit-scrollbar-track {
   background: #ebeef5;
 }
 
-.table-scroll-area::-webkit-scrollbar-thumb {
+.table-wrap :deep(.el-table__body-wrapper)::-webkit-scrollbar-thumb {
+  background: #c0c4cc;
+  border-radius: 4px;
+}
+
+.table-wrap :deep(.el-table__body-wrapper)::-webkit-scrollbar-thumb:hover {
   background: #a8abb2;
-  border-radius: 7px;
-  border: 2px solid #ebeef5;
-  min-width: 48px;
-}
-
-.table-scroll-area::-webkit-scrollbar-thumb:hover {
-  background: #909399;
-}
-
-.table-wrap :deep(.detail-table) {
-  width: 100%;
-}
-
-.table-wrap :deep(.detail-table--wide) {
-  width: 100%;
-  min-width: 2124px;
 }
 
 .table-wrap :deep(.el-table) {
