@@ -1,1 +1,0 @@
-import{F as e}from"./FeaturePlaceholderPage-DJrfOkPe.js";import{d as t,o,A as r}from"./index-BFMcFZ_r.js";import"./SystemPageCard-CGOWGj-_.js";const m=t({__name:"BenefitQueryPage",setup(a){return(n,i)=>(o(),r(e,{title:"效益分析查询",subtitle:"数据决策 / 效益分析",description:"效益分析查询功能开发中",hint:"菜单已开通（ANA-UI-02）；完整能力见待开发池 BACKLOG-ANA-02"}))}});export{m as default};
