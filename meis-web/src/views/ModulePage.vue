@@ -123,6 +123,7 @@ const pageMap: Record<string, ReturnType<typeof defineAsyncComponent>> = {
   '/pm/execution': defineAsyncComponent(() => import('@/views/pm/PmExecutionPage.vue')),
   '/pm/query': defineAsyncComponent(() => import('@/views/pm/PmQueryPage.vue')),
   '/pm/device': defineAsyncComponent(() => import('@/views/pm/PmDevicePage.vue')),
+  '/analytics/fee-manual': defineAsyncComponent(() => import('@/views/analytics/FeeManualPage.vue')),
   '/analytics/mapping': defineAsyncComponent(() => import('@/views/analytics/BenefitMappingPage.vue')),
   '/analytics/efficiency': defineAsyncComponent(() => import('@/views/analytics/EfficiencyAnalysisPage.vue')),
   '/analytics/benefit-query': defineAsyncComponent(() => import('@/views/analytics/BenefitQueryPage.vue')),

@@ -39,7 +39,9 @@ INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, 
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('analytics_efficiency_view', 'analytics_efficiency', '效率分析', 'menu', '/analytics/efficiency', NULL, 1, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
-INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('analytics_mapping', 'analytics_benefit_group', '效益分析对照', 'menu', '/analytics/mapping', NULL, 1, TRUE)
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('analytics_fee_manual', 'analytics_benefit_group', '费用手工登记', 'menu', '/analytics/fee-manual', NULL, 1, TRUE)
+ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('analytics_mapping', 'analytics_benefit_group', '效益分析对照', 'menu', '/analytics/mapping', NULL, 2, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('analytics_reports', 'analytics_asset_report_group', '统计报表', 'menu', '/analytics/reports', NULL, 1, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
@@ -101,7 +103,7 @@ INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, 
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('analytics_efficiency', 'mod_analytics', '效率分析', 'group', NULL, NULL, 2, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
-INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('analytics_sync', 'analytics_benefit_group', '效益分析提取', 'menu', '/analytics/sync', NULL, 2, TRUE)
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('analytics_sync', 'analytics_benefit_group', '效益分析提取', 'menu', '/analytics/sync', NULL, 3, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('asset_dept_inventory_report', 'asset_dept_inventory', '设备盘点报表', 'menu', '/asset/dept-inventory-report', NULL, 2, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
@@ -155,7 +157,7 @@ INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, 
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('analytics_asset_report_group', 'mod_analytics', '资产报表统计', 'group', NULL, NULL, 3, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
-INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('analytics_summary', 'analytics_benefit_group', '效益分析报表', 'menu', '/analytics/summary', NULL, 3, TRUE)
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('analytics_summary', 'analytics_benefit_group', '效益分析报表', 'menu', '/analytics/summary', NULL, 4, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('analytics_value_structure', 'analytics_asset_report_group', '价值结构分析表', 'menu', '/analytics/value-structure', NULL, 3, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
@@ -207,7 +209,7 @@ INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, 
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('warehouse_transfer', 'asset_change', '库房调拨', 'menu', '/warehouse/transfer', NULL, 3, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
-INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('analytics_cost', 'analytics_benefit_group', '效益分析上报', 'menu', '/analytics/cost', NULL, 4, TRUE)
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('analytics_cost', 'analytics_benefit_group', '效益分析上报', 'menu', '/analytics/cost', NULL, 5, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('analytics_depr_due', 'analytics_asset_report_group', '折旧到期汇总', 'menu', '/analytics/depr-due', NULL, 4, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
@@ -243,7 +245,7 @@ INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, 
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('system_log', 'mod_system', '操作日志', 'menu', '/system/log', NULL, 4, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
-INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('analytics_benefit_query', 'analytics_benefit_group', '效益分析查询', 'menu', '/analytics/benefit-query', NULL, 5, TRUE)
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('analytics_benefit_query', 'analytics_benefit_group', '效益分析查询', 'menu', '/analytics/benefit-query', NULL, 6, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('analytics_depr_stats', 'analytics_asset_report_group', '资产折旧统计', 'menu', '/analytics/depr-stats', NULL, 5, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
@@ -275,7 +277,7 @@ INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, 
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('analytics_depr_ratio', 'analytics_asset_report_group', '折旧明细比例', 'menu', '/analytics/depr-ratio', NULL, 6, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
-INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('analytics_device', 'analytics_benefit_group', '单机效益分析', 'menu', '/analytics/device', NULL, 6, TRUE)
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('analytics_device', 'analytics_benefit_group', '单机效益分析', 'menu', '/analytics/device', NULL, 7, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('asset_transfer', 'mod_asset', '资产流转', 'menu', '/asset/transfer', NULL, 6, FALSE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
@@ -347,6 +349,7 @@ INSERT INTO sys_package_menu (package_code, menu_code) VALUES
 ('flagship','analytics_device'),
 ('flagship','analytics_efficiency'),
 ('flagship','analytics_efficiency_view'),
+('flagship','analytics_fee_manual'),
 ('flagship','analytics_mapping'),
 ('flagship','analytics_reports'),
 ('flagship','analytics_summary'),
@@ -489,6 +492,7 @@ INSERT INTO sys_package_menu (package_code, menu_code) VALUES
 ('flagship','warehouse_transfer'),
 ('professional','analytics_cost'),
 ('professional','analytics_device'),
+('professional','analytics_fee_manual'),
 ('professional','analytics_mapping'),
 ('professional','analytics_summary'),
 ('professional','analytics_sync'),
@@ -530,6 +534,7 @@ INSERT INTO sys_package_menu (package_code, menu_code) VALUES
 ('standard','analytics_device'),
 ('standard','analytics_efficiency'),
 ('standard','analytics_efficiency_view'),
+('standard','analytics_fee_manual'),
 ('standard','analytics_mapping'),
 ('standard','analytics_reports'),
 ('standard','analytics_summary'),

@@ -2,14 +2,16 @@
   <div class="dashboard page-view--scroll">
     <el-row :gutter="12" class="kpi-row">
       <el-col v-for="item in profile.kpis" :key="item.key" :span="kpiSpan">
-        <StatCard
-          :title="item.title"
-          :value="numVal(stats[item.key])"
-          :icon="item.icon"
-          :color="item.color"
-          :bg-color="item.bgColor"
-          :hint="item.hint"
-        />
+        <BorderBeam :color="kpiBorderBeamColor" :duration="2.5" :beam-percent="20" :border-width="2.5">
+          <StatCard
+            :title="item.title"
+            :value="numVal(stats[item.key])"
+            :icon="item.icon"
+            :color="item.color"
+            :bg-color="item.bgColor"
+            :hint="item.hint"
+          />
+        </BorderBeam>
       </el-col>
     </el-row>
 
@@ -127,6 +129,7 @@ import { useLayoutStore } from '@/stores/layout'
 import { useDashboardProfile } from '@/composables/useDashboardProfile'
 import { ALL_QUICK_ENTRIES, type DashboardChartKey } from '@/config/dashboardProfiles'
 import StatCard from '@/components/dashboard/StatCard.vue'
+import BorderBeam, { BORDER_BEAM_OCEAN } from '@/components/dashboard/BorderBeam.vue'
 import ChartCard from '@/components/dashboard/ChartCard.vue'
 import QuickEntryGrid, { type QuickEntryItem } from '@/components/dashboard/QuickEntryGrid.vue'
 import QuickEntrySettingsDialog from '@/components/dashboard/QuickEntrySettingsDialog.vue'
@@ -164,6 +167,9 @@ const QUICK_ENTRY_COLORS = [
   { color: '#52c41a', bgColor: 'rgba(82, 196, 26, 0.08)' },
   { color: '#fa541c', bgColor: 'rgba(250, 84, 28, 0.08)' }
 ]
+
+/** 工作台 KPI 边框流光：antd BorderBeam Ocean 预设 */
+const kpiBorderBeamColor = BORDER_BEAM_OCEAN
 
 const progressCircleDemo: { variant: ProgressCircleVariant; label: string; value: number }[] = [
   { variant: 'default', label: 'Default', value: 62 },

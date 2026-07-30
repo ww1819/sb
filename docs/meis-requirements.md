@@ -192,6 +192,7 @@
 - [x] DASH-UI-08 数据分析：「资产分布」按科室台数/占比（接 dashboard；原日常办公交通方式位）
 - [x] DASH-UI-09 数据分析：「设备状态」图例/扇区按固定资产字典中文展示（排除已退货）
 - [x] DASH-UI-10 数据分析：「设备状态」改用同心 Multi KPI gauge；移除独立 Multiple KPI gauge 框
+- [x] DASH-UI-11 工作台顶部 KPI 卡（设备总数/待处理工单/保养计划/待审批）边框流光（Ocean）
 - [x] **SYS-UI-01 登录页左侧立体插画（2026-07-28）**
 
 **SYS-UI-01 定稿（2026-07-28）**
@@ -305,6 +306,15 @@
 | **数据** | 同 DASH-UI-09：`deviceByDept` 无关，用 `deviceStatus`（中文标签、排除已退货） |
 | **移除** | 独立「Multiple KPI gauge」示意框（DASH-UI-04）从 profile 图表序删除；`kpiGauge` 图表键废止 |
 | **实现** | `buildMultiKpiGaugeOption` + `buildDeviceStatusGauge` |
+
+**DASH-UI-11 定稿（2026-07-30）**
+
+| 项 | 定稿 |
+|----|------|
+| **范围** | 工作台 `/dashboard` 顶部 KPI：`设备总数` / `待处理工单` / `保养计划` / `待审批`（各 profile 实际展示的 KPI 卡均套用） |
+| **效果** | 边框流光（对齐 antd `BorderBeam`）；色标固定 **Ocean**：`#1677ff → #36cfc9 → #95de64` |
+| **实现** | `BorderBeam.vue` 包裹 `StatCard`；`prefers-reduced-motion` 时停转动画保留静态渐变边 |
+| **范围外** | 不引入 React/antd 运行时；不改 KPI 数据接口 |
 
 ---
 ### 3.2 基础字典（DICT）
@@ -1555,6 +1565,7 @@
 | 子模块 | 路径 | 说明 |
 |--------|------|------|
 | **效益分析**（二级） | — | 分组 `analytics_benefit_group`（ANA-UI-01/02） |
+| └ 费用手工登记 | `/analytics/fee-manual` | ANA-UI-12 新增；业务见 BACKLOG-ANA-13 |
 | └ 效益分析对照 | `/analytics/mapping` | 原「对照管理」 |
 | └ 效益分析提取 | `/analytics/sync` | 原「数据抓取」 |
 | └ 效益分析报表 | `/analytics/summary` | 原「效益分析汇总」 |
@@ -1717,6 +1728,17 @@
 | **数据** | **本期不接后台**（前端示意）；完整业务仍见 BACKLOG-ANA-12 |
 | **实现** | `AssetTransferReportPage.vue`；菜单名见 `R__menus.sql` |
 
+**ANA-UI-12 定稿（2026-07-30）**
+
+| 项 | 定稿 |
+|----|------|
+| **菜单** | 数据决策 → 效益分析 → **费用手工登记**（排在「效益分析对照」之上） |
+| **路由** | `/analytics/fee-manual`；`menu_code=analytics_fee_manual` |
+| **排序** | 效益分析子菜单：费用手工登记(1) → 对照(2) → 提取(3) → 报表(4) → 上报(5) → 查询(6) → 单机(7) |
+| **套餐** | `flagship` / `professional` / `standard` 均挂接 |
+| **本期** | 仅菜单入口 + 前端占位页；完整业务见 BACKLOG-ANA-13 |
+| **实现** | `FeeManualPage.vue`；`R__menus.sql` |
+
 **需求摘要（待补充）**：
 
 - [x] ANA-UI-01 效益分析分组 + 效率分析菜单
@@ -1730,6 +1752,7 @@
 - [x] ANA-UI-09 资产增减统计：明细/汇总同套布局（对齐 ANA-UI-05）；示意数据，不接后台
 - [x] ANA-UI-10 资产在用统计（原占用统计）：明细/汇总同套布局（对齐 ANA-UI-05）；示意数据，不接后台
 - [x] ANA-UI-11 资产移动统计表（原异动统计）：明细/汇总同套布局（对齐 ANA-UI-05）；示意数据，不接后台
+- [x] ANA-UI-12 效益分析下新增「费用手工登记」菜单（对照之上）；占位，不接后台
 - [ ] ANA-B-01 效益指标定义（使用率、利润率、机时等）
 - [ ] ANA-F-01 HIS/PACS 数据对照与同步
 - [ ] ANA-F-02 成本项归集规则
@@ -2523,6 +2546,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | BACKLOG-ANA-10 | 效益 | 资产增减统计 | ANA-UI-03 菜单已挂 | P2 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-ANA-11 | 效益 | 资产在用统计（原占用统计） | ANA-UI-03/10 菜单已挂 | P2 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-ANA-12 | 效益 | 资产移动统计表（原异动统计） | ANA-UI-03/11 菜单已挂 | P2 | 先菜单入口；业务待排期 | 可排期 |
+| BACKLOG-ANA-13 | 效益 | 费用手工登记完整业务 | ANA-UI-12 菜单已挂 | P2 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-PLT-W02 | 跨模块 | 非维修业务责任人姓名快照（出入库 operator、不良事件 reporter/handler、验收成员等） | 附录 W.5.3 | P1 | 01.2 已落地主路径；标签绑定等零星入口可后续 | 已完成 |
 | BACKLOG-PLT-W03 | 跨模块 | 存量主从单据明细缺业务单号/主数据 code·name 的分批补齐（明细见 W.6.4） | 附录 W.6.4 | P1–P2 | P1/P2 及弱项 dept_name 写点已落地 | 已完成 |
 | BACKLOG-PLT-UI02 | 跨模块 | 列表检索多选推广剩余页（采购/借调/不良事件等） | PLT-UI-02 | P2 | 三期已落地 | 已完成 |

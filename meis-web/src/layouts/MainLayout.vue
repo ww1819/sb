@@ -671,6 +671,7 @@ function buildTitleMap(list: NavModule[]) {
   map.set('/tenant/list', '租户列表')
 
   map.set('/analytics/reports', '统计报表')
+  map.set('/analytics/fee-manual', '费用手工登记')
   map.set('/analytics/asset-usage', '资产使用率统计')
   map.set('/analytics/value-structure', '价值结构分析表')
   map.set('/analytics/depr-due', '折旧到期汇总')
