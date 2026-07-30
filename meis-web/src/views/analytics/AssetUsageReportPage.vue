@@ -25,6 +25,7 @@
                 <el-form-item label-width="0">
                   <el-button type="primary" @click="onDetailSearch">查询</el-button>
                   <el-button @click="onDetailReset">重置</el-button>
+                  <el-button @click="onDetailExport">导出</el-button>
                 </el-form-item>
               </el-col>
             </el-row>
@@ -137,6 +138,7 @@
                 <el-form-item label-width="0">
                   <el-button type="primary" @click="onSummarySearch">查询</el-button>
                   <el-button @click="onSummaryReset">重置</el-button>
+                  <el-button @click="onSummaryExport">导出</el-button>
                 </el-form-item>
               </el-col>
             </el-row>
@@ -216,6 +218,12 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import {
+  downloadExcelHtml,
+  escapeHtml,
+  formatExportDate
+} from '@/utils/excelHtmlExport'
 
 const activeTab = ref<'detail' | 'summary'>('detail')
 
@@ -428,6 +436,45 @@ function onDetailReset() {
   detailPage.value = 1
 }
 
+function onDetailExport() {
+  const rows = allDetailRows.value
+  if (!rows.length) {
+    ElMessage.warning('暂无数据可导出')
+    return
+  }
+  let totalPrice = 0
+  const body = rows
+    .map((r, i) => {
+      totalPrice += r._price
+      return `<tr>
+      <td>${i + 1}</td>
+      <td>${escapeHtml(r.asset_code)}</td>
+      <td>${escapeHtml(r.dept_name)}</td>
+      <td>${escapeHtml(r.asset_name)}</td>
+      <td>${escapeHtml(r.usage_rate)}</td>
+      <td>${escapeHtml(r.specification)}</td>
+      <td>${escapeHtml(r.price)}</td>
+    </tr>`
+    })
+    .join('')
+  const totalRow = `<tr>
+      <td></td><td></td><td></td><td></td><td></td>
+      <td><b>合计</b></td>
+      <td><b>${escapeHtml(formatMoney(totalPrice))}</b></td>
+    </tr>`
+  const table = `<table border="1">
+    <thead>
+      <tr>
+        <th>序号</th><th>资产编号</th><th>科室</th><th>资产名称</th>
+        <th>使用率</th><th>资产规格</th><th>资产价格</th>
+      </tr>
+    </thead>
+    <tbody>${body}${totalRow}</tbody>
+  </table>`
+  downloadExcelHtml(table, `资产使用率统计-明细表${formatExportDate()}`)
+  ElMessage.success(`已导出 ${rows.length} 条`)
+}
+
 function onSummarySearch() {
   summaryPage.value = 1
 }
@@ -436,6 +483,46 @@ function onSummaryReset() {
   summaryFilters.deptName = ''
   summaryFilters.minUsageRate = ''
   summaryPage.value = 1
+}
+
+function onSummaryExport() {
+  const rows = allSummaryRows.value
+  if (!rows.length) {
+    ElMessage.warning('暂无数据可导出')
+    return
+  }
+  let totalCount = 0
+  let totalPrice = 0
+  const body = rows
+    .map((r, i) => {
+      totalCount += r._count
+      totalPrice += r._price
+      return `<tr>
+      <td>${i + 1}</td>
+      <td>${escapeHtml(r.dept_name)}</td>
+      <td>${escapeHtml(r.asset_count)}</td>
+      <td>${escapeHtml(r.avg_usage_rate)}</td>
+      <td>${escapeHtml(r.total_price)}</td>
+    </tr>`
+    })
+    .join('')
+  const totalRow = `<tr>
+      <td></td>
+      <td><b>合计</b></td>
+      <td><b>${totalCount}</b></td>
+      <td></td>
+      <td><b>${escapeHtml(formatMoney(totalPrice))}</b></td>
+    </tr>`
+  const table = `<table border="1">
+    <thead>
+      <tr>
+        <th>序号</th><th>科室</th><th>资产数量</th><th>平均使用率</th><th>资产总价</th>
+      </tr>
+    </thead>
+    <tbody>${body}${totalRow}</tbody>
+  </table>`
+  downloadExcelHtml(table, `资产使用率统计-汇总表${formatExportDate()}`)
+  ElMessage.success(`已导出 ${rows.length} 条`)
 }
 </script>
 

@@ -33,6 +33,7 @@
                 <el-form-item label-width="0">
                   <el-button type="primary" @click="onDetailSearch">查询</el-button>
                   <el-button @click="onDetailReset">重置</el-button>
+                  <el-button @click="onDetailExport">导出</el-button>
                 </el-form-item>
               </el-col>
             </el-row>
@@ -157,6 +158,7 @@
                 <el-form-item label-width="0">
                   <el-button type="primary" @click="onSummarySearch">查询</el-button>
                   <el-button @click="onSummaryReset">重置</el-button>
+                  <el-button @click="onSummaryExport">导出</el-button>
                 </el-form-item>
               </el-col>
             </el-row>
@@ -177,6 +179,7 @@
           stripe
           empty-text="暂无数据（前端样式示意，未接后台）"
         >
+          <el-table-column type="index" label="序号" width="64" align="center" />
           <el-table-column prop="device_type" label="设备类型" min-width="160" show-overflow-tooltip />
           <el-table-column prop="quantity" label="数量合计" width="110" align="right" />
           <el-table-column prop="original_value" label="期末原值合计（元）" min-width="150" align="right" />
@@ -191,6 +194,8 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { downloadExcelHtml, escapeHtml, formatExportDate } from '@/utils/excelHtmlExport'
 
 const activeTab = ref<'detail' | 'summary'>('detail')
 
@@ -285,7 +290,56 @@ function buildMockDetailRows(count = 50): DetailRow[] {
   return rows
 }
 
+type SummaryRow = {
+  device_type: string
+  quantity: string
+  original_value: string
+  net_value: string
+  original_pct: string
+  avg_net_rate: string
+  _qty: number
+  _original: number
+  _net: number
+}
+
+function buildMockSummaryRows(details: DetailRow[]): SummaryRow[] {
+  const map = new Map<
+    string,
+    { qty: number; original: number; net: number; netRateSum: number; count: number }
+  >()
+  let totalOriginal = 0
+  for (const row of details) {
+    totalOriginal += row._original
+    const cur = map.get(row.device_type) ?? {
+      qty: 0,
+      original: 0,
+      net: 0,
+      netRateSum: 0,
+      count: 0
+    }
+    const net = row._original - (Number(String(row.accum_depr).replace(/,/g, '')) || 0)
+    cur.qty += row._qty
+    cur.original += row._original
+    cur.net += net
+    cur.netRateSum += Number(row.net_rate) || 0
+    cur.count += 1
+    map.set(row.device_type, cur)
+  }
+  return [...map.entries()].map(([type, v]) => ({
+    device_type: type,
+    quantity: String(v.qty),
+    original_value: formatMoney(v.original),
+    net_value: formatMoney(v.net),
+    original_pct: totalOriginal ? ((v.original / totalOriginal) * 100).toFixed(2) : '0.00',
+    avg_net_rate: (v.netRateSum / v.count).toFixed(2),
+    _qty: v.qty,
+    _original: v.original,
+    _net: v.net
+  }))
+}
+
 const allDetailRows = ref<DetailRow[]>(buildMockDetailRows(50))
+const summaryRows = ref<SummaryRow[]>(buildMockSummaryRows(allDetailRows.value))
 const detailPage = ref(1)
 const detailPageSize = ref(10)
 const detailSort = ref<{ prop: string; order: 'ascending' | 'descending' | null }>({
@@ -339,19 +393,7 @@ function onDetailSortChange(payload: {
   detailPage.value = 1
 }
 
-const summaryRows = ref<
-  {
-    device_type: string
-    quantity: string
-    original_value: string
-    net_value: string
-    original_pct: string
-    avg_net_rate: string
-  }[]
->([])
-
 function onDetailSearch() {
-  // 本期不接后台；查询后回到第一页
   detailPage.value = 1
 }
 
@@ -362,6 +404,60 @@ function onDetailReset() {
   detailPage.value = 1
 }
 
+function onDetailExport() {
+  const rows = allDetailRows.value
+  if (!rows.length) {
+    ElMessage.warning('暂无数据可导出')
+    return
+  }
+  let totalQty = 0
+  let totalOriginal = 0
+  let totalDepr = 0
+  let totalNet = 0
+  const body = rows
+    .map((r, i) => {
+      totalQty += r._qty
+      totalOriginal += r._original
+      const depr = Number(String(r.accum_depr).replace(/,/g, '')) || 0
+      const net = r._original - depr
+      totalDepr += depr
+      totalNet += net
+      return `<tr>
+      <td>${i + 1}</td>
+      <td>${escapeHtml(r.category_code)}</td>
+      <td>${escapeHtml(r.device_type)}</td>
+      <td>${escapeHtml(r.quantity)}</td>
+      <td>${escapeHtml(r.original_value)}</td>
+      <td>${escapeHtml(r.accum_depr)}</td>
+      <td>${escapeHtml(r.net_value)}</td>
+      <td>${escapeHtml(r.original_pct)}</td>
+      <td>${escapeHtml(r.net_rate)}</td>
+    </tr>`
+    })
+    .join('')
+  const totalRow = `<tr>
+      <td></td><td></td>
+      <td><b>合计</b></td>
+      <td><b>${totalQty}</b></td>
+      <td><b>${escapeHtml(formatMoney(totalOriginal))}</b></td>
+      <td><b>${escapeHtml(formatMoney(totalDepr))}</b></td>
+      <td><b>${escapeHtml(formatMoney(totalNet))}</b></td>
+      <td></td><td></td>
+    </tr>`
+  const table = `<table border="1">
+    <thead>
+      <tr>
+        <th>序号</th><th>设备分类编号</th><th>设备类型</th><th>数量</th>
+        <th>期末原值（元）</th><th>期末累计折旧(元)</th><th>期末净值（元)</th>
+        <th>原值百分比(%)</th><th>净值率(%)</th>
+      </tr>
+    </thead>
+    <tbody>${body}${totalRow}</tbody>
+  </table>`
+  downloadExcelHtml(table, `价值结构分析表-明细表${formatExportDate()}`)
+  ElMessage.success(`已导出 ${rows.length} 条`)
+}
+
 function onSummarySearch() {
   // 本期不接后台
 }
@@ -369,6 +465,53 @@ function onSummarySearch() {
 function onSummaryReset() {
   summaryFilters.deviceType = ''
   summaryFilters.minNetRate = ''
+}
+
+function onSummaryExport() {
+  const rows = summaryRows.value
+  if (!rows.length) {
+    ElMessage.warning('暂无数据可导出')
+    return
+  }
+  let totalQty = 0
+  let totalOriginal = 0
+  let totalNet = 0
+  const body = rows
+    .map((r, i) => {
+      totalQty += r._qty
+      totalOriginal += r._original
+      totalNet += r._net
+      return `<tr>
+      <td>${i + 1}</td>
+      <td>${escapeHtml(r.device_type)}</td>
+      <td>${escapeHtml(r.quantity)}</td>
+      <td>${escapeHtml(r.original_value)}</td>
+      <td>${escapeHtml(r.net_value)}</td>
+      <td>${escapeHtml(r.original_pct)}</td>
+      <td>${escapeHtml(r.avg_net_rate)}</td>
+    </tr>`
+    })
+    .join('')
+  const totalRow = `<tr>
+      <td></td>
+      <td><b>合计</b></td>
+      <td><b>${totalQty}</b></td>
+      <td><b>${escapeHtml(formatMoney(totalOriginal))}</b></td>
+      <td><b>${escapeHtml(formatMoney(totalNet))}</b></td>
+      <td></td><td></td>
+    </tr>`
+  const table = `<table border="1">
+    <thead>
+      <tr>
+        <th>序号</th><th>设备类型</th><th>数量合计</th>
+        <th>期末原值合计（元）</th><th>期末净值合计（元）</th>
+        <th>原值百分比(%)</th><th>平均净值率(%)</th>
+      </tr>
+    </thead>
+    <tbody>${body}${totalRow}</tbody>
+  </table>`
+  downloadExcelHtml(table, `价值结构分析表-汇总表${formatExportDate()}`)
+  ElMessage.success(`已导出 ${rows.length} 条`)
 }
 </script>
 
