@@ -1,5 +1,5 @@
 <template>
-  <div class="asset-occupy-report">
+  <div class="asset-transfer-report">
     <el-tabs v-model="activeTab" class="report-tabs">
       <el-tab-pane label="明细表" name="detail" />
       <el-tab-pane label="汇总表" name="summary" />
@@ -12,17 +12,21 @@
           <el-form :model="detailFilters" class="filter-form" label-width="100px" @submit.prevent>
             <el-row :gutter="16">
               <el-col :xs="24" :sm="12" :md="8">
-                <el-form-item label="价格区间">
+                <el-form-item label="转科单号">
                   <el-input
-                    v-model="detailFilters.priceRange"
+                    v-model="detailFilters.transferNo"
                     clearable
-                    placeholder="价格区间搜索"
+                    placeholder="转科单号搜索"
                   />
                 </el-form-item>
               </el-col>
               <el-col :xs="24" :sm="12" :md="8">
-                <el-form-item label="科室">
-                  <el-input v-model="detailFilters.dept" clearable placeholder="科室搜索" />
+                <el-form-item label="资产名称">
+                  <el-input
+                    v-model="detailFilters.assetName"
+                    clearable
+                    placeholder="资产名称搜索"
+                  />
                 </el-form-item>
               </el-col>
               <el-col :xs="24" :sm="12" :md="8" class="filter-actions">
@@ -35,11 +39,11 @@
             </el-row>
             <el-row :gutter="16">
               <el-col :span="24">
-                <el-form-item label="资产名称">
+                <el-form-item label="调出科室">
                   <el-input
-                    v-model="detailFilters.assetName"
+                    v-model="detailFilters.fromDept"
                     clearable
-                    placeholder="资产名称搜索"
+                    placeholder="调出科室搜索"
                     style="max-width: 320px"
                   />
                 </el-form-item>
@@ -50,7 +54,7 @@
       </div>
 
       <div class="table-wrap">
-        <div class="section-bar">资产在用统计-明细表</div>
+        <div class="section-bar">资产移动统计表-明细表</div>
         <el-table
           :data="pagedDetailRows"
           border
@@ -61,9 +65,11 @@
           @sort-change="onDetailSortChange"
         >
           <el-table-column type="index" label="序号" width="64" align="center" :index="detailIndexMethod" />
-          <el-table-column prop="price_range" label="价格区间" min-width="120" sortable="custom" />
-          <el-table-column prop="dept" label="科室" min-width="120" show-overflow-tooltip sortable="custom" />
-          <el-table-column prop="asset_code" label="资产编码" min-width="130" sortable="custom" />
+          <el-table-column prop="transfer_no" label="转科单号" min-width="130" sortable="custom" />
+          <el-table-column prop="apply_date" label="申请日期" min-width="110" align="center" sortable="custom" />
+          <el-table-column prop="transfer_date" label="转科日期" min-width="110" align="center" sortable="custom" />
+          <el-table-column prop="asset_code" label="资产编号" min-width="120" sortable="custom" />
+          <el-table-column prop="serial_no" label="资产序列号" min-width="130" show-overflow-tooltip />
           <el-table-column
             prop="asset_name"
             label="资产名称"
@@ -71,13 +77,20 @@
             show-overflow-tooltip
             sortable="custom"
           />
-          <el-table-column prop="specification" label="规格/型号" min-width="130" show-overflow-tooltip />
-          <el-table-column prop="quantity" label="数量" width="90" align="right" sortable="custom" />
-          <el-table-column prop="unit_price" label="单价" min-width="120" align="right" sortable="custom" />
-          <el-table-column prop="amount" label="金额(元)" min-width="130" align="right" sortable="custom" />
-          <el-table-column prop="manufacturer" label="生产厂家" min-width="140" show-overflow-tooltip />
-          <el-table-column prop="supplier" label="供应商" min-width="140" show-overflow-tooltip />
-          <el-table-column prop="serial_no" label="序列号" min-width="130" show-overflow-tooltip />
+          <el-table-column prop="barcode" label="条码号" min-width="120" show-overflow-tooltip />
+          <el-table-column prop="brand" label="资产品牌" min-width="110" show-overflow-tooltip />
+          <el-table-column prop="model" label="型号" min-width="110" show-overflow-tooltip />
+          <el-table-column prop="unit" label="单位" width="70" align="center" />
+          <el-table-column prop="original_value" label="原值（元）" min-width="120" align="right" sortable="custom" />
+          <el-table-column prop="residual_value" label="残值（元）" min-width="120" align="right" />
+          <el-table-column prop="from_dept" label="调出科室" min-width="110" show-overflow-tooltip sortable="custom" />
+          <el-table-column prop="from_owner" label="原负责人" min-width="100" show-overflow-tooltip />
+          <el-table-column prop="to_dept" label="调入科室" min-width="110" show-overflow-tooltip />
+          <el-table-column prop="to_owner" label="现负责人" min-width="100" show-overflow-tooltip />
+          <el-table-column prop="reason" label="转科原因" min-width="120" show-overflow-tooltip />
+          <el-table-column prop="doc_no" label="转科文号" min-width="120" show-overflow-tooltip />
+          <el-table-column prop="years" label="年限" width="80" align="right" />
+          <el-table-column prop="depr_status" label="折旧状态" min-width="100" align="center" />
         </el-table>
         <div class="table-footer">
           <div class="table-footer-summary">
@@ -125,7 +138,7 @@
       </div>
 
       <div class="table-wrap">
-        <div class="section-bar">资产在用统计-汇总表</div>
+        <div class="section-bar">资产移动统计表-汇总表</div>
         <el-table
           :data="pagedSummaryRows"
           border
@@ -172,15 +185,14 @@ import { downloadExcelHtml, escapeHtml, formatExportDate } from '@/utils/excelHt
 const activeTab = ref<'detail' | 'summary'>('detail')
 
 const detailFilters = reactive({
-  priceRange: '',
-  dept: '',
-  assetName: ''
+  transferNo: '',
+  assetName: '',
+  fromDept: ''
 })
 const summaryFilters = reactive({
   dept: ''
 })
 
-const PRICE_RANGES = ['万元以下', '1-10万', '10-20万', '20-50万', '50万元以上'] as const
 const MOCK_DEPTS = [
   '放射科',
   '超声科',
@@ -205,25 +217,35 @@ const MOCK_NAMES = [
   '生化分析仪',
   '牙科综合治疗台'
 ]
-const MOCK_SPECS = ['A1', 'B2-Pro', 'Portable X', 'S300', 'V6', 'Lite']
-const MOCK_MAKERS = ['迈瑞', '飞利浦', 'GE医疗', '西门子', '鱼跃', '理邦']
-const MOCK_SUPPLIERS = ['华康器械', '安泰医疗', '博远供应', '仁和贸易', '康达商贸']
+const MOCK_BRANDS = ['迈瑞', '飞利浦', 'GE', '西门子', '鱼跃', '理邦']
+const MOCK_MODELS = ['A1', 'B2-Pro', 'S300', 'V6', 'Lite', 'X5']
+const MOCK_OWNERS = ['张伟', '李娜', '王强', '赵敏', '陈浩', '刘芳']
+const MOCK_REASONS = ['科室调整', '设备调配', '业务需要', '资源整合', '临时借用']
+const MOCK_DEPR = ['在用折旧', '提足折旧', '未折旧', '停用']
 
 type DetailRow = {
-  price_range: string
-  dept: string
+  transfer_no: string
+  apply_date: string
+  transfer_date: string
   asset_code: string
-  asset_name: string
-  specification: string
-  quantity: string
-  unit_price: string
-  amount: string
-  manufacturer: string
-  supplier: string
   serial_no: string
+  asset_name: string
+  barcode: string
+  brand: string
+  model: string
+  unit: string
+  original_value: string
+  residual_value: string
+  from_dept: string
+  from_owner: string
+  to_dept: string
+  to_owner: string
+  reason: string
+  doc_no: string
+  years: string
+  depr_status: string
   _qty: number
-  _unit: number
-  _amount: number
+  _original: number
 }
 
 type SummaryRow = {
@@ -238,48 +260,60 @@ function formatMoney(n: number) {
   return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function pickPriceRange(unitPrice: number) {
-  if (unitPrice < 10000) return PRICE_RANGES[0]
-  if (unitPrice < 100000) return PRICE_RANGES[1]
-  if (unitPrice < 200000) return PRICE_RANGES[2]
-  if (unitPrice < 500000) return PRICE_RANGES[3]
-  return PRICE_RANGES[4]
+function pad2(n: number) {
+  return String(n).padStart(2, '0')
+}
+
+function mockDate(i: number, dayOffset: number) {
+  const month = 1 + ((i + dayOffset) % 12)
+  const day = 1 + ((i * 3 + dayOffset) % 28)
+  return `2026-${pad2(month)}-${pad2(day)}`
 }
 
 /** 前端样式示意：50 条测试数据，不请求后台 */
 function buildMockDetailRows(count = 50): DetailRow[] {
   const rows: DetailRow[] = []
   for (let i = 1; i <= count; i++) {
-    const unit = 4200 + ((i * 18341) % 720000)
-    const qty = 1 + ((i * 3) % 5)
-    const amount = unit * qty
+    const original = 18000 + ((i * 19381) % 860000)
+    const residual = Math.round(original * (0.05 + ((i * 3) % 10) / 100))
+    const fromIdx = (i - 1) % MOCK_DEPTS.length
+    const toIdx = (i + 3) % MOCK_DEPTS.length
     rows.push({
-      price_range: pickPriceRange(unit),
-      dept: MOCK_DEPTS[(i - 1) % MOCK_DEPTS.length],
-      asset_code: `ZY-${String(i).padStart(4, '0')}`,
+      transfer_no: `ZK${20260000 + i}`,
+      apply_date: mockDate(i, 0),
+      transfer_date: mockDate(i, 5),
+      asset_code: `ZC-${String(i).padStart(4, '0')}`,
+      serial_no: `SN${20242000 + i}`,
       asset_name: MOCK_NAMES[(i - 1) % MOCK_NAMES.length],
-      specification: MOCK_SPECS[(i - 1) % MOCK_SPECS.length],
-      quantity: String(qty),
-      unit_price: formatMoney(unit),
-      amount: formatMoney(amount),
-      manufacturer: MOCK_MAKERS[(i - 1) % MOCK_MAKERS.length],
-      supplier: MOCK_SUPPLIERS[(i - 1) % MOCK_SUPPLIERS.length],
-      serial_no: `SN${20241000 + i}`,
-      _qty: qty,
-      _unit: unit,
-      _amount: amount
+      barcode: `BC${88000000 + i}`,
+      brand: MOCK_BRANDS[(i - 1) % MOCK_BRANDS.length],
+      model: MOCK_MODELS[(i - 1) % MOCK_MODELS.length],
+      unit: '台',
+      original_value: formatMoney(original),
+      residual_value: formatMoney(residual),
+      from_dept: MOCK_DEPTS[fromIdx],
+      from_owner: MOCK_OWNERS[(i - 1) % MOCK_OWNERS.length],
+      to_dept: MOCK_DEPTS[toIdx],
+      to_owner: MOCK_OWNERS[(i + 2) % MOCK_OWNERS.length],
+      reason: MOCK_REASONS[(i - 1) % MOCK_REASONS.length],
+      doc_no: `文号〔2026〕${pad2(i)}号`,
+      years: String(3 + (i % 8)),
+      depr_status: MOCK_DEPR[(i - 1) % MOCK_DEPR.length],
+      _qty: 1,
+      _original: original
     })
   }
   return rows
 }
 
+/** 汇总按调出科室归集（示意） */
 function buildMockSummaryRows(details: DetailRow[]): SummaryRow[] {
   const map = new Map<string, { qty: number; amount: number }>()
   for (const row of details) {
-    const cur = map.get(row.dept) ?? { qty: 0, amount: 0 }
+    const cur = map.get(row.from_dept) ?? { qty: 0, amount: 0 }
     cur.qty += row._qty
-    cur.amount += row._amount
-    map.set(row.dept, cur)
+    cur.amount += row._original
+    map.set(row.from_dept, cur)
   }
   return [...map.entries()].map(([dept, v]) => ({
     dept,
@@ -308,12 +342,12 @@ const summarySort = ref<{ prop: string; order: 'ascending' | 'descending' | null
 })
 
 function matchDetail(row: DetailRow) {
-  const rangeKw = detailFilters.priceRange.trim()
-  const deptKw = detailFilters.dept.trim()
+  const noKw = detailFilters.transferNo.trim()
   const nameKw = detailFilters.assetName.trim()
-  if (rangeKw && !row.price_range.includes(rangeKw)) return false
-  if (deptKw && !row.dept.includes(deptKw)) return false
+  const deptKw = detailFilters.fromDept.trim()
+  if (noKw && !row.transfer_no.includes(noKw)) return false
   if (nameKw && !row.asset_name.includes(nameKw)) return false
+  if (deptKw && !row.from_dept.includes(deptKw)) return false
   return true
 }
 
@@ -324,9 +358,7 @@ const filteredDetailRows = computed(() => {
   const factor = order === 'ascending' ? 1 : -1
   rows = [...rows]
   rows.sort((a, b) => {
-    if (prop === 'quantity') return (a._qty - b._qty) * factor
-    if (prop === 'unit_price') return (a._unit - b._unit) * factor
-    if (prop === 'amount') return (a._amount - b._amount) * factor
+    if (prop === 'original_value') return (a._original - b._original) * factor
     const av = String((a as Record<string, unknown>)[prop] ?? '')
     const bv = String((b as Record<string, unknown>)[prop] ?? '')
     return av.localeCompare(bv, 'zh-CN') * factor
@@ -344,9 +376,9 @@ const detailSummary = computed(() => {
   const page = pagedDetailRows.value
   return {
     totalQty: rows.reduce((s, r) => s + r._qty, 0),
-    totalAmount: formatMoney(rows.reduce((s, r) => s + r._amount, 0)),
+    totalAmount: formatMoney(rows.reduce((s, r) => s + r._original, 0)),
     pageQty: page.reduce((s, r) => s + r._qty, 0),
-    pageAmount: formatMoney(page.reduce((s, r) => s + r._amount, 0))
+    pageAmount: formatMoney(page.reduce((s, r) => s + r._original, 0))
   }
 })
 
@@ -402,9 +434,9 @@ function onDetailSearch() {
   detailPage.value = 1
 }
 function onDetailReset() {
-  detailFilters.priceRange = ''
-  detailFilters.dept = ''
+  detailFilters.transferNo = ''
   detailFilters.assetName = ''
+  detailFilters.fromDept = ''
   detailPage.value = 1
 }
 function onSummarySearch() {
@@ -426,43 +458,52 @@ function onDetailExport() {
   const body = rows
     .map((r, i) => {
       totalQty += r._qty
-      totalAmount += r._amount
+      totalAmount += r._original
       return `<tr>
       <td>${i + 1}</td>
-      <td>${escapeHtml(r.price_range)}</td>
-      <td>${escapeHtml(r.dept)}</td>
+      <td>${escapeHtml(r.transfer_no)}</td>
+      <td>${escapeHtml(r.apply_date)}</td>
+      <td>${escapeHtml(r.transfer_date)}</td>
       <td>${escapeHtml(r.asset_code)}</td>
-      <td>${escapeHtml(r.asset_name)}</td>
-      <td>${escapeHtml(r.specification)}</td>
-      <td>${escapeHtml(r.quantity)}</td>
-      <td>${escapeHtml(r.unit_price)}</td>
-      <td>${escapeHtml(r.amount)}</td>
-      <td>${escapeHtml(r.manufacturer)}</td>
-      <td>${escapeHtml(r.supplier)}</td>
       <td>${escapeHtml(r.serial_no)}</td>
+      <td>${escapeHtml(r.asset_name)}</td>
+      <td>${escapeHtml(r.barcode)}</td>
+      <td>${escapeHtml(r.brand)}</td>
+      <td>${escapeHtml(r.model)}</td>
+      <td>${escapeHtml(r.unit)}</td>
+      <td>${escapeHtml(r.original_value)}</td>
+      <td>${escapeHtml(r.residual_value)}</td>
+      <td>${escapeHtml(r.from_dept)}</td>
+      <td>${escapeHtml(r.from_owner)}</td>
+      <td>${escapeHtml(r.to_dept)}</td>
+      <td>${escapeHtml(r.to_owner)}</td>
+      <td>${escapeHtml(r.reason)}</td>
+      <td>${escapeHtml(r.doc_no)}</td>
+      <td>${escapeHtml(r.years)}</td>
+      <td>${escapeHtml(r.depr_status)}</td>
     </tr>`
     })
     .join('')
   const totalRow = `<tr>
-      <td></td><td></td><td></td><td></td>
+      <td></td><td></td><td></td><td></td><td></td><td></td>
       <td><b>合计</b></td>
-      <td></td>
-      <td><b>${totalQty}</b></td>
-      <td></td>
+      <td></td><td></td><td></td><td></td>
       <td><b>${escapeHtml(formatMoney(totalAmount))}</b></td>
-      <td></td><td></td><td></td>
+      <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
     </tr>`
   const table = `<table border="1">
     <thead>
       <tr>
-        <th>序号</th><th>价格区间</th><th>科室</th><th>资产编码</th><th>资产名称</th><th>规格/型号</th>
-        <th>数量</th><th>单价</th><th>金额(元)</th><th>生产厂家</th><th>供应商</th><th>序列号</th>
+        <th>序号</th><th>转科单号</th><th>申请日期</th><th>转科日期</th><th>资产编号</th>
+        <th>资产序列号</th><th>资产名称</th><th>条码号</th><th>资产品牌</th><th>型号</th><th>单位</th>
+        <th>原值（元）</th><th>残值（元）</th><th>调出科室</th><th>原负责人</th>
+        <th>调入科室</th><th>现负责人</th><th>转科原因</th><th>转科文号</th><th>年限</th><th>折旧状态</th>
       </tr>
     </thead>
     <tbody>${body}${totalRow}</tbody>
   </table>`
-  downloadExcelHtml(table, `资产在用统计-明细表${formatExportDate()}`)
-  ElMessage.success(`已导出 ${rows.length} 条`)
+  downloadExcelHtml(table, `资产移动统计表-明细表${formatExportDate()}`)
+  ElMessage.success(`已导出 ${rows.length} 条（合计数量 ${totalQty}）`)
 }
 
 function onSummaryExport() {
@@ -499,13 +540,13 @@ function onSummaryExport() {
     </thead>
     <tbody>${body}${totalRow}</tbody>
   </table>`
-  downloadExcelHtml(table, `资产在用统计-汇总表${formatExportDate()}`)
+  downloadExcelHtml(table, `资产移动统计表-汇总表${formatExportDate()}`)
   ElMessage.success(`已导出 ${rows.length} 条`)
 }
 </script>
 
 <style scoped>
-.asset-occupy-report {
+.asset-transfer-report {
   height: 100%;
   min-height: 0;
   display: flex;

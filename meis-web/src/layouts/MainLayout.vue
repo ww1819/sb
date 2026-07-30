@@ -678,8 +678,8 @@ function buildTitleMap(list: NavModule[]) {
   map.set('/analytics/depr-ratio', '折旧明细比例')
   map.set('/analytics/depr-detail', '折旧详情')
   map.set('/analytics/asset-change', '资产增减统计')
-  map.set('/analytics/asset-occupy', '资产占用统计')
-  map.set('/analytics/asset-transfer', '资产异动统计')
+  map.set('/analytics/asset-occupy', '资产在用统计')
+  map.set('/analytics/asset-transfer', '资产移动统计表')
 
   map.set('/dashboard', '工作台')
 
