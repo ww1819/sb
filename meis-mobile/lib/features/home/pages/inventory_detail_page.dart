@@ -31,13 +31,6 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
   var localMode = false;
   late final TabController tabs;
 
-  static const statusLabel = {
-    'planning': '计划中',
-    'in_progress': '进行中',
-    'completed': '已完成',
-    'pending': '未审核',
-    'approved': '已审核',
-  };
 
   @override
   void initState() {
@@ -286,7 +279,7 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
     final title = master?['check_name']?.toString() ?? '盘点明细';
     final status = master?['status']?.toString() ?? '';
     final audit = master?['audit_status']?.toString() ?? '';
-    final statusText = '${statusLabel[status] ?? status} / ${statusLabel[audit] ?? audit}';
+    final statusText = '${resolveStatusLabel('check_status', status)} / ${resolveStatusLabel('audit_status', audit)}';
     return Scaffold(
       appBar: AppBar(
         title: Text(localMode ? '$title（离线）' : title),

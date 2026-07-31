@@ -5,7 +5,7 @@
       <view class="head">
         <text class="no">{{ exec?.execution_no || '执行明细' }}</text>
         <text class="meta">{{ item?.device_name }} · {{ item?.device_code }}</text>
-        <text class="status">状态：{{ exec?.status || '—' }} / 明细：{{ item?.status || '—' }}</text>
+        <text class="status">状态：{{ opsExecStatusLabel(exec?.status) }} / 明细：{{ opsExecItemStatusLabel(item?.status) }}</text>
         <text class="channels">
           制单途径：{{ channelLabel(exec?.create_channel) }} · 提交途径：{{ channelLabel(exec?.submit_channel) }} · 修改途径：{{ channelLabel(exec?.update_channel) }}
         </text>
@@ -112,6 +112,7 @@ import { chooseAndUploadImage } from '@/api/upload'
 import { OPS_MODULES, type OpsModule, type OpsModuleConfig } from '@/config/ops'
 import { useAuthStore } from '@/stores/auth'
 import { requestSubscribe } from '@/utils/subscribe'
+import { opsExecItemStatusLabel, opsExecStatusLabel } from '@/utils/statusLabels'
 
 interface ResultRow {
   id: string

@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/utils/datetime_format.dart';
+import '../../../shared/utils/status_labels.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_status_chip.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -21,15 +22,6 @@ class SharedLoanListPage extends ConsumerStatefulWidget {
 class _SharedLoanListPageState extends ConsumerState<SharedLoanListPage> {
   List<Map<String, dynamic>> items = [];
   var loading = true;
-
-  static const statusLabel = {
-    'draft': '草稿',
-    'pending': '待审批',
-    'approved': '已审批',
-    'on_loan': '借出中',
-    'returned': '已归还',
-    'rejected': '已驳回',
-  };
 
   ApiService get api => ref.read(apiServiceProvider);
 
@@ -173,7 +165,7 @@ class _SharedLoanListPageState extends ConsumerState<SharedLoanListPage> {
 
   Widget _buildCard(Map<String, dynamic> row) {
     final status = row['status']?.toString() ?? '';
-    final label = statusLabel[status] ?? status;
+    final label = resolveStatusLabel('loan_status', status);
     return MeisListCard(
       onTap: status == 'draft' || status == 'pending'
           ? () => openForm(id: row['id']?.toString())

@@ -40,6 +40,7 @@ import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { http } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
+import { resolveStatusLabel } from '@/utils/statusLabels'
 
 interface DeviceRow {
   id: string
@@ -60,17 +61,8 @@ const loading = ref(false)
 
 const hasMore = computed(() => rows.value.length < total.value)
 
-const STATUS_MAP: Record<string, string> = {
-  normal: '正常',
-  maintenance: '维修中',
-  pending_verify: '待验收',
-  scrap: '报废',
-  idle: '闲置'
-}
-
 function statusLabel(s?: string) {
-  if (!s) return '—'
-  return STATUS_MAP[s] || s
+  return resolveStatusLabel('device_status', s)
 }
 
 async function load(reset = false) {

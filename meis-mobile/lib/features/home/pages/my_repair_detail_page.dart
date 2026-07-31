@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/utils/datetime_format.dart';
+import '../../../shared/utils/status_labels.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_section_label.dart';
 import '../../../shared/widgets/meis_status_chip.dart';
@@ -23,21 +24,6 @@ class _MyRepairDetailPageState extends ConsumerState<MyRepairDetailPage> {
   Map<String, dynamic>? timeline;
   var loading = true;
   var submitting = false;
-
-  static const statusLabel = {
-    'draft': '草稿',
-    'reported': '已报修',
-    'dispatching': '派工中',
-    'pending_accept': '待接单',
-    'accepted': '已接单',
-    'repairing': '维修中',
-    'suspended': '挂起',
-    'pending_verify': '待验收',
-    'verify_rejected': '拒绝验收',
-    'verified': '已验收',
-    'closed': '已关闭',
-    'cancelled': '已取消',
-  };
 
   ApiService get api => ref.read(apiServiceProvider);
 
@@ -189,7 +175,7 @@ class _MyRepairDetailPageState extends ConsumerState<MyRepairDetailPage> {
                           ),
                           const SizedBox(width: 8),
                           MeisStatusChip(
-                            statusLabel[st] ?? st,
+                            resolveStatusLabel('wo_status', st),
                             emphasize: st == 'pending_verify',
                           ),
                         ],

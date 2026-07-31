@@ -31,23 +31,14 @@ import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { http } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
+import { resolveStatusLabel } from '@/utils/statusLabels'
 
 const auth = useAuthStore()
 const rows = ref<Record<string, unknown>[]>([])
 const loading = ref(false)
 
-const LOAN_STATUS: Record<string, string> = {
-  draft: '草稿',
-  pending: '待审核',
-  approved: '已批准',
-  on_loan: '借出中',
-  returned: '已归还',
-  rejected: '已驳回'
-}
-
 function statusLabel(s: unknown) {
-  const k = String(s || '')
-  return LOAN_STATUS[k] || k || '—'
+  return resolveStatusLabel('loan_status', s)
 }
 
 function asRecords(data: unknown): Record<string, unknown>[] {

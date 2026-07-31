@@ -21,7 +21,7 @@
 
         <el-descriptions :column="3" border size="small" title="采购计划">
           <el-descriptions-item label="计划编号">{{ chain.plan?.plan_code }}</el-descriptions-item>
-          <el-descriptions-item label="审批状态">{{ chain.plan?.approval_status }}</el-descriptions-item>
+          <el-descriptions-item label="审批状态">{{ label('approval_status', chain.plan?.approval_status) }}</el-descriptions-item>
           <el-descriptions-item label="预算">{{ chain.plan?.total_budget }}</el-descriptions-item>
         </el-descriptions>
 
@@ -29,7 +29,9 @@
         <el-table :data="chain.projects || []" size="small" stripe>
           <el-table-column prop="project_code" label="项目编号" />
           <el-table-column prop="project_name" label="项目名称" />
-          <el-table-column prop="status" label="状态" width="90" />
+          <el-table-column label="状态" width="90">
+            <template #default="{ row }">{{ label('project_status', row.status) }}</template>
+          </el-table-column>
           <el-table-column prop="total_amount" label="金额" width="100" />
         </el-table>
 
@@ -37,29 +39,39 @@
         <el-table :data="chain.contracts || []" size="small" stripe>
           <el-table-column prop="contract_code" label="合同编号" />
           <el-table-column prop="contract_name" label="合同名称" />
-          <el-table-column prop="approval_status" label="审批" width="90" />
+          <el-table-column label="审批" width="90">
+            <template #default="{ row }">{{ label('contract_approval_status', row.approval_status) }}</template>
+          </el-table-column>
           <el-table-column prop="payment_progress" label="付款%" width="80" />
         </el-table>
 
         <h4 class="section-title">安装验收</h4>
         <el-table :data="chain.acceptances || []" size="small" stripe>
           <el-table-column prop="acceptance_no" label="验收单号" />
-          <el-table-column prop="acceptance_status" label="状态" width="90" />
-          <el-table-column prop="approval_status" label="审批" width="90" />
+          <el-table-column label="状态" width="90">
+            <template #default="{ row }">{{ label('acceptance_status', row.acceptance_status) }}</template>
+          </el-table-column>
+          <el-table-column label="审批" width="90">
+            <template #default="{ row }">{{ label('acceptance_review_status', row.approval_status) }}</template>
+          </el-table-column>
         </el-table>
 
         <h4 class="section-title">设备入库</h4>
         <el-table :data="chain.entries || []" size="small" stripe>
           <el-table-column prop="entry_no" label="入库单号" />
           <el-table-column prop="business_chain_no" label="业务链编号" />
-          <el-table-column prop="status" label="状态" width="90" />
+          <el-table-column label="状态" width="90">
+            <template #default="{ row }">{{ label('entry_status', row.status) }}</template>
+          </el-table-column>
         </el-table>
 
         <h4 class="section-title">台账设备</h4>
         <el-table :data="chain.devices || []" size="small" stripe>
           <el-table-column prop="device_code" label="设备编码" />
           <el-table-column prop="device_name" label="设备名称" />
-          <el-table-column prop="device_status" label="状态" width="90" />
+          <el-table-column label="状态" width="90">
+            <template #default="{ row }">{{ label('device_status', row.device_status) }}</template>
+          </el-table-column>
         </el-table>
 
         <h4 class="section-title">合同付款</h4>
@@ -67,7 +79,9 @@
           <el-table-column prop="payment_no" label="付款单号" />
           <el-table-column prop="payment_stage" label="阶段" width="90" />
           <el-table-column prop="payment_amount" label="金额" width="100" />
-          <el-table-column prop="status" label="状态" width="90" />
+          <el-table-column label="状态" width="90">
+            <template #default="{ row }">{{ label('payment_status', row.status) }}</template>
+          </el-table-column>
         </el-table>
       </el-card>
     </div>
@@ -77,6 +91,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import http from '@/api/http'
+import { resolveCodedLabel } from '@/i18n/resolveCodedLabel'
+
+function label(dictType: string, value: unknown) {
+  return resolveCodedLabel({ dictType, value })
+}
 
 interface PurchasePlanTrace {
   business_chain_no?: string

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/utils/status_labels.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_status_chip.dart';
 import 'my_repair_detail_page.dart';
@@ -22,21 +23,6 @@ class _MyRepairsPageState extends ConsumerState<MyRepairsPage> {
   List<Map<String, dynamic>> rows = [];
   var loading = true;
   var pendingOnly = false;
-
-  static const statusLabel = {
-    'draft': '草稿',
-    'reported': '已报修',
-    'dispatching': '派工中',
-    'pending_accept': '待接单',
-    'accepted': '已接单',
-    'repairing': '维修中',
-    'suspended': '挂起',
-    'pending_verify': '待验收',
-    'verify_rejected': '拒绝验收',
-    'verified': '已验收',
-    'closed': '已关闭',
-    'cancelled': '已取消',
-  };
 
   @override
   void initState() {
@@ -129,7 +115,7 @@ class _MyRepairsPageState extends ConsumerState<MyRepairsPage> {
                                     ),
                                     const SizedBox(height: 6),
                                     Text(
-                                      '${r['device_name'] ?? ''} · ${statusLabel[st] ?? st}',
+                                      '${r['device_name'] ?? ''} · ${resolveStatusLabel('wo_status', st)}',
                                       style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                                     ),
                                     if (fault.isNotEmpty) ...[

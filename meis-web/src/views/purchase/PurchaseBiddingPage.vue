@@ -246,6 +246,7 @@ import type { FieldSchema } from '@/config/pageSchemas'
 import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
 import { promptListActionScope } from '@/composables/useListActionScope'
 import { downloadApiFile } from '@/utils/fileDownload'
+import { resolveCodedLabel } from '@/i18n/resolveCodedLabel'
 
 type SupplierOption = {
   id: string
@@ -309,10 +310,13 @@ function isBiddingReviewed(row: Record<string, unknown> | null | undefined) {
 }
 
 function biddingStatusText(row: Record<string, unknown>) {
-  if (row.bidding_status != null && String(row.bidding_status).trim() !== '') {
-    return String(row.bidding_status)
-  }
-  return row.bidding_review_result === 'passed' ? '已招标' : '未招标'
+  const raw =
+    row.bidding_status != null && String(row.bidding_status).trim() !== ''
+      ? row.bidding_status
+      : row.bidding_review_result === 'passed'
+        ? 'passed'
+        : 'pending'
+  return resolveCodedLabel({ dictType: 'bidding_status', value: raw })
 }
 
 let supplierKeySeq = 0

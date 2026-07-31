@@ -45,7 +45,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'product_attribute_req', label: '产品属性要求', detail: true, width: 130 },
     { prop: 'fund_source', label: '资金来源', dictType: 'fund_source', detail: true, width: 120 },
     { prop: 'demand_nature', label: '需求性质', detail: true, width: 110 },
-    { prop: 'existing_device_status', label: '现有设备运行状态', detail: true, width: 150 },
+    { prop: 'existing_device_status', label: '现有设备运行状态', dictType: 'device_status', detail: true, width: 150 },
     { prop: 'existing_device_usage_freq', label: '现有设备使用频次', detail: true, width: 150 },
     { prop: 'other_condition_confirm', label: '其他条件确认', detail: true, width: 130 },
     { prop: 'is_large_equipment', label: '大型设备', type: 'boolean', detail: true, width: 100 },
@@ -151,7 +151,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'approved_by_name', label: '审核人', list: true, group: 'workflow', readonly: true, form: false, width: 100 },
     { prop: 'approved_at', label: '审核日期', type: 'date', list: true, group: 'workflow', readonly: true, form: false, width: 120 },
     { prop: 'entry_no', label: '入库单号', group: 'workflow', readonly: true, form: false },
-    { prop: 'entry_status', label: '入库状态', group: 'workflow', readonly: true, form: false },
+    { prop: 'entry_status', label: '入库状态', dictType: 'entry_status', group: 'workflow', readonly: true, form: false },
     { prop: 'quality_check_passed', label: '质检通过', type: 'boolean', group: 'workflow' },
     { prop: 'quality_checker_id', label: '质检人', linkTable: 'sys_user', group: 'workflow' },
     { prop: 'quality_check_date', label: '质检日期', type: 'date', group: 'workflow' },
@@ -599,7 +599,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'approval_status', label: '审批状态', dictType: 'acceptance_review_status', list: true, readonly: true, form: false, width: 100 },
     { prop: 'approved_by_name', label: '审核人', list: true, readonly: true, form: false, width: 100 },
     { prop: 'approved_at', label: '审核日期', type: 'date', list: true, readonly: true, form: false, width: 120 },
-    { prop: 'doc_status', label: '单据状态', form: false },
+    { prop: 'doc_status', label: '单据状态', dictType: 'approval_status', form: false },
     { prop: 'status', label: '退货状态', dictType: 'goods_return_status', form: false }
   ],
   device_goods_return_item: [

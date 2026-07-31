@@ -45,7 +45,11 @@
       <el-table-column prop="device_code" label="资产编码" min-width="120" />
       <el-table-column prop="financial_code" label="流水号" min-width="110" />
       <el-table-column prop="serial_number" label="序列号" min-width="110" />
-      <el-table-column prop="device_status" label="状态" width="90" />
+      <el-table-column prop="device_status" label="状态" width="90">
+        <template #default="{ row }">
+          <TableCellValue :field="{ prop: 'device_status', dictType: 'device_status' }" :value="row.device_status" />
+        </template>
+      </el-table-column>
     </el-table>
 
     <template #footer>
@@ -60,6 +64,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/api/http'
 import AppModal from '@/components/AppModal.vue'
+import TableCellValue from '@/components/table/TableCellValue.vue'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{

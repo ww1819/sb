@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import http from '@/api/http'
+import { resolveCodedLabel } from '@/i18n/resolveCodedLabel'
 
 const cache = new Map<string, { label: string; value: string }[]>()
 /** 缓存写入后递增，供列表单元格响应式刷新中文标签 */
@@ -36,7 +37,7 @@ export function useDict() {
     return cache.get(type) ?? []
   }
 
-  /** 从缓存解析中文标签；未命中返回 null（调用方回退原值） */
+  /** 从缓存解析中文标签；未命中返回 null（调用方走 catalog / 未知(码)） */
   function resolveDictLabel(type: string | undefined, value: unknown): string | null {
     void cacheVersion.value
     if (!type || value === null || value === undefined || value === '') return null
@@ -46,5 +47,15 @@ export function useDict() {
     return hit?.label ?? null
   }
 
-  return { loadDict, preloadDictTypes, getCached, resolveDictLabel, cacheVersion, loading }
+  /** 字典 → catalog → 未知(码)；自定义页推荐直接用此方法 */
+  function resolveLabel(type: string | undefined, value: unknown, prop?: string): string {
+    return resolveCodedLabel({
+      dictType: type,
+      prop,
+      value,
+      fromDict: resolveDictLabel(type, value)
+    })
+  }
+
+  return { loadDict, preloadDictTypes, getCached, resolveDictLabel, resolveLabel, cacheVersion, loading }
 }

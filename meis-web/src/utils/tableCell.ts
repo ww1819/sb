@@ -1,3 +1,5 @@
+import { resolveCodedLabel } from '@/i18n/resolveCodedLabel'
+
 export type StatusTagType = '' | 'success' | 'warning' | 'danger' | 'info'
 
 const STATUS_PROP_PATTERN = /status|state|urgency|priority|phase|stage/i
@@ -57,7 +59,7 @@ export function statusTagType(value: unknown): StatusTagType {
   return 'info'
 }
 
-export function formatStatusLabel(value: unknown, prop?: string) {
+export function formatStatusLabel(value: unknown, prop?: string, dictType?: string) {
   if (prop === 'is_active') {
     if (value === true || value === 'true' || value === 1 || value === '1') return '启用'
     if (value === false || value === 'false' || value === 0 || value === '0') return '停用'
@@ -72,20 +74,8 @@ export function formatStatusLabel(value: unknown, prop?: string) {
     if (value === true || value === 'true' || value === 1 || value === '1') return '是'
     if (value === false || value === 'false' || value === 0 || value === '0') return '否'
   }
-  // 审批简化文案：字典未就绪时也勿直接显示 draft（合同=已审批；验收页靠 dictType 覆盖为已审核）
-  if (prop === 'approval_status') {
-    const s = String(value)
-    if (s === 'approved') return '已审批'
-    if (s === 'draft' || s === 'pending' || s === 'rejected' || s === 'unapproved') return '未审批'
-  }
-  // 安装验收状态（PUR-UI-29）
-  if (prop === 'acceptance_status') {
-    const s = String(value)
-    if (s === 'passed') return '已经验收'
-    if (s === 'pending') return '待验收'
-    if (s === 'failed') return '验收不通过'
-  }
-  return String(value)
+  // 统一走 I18N 预留解析（字典未命中 → catalog → 未知(码)）
+  return resolveCodedLabel({ value, prop, dictType })
 }
 
 export function columnAlign(prop: string, type?: string) {

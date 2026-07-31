@@ -1003,3 +1003,51 @@ BEGIN
     EXECUTE sql;
   END LOOP;
 END $$;
+
+-- ========== PLT-STATUS-CN-01：补齐运维执行/招标/健康检查等状态字典 ==========
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('maintain_exec_status', 'draft', '草稿', 'draft', 1),
+('maintain_exec_status', 'pending', '待执行', 'pending', 2),
+('maintain_exec_status', 'in_progress', '执行中', 'in_progress', 3),
+('maintain_exec_status', 'submitted', '已提交', 'submitted', 4),
+('maintain_exec_status', 'audited', '已审核', 'audited', 5),
+('maintain_exec_status', 'completed', '已完成', 'completed', 6),
+('inspect_exec_status', 'draft', '草稿', 'draft', 1),
+('inspect_exec_status', 'pending', '待执行', 'pending', 2),
+('inspect_exec_status', 'in_progress', '执行中', 'in_progress', 3),
+('inspect_exec_status', 'submitted', '已提交', 'submitted', 4),
+('inspect_exec_status', 'audited', '已审核', 'audited', 5),
+('inspect_exec_status', 'completed', '已完成', 'completed', 6),
+('metrology_exec_status', 'draft', '草稿', 'draft', 1),
+('metrology_exec_status', 'pending', '待执行', 'pending', 2),
+('metrology_exec_status', 'in_progress', '执行中', 'in_progress', 3),
+('metrology_exec_status', 'submitted', '已提交', 'submitted', 4),
+('metrology_exec_status', 'audited', '已审核', 'audited', 5),
+('metrology_exec_status', 'completed', '已完成', 'completed', 6),
+('maintain_exec_item_status', 'pending', '待执行', 'pending', 10),
+('maintain_exec_item_status', 'in_progress', '执行中', 'in_progress', 20),
+('maintain_exec_item_status', 'completed', '已完成', 'completed', 30),
+('maintain_exec_item_status', 'confirmed', '已确认', 'confirmed', 40),
+('inspect_exec_item_status', 'pending', '待执行', 'pending', 10),
+('inspect_exec_item_status', 'in_progress', '执行中', 'in_progress', 20),
+('inspect_exec_item_status', 'completed', '已完成', 'completed', 30),
+('inspect_exec_item_status', 'confirmed', '已确认', 'confirmed', 40),
+('metrology_exec_item_status', 'pending', '待执行', 'pending', 10),
+('metrology_exec_item_status', 'in_progress', '执行中', 'in_progress', 20),
+('metrology_exec_item_status', 'completed', '已完成', 'completed', 30),
+('metrology_exec_item_status', 'confirmed', '已确认', 'confirmed', 40),
+('bidding_status', 'passed', '已招标', 'passed', 1),
+('bidding_status', 'pending', '未招标', 'pending', 2),
+('bidding_status', 'failed', '未招标', 'failed', 3),
+('bidding_status', 'not_passed', '未招标', 'not_passed', 4),
+('service_health', 'UP', '正常', 'UP', 1),
+('service_health', 'DOWN', '异常', 'DOWN', 2),
+('tenant_status', 'active', '启用', 'active', 1),
+('tenant_status', 'inactive', '停用', 'inactive', 2),
+('tenant_status', 'disabled', '停用', 'disabled', 3),
+('tenant_status', 'suspended', '已挂起', 'suspended', 4)
+ON CONFLICT (dict_type, dict_code) DO UPDATE
+SET dict_label = EXCLUDED.dict_label,
+    dict_value = EXCLUDED.dict_value,
+    sort_order = EXCLUDED.sort_order;
+

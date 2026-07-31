@@ -11,7 +11,7 @@
       <el-table-column prop="package_code" label="套餐" width="100" />
       <el-table-column prop="status" label="状态" width="100">
         <template #default="{ row }">
-          <el-tag :type="statusType(row.status)" size="small">{{ row.status || '未知' }}</el-tag>
+          <el-tag :type="statusType(row.status)" size="small">{{ tenantStatusLabel(row.status) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="140">
@@ -87,6 +87,11 @@ import { ElMessage } from 'element-plus'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
+import { resolveCodedLabel } from '@/i18n/resolveCodedLabel'
+
+function tenantStatusLabel(status: unknown) {
+  return resolveCodedLabel({ dictType: 'tenant_status', value: status })
+}
 
 const tableHeight = useSystemTableHeight()
 

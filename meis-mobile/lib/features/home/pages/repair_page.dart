@@ -7,6 +7,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/repair_draft_store.dart';
 import '../../../shared/utils/datetime_format.dart';
+import '../../../shared/utils/status_labels.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_section_label.dart';
 import '../../../shared/widgets/meis_status_chip.dart';
@@ -23,21 +24,6 @@ class _RepairPageState extends ConsumerState<RepairPage> {
   List<Map<String, dynamic>> items = [];
   List<Map<String, dynamic>> localDrafts = [];
   var loading = true;
-
-  static const statusLabel = {
-    'draft': '未提交',
-    'reported': '已报修',
-    'dispatching': '派工中',
-    'pending_accept': '待接单',
-    'accepted': '已接单',
-    'repairing': '维修中',
-    'pending_verify': '待验收',
-    'verify_rejected': '验收驳回',
-    'verified': '已验收',
-    'suspended': '挂起',
-    'closed': '已关闭',
-    'cancelled': '已取消',
-  };
 
   @override
   void initState() {
@@ -296,7 +282,7 @@ class _RepairPageState extends ConsumerState<RepairPage> {
 
   Widget _buildServerCard(Map<String, dynamic> row) {
     final status = row['status']?.toString() ?? '';
-    final label = statusLabel[status] ?? status;
+    final label = resolveStatusLabel('wo_status', status);
     final fault = _text(row, 'fault_description');
     return MeisListCard(
       onTap: () => openForm(id: row['id']?.toString()),

@@ -108,6 +108,7 @@ import { http } from '@/api/http'
 import { chooseAndUploadImage } from '@/api/upload'
 import { useAuthStore } from '@/stores/auth'
 import { requestSubscribe } from '@/utils/subscribe'
+import { resolveStatusLabel } from '@/utils/statusLabels'
 
 interface DeviceInfo {
   id: string
@@ -153,17 +154,8 @@ function onFaultTypeChange(e: { detail: { value: string } }) {
   faultTypeIndex.value = Number(e.detail.value)
 }
 
-const STATUS_MAP: Record<string, string> = {
-  normal: '正常',
-  maintenance: '维修中',
-  pending_verify: '待验收',
-  scrap: '报废',
-  idle: '闲置'
-}
-
 function statusLabel(s?: string) {
-  if (!s) return '—'
-  return STATUS_MAP[s] || s
+  return resolveStatusLabel('device_status', s)
 }
 
 function onUrgencyChange(e: { detail: { value: string } }) {

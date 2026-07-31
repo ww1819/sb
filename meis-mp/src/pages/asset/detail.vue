@@ -17,6 +17,7 @@ import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { http } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
+import { resolveStatusLabel } from '@/utils/statusLabels'
 
 const auth = useAuthStore()
 const deviceId = ref('')
@@ -35,19 +36,11 @@ const fields = [
   { key: 'location', label: '位置' }
 ]
 
-const STATUS_MAP: Record<string, string> = {
-  normal: '正常',
-  maintenance: '维修中',
-  pending_verify: '待验收',
-  scrap: '报废',
-  idle: '闲置'
-}
-
 function display(key: string) {
   if (!device.value) return '—'
   const v = device.value[key]
   if (v === null || v === undefined || v === '') return '—'
-  if (key === 'device_status') return STATUS_MAP[String(v)] || String(v)
+  if (key === 'device_status') return resolveStatusLabel('device_status', v)
   return String(v)
 }
 

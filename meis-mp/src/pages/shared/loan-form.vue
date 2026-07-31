@@ -94,6 +94,7 @@ import { computed, reactive, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { http } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
+import { resolveStatusLabel } from '@/utils/statusLabels'
 import { formatDate, toDateParam } from '@/utils/datetime'
 
 const auth = useAuthStore()
@@ -111,15 +112,6 @@ const reason = ref('')
 const saving = ref(false)
 const depts = ref<Record<string, unknown>[]>([])
 
-const LOAN_STATUS: Record<string, string> = {
-  draft: '草稿',
-  pending: '待审核',
-  approved: '已批准',
-  on_loan: '借出中',
-  returned: '已归还',
-  rejected: '已驳回'
-}
-
 type PickerRow = { key?: string; title: string; subtitle?: string; raw: Record<string, unknown> }
 const picker = reactive({
   visible: false,
@@ -132,8 +124,7 @@ const editable = computed(() => ['draft', 'pending'].includes(status.value) || !
 const canSave = computed(() => !!(device.value?.id && toDeptId.value && loanStart.value && loanEnd.value))
 
 function statusLabel(s: unknown) {
-  const k = String(s || '')
-  return LOAN_STATUS[k] || k || '—'
+  return resolveStatusLabel('loan_status', s)
 }
 
 function todayYmd() {

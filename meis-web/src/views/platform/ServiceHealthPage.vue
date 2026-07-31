@@ -23,7 +23,7 @@
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
           <el-tag :type="row.status === 'UP' ? 'success' : 'danger'" size="small">
-            {{ row.status || '—' }}
+            {{ healthLabel(row.status) }}
           </el-tag>
         </template>
       </el-table-column>
@@ -40,6 +40,11 @@ import { ElMessage } from 'element-plus'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
 import { useSystemTableHeight } from '@/composables/useSystemTableHeight'
+import { resolveCodedLabel } from '@/i18n/resolveCodedLabel'
+
+function healthLabel(status: unknown) {
+  return resolveCodedLabel({ dictType: 'service_health', value: status })
+}
 
 const tableHeight = useSystemTableHeight()
 const loading = ref(false)

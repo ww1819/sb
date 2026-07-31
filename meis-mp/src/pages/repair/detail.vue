@@ -37,6 +37,7 @@ import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { http } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
+import { resolveStatusLabel } from '@/utils/statusLabels'
 import { formatDisplayDateTime } from '@/utils/datetime'
 
 const auth = useAuthStore()
@@ -46,24 +47,8 @@ const milestones = ref<Record<string, unknown>[]>([])
 const loading = ref(true)
 const submitting = ref(false)
 
-const STATUS: Record<string, string> = {
-  draft: '草稿',
-  reported: '已报修',
-  dispatching: '派工中',
-  pending_accept: '待接单',
-  accepted: '已接单',
-  repairing: '维修中',
-  suspended: '挂起',
-  pending_verify: '待验收',
-  verify_rejected: '拒绝验收',
-  verified: '已验收',
-  closed: '已关闭',
-  cancelled: '已取消'
-}
-
 function statusLabel(s: unknown) {
-  const k = String(s || '')
-  return STATUS[k] || k || '—'
+  return resolveStatusLabel('wo_status', s)
 }
 
 const canVerify = computed(() => wo.value?.status === 'pending_verify')

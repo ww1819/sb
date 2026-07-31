@@ -21,12 +21,6 @@ class _SharedReturnListPageState extends ConsumerState<SharedReturnListPage> {
   List<Map<String, dynamic>> items = [];
   var loading = true;
 
-  static const statusLabel = {
-    'draft': '草稿',
-    'pending': '待审批',
-    'approved': '已审批',
-    'rejected': '已驳回',
-  };
 
   ApiService get api => ref.read(apiServiceProvider);
 
@@ -115,8 +109,7 @@ class _SharedReturnListPageState extends ConsumerState<SharedReturnListPage> {
                                     ),
                                   ),
                                   MeisStatusChip(
-                                    statusLabel[row['status']?.toString()] ??
-                                        (row['status']?.toString() ?? ''),
+                                    resolveStatusLabel('return_status', row['status']),
                                     emphasize: row['status']?.toString() == 'pending',
                                   ),
                                 ],

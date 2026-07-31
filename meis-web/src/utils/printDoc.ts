@@ -1,7 +1,13 @@
-﻿export interface PrintTableSection {
+﻿import { resolveCodedLabel } from '@/i18n/resolveCodedLabel'
+
+export interface PrintTableSection {
   title?: string
   headers: string[]
   rows: string[][]
+}
+
+function coded(dictType: string, value: unknown) {
+  return resolveCodedLabel({ dictType, value })
 }
 
 export interface HospitalPrintOptions {
@@ -94,7 +100,7 @@ export function printPlanDoc(plan: Record<string, unknown>) {
       ['资金来源', String(plan.fund_source ?? '')],
       ['预算总额', String(plan.total_budget ?? '')],
       ['大型设备', plan.is_large_equipment ? '是' : '否'],
-      ['审批状态', String(plan.approval_status ?? '')],
+      ['审批状态', coded('approval_status', plan.approval_status)],
       ['论证说明', String(plan.justification ?? '')]
     ],
     tables: items.length ? [{
@@ -123,8 +129,8 @@ export function printProjectDoc(project: Record<string, unknown>) {
       ['招标代理', String(project.bid_agency ?? '')],
       ['控制价', String(project.control_price ?? '')],
       ['项目金额', String(project.total_amount ?? '')],
-      ['项目状态', String(project.status ?? '')],
-      ['审批状态', String(project.approval_status ?? '')]
+      ['项目状态', coded('project_status', project.status)],
+      ['审批状态', coded('approval_status', project.approval_status)]
     ],
     tables: bidders.length ? [{
       title: '投标人一览',
@@ -152,7 +158,7 @@ export function printContractDoc(contract: Record<string, unknown>) {
       ['签订日期', String(contract.sign_date ?? '')],
       ['交货期限', String(contract.delivery_deadline ?? '')],
       ['付款进度', String(contract.payment_progress ?? '') + '%'],
-      ['审批状态', String(contract.approval_status ?? '')]
+      ['审批状态', coded('contract_approval_status', contract.approval_status)]
     ],
     tables: payments.length ? [{
       title: '付款计划',
@@ -161,7 +167,7 @@ export function printContractDoc(contract: Record<string, unknown>) {
         String(p.payment_no ?? ''),
         String(p.payment_stage ?? ''),
         String(p.payment_amount ?? ''),
-        String(p.status ?? '')
+        coded('payment_status', p.status)
       ])
     }] : undefined,
     signatures: ['合同经办人', '财务审核', '分管院领导']

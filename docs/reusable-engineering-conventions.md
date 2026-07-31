@@ -4,7 +4,7 @@
 > **来源**：`docs/meis-requirements.md` 附录 Q / C / D / E / F / G / H / I / R / S / T 等。  
 > **用法**：新系统可整份复制后，按「落地映射」改路径与模块名；MEIS 专属细节见文末附录。
 
-**版本**：1.29（2026-07-30）
+**版本**：1.30（2026-07-31）
 
 ---
 
@@ -211,9 +211,12 @@
 
 ### 5.1 字典 / 状态码
 
-- 库内存英文码；列表/详情用字典 **中文标签**。  
+- 库内存英文码；列表/详情/标签/打印等用户可见处用字典 **中文标签**（当前默认 locale=`zh-CN`）。  
 - 布尔 `is_*`：无字典时「是/否」；启用类字段可用「启用/停用」。  
-- Schema 带 `dictType` 的字段必须走字典解析；页面进入时预加载相关字典。
+- Schema 带 `dictType` 的字段必须走字典解析；页面进入时预加载相关字典。  
+- **禁止**页面裸绑状态码；统一走各端 `resolveCodedLabel` / 等价入口。  
+- 字典未命中：显示 `未知(码值)`，并**尽快补齐**字典种子；静态 catalog 仅作离线/未加载兜底，须与种子一致。  
+- 新状态机/枚举：**先种子、再 schema/三端解析**，再上线功能。
 
 ### 5.2 外键显示
 
@@ -398,6 +401,23 @@ USB 外设（如文档高拍仪）**勿**由浏览器直连硬件；经厂商本
 | **端覆盖** | Web / App（Flutter）/ 微信小程序同一套格式；各端集中工具函数，禁止页面内散落拼接 |
 
 落地映射：MEIS PLT-DT-01；`meis-web/src/utils/datetime.ts`、`meis-mobile/lib/shared/utils/datetime_format.dart`、`meis-mp/src/utils/datetime.ts`。
+
+### 5.13 国际化（I18N）架构预留
+
+> 本期可不做运行时语言切换，但须为**本仓库内**后续 I18N 升级预留空间（优先原地改造）。
+
+| 原则 | 要求 |
+|------|------|
+| **码值与文案分离** | API/DB 只存稳定码；文案在标签层按 locale 解析 |
+| **单一解析入口** | 各端集中 resolve；禁止业务页散落双语 map |
+| **locale 参数** | 解析函数预留 `locale`（默认 `zh-CN`），便于挂文案包或多语言字典 |
+| **字典即配置源** | 业务枚举以 `sys_dict`（或等价）为源；静态 catalog 与种子对齐，可抽成 `locales/*` |
+| **UI 壳文案** | 菜单/按钮可暂硬编码默认语言；**业务状态**不得硬编码在组件内 |
+| **后端** | 默认不引入 MessageSource；切语言时再引入或扩展字典 locale 列 |
+
+升级路径建议：Web `vue-i18n` → App `gen-l10n` → 小程序 uni-i18n → 可选字典多语言表；与 §5.1 同一 key 空间。
+
+落地映射：MEIS PLT-I18N-01 / PLT-STATUS-CN-01；`meis-web/src/i18n/`、`meis-mobile/.../status_labels.dart`、`meis-mp/src/utils/statusLabels.ts`。
 
 ---
 
@@ -585,7 +605,7 @@ USB 外设（如文档高拍仪）**勿**由浏览器直连硬件；经厂商本
 | 标准七列/软删 | 附录 G / I / K / G.10 | `SoftDeleteSupport`、`R__columns_audit.sql` |
 | 新表 CRUD 清单 | 附录 M.7 | DomainController / CrudPage |
 | 外键中文 | 附录 H | `refSelectConfig`、`useRefLabelMap` |
-| 字典中文 | 附录 R | `useDict`、`TableCellValue` |
+| 字典中文 / I18N 预留 | 附录 R、PLT-STATUS-CN-01、PLT-I18N-01、§5.1 / **§5.13** | `meis-web/src/i18n/`、`useDict`、`StatusTag`；App/MP `status_labels` |
 | 报修草稿/撤回 / 故障图片 | 附录 S（含 S.6）、约定包 §6.4 / §6.5 | `RepairWorkorderController`、`fault_photos` |
 | 移动端扫码报修 | 附录 MOB | `meis-mobile` 扫码报修 |
 | 移动端本地 SQLite | 附录 MOB.7 / MOB.8、约定包 §8.1 | `sqlite_helper.dart`；离线盘点/台账缓存 |
@@ -614,7 +634,7 @@ USB 外设（如文档高拍仪）**勿**由浏览器直连硬件；经厂商本
 2. 建需求文档结构：缺陷 / 待确认 / 待开发池 / 协作附录  
 3. 落库：固定槽位双轨 + 标准七列 + 软删工具类 + 缺表防护  
 4. 主数据：变更记录表 + 快照白名单文档  
-5. 前端：字典标签 + 外键标签 + ID 字符串化 + **列表勾选/作用域**（§5.4）+ **筛选多选/分类模糊**（§5.5）+ **外键回填**（§5.6）+ **日期时间格式**（§5.12）  
+5. 前端：字典标签（§5.1）+ **I18N 预留**（§5.13）+ 外键标签 + ID 字符串化 + **列表勾选/作用域**（§5.4）+ **筛选多选/分类模糊**（§5.5）+ **外键回填**（§5.6）+ **日期时间格式**（§5.12）  
 6. Cursor rule：指向协作流程与本约定包  
 
 *完*

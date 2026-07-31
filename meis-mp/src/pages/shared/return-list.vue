@@ -25,21 +25,15 @@ import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { http } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
+import { resolveStatusLabel } from '@/utils/statusLabels'
 import { formatDisplayDate } from '@/utils/datetime'
 
 const auth = useAuthStore()
 const rows = ref<Record<string, unknown>[]>([])
 const loading = ref(false)
 
-const RETURN_STATUS: Record<string, string> = {
-  pending: '待审核',
-  approved: '已批准',
-  rejected: '已驳回'
-}
-
 function statusLabel(s: unknown) {
-  const k = String(s || '')
-  return RETURN_STATUS[k] || k || '—'
+  return resolveStatusLabel('return_status', s)
 }
 
 function asRecords(data: unknown): Record<string, unknown>[] {

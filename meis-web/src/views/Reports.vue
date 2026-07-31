@@ -1,7 +1,14 @@
 <template>
   <el-tabs v-model="tab">
     <el-tab-pane label="资产报表" name="asset">
-      <el-table :data="deviceStatus" border><el-table-column prop="device_status" label="状态" /><el-table-column prop="count" label="数量" /></el-table>
+      <el-table :data="deviceStatus" border>
+        <el-table-column prop="device_status" label="状态">
+          <template #default="{ row }">
+            <TableCellValue :field="{ prop: 'device_status', dictType: 'device_status' }" :value="row.device_status" />
+          </template>
+        </el-table-column>
+        <el-table-column prop="count" label="数量" />
+      </el-table>
     </el-tab-pane>
     <el-tab-pane label="维修报表" name="repair">
       <el-table :data="repairVolume" border><el-table-column prop="dept_name" label="科室" /><el-table-column prop="count" label="报修量" /></el-table>
@@ -17,6 +24,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import http from '@/api/http'
+import TableCellValue from '@/components/table/TableCellValue.vue'
 
 const tab = ref('asset')
 const deviceStatus = ref<Record<string, unknown>[]>([])

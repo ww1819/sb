@@ -254,7 +254,7 @@
         />
         <el-alert
           v-if="acceptance.entry_no"
-          :title="`已关联入库单：${acceptance.entry_no}（${acceptance.entry_status ?? ''}）`"
+          :title="`已关联入库单：${acceptance.entry_no}（${entryStatusLabel(acceptance.entry_status)}）`"
           type="success"
           show-icon
           class="entry-alert"
@@ -285,6 +285,11 @@ import RefSelect from '@/components/form/RefSelect.vue'
 import { getPageConfig } from '@/config/pageRegistry'
 import { getSchema } from '@/config/pageSchemas'
 import { printAcceptanceDoc } from '@/utils/printDoc'
+import { resolveCodedLabel } from '@/i18n/resolveCodedLabel'
+
+function entryStatusLabel(status: unknown) {
+  return resolveCodedLabel({ dictType: 'entry_status', value: status })
+}
 
 type DeviceRow = {
   device_name: string

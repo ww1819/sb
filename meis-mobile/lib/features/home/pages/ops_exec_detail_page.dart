@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/utils/camera_permission.dart';
+import '../../../shared/utils/status_labels.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_section_label.dart';
 import '../../../shared/widgets/meis_status_chip.dart';
@@ -319,7 +320,7 @@ class _OpsExecDetailPageState extends ConsumerState<OpsExecDetailPage> {
                           ),
                           const SizedBox(width: 8),
                           MeisStatusChip(
-                            '${exec?['status'] ?? ''} / ${item?['status'] ?? ''}',
+                            '${opsExecStatusLabel(exec?['status'])} / ${opsExecItemStatusLabel(item?['status'])}',
                             emphasize: item?['status']?.toString() == 'confirmed',
                           ),
                         ],

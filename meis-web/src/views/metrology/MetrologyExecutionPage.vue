@@ -10,7 +10,11 @@
             <el-table-column prop="device_name" label="设备名称" min-width="140" />
             <el-table-column prop="certificate_no" label="证书编号" width="120" />
             <el-table-column prop="cost" label="费用" width="80" />
-            <el-table-column prop="status" label="状态" width="100" />
+            <el-table-column prop="status" label="状态" width="100">
+              <template #default="{ row }">
+                <TableCellValue :field="{ prop: 'status', dictType: 'metrology_exec_item_status' }" :value="row.status" />
+              </template>
+            </el-table-column>
             <el-table-column label="操作" width="100" fixed="right">
               <template #default="{ row }">
                 <el-button v-if="row.status !== 'completed'" link type="primary" @click="openItem(row)">执行</el-button>
@@ -74,6 +78,7 @@ import CrudPage from '@/components/CrudPage.vue'
 import GroupedFormFields from '@/components/form/GroupedFormFields.vue'
 import FormSection from '@/components/form/FormSection.vue'
 import AppModal from '@/components/AppModal.vue'
+import TableCellValue from '@/components/table/TableCellValue.vue'
 import type { PageConfig } from '@/config/pageRegistry'
 
 const config: PageConfig = {

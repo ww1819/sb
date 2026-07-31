@@ -134,6 +134,7 @@ import WarehouseTwinScene, {
 } from '@/components/screen/WarehouseTwinScene.vue'
 import { useLayoutStore } from '@/stores/layout'
 import { useAuthStore } from '@/stores/auth'
+import { resolveCodedLabel } from '@/i18n/resolveCodedLabel'
 
 interface TwinWarehouse {
   id: string
@@ -146,9 +147,11 @@ interface TwinWarehouse {
 
 const DEVICE_STATUS_MAP: Record<string, string> = {
   normal: '正常',
+  in_use: '在用',
   maintenance: '维修中',
-  pending_verify: '待验收',
-  scrap: '报废',
+  pending_verify: '已维修待验收',
+  scrap: '已报废',
+  returned: '已退货',
   idle: '闲置',
   unknown: '未知'
 }
@@ -182,7 +185,7 @@ const activeDevices = computed<TwinDevice[]>(() => {
 })
 
 function statusLabel(s?: string) {
-  return DEVICE_STATUS_MAP[String(s)] || String(s ?? '—')
+  return DEVICE_STATUS_MAP[String(s)] || resolveCodedLabel({ dictType: 'device_status', value: s })
 }
 
 function onTwinSelect(payload: TwinShelfSelect | null) {

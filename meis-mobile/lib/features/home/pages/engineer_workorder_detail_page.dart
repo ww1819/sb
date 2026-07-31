@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/utils/status_labels.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_section_label.dart';
 import '../../../shared/widgets/meis_status_chip.dart';
@@ -24,18 +25,6 @@ class _EngineerWorkorderDetailPageState
   List<Map<String, dynamic>> segments = [];
   var loading = true;
   var busy = false;
-
-  static const statusLabel = {
-    'reported': '已报修',
-    'dispatching': '派工中',
-    'pending_accept': '待接单',
-    'accepted': '已接单',
-    'repairing': '维修中',
-    'suspended': '挂起',
-    'pending_verify': '待验收',
-    'verify_rejected': '拒绝验收',
-    'closed': '已关闭',
-  };
 
   ApiService get api => ref.read(apiServiceProvider);
 
@@ -336,7 +325,7 @@ class _EngineerWorkorderDetailPageState
                           ),
                           const SizedBox(width: 8),
                           MeisStatusChip(
-                            statusLabel[status] ?? status,
+                            resolveStatusLabel('wo_status', status),
                             emphasize: status == 'pending_accept' || status == 'repairing',
                           ),
                         ],

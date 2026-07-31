@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/local_sync_service.dart';
+import '../../../shared/utils/status_labels.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_section_label.dart';
 import '../../../shared/widgets/meis_status_chip.dart';
@@ -22,14 +23,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
   List<Map<String, Object?>> offline = [];
   var loading = true;
   var offlineMode = false;
-
-  static const statusLabel = {
-    'planning': '计划中',
-    'in_progress': '进行中',
-    'completed': '已完成',
-    'pending': '未审核',
-    'approved': '已审核',
-  };
 
   @override
   void initState() {
@@ -164,8 +157,8 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
   Widget _card(Map row, {required bool local}) {
     final status = row['status']?.toString() ?? '';
     final audit = row['audit_status']?.toString() ?? '';
-    final label = statusLabel[status] ?? status;
-    final auditLabel = statusLabel[audit] ?? audit;
+    final label = resolveStatusLabel('check_status', status);
+    final auditLabel = resolveStatusLabel('audit_status', audit);
     return MeisListCard(
       onTap: () {
         final id = row['id']?.toString();

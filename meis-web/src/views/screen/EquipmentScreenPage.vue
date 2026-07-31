@@ -224,6 +224,7 @@ import ChartCard from '@/components/dashboard/ChartCard.vue'
 import { useLayoutStore } from '@/stores/layout'
 import { useAuthStore } from '@/stores/auth'
 import { formatDisplayDate, formatDisplayDateTime } from '@/utils/datetime'
+import { resolveCodedLabel } from '@/i18n/resolveCodedLabel'
 
 const layoutStore = useLayoutStore()
 const authStore = useAuthStore()
@@ -257,25 +258,27 @@ const kpiItems = [
 ]
 
 const STATUS_MAP: Record<string, string> = {
-  reported: '已报修',
-  dispatching: '派工中',
+  reported: '报修中',
+  dispatching: '派单中',
   pending_accept: '待接单',
   accepted: '已接单',
   repairing: '维修中',
-  pending_verify: '待验收',
-  suspended: '挂起',
-  verify_rejected: '验收驳回',
+  pending_verify: '已维修待验收',
+  suspended: '已挂起',
+  verify_rejected: '拒绝验收',
   verified: '已验收',
   closed: '已关闭',
   cancelled: '已取消',
-  draft: '草稿'
+  draft: '未提交'
 }
 
 const DEVICE_STATUS_MAP: Record<string, string> = {
   normal: '正常',
+  in_use: '在用',
   maintenance: '维修中',
-  pending_verify: '待验收',
-  scrap: '报废',
+  pending_verify: '已维修待验收',
+  scrap: '已报废',
+  returned: '已退货',
   idle: '闲置'
 }
 
@@ -328,7 +331,7 @@ const deviceStatusOption = computed<EChartsOption>(() => ({
       itemStyle: { shadowBlur: 18, shadowColor: 'rgba(0, 212, 255, 0.45)' }
     },
     data: deviceStatus.value.map((r, i) => ({
-      name: DEVICE_STATUS_MAP[String(r.name)] || String(r.name),
+      name: DEVICE_STATUS_MAP[String(r.name)] || resolveCodedLabel({ dictType: 'device_status', value: r.name }),
       value: Number(r.value) || 0,
       itemStyle: { color: CHART_COLORS[i % CHART_COLORS.length] }
     }))
@@ -466,7 +469,7 @@ function formatDate(v: unknown) {
 }
 
 function statusLabel(s: unknown) {
-  return STATUS_MAP[String(s)] || String(s ?? '—')
+  return STATUS_MAP[String(s)] || resolveCodedLabel({ dictType: 'wo_status', value: s })
 }
 
 function statusClass(s: unknown) {
