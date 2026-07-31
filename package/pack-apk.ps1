@@ -114,6 +114,22 @@ try {
     $env:Path = "$(Join-Path $sdk 'platform-tools');$(Join-Path $sdk 'cmdline-tools\latest\bin');$env:Path"
     Write-Host "ANDROID_HOME=$sdk" -ForegroundColor Cyan
     Write-MeisAndroidLocalProperties -MobileDir $mobileDir -SdkRoot $sdk -FlutterRoot $flutterRoot
+    # Persist for Android Studio / dart_build (they often miss process ANDROID_HOME)
+    try {
+        & $flutterBat config "--android-sdk=$sdk" 2>&1 | Out-Host
+    } catch { }
+    try {
+        [Environment]::SetEnvironmentVariable('ANDROID_HOME', $sdk, 'User')
+        [Environment]::SetEnvironmentVariable('ANDROID_SDK_ROOT', $sdk, 'User')
+    } catch { }
+    # Flutter AGP requires side-by-side NDK; incomplete installs cause InstallFailedException
+    $ndkVer = '28.2.13676358'
+    $ndkDir = Join-Path $sdk "ndk\$ndkVer"
+    $ndkOk = (Test-Path (Join-Path $ndkDir 'source.properties')) -and (Test-Path (Join-Path $ndkDir 'ndk-build.cmd'))
+    if (-not $ndkOk) {
+        throw "Android NDK $ndkVer missing/incomplete under $ndkDir. Run package\安装AndroidSDK.bat (downloads NDK via Tencent mirror), then retry."
+    }
+    Write-Host "NDK=$ndkDir" -ForegroundColor DarkGray
 } catch {
     throw "$($_.Exception.Message)"
 }
@@ -127,6 +143,17 @@ if (Test-Path -LiteralPath $wrapperProps) {
         Set-Content -Path $wrapperProps -Value $txt2.TrimEnd() -Encoding UTF8
         Write-Host 'Gradle distributionUrl -> Tencent mirror (PKIX workaround)' -ForegroundColor Yellow
     }
+}
+
+# Force plugin/deps Maven lookups through China mirrors (blocks TLS failures to google/maven central)
+# Note: --init-script cannot go in GRADLE_OPTS (JVM opts). Use ~/.gradle/init.d instead.
+$mirrorInit = Join-Path $mobileDir 'android\init.mirror.gradle'
+if (Test-Path -LiteralPath $mirrorInit) {
+    $initDir = Join-Path $env:USERPROFILE '.gradle\init.d'
+    New-Item -ItemType Directory -Path $initDir -Force | Out-Null
+    $destInit = Join-Path $initDir 'meis-android-mirror.gradle'
+    Copy-Item -LiteralPath $mirrorInit -Destination $destInit -Force
+    Write-Host "Gradle init.d mirror: $destInit" -ForegroundColor DarkGray
 }
 
 # Clear stale Gradle locks from previously hung builds (Timeout waiting to lock buildLogic.lock)

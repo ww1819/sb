@@ -18,6 +18,7 @@ MEIS package 现场包
    → 构建 meis-mobile release APK，拷到 package\apk\
    → 需本机 Flutter；env.txt 可设 FLUTTER_ROOT（如 E:\flutter）
    → 需 Android SDK；没有则先双击 安装AndroidSDK.bat（或装 Android Studio 后设 ANDROID_HOME）
+   → 国内网络：安装脚本优先腾讯镜像 + curl；Google 超时可用 -ZipPath 离线 zip
 
 说明：
 - meis-common / meis-api / 根 pom 有变更时，更新打包会重打全部业务 JAR
