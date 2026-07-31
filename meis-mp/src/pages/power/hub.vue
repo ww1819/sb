@@ -36,6 +36,7 @@ import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { http } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
+import { scanBarcode } from '@/utils/scanCode'
 
 type TagRow = Record<string, unknown>
 
@@ -52,17 +53,9 @@ onShow(() => {
 })
 
 async function onScan() {
-  try {
-    const res = await uni.scanCode({ onlyFromCamera: false })
-    const code = String(res.result || '').trim()
-    if (!code) {
-      uni.showToast({ title: '请扫描电流标签条码', icon: 'none' })
-      return
-    }
-    await lookupExact(code)
-  } catch {
-    /* 用户取消 */
-  }
+  const code = await scanBarcode()
+  if (!code) return
+  await lookupExact(code)
 }
 
 async function lookupExact(code: string) {

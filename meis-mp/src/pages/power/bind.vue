@@ -41,6 +41,7 @@ import { ref } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { http } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
+import { scanBarcode } from '@/utils/scanCode'
 
 type Row = Record<string, unknown>
 
@@ -89,20 +90,15 @@ function isSelected(d: Row) {
 }
 
 async function scanDevice() {
+  const code = await scanBarcode()
+  if (!code) return
+  keyword.value = code
   try {
-    const res = await uni.scanCode({ onlyFromCamera: false })
-    const code = String(res.result || '').trim()
-    if (!code) return
-    keyword.value = code
-    try {
-      const data = await http.get<Row>(`/asset/device/by-code/${encodeURIComponent(code)}`)
-      device.value = data
-      candidates.value = [data]
-    } catch {
-      await searchDevice()
-    }
+    const data = await http.get<Row>(`/asset/device/by-code/${encodeURIComponent(code)}`)
+    device.value = data
+    candidates.value = [data]
   } catch {
-    /* cancel */
+    await searchDevice()
   }
 }
 

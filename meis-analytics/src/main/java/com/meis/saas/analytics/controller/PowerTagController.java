@@ -59,12 +59,16 @@ public class PowerTagController {
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(PageQuery query,
             @RequestParam(required = false) Boolean activeOnly,
-            @RequestParam(required = false) UUID stationId) {
+            @RequestParam(required = false) UUID stationId,
+            @RequestParam(required = false) Boolean unboundOnly) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "power_tag", "t"));
         List<Object> args = new ArrayList<>();
         if (Boolean.TRUE.equals(activeOnly)) {
             where.append(" AND t.is_active = true ");
+        }
+        if (Boolean.TRUE.equals(unboundOnly)) {
+            where.append(" AND t.device_id IS NULL ");
         }
         if (stationId != null) {
             where.append(" AND t.station_id = ?::uuid ");

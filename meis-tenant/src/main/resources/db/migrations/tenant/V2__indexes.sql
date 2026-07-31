@@ -208,3 +208,11 @@ CREATE INDEX IF NOT EXISTS idx_insp_exec_result_exec_no ON inspection_execution_
 CREATE INDEX IF NOT EXISTS idx_metro_exec_result_exec_no ON metrology_execution_result(execution_no);
 CREATE INDEX IF NOT EXISTS idx_wo_segment_user_wo_no ON repair_workorder_segment_user(wo_no);
 CREATE INDEX IF NOT EXISTS idx_insp_record_device_code ON inspection_record(device_code);
+
+-- ---------- AST-WRN-01：设备维保时段 ----------
+CREATE INDEX IF NOT EXISTS idx_device_warranty_term_device ON device_warranty_term(device_id);
+COMMENT ON INDEX idx_device_warranty_term_device IS '索引：设备维保时段.设备';
+CREATE INDEX IF NOT EXISTS idx_device_warranty_term_dates ON device_warranty_term(start_date, end_date);
+COMMENT ON INDEX idx_device_warranty_term_dates IS '索引：设备维保时段.起止日期';
+CREATE INDEX IF NOT EXISTS idx_device_warranty_term_supplier ON device_warranty_term(supplier_id);
+COMMENT ON INDEX idx_device_warranty_term_supplier IS '索引：设备维保时段.维保公司';

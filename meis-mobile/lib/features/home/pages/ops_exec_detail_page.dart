@@ -5,7 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
-import '../../../shared/utils/camera_permission.dart';
+import '../../../shared/utils/image_pick.dart';
 import '../../../shared/utils/status_labels.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_section_label.dart';
@@ -127,11 +127,11 @@ class _OpsExecDetailPageState extends ConsumerState<OpsExecDetailPage> {
   }
 
   Future<String?> uploadImage(ImageSource source) async {
-    if (source == ImageSource.camera) {
-      final ok = await ensureCameraPermission(context, usage: '拍照上传');
-      if (!ok || !mounted) return null;
-    }
-    final file = await ImagePicker().pickImage(source: source, imageQuality: 85);
+    final file = await pickImageWithPermission(
+      context,
+      source: source,
+      usage: '拍照上传',
+    );
     if (file == null) return null;
     return api.uploadFile(file.path, filename: file.name);
   }

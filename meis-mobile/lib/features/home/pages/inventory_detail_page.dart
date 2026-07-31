@@ -5,10 +5,10 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/local_sync_service.dart';
+import '../../../shared/utils/barcode_scan.dart';
 import '../../../shared/utils/status_labels.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_status_chip.dart';
-import 'repair_scan_page.dart';
 
 class InventoryDetailPage extends ConsumerStatefulWidget {
   const InventoryDetailPage({
@@ -168,11 +168,8 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
   }
 
   Future<void> scanAndMark() async {
-    final code = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(builder: (_) => const RepairScanPage()),
-    );
-    if (code == null || code.isEmpty) return;
+    final code = await openBarcodeScanner(context);
+    if (code == null) return;
     if (localMode) {
       final match = items.where((e) => e['device_code']?.toString() == code.trim()).toList();
       if (match.isEmpty) {

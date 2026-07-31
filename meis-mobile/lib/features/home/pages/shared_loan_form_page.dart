@@ -4,11 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/utils/barcode_scan.dart';
 import '../../../shared/utils/datetime_format.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_section_label.dart';
 import '../../auth/providers/auth_provider.dart';
-import 'repair_scan_page.dart';
 
 /// 借调申请表单（MOB-SHR-01）
 class SharedLoanFormPage extends ConsumerStatefulWidget {
@@ -159,12 +159,9 @@ class _SharedLoanFormPageState extends ConsumerState<SharedLoanFormPage> {
 
   Future<void> openScan() async {
     if (!mounted) return;
-    final code = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(builder: (_) => const RepairScanPage()),
-    );
-    if (code == null || code.trim().isEmpty) return;
-    await resolveByCode(code.trim());
+    final code = await openBarcodeScanner(context);
+    if (code == null) return;
+    await resolveByCode(code);
   }
 
   Future<void> resolveByCode(String code) async {

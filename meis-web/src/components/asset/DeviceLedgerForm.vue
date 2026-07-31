@@ -21,6 +21,22 @@
 
       <DeviceArchivePanel v-show="activeTab === 'archive'" :readonly="isView" />
       <DeviceImagePanel v-show="activeTab === 'images'" :readonly="isView" />
+      <DevicePowerMonitorPanel
+        v-show="activeTab === 'power_monitor'"
+        :device-id="deviceId"
+        :device-code="String(model.device_code ?? '')"
+        :device-name="String(model.device_name ?? '')"
+        :model="model"
+        :readonly="isView"
+      />
+      <DeviceWarrantyPanel
+        v-show="activeTab === 'warranty'"
+        :device-id="deviceId"
+        :device-code="String(model.device_code ?? '')"
+        :device-name="String(model.device_name ?? '')"
+        :manufacturer-name="String(model.manufacturer_name ?? '')"
+        :readonly="isView"
+      />
 
       <DeviceLabelPanel
         v-show="activeTab === 'label'"
@@ -157,6 +173,8 @@ import GroupedFormFields from '@/components/form/GroupedFormFields.vue'
 import DeviceAssetCard from '@/components/asset/DeviceAssetCard.vue'
 import DeviceArchivePanel from '@/components/asset/tabs/DeviceArchivePanel.vue'
 import DeviceImagePanel from '@/components/asset/tabs/DeviceImagePanel.vue'
+import DevicePowerMonitorPanel from '@/components/asset/tabs/DevicePowerMonitorPanel.vue'
+import DeviceWarrantyPanel from '@/components/asset/tabs/DeviceWarrantyPanel.vue'
 import DeviceRecordTablePanel from '@/components/asset/tabs/DeviceRecordTablePanel.vue'
 import DeviceCurrentReadingPanel from '@/components/asset/tabs/DeviceCurrentReadingPanel.vue'
 import DeviceLabelPanel from '@/components/asset/tabs/DeviceLabelPanel.vue'
@@ -185,12 +203,14 @@ type CrudBeforeSaveApi = {
 }
 const crudBeforeSave = inject<CrudBeforeSaveApi | null>('crudBeforeSave', null)
 
-/** AST-UI-14 / 附录 P.2：查看态完整顺序 */
+/** AST-UI-14 / 附录 P.2：查看态完整顺序；编辑态见 AST-UI-17 */
 const allTabs = [
   { key: 'basic', label: '基本信息' },
   { key: 'card', label: '资产卡片' },
   { key: 'archive', label: '设备档案' },
   { key: 'images', label: '设备图片' },
+  { key: 'power_monitor', label: '电流监测' },
+  { key: 'warranty', label: '维保信息' },
   { key: 'label', label: '资产标签' },
   { key: 'repair', label: '维修记录' },
   { key: 'maintain', label: '保养记录' },
@@ -209,10 +229,13 @@ const allTabs = [
   { key: 'current_bind', label: '电流标签绑定记录' }
 ]
 
-const ledgerKeys = new Set(['basic', 'archive', 'images'])
+/** AST-UI-17 / AST-WRN-01：编辑/新增露出电流监测与维保信息；查看态保留完整业务 Tab（含维保，不含编辑专用 power_monitor） */
+const ledgerKeys = new Set(['basic', 'archive', 'images', 'power_monitor', 'warranty'])
 
 const visibleTabs = computed(() => {
-  if (isView.value) return allTabs
+  if (isView.value) {
+    return allTabs.filter((t) => t.key !== 'power_monitor')
+  }
   return allTabs.filter((t) => ledgerKeys.has(t.key))
 })
 

@@ -59,7 +59,9 @@ INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, 
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('maintain_param', 'ops_maintain', '保养参数设置', 'menu', '/maintain/param', NULL, 1, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
-INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('mcontract_list', 'asset_maint_mgmt', '维保合同', 'menu', '/maintenance-contract/list', NULL, 1, TRUE)
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('asset_warranty_term', 'asset_maint_mgmt', '设备维保信息', 'menu', '/asset/warranty-term', NULL, 1, TRUE)
+ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('mcontract_list', 'asset_maint_mgmt', '维保合同', 'menu', '/maintenance-contract/list', NULL, 2, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('metrology_param', 'ops_metrology', '计量参数设置', 'menu', '/metrology/param', NULL, 1, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
@@ -119,7 +121,7 @@ INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, 
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('maintain_plan', 'ops_maintain', '保养计划', 'menu', '/maintain/plan', NULL, 2, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
-INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('mcontract_fulfillment', 'asset_maint_mgmt', '履约记录', 'menu', '/maintenance-contract/fulfillment', NULL, 2, TRUE)
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('mcontract_fulfillment', 'asset_maint_mgmt', '履约记录', 'menu', '/maintenance-contract/fulfillment', NULL, 3, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('metrology_plan', 'ops_metrology', '计量计划', 'menu', '/metrology/plan', NULL, 2, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
@@ -189,7 +191,7 @@ INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, 
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('qc_metrology', 'mod_quality', '计量管理', 'menu', '/qc/metrology', NULL, 3, FALSE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
-INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('qc_performance', 'asset_maint_mgmt', '性能检测', 'menu', '/qc/performance', NULL, 3, TRUE)
+INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('qc_performance', 'asset_maint_mgmt', '性能检测', 'menu', '/qc/performance', NULL, 4, TRUE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
 INSERT INTO sys_menu (menu_code, parent_code, menu_name, menu_type, path, icon, sort_order, is_active) VALUES ('repair_spare', 'mod_ops', '备件管理', 'menu', '/repair/spare', NULL, 3, FALSE)
 ON CONFLICT (menu_code) DO UPDATE SET parent_code=EXCLUDED.parent_code, menu_name=EXCLUDED.menu_name, menu_type=EXCLUDED.menu_type, path=EXCLUDED.path, icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order, is_active=EXCLUDED.is_active;
@@ -365,6 +367,7 @@ INSERT INTO sys_package_menu (package_code, menu_code) VALUES
 ('flagship','asset_import'),
 ('flagship','asset_inventory'),
 ('flagship','asset_maint_mgmt'),
+('flagship','asset_warranty_term'),
 ('flagship','asset_outbound'),
 ('flagship','asset_query'),
 ('flagship','asset_query_group'),
@@ -550,6 +553,7 @@ INSERT INTO sys_package_menu (package_code, menu_code) VALUES
 ('standard','asset_import'),
 ('standard','asset_inventory'),
 ('standard','asset_maint_mgmt'),
+('standard','asset_warranty_term'),
 ('standard','asset_outbound'),
 ('standard','asset_query'),
 ('standard','asset_query_group'),

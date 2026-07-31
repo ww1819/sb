@@ -95,6 +95,14 @@ public class AssetDeviceController {
             PageQuery query,
             @RequestParam(value = "enable_dateFrom", required = false) String enable_dateFrom,
             @RequestParam(value = "enable_dateTo", required = false) String enable_dateTo,
+            @RequestParam(value = "created_atFrom", required = false) String created_atFrom,
+            @RequestParam(value = "created_atTo", required = false) String created_atTo,
+            @RequestParam(value = "production_dateFrom", required = false) String production_dateFrom,
+            @RequestParam(value = "production_dateTo", required = false) String production_dateTo,
+            @RequestParam(value = "acceptance_dateFrom", required = false) String acceptance_dateFrom,
+            @RequestParam(value = "acceptance_dateTo", required = false) String acceptance_dateTo,
+            @RequestParam(value = "has_power_tag", required = false) String has_power_tag,
+            @RequestParam(value = "power_tag_code", required = false) String power_tag_code,
             @RequestParam(value = "supplier_id", required = false) String supplier_id,
             @RequestParam(value = "manufacturer_id", required = false) String manufacturer_id,
             @RequestParam(value = "supplier_name", required = false) String supplier_name,
@@ -118,78 +126,18 @@ public class AssetDeviceController {
             @RequestParam(value = "finance_category_kw", required = false) String finance_category_kw,
             @RequestParam(value = "stock_scope", required = false) String stock_scope,
             @RequestParam(value = "hide_returned", required = false) Boolean hide_returned) {
-        StringBuilder where = new StringBuilder(" WHERE 1=1 ");
-        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d"));
-        List<Object> args = new ArrayList<>();
-        // 库房库存：仅仓库在库（WH-UI-19）；科室在用：不在库（WH-UI-24 退库选资产）
-        if ("warehouse".equalsIgnoreCase(stock_scope)) {
-            where.append(" AND d.warehouse_id IS NOT NULL ");
-        } else if ("dept".equalsIgnoreCase(stock_scope)) {
-            where.append(" AND d.warehouse_id IS NULL ");
-        }
-        // 资产登记：已退货不展示（AST-UI-12）；库存/综合查询等不传此参
-        if (Boolean.TRUE.equals(hide_returned)) {
-            where.append(" AND COALESCE(d.device_status, '') <> 'returned' ");
-        }
-        if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
-            String kw = "%" + query.getKeyword().trim() + "%";
-            where.append("""
-                     AND (d.device_code ILIKE ? OR d.device_name ILIKE ? OR d.specification ILIKE ?
-                          OR d.financial_code ILIKE ? OR d.serial_number ILIKE ?)
-                    """);
-            args.add(kw);
-            args.add(kw);
-            args.add(kw);
-            args.add(kw);
-            args.add(kw);
-        }
-        appendUuidEq(where, args, "d.supplier_id", supplier_id);
-        appendUuidEq(where, args, "d.manufacturer_id", manufacturer_id);
-        FilterCsvSupport.appendUuidIn(where, args, "d.dept_id", dept_id);
-        FilterCsvSupport.appendUuidIn(where, args, "d.manage_dept_id", manage_dept_id);
-        appendUuidEq(where, args, "d.warehouse_id", warehouse_id);
-        FilterCsvSupport.appendUuidIn(where, args, "d.category_id", category_id);
-        FilterCsvSupport.appendUuidIn(where, args, "d.asset_category_id", asset_category_id);
-        FilterCsvSupport.appendUuidIn(where, args, "d.finance_category_id", finance_category_id);
-        boolean needSupplier = true;
-        boolean needManufacturer = true;
-        // 列表须带出科室/仓库/分类名称
-        boolean needUseDept = true;
-        boolean needManageDept = true;
-        boolean needWarehouse = true;
-        boolean needCategory = true;
-        if (hasText(supplier_name)) {
-            appendSupplierSearch(where, args, supplier_name);
-        }
-        if (!hasText(manufacturer_id)) {
-            appendNameOrPinyin(where, args, "mfr.manufacturer_name", "mfr.pinyin_code", manufacturer_name);
-        }
-        appendNameOrPinyin(where, args, "d.device_name", "d.pinyin_code", device_name);
-        appendLike(where, args, "d.specification", specification);
-        appendLike(where, args, "d.model", model);
-        if (!hasText(dept_id)) {
-            appendNameOrPinyin(where, args, "use_dept.dept_name", "use_dept.pinyin_code", dept_name);
-        }
-        if (!hasText(manage_dept_id)) {
-            appendNameOrPinyin(where, args, "mgr_dept.dept_name", "mgr_dept.pinyin_code", manage_dept_name);
-        }
-        appendLike(where, args, "d.serial_number", serial_number);
-        appendLike(where, args, "d.device_code", device_code);
-        FilterCsvSupport.appendStrIn(where, args, "d.device_status", device_status);
-        FilterCsvSupport.appendCodeNamePinyin(where, args, "mdc.category_code", "mdc.category_name", null, category_kw);
-        FilterCsvSupport.appendCodeNamePinyin(where, args, "ac.category_code", "ac.category_name", null, asset_category_kw);
-        FilterCsvSupport.appendCodeNamePinyin(where, args, "fc.finance_code", "fc.finance_name", null, finance_category_kw);
-        if (enable_dateFrom != null && !enable_dateFrom.isBlank()) {
-            where.append(" AND d.enable_date >= ?::date ");
-            args.add(enable_dateFrom.trim());
-        }
-        if (enable_dateTo != null && !enable_dateTo.isBlank()) {
-            where.append(" AND d.enable_date <= ?::date ");
-            args.add(enable_dateTo.trim());
-        }
-        String from = buildFrom(needSupplier, needManufacturer, needUseDept, needManageDept, needWarehouse, needCategory);
+        FilterBuild fb = buildListFilter(query, enable_dateFrom, enable_dateTo,
+                created_atFrom, created_atTo, production_dateFrom, production_dateTo,
+                acceptance_dateFrom, acceptance_dateTo,
+                has_power_tag, power_tag_code,
+                supplier_id, manufacturer_id, supplier_name, manufacturer_name,
+                device_name, specification, model, dept_id, manage_dept_id,
+                dept_name, manage_dept_name, serial_number, device_code, device_status,
+                warehouse_id, category_id, asset_category_id, finance_category_id,
+                category_kw, asset_category_kw, finance_category_kw, stock_scope, hide_returned);
         long total = Optional.ofNullable(jdbc.queryForObject(
-                "SELECT COUNT(*) " + from + where, Long.class, args.toArray())).orElse(0L);
+                "SELECT COUNT(*) " + fb.from + fb.where, Long.class, fb.args.toArray())).orElse(0L);
+        List<Object> args = new ArrayList<>(fb.args);
         int offset = (query.getPage() - 1) * query.getSize();
         args.add(query.getSize());
         args.add(offset);
@@ -211,8 +159,17 @@ public class AssetDeviceController {
                             WHEN d.service_expiry_date <= CURRENT_DATE THEN TRUE
                             ELSE FALSE END AS service_expiry_reached,
                        CASE WHEN d.service_expiry_date IS NULL THEN NULL
-                            ELSE GREATEST(0, (d.service_expiry_date - CURRENT_DATE)) END AS service_expiry_remaining_days
-                """ + from + where + buildOrderBy(query) + " LIMIT ? OFFSET ?", args.toArray());
+                            ELSE GREATEST(0, (d.service_expiry_date - CURRENT_DATE)) END AS service_expiry_remaining_days,
+                       CASE WHEN pt.tag_code IS NOT NULL THEN TRUE ELSE FALSE END AS has_power_tag,
+                       pt.tag_code AS power_tag_code,
+                       EXISTS (
+                         SELECT 1 FROM device_warranty_term wt
+                         WHERE wt.device_id = d.id
+                           AND wt.start_date <= CURRENT_DATE AND wt.end_date >= CURRENT_DATE
+                           AND wt.is_deleted = 0
+                       ) AS under_warranty
+                """ + fb.from + powerTagLateralJoin() + fb.where + buildOrderBy(query)
+                + " LIMIT ? OFFSET ?", args.toArray());
         MedicalDeviceDeleteGuard.enrichCanDelete(jdbc, rows);
         return Result.ok(new PageResult<>(rows, total, query.getPage(), query.getSize()));
     }
@@ -223,6 +180,14 @@ public class AssetDeviceController {
             PageQuery query,
             @RequestParam(value = "enable_dateFrom", required = false) String enable_dateFrom,
             @RequestParam(value = "enable_dateTo", required = false) String enable_dateTo,
+            @RequestParam(value = "created_atFrom", required = false) String created_atFrom,
+            @RequestParam(value = "created_atTo", required = false) String created_atTo,
+            @RequestParam(value = "production_dateFrom", required = false) String production_dateFrom,
+            @RequestParam(value = "production_dateTo", required = false) String production_dateTo,
+            @RequestParam(value = "acceptance_dateFrom", required = false) String acceptance_dateFrom,
+            @RequestParam(value = "acceptance_dateTo", required = false) String acceptance_dateTo,
+            @RequestParam(value = "has_power_tag", required = false) String has_power_tag,
+            @RequestParam(value = "power_tag_code", required = false) String power_tag_code,
             @RequestParam(value = "supplier_id", required = false) String supplier_id,
             @RequestParam(value = "manufacturer_id", required = false) String manufacturer_id,
             @RequestParam(value = "supplier_name", required = false) String supplier_name,
@@ -246,8 +211,12 @@ public class AssetDeviceController {
             @RequestParam(value = "finance_category_kw", required = false) String finance_category_kw,
             @RequestParam(value = "stock_scope", required = false) String stock_scope,
             @RequestParam(value = "hide_returned", required = false) Boolean hide_returned) {
-        FilterBuild fb = buildListFilter(query, enable_dateFrom, enable_dateTo, supplier_id, manufacturer_id,
-                supplier_name, manufacturer_name, device_name, specification, model, dept_id, manage_dept_id,
+        FilterBuild fb = buildListFilter(query, enable_dateFrom, enable_dateTo,
+                created_atFrom, created_atTo, production_dateFrom, production_dateTo,
+                acceptance_dateFrom, acceptance_dateTo,
+                has_power_tag, power_tag_code,
+                supplier_id, manufacturer_id, supplier_name, manufacturer_name,
+                device_name, specification, model, dept_id, manage_dept_id,
                 dept_name, manage_dept_name, serial_number, device_code, device_status, warehouse_id,
                 category_id, asset_category_id, finance_category_id, category_kw, asset_category_kw,
                 finance_category_kw, stock_scope, hide_returned);
@@ -329,6 +298,10 @@ public class AssetDeviceController {
     private FilterBuild buildListFilter(
             PageQuery query,
             String enable_dateFrom, String enable_dateTo,
+            String created_atFrom, String created_atTo,
+            String production_dateFrom, String production_dateTo,
+            String acceptance_dateFrom, String acceptance_dateTo,
+            String has_power_tag, String power_tag_code,
             String supplier_id, String manufacturer_id,
             String supplier_name, String manufacturer_name,
             String device_name, String specification, String model,
@@ -390,14 +363,21 @@ public class AssetDeviceController {
         FilterCsvSupport.appendCodeNamePinyin(where, args, "mdc.category_code", "mdc.category_name", null, category_kw);
         FilterCsvSupport.appendCodeNamePinyin(where, args, "ac.category_code", "ac.category_name", null, asset_category_kw);
         FilterCsvSupport.appendCodeNamePinyin(where, args, "fc.finance_code", "fc.finance_name", null, finance_category_kw);
-        if (enable_dateFrom != null && !enable_dateFrom.isBlank()) {
-            where.append(" AND d.enable_date >= ?::date ");
-            args.add(enable_dateFrom.trim());
+        appendDateGe(where, args, "d.enable_date", enable_dateFrom);
+        appendDateLe(where, args, "d.enable_date", enable_dateTo);
+        appendDateGe(where, args, "d.production_date", production_dateFrom);
+        appendDateLe(where, args, "d.production_date", production_dateTo);
+        appendDateGe(where, args, "d.acceptance_date", acceptance_dateFrom);
+        appendDateLe(where, args, "d.acceptance_date", acceptance_dateTo);
+        if (hasText(created_atFrom)) {
+            where.append(" AND d.created_at >= ?::date ");
+            args.add(created_atFrom.trim());
         }
-        if (enable_dateTo != null && !enable_dateTo.isBlank()) {
-            where.append(" AND d.enable_date <= ?::date ");
-            args.add(enable_dateTo.trim());
+        if (hasText(created_atTo)) {
+            where.append(" AND d.created_at < (?::date + INTERVAL '1 day') ");
+            args.add(created_atTo.trim());
         }
+        appendPowerTagFilters(where, args, has_power_tag, power_tag_code);
         String from = buildFrom(true, true, true, true, true, true);
         return new FilterBuild(from, where.toString(), args);
     }
@@ -409,6 +389,10 @@ public class AssetDeviceController {
         FilterBuild fb = buildListFilter(
                 query,
                 str(body.get("enable_dateFrom")), str(body.get("enable_dateTo")),
+                str(body.get("created_atFrom")), str(body.get("created_atTo")),
+                str(body.get("production_dateFrom")), str(body.get("production_dateTo")),
+                str(body.get("acceptance_dateFrom")), str(body.get("acceptance_dateTo")),
+                str(body.get("has_power_tag")), str(body.get("power_tag_code")),
                 str(body.get("supplier_id")), str(body.get("manufacturer_id")),
                 str(body.get("supplier_name")), str(body.get("manufacturer_name")),
                 str(body.get("device_name")), str(body.get("specification")), str(body.get("model")),
@@ -461,6 +445,56 @@ public class AssetDeviceController {
         if (!hasText(value)) return;
         where.append(" AND ").append(column).append(" ILIKE ? ");
         args.add("%" + value.trim() + "%");
+    }
+
+    private static void appendDateGe(StringBuilder where, List<Object> args, String column, String value) {
+        if (!hasText(value)) return;
+        where.append(" AND ").append(column).append(" >= ?::date ");
+        args.add(value.trim());
+    }
+
+    private static void appendDateLe(StringBuilder where, List<Object> args, String column, String value) {
+        if (!hasText(value)) return;
+        where.append(" AND ").append(column).append(" <= ?::date ");
+        args.add(value.trim());
+    }
+
+    /** AST-UI-16：电流监测标签筛选（未软删绑定） */
+    private void appendPowerTagFilters(StringBuilder where, List<Object> args,
+                                       String has_power_tag, String power_tag_code) {
+        String notDel = SoftDeleteSupport.notDeletedClause(jdbc, "power_tag", "pt");
+        if (hasText(has_power_tag)) {
+            String v = has_power_tag.trim().toLowerCase(Locale.ROOT);
+            boolean wantYes = "true".equals(v) || "1".equals(v) || "yes".equals(v) || "是".equals(has_power_tag.trim());
+            boolean wantNo = "false".equals(v) || "0".equals(v) || "no".equals(v) || "否".equals(has_power_tag.trim());
+            if (wantYes) {
+                where.append(" AND EXISTS (SELECT 1 FROM power_tag pt WHERE pt.device_id = d.id ")
+                        .append(notDel).append(") ");
+            } else if (wantNo) {
+                where.append(" AND NOT EXISTS (SELECT 1 FROM power_tag pt WHERE pt.device_id = d.id ")
+                        .append(notDel).append(") ");
+            }
+        }
+        if (hasText(power_tag_code)) {
+            where.append(" AND EXISTS (SELECT 1 FROM power_tag pt WHERE pt.device_id = d.id ")
+                    .append(notDel).append(" AND pt.tag_code ILIKE ?) ");
+            args.add("%" + power_tag_code.trim() + "%");
+        }
+    }
+
+    /** AST-UI-16：列表带出一条有效标签编码 */
+    private String powerTagLateralJoin() {
+        String notDel = SoftDeleteSupport.notDeletedClause(jdbc, "power_tag", "pt");
+        return """
+                 LEFT JOIN LATERAL (
+                   SELECT pt.tag_code
+                   FROM power_tag pt
+                   WHERE pt.device_id = d.id
+                """ + notDel + """
+                   ORDER BY pt.updated_at DESC NULLS LAST, pt.created_at DESC NULLS LAST
+                   LIMIT 1
+                 ) pt ON TRUE
+                """;
     }
 
     /** @deprecated 使用 {@link FilterCsvSupport#appendStrIn} */

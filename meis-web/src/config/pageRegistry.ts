@@ -356,8 +356,24 @@ export const pageRegistry: Record<string, PageConfig> = {
     sortableColumns: ['device_code', 'device_name', 'specification', 'dept_name'],
     listParams: { hide_returned: true },
     listFilters: [
-      { key: 'enable_dateFrom', label: '起', type: 'date', actionBar: true },
-      { key: 'enable_dateTo', label: '止', type: 'date', actionBar: true },
+      { key: 'enable_dateFrom', label: '启用日期起', type: 'date', actionBar: true },
+      { key: 'enable_dateTo', label: '启用日期止', type: 'date', actionBar: true },
+      { key: 'created_atFrom', label: '录入时间起', type: 'date', actionBar: true },
+      { key: 'created_atTo', label: '录入时间止', type: 'date', actionBar: true },
+      { key: 'production_dateFrom', label: '生产日期起', type: 'date', actionBar: true },
+      { key: 'production_dateTo', label: '生产日期止', type: 'date', actionBar: true },
+      { key: 'acceptance_dateFrom', label: '验收日期起', type: 'date', actionBar: true },
+      { key: 'acceptance_dateTo', label: '验收日期止', type: 'date', actionBar: true },
+      {
+        key: 'has_power_tag',
+        label: '是否有电流监测标签',
+        type: 'select',
+        actionBar: true,
+        options: [
+          { value: 'true', label: '是' },
+          { value: 'false', label: '否' }
+        ]
+      },
       {
         key: 'device_status',
         label: '设备状态',
@@ -369,6 +385,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     ],
     moreSearchFields: [
       { key: 'device_code', label: '资产编码', placeholder: '资产编码模糊' },
+      { key: 'power_tag_code', label: '电流监测标签编码', placeholder: '标签编码模糊' },
       { key: 'supplier_id', label: '供应商', placeholder: '供应商名称/编码', linkTable: 'supplier' },
       { key: 'manufacturer_id', label: '生产厂家', placeholder: '生产厂家名称/编码', linkTable: 'manufacturer' },
       { key: 'device_name', label: '资产名称', placeholder: '资产名称/简码' },
@@ -892,6 +909,23 @@ export const pageRegistry: Record<string, PageConfig> = {
   },
   '/qc/metrology': { title: '计量管理', apiBase: '/qc', table: 'metrology_record' },
   '/qc/performance': { title: '性能检测', apiBase: '/qc', table: 'performance_test' },
+  '/asset/warranty-term': {
+    title: '设备维保信息',
+    apiBase: '/asset',
+    table: 'device_warranty_term',
+    listPageUrl: '/asset/warranty-term/page',
+    saveUrl: '/asset/warranty-term',
+    showRowIndex: true,
+    listFilters: [
+      { key: 'under_warranty', label: '是否在保', type: 'select', actionBar: true, options: [
+        { value: 'true', label: '在保' },
+        { value: 'false', label: '不在保' }
+      ] },
+      { key: 'end_dateFrom', label: '结束日期起', type: 'date', actionBar: true },
+      { key: 'end_dateTo', label: '结束日期止', type: 'date', actionBar: true },
+      { key: 'supplier_id', label: '维保公司', linkTable: 'supplier', actionBar: true }
+    ]
+  },
   '/maintenance-contract/list': { title: '维保合同', apiBase: '/maintenance-contract', table: 'maintenance_contract' },
   '/maintenance-contract/fulfillment': { title: '履约记录', apiBase: '/maintenance-contract', table: 'maintenance_contract_fulfillment' },
   '/special/life': {

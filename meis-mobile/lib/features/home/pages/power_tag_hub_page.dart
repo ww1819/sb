@@ -4,13 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/utils/barcode_scan.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_section_label.dart';
 import '../../auth/providers/auth_provider.dart';
 import 'power_readings_page.dart';
 import 'power_tag_bind_page.dart';
 import 'power_tag_form_page.dart';
-import 'repair_scan_page.dart';
 
 /// MOB-PWR-01：电流标签 — 扫码 / 手输查询 / 新增入口
 class PowerTagHubPage extends ConsumerStatefulWidget {
@@ -35,12 +35,9 @@ class _PowerTagHubPageState extends ConsumerState<PowerTagHubPage> {
 
   Future<void> _scan() async {
     if (!mounted) return;
-    final code = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(builder: (_) => const RepairScanPage()),
-    );
-    if (code == null || code.trim().isEmpty) return;
-    await _lookupExact(code.trim());
+    final code = await openBarcodeScanner(context);
+    if (code == null) return;
+    await _lookupExact(code);
   }
 
   Future<void> _lookupExact(String code) async {
