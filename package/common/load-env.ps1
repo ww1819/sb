@@ -1,4 +1,4 @@
-# Shared loader for package\env.txt (ASCII only to avoid PS encoding issues)
+﻿# Shared loader for package\env.txt (ASCII only to avoid PS encoding issues)
 function Import-MeisPackageEnv {
     param(
         [string]$EnvFile = (Join-Path $PSScriptRoot 'env.txt')

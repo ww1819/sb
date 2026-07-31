@@ -16,8 +16,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$pkgDir = $PSScriptRoot
-. (Join-Path $pkgDir 'load-env.ps1')
+$pkgDir = Split-Path $PSScriptRoot -Parent
+. (Join-Path $pkgDir 'common\load-env.ps1')
 Import-MeisPackageEnv -EnvFile (Join-Path $pkgDir 'env.txt')
 
 if (-not $SdkRoot) {

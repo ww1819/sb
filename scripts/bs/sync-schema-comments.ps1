@@ -1,10 +1,12 @@
 # Merge V2 ALTER into V1; embed COMMENT ON in V1/V2; V4 backfills legacy objects.
 param(
-    [string]$Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path,
+    [string]$Root = '',
     [switch]$CommentsOnly
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path (Split-Path $PSScriptRoot -Parent) 'common\meis-root.ps1')
+if ([string]::IsNullOrWhiteSpace($Root)) { $Root = $script:MeisRoot }
 $labelsPath = Join-Path $PSScriptRoot 'schema-comment-labels.json'
 $labels = Get-Content $labelsPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $TableLabels = @{}

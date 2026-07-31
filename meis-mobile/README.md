@@ -20,15 +20,16 @@
 
 ```bat
 REM 1. 先启动 MEIS 后端
-scripts\start.bat
+scripts\bs\start.bat
 
 REM 2. 首次：生成 android/windows 平台工程
-scripts\setup-mobile.bat
+scripts\app\setup-mobile.bat
 
 REM 3. 运行 App（弹出独立窗口）
-scripts\run-mobile.bat
+scripts\app\run-mobile.bat
 ```
 
+（根目录 `scripts\start.bat` / `setup-mobile.bat` / `run-mobile.bat` 仍为转发入口。）
 ## 手动命令
 
 ```powershell

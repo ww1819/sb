@@ -11,7 +11,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$repoRoot = Split-Path $PSScriptRoot -Parent
+. (Join-Path (Split-Path $PSScriptRoot -Parent) 'common\meis-root.ps1')
+$repoRoot = $script:MeisRoot
 $patchFile = Join-Path $repoRoot "meis-tenant\src\main\resources\db\migrations\tenant\R__columns_biz.sql"
 
 if (-not (Test-Path $patchFile)) { throw "Patch file not found: $patchFile" }

@@ -9,14 +9,15 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$repoRoot = Split-Path $PSScriptRoot -Parent
+. (Join-Path (Split-Path $PSScriptRoot -Parent) 'common\meis-root.ps1')
+$repoRoot = $script:MeisRoot
 $jar = Join-Path $repoRoot "meis-common\target\deps\postgresql-42.7.3.jar"
 if (-not (Test-Path $jar)) {
     Push-Location (Join-Path $repoRoot "meis-common")
     mvn -q dependency:copy-dependencies -DincludeArtifactIds=postgresql -DoutputDirectory=target/deps | Out-Null
     Pop-Location
 }
-Push-Location (Join-Path $repoRoot "scripts")
+Push-Location $script:MeisScriptsBs
 try {
     javac -encoding UTF-8 -cp $jar EnsureTenantV1Tables.java
     if ($Schema.Count -gt 0) {
