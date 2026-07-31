@@ -347,7 +347,7 @@ function reset() {
 }
 
 .preview-wrap {
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--meis-report-line);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -356,8 +356,8 @@ function reset() {
   padding: 8px 12px;
   font-size: 13px;
   font-weight: 600;
-  background: #d6ebf8;
-  border-bottom: 1px solid #d0d7de;
+  background: var(--meis-report-header-bg);
+  border-bottom: 1px solid var(--meis-report-line);
 }
 
 .preview-count {

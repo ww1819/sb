@@ -47,10 +47,10 @@ defineEmits<{
 
 <style scoped>
 .page-filter-bar {
-  padding: 12px var(--meis-space-md);
-  background: var(--meis-surface-muted);
-  border: 1px solid var(--meis-border-light);
-  border-radius: var(--meis-card-radius);
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   margin-bottom: 0;
 }
 

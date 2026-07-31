@@ -171,6 +171,13 @@ const pageComponent = computed(() => {
   height: 100%;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.module-page > :deep(*) {
+  flex: 1;
+  min-height: 0;
 }
 
 .module-page-loading {

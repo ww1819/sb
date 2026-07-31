@@ -9,6 +9,7 @@
   --meis-card-shadow: var(--meis-shadow-sm);
   --meis-header-gradient-start: #001529;
   --meis-header-gradient-end: #003a70;
+  --meis-sidebar-deep: #002140;
   --meis-text-primary: #303133;
   --meis-text-secondary: #909399;
   --meis-border-light: #ebeef5;
@@ -41,7 +42,16 @@
   --meis-table-hover: #f5f9ff;
   --meis-table-hover-accent: var(--el-color-primary);
 
+  /* Report surface (overridden at runtime by applyBrandColor) */
+  --meis-report-header-bg: #d6ebf8;
+  --meis-report-hover: #e6f7ff;
+  --meis-report-border: #b7d4ea;
+  --meis-report-stripe: #fef5e7;
+  --meis-report-warn-bg: #fff7e6;
+  --meis-report-line: #d0d7de;
+
   --el-color-primary: #1677ff;
+  --el-color-primary-rgb: 22, 119, 255;
   --el-color-primary-light-3: #4096ff;
   --el-color-primary-light-5: #69b1ff;
   --el-color-primary-light-7: #91caff;

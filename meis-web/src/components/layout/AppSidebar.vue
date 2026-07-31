@@ -195,7 +195,7 @@ function moduleIcon(id: string): Component {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: linear-gradient(180deg, var(--meis-header-gradient-start) 0%, #002140 100%);
+  background: linear-gradient(180deg, var(--meis-header-gradient-start) 0%, var(--meis-sidebar-deep) 100%);
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08);
   transition: width 0.2s ease;
   flex-shrink: 0;

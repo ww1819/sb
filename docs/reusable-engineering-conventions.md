@@ -4,7 +4,7 @@
 > **来源**：`docs/meis-requirements.md` 附录 Q / C / D / E / F / G / H / I / R / S / T 等。  
 > **用法**：新系统可整份复制后，按「落地映射」改路径与模块名；MEIS 专属细节见文末附录。
 
-**版本**：1.31（2026-07-31）
+**版本**：1.33（2026-07-31）
 
 ---
 
@@ -419,6 +419,19 @@ USB 外设（如文档高拍仪）**勿**由浏览器直连硬件；经厂商本
 
 落地映射：MEIS PLT-I18N-01 / PLT-STATUS-CN-01；`meis-web/src/i18n/`、`meis-mobile/.../status_labels.dart`、`meis-mp/src/utils/statusLabels.ts`。
 
+### 5.14 列表页与弹窗表面（报表风）
+
+业务列表/字典页与表单弹窗默认采用同一套表面，避免各页私自灰底卡片+圆角弹窗混搭。
+
+| 项 | 要求 |
+|----|------|
+| **列表** | 查询区色条「查询条件」+ 表格外框 + 表题色条 + 底栏分页；走品牌色报表 token |
+| **弹窗/抽屉** | 标题条与列表色条同色；右侧抽屉贴边、去掉组件默认内边距；底栏同表格 footer |
+| **实现** | 共享列表壳/弹窗组件默认启用该表面；筛选条不要再套一层灰底卡片 |
+| **例外** | 大屏/工作台等非列表壳；单页需旧样式时显式关闭 |
+
+落地映射：MEIS PLT-UI-SURFACE-01；`list-surface.css`、`SystemPageCard` / `AppModal` / `FormDrawer` 默认 `variant=report`。
+
 ---
 
 ## 6. 单据草稿 / 提交 / 撤回（业务模式）
@@ -568,6 +581,7 @@ USB 外设（如文档高拍仪）**勿**由浏览器直连硬件；经厂商本
 | NF-06 | 编码 | 业务唯一编码创建后只读（前后端双重忽略改码） |
 | NF-07 | 删除约束 | 存在关联业务数据则禁止删主数据（软删前校验） |
 | NF-08 | 版本库 | **构建产物 / 本机密钥环境文件 / 临时调试文件不入库**；目录可用 `*` + `!.gitignore` 占位；已误跟踪的用 `git rm --cached` 移出 |
+| NF-09 | 体验 | Web 品牌主色可由用户偏好切换（预设/自定义）；报表装饰色与主色同源 token，避免写死色与菜单两套体系 |
 
 ### 8.1 移动端本地数据库（Flutter）
 
@@ -629,6 +643,7 @@ USB 外设（如文档高拍仪）**勿**由浏览器直连硬件；经厂商本
 | 多端日期时间格式 | PLT-DT-01、约定包 **§5.12** | `meis-web/src/utils/datetime.ts`；`meis-mobile/.../datetime_format.dart`；`meis-mp/src/utils/datetime.ts`；列表/表单/筛选 |
 | 构建产物不入库 | PKG-VCS-01、约定包 **NF-08** | `.gitignore`；`package/www|.jars|.apk` 目录内占位 ignore |
 | 开发/现场脚本分区 | 本文 **§9.1** | `scripts/{common,bs,app}`；`package/{common,bs,app}`；根目录薄转发 |
+| Web 品牌色偏好 | PLT-THEME-01、约定包 **NF-09** | `styles/brand.ts`、`layout` store、`LayoutPreferencesDrawer`；报表 `--meis-report-*` |
 | 变更记录/快照 | 附录 T（含 T.5） | `EntityChangeLogService` |
 | 主从保存 | 第 4 章 PLT-X-05 | 出入库/计划等专用保存 |
 | 业务冗余字段 | 附录 W（含 W.5 / **W.6**）、约定包 §6.2 / §6.3 | 设备/主数据 code+name；单据号下沉明细；人员姓名快照 |

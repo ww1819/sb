@@ -1,5 +1,7 @@
 /** 前端示意报表：导出为 Excel 可打开的 HTML/.xls */
 
+import { getBrandExportColors } from '@/styles/brand'
+
 export function formatExportDate(d = new Date()) {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -16,7 +18,16 @@ export function escapeHtml(s: string) {
 }
 
 export function downloadExcelHtml(htmlTable: string, filenameWithoutExt: string) {
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8" /></head><body>${htmlTable}</body></html>`
+  const colors = getBrandExportColors(
+    document.documentElement.dataset.brand,
+    document.documentElement.classList.contains('dark')
+  )
+  const style = `<style>
+    table{border-collapse:collapse;font-size:12px}
+    th{background:${colors.headerBg};border:1px solid ${colors.line};padding:4px 6px}
+    td{border:1px solid ${colors.line};padding:4px 6px}
+  </style>`
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8" />${style}</head><body>${htmlTable}</body></html>`
   const blob = new Blob([`\uFEFF${html}`], { type: 'application/vnd.ms-excel;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

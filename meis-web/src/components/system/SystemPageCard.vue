@@ -1,7 +1,7 @@
 <template>
-  <div class="system-page">
-    <el-card shadow="never" class="system-card">
-      <template v-if="showHeader" #header>
+  <div class="system-page" :class="{ 'system-page--report': isReport }">
+    <el-card shadow="never" class="system-card" :class="{ 'system-card--report': isReport }">
+      <template v-if="showHeader && !isReport" #header>
         <div class="system-header">
           <div v-if="showTitle || subtitle" class="system-header-text">
             <div v-if="showTitle" class="system-title">{{ title }}</div>
@@ -13,8 +13,36 @@
         </div>
       </template>
 
-      <div class="system-card-body">
-        <div v-if="$slots.filterBar" class="system-filter-slot">
+      <div class="system-card-body" :class="{ 'system-card-body--report': isReport }">
+        <!-- report：查询条件色条（含 filterBar / 简易搜索） -->
+        <div
+          v-if="isReport && ($slots.filterBar || $slots.filter || showSearch)"
+          class="meis-query-box"
+        >
+          <div class="meis-section-bar">查询条件</div>
+          <div class="meis-query-body">
+            <template v-if="$slots.filterBar">
+              <slot name="filterBar" />
+            </template>
+            <template v-else>
+              <el-input
+                v-if="showSearch"
+                :model-value="keyword"
+                placeholder="关键词搜索"
+                clearable
+                class="search-input"
+                @update:model-value="$emit('update:keyword', $event)"
+                @clear="$emit('search')"
+                @keyup.enter="$emit('search')"
+              />
+              <el-button v-if="showSearch" type="primary" @click="$emit('search')">查询</el-button>
+              <el-button v-if="showSearch" @click="$emit('reset')">重置</el-button>
+              <slot name="filter" />
+            </template>
+          </div>
+        </div>
+
+        <div v-else-if="$slots.filterBar" class="system-filter-slot">
           <slot name="filterBar" />
         </div>
 
@@ -34,7 +62,12 @@
           <slot name="filter" />
         </div>
 
-        <div v-loading="loading" class="system-table-wrap">
+        <div
+          v-loading="loading"
+          class="system-table-wrap"
+          :class="{ 'meis-table-wrap': isReport }"
+        >
+          <div v-if="isReport" class="meis-section-bar">{{ tableTitle }}</div>
           <div ref="tableWrapRef" class="system-table-fill">
             <slot name="table">
               <slot />
@@ -43,9 +76,23 @@
               <slot name="empty" />
             </div>
           </div>
+          <div v-if="isReport && showPager" class="meis-table-footer">
+            <el-pagination
+              :current-page="page"
+              :page-size="size"
+              :total="total"
+              :page-sizes="[10, 20, 50, 100]"
+              layout="total, sizes, prev, pager, next, jumper"
+              background
+              @update:current-page="$emit('update:page', $event)"
+              @update:page-size="$emit('update:size', $event)"
+              @current-change="$emit('page-change')"
+              @size-change="$emit('page-change')"
+            />
+          </div>
         </div>
 
-        <div v-if="showPager" class="system-pager">
+        <div v-if="!isReport && showPager" class="system-pager">
           <el-pagination
             :current-page="page"
             :page-size="size"
@@ -68,6 +115,8 @@
 import { computed, provide, ref, useSlots } from 'vue'
 import { useTableHeight } from '@/composables/useTableHeight'
 
+export type SystemPageVariant = 'default' | 'report'
+
 const props = withDefaults(
   defineProps<{
     title: string
@@ -80,8 +129,10 @@ const props = withDefaults(
     page?: number
     size?: number
     total?: number
+    /** report = 价值结构表同款；全站默认 report */
+    variant?: SystemPageVariant
   }>(),
-  { showTitle: false }
+  { showTitle: false, variant: 'report' }
 )
 
 defineEmits<{
@@ -99,6 +150,9 @@ const tableHeight = useTableHeight(tableWrapRef)
 
 provide('systemTableHeight', tableHeight)
 
+const isReport = computed(() => props.variant === 'report')
+const tableTitle = computed(() => props.title || '列表')
+
 const showHeader = computed(
   () => props.showTitle || !!props.subtitle || !!slots.actions
 )
@@ -112,6 +166,11 @@ const showHeader = computed(
   flex-direction: column;
 }
 
+.system-page--report {
+  padding-bottom: 16px;
+  box-sizing: border-box;
+}
+
 .system-card {
   height: 100%;
   min-height: 0;
@@ -120,6 +179,17 @@ const showHeader = computed(
   border-radius: var(--meis-card-radius);
   border: 1px solid var(--meis-border-light);
   box-shadow: var(--meis-card-shadow);
+}
+
+.system-card--report {
+  border-radius: 0;
+  box-shadow: none;
+  border-color: transparent;
+  background: transparent;
+}
+
+.system-card--report :deep(.el-card__body) {
+  background: transparent;
 }
 
 .system-card :deep(.el-card__header) {
@@ -145,6 +215,11 @@ const showHeader = computed(
   flex-direction: column;
   padding: 8px 16px 0;
   overflow: hidden;
+}
+
+.system-card-body--report {
+  padding: 0;
+  gap: 0;
 }
 
 .system-header {
@@ -231,6 +306,10 @@ const showHeader = computed(
   border-radius: var(--meis-card-radius);
 }
 
+.system-page--report .system-table-wrap {
+  border-radius: 2px;
+}
+
 .system-table-fill {
   flex: 1;
   min-height: 0;
@@ -263,5 +342,15 @@ const showHeader = computed(
   height: 100%;
   min-height: 160px;
 }
-</style>
 
+.meis-query-body {
+  display: block;
+}
+
+.meis-query-body :deep(.page-filter-bar) {
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+</style>
