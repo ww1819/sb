@@ -970,6 +970,16 @@ COMMENT ON COLUMN shared_device_fee.device_id IS '设备ID冗余（W.6 / AST-W01
 COMMENT ON COLUMN shared_device_fee.device_code IS '设备编码快照';
 COMMENT ON COLUMN shared_device_fee.device_name IS '设备名称快照';
 
+-- ---------- 附录 W.5：维修流程子表姓名快照（PLT-DB-SYNC-01 / 2026-08-01） ----------
+ALTER TABLE repair_workorder_process ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
+ALTER TABLE repair_workorder_process ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(100);
+ALTER TABLE repair_workorder_segment_user ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
+ALTER TABLE repair_workorder_segment_user ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(100);
+COMMENT ON COLUMN repair_workorder_process.created_by_name IS '创建人姓名快照（W.5）';
+COMMENT ON COLUMN repair_workorder_process.updated_by_name IS '更新人姓名快照（W.5）';
+COMMENT ON COLUMN repair_workorder_segment_user.created_by_name IS '创建人姓名快照（W.5）';
+COMMENT ON COLUMN repair_workorder_segment_user.updated_by_name IS '更新人姓名快照（W.5）';
+
 ALTER TABLE maintenance_plan_item ADD COLUMN IF NOT EXISTS dept_name VARCHAR(100);
 ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS dept_name VARCHAR(100);
 ALTER TABLE inspection_plan_item ADD COLUMN IF NOT EXISTS dept_name VARCHAR(100);

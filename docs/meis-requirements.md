@@ -111,6 +111,7 @@
 |------|------|----------|------|
 | PLT-D-01 | 所有业务数据按租户 Schema 隔离 | 登录后仅访问本租户数据 | 已实现 |
 | PLT-D-02 | 新开户租户自动建表、补列、补注释 | Flyway 迁移成功即可用；**V1 建表字段须最全**（见附录 D） | 进行中 |
+| PLT-DB-SYNC-01 | 代码用列与 V1/R__ 双轨对齐（借调费用 W.6、维修子表 W.5 等） | 见下方定稿；老租户重启 `meis-tenant` 跑 R__ 补列 | **已完成**（余量见 BACKLOG） |
 | PLT-D-03 | 跨环境数据库备份可还原 | plain SQL + 版本兼容策略 | 已修复 |
 
 ### 2.2 列表与 CRUD 规范
@@ -807,6 +808,17 @@
 - [x] AST-DEMO-01 资产登记演示数据（删后插可重跑；约 60 台 + SD24080001 各可落库 Sheet）
 - [x] PLT-DEV-LIST-01 从属设备列表字段与筛选约定（选择器/维保/计划执行/出入库盘点报修已对齐）
 - [x] PLT-DT-01 修补：维保 Tab 等手写表格时间列统一 `formatDisplayDateTime`（禁裸 ISO `T`）
+- [x] PLT-DB-SYNC-01 代码/种子用列与 V1+R__ 双轨对齐（shared_device_fee W.6、维修子表 W.5 姓名等）
+
+**PLT-DB-SYNC-01 定稿（2026-08-01）**
+
+| 项 | 定稿 |
+|----|------|
+| **触发** | 种子脚本报 `shared_device_fee.loan_no` 不存在；对照代码与迁库发现 **V1 建表缺列、仅 R__ 有**（双轨不同步） |
+| **已补 V1** | `shared_device_fee`：`loan_no/device_id/device_code/device_name`；`shared_device_loan/return`：途径列；`repair_workorder_process`：`wo_no`+姓名列+`created/updated_by_name`；`repair_workorder_segment_user`：`user_name/wo_no/created/updated_by_name`；`medical_device`：`location_floor/room_number/use_dept_head` |
+| **已补 R__** | `repair_workorder_process/segment_user` 的 `created_by_name/updated_by_name`（原代码写入但迁库无列） |
+| **老租户** | 重启 `meis-tenant`（或触发租户 Flyway）执行 `R__columns_biz.sql`；`shared_device_fee` 四列本已在 R__ L964+，未跑迁移则仍缺列 |
+| **余量** | R__ 中尚有约 200 列未回写 V1（台账扩展、途径列等），记 `BACKLOG-PLT-DB-SYNC-01`，按模块分批回填，禁止碎片脚本 |
 
 **AST-UI-19 定稿（2026-08-01）**
 
@@ -2428,6 +2440,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+| 2.193 | 2026-08-01 01:15:00 | — | PLT-DB-SYNC-01：shared_device_fee 等双轨补列；维修子表 W.5 姓名；余量入 BACKLOG |
 | 2.192 | 2026-08-01 01:05:00 | — | AST-DEMO-01：先物理删除再插入可重跑；文案去「演示/测试」；样板机改为 SD24080001 |
 | 2.191 | 2026-08-01 01:10:00 | — | AST-DEMO-01 扩展：DEMO-AST-001 覆盖查看态可落库 Sheet；档案/图片注明不可 SQL 填充 |
 | 2.190 | 2026-08-01 00:50:00 | — | AST-GAP-01 台账缺口分析；AST-DEMO-01 演示数据脚本；AST-UI-21 配件更换记录 Sheet |
@@ -2759,6 +2772,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | BACKLOG-REP-07 | 维修 | 报修申请列表展示全部未删工单；维修处理列表范围与进程可编规则 | 附录 U.8 | P1 | — | 已完成 |
 | BACKLOG-REP-F-02 | 维修 | 配件库存扣减与费用汇总 | 附录 U.7 / REP-F-02 | P2 | 待真实用户、降低交付难度 | **长期搁置** |
 | BACKLOG-REP-F-03 | 维修 | 外协维修独立单据 | 附录 U.7 / REP-F-03 | P2 | 待真实用户、降低交付难度 | **长期搁置** |
+| BACKLOG-PLT-DB-SYNC-01 | 平台 | 将 R__ 中仍未回写 V1 的扩展列分批同步进 `V1__tables.sql`（约 200 列：台账扩展、途径列等） | PLT-DB-SYNC-01 / 附录 D.1 | P2 | 本期已修关键业务路径；全量回填工作量大 | 可排期 |
 | BACKLOG-AST-W01 | 跨模块 | 保养/计量/巡检/PM 执行表与公用设备费用表等补齐 device_id/code/name 冗余 | 附录 W.3.2 | P1 | 维修 P0 先落地；其余分批 | 可排期 |
 | BACKLOG-AST-07 | 资产 | 科室盘点申请 / 设备盘点报表完整业务（表结构、流程、报表） | AST-UI-07 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-AST-08 | 资产 | 资产动态统计完整业务（指标、图表、导出） | AST-UI-08 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
@@ -2916,6 +2930,18 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | （新表） | `metrology_type`（计量检定类型）+ 索引 `idx_metrology_type_parent` / `idx_metrology_type_group` |
 
 其余 R__ 中的 `ALTER` 列（如 `repair_workorder`、`inspection_plan`、`device_outbound` 等）经核对 **已在 V1 中存在**，无需重复添加。
+
+### D.3.1 双轨补齐（PLT-DB-SYNC-01，2026-08-01）
+
+| 表 | 补入 V1 | 补入 R__columns_biz |
+|----|---------|---------------------|
+| `shared_device_fee` | `loan_no`、`device_id`、`device_code`、`device_name` | （原已有 ALTER，保持） |
+| `shared_device_loan` / `return` | `create/update/submit/confirm_channel` | （原已有 ALTER，保持） |
+| `repair_workorder_process` | `wo_no`、姓名列、`created/updated_by_name` | `created_by_name`、`updated_by_name`（新增） |
+| `repair_workorder_segment_user` | `user_name`、`wo_no`、`created/updated_by_name` | 同上姓名列（新增） |
+| `medical_device` | `location_floor`、`room_number`、`use_dept_head` | （原已有 ALTER，保持） |
+
+余量（R__ 有而 V1 仍缺的扩展列）见第 7 章 `BACKLOG-PLT-DB-SYNC-01`。
 
 ---
 
@@ -6907,8 +6933,5 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 > **PLT-STATUS-CN-01 修订（v2.178）**：标签维护等页编码/名称被打成「未知(…)」已修复——仅状态与 `dictType` 分类字段走中文/`未知(码)`；编码、规格、型号等属性原样显示。
 
 
-> 已定稿并实现：**AST-WRN-02**；**AST-UI-18～21**；**AST-GAP-01**；**AST-DEMO-01**（`data/seed/demo_asset_ledger.sql`：先删后插可重跑，样板机 `SD24080001`）；**PLT-DEV-LIST-01**。
-> 缺口全文：[meis-requirements-asset-ledger-gap.md](meis-requirements-asset-ledger-gap.md)。演示数据：对租户执行上述 SQL（先 `SET search_path`）。
-
-
-检查代码与数据库中字段差异，补齐建表和补字段脚本
+> 已定稿并实现：**AST-WRN-02**；**AST-UI-18～21**；**AST-GAP-01**；**AST-DEMO-01**；**PLT-DEV-LIST-01**；**PLT-DB-SYNC-01**（`shared_device_fee` 等双轨补列，见附录 D.3.1）。
+> 缺口全文：[meis-requirements-asset-ledger-gap.md](meis-requirements-asset-ledger-gap.md)。老租户需重启 `meis-tenant` 使 R__ 补列生效后再跑种子脚本。

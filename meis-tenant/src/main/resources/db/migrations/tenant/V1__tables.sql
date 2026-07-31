@@ -931,6 +931,9 @@ CREATE TABLE medical_device (
     dept_id UUID REFERENCES department(id),
     warehouse_id UUID REFERENCES warehouse(id),
     location_detail VARCHAR(200),
+    location_floor VARCHAR(50),
+    room_number VARCHAR(50),
+    use_dept_head VARCHAR(100),
     -- 时间信息
     purchase_date DATE,
     acceptance_date DATE,
@@ -1000,6 +1003,9 @@ COMMENT ON COLUMN medical_device.campus_id IS '所属院区';
 COMMENT ON COLUMN medical_device.building_id IS '所属建筑物';
 COMMENT ON COLUMN medical_device.dept_id IS '所属科室';
 COMMENT ON COLUMN medical_device.location_detail IS '详细位置';
+COMMENT ON COLUMN medical_device.location_floor IS '楼层';
+COMMENT ON COLUMN medical_device.room_number IS '房间号';
+COMMENT ON COLUMN medical_device.use_dept_head IS '使用科室负责人';
 COMMENT ON COLUMN medical_device.purchase_date IS '采购日期';
 COMMENT ON COLUMN medical_device.acceptance_date IS '验收日期';
 COMMENT ON COLUMN medical_device.enable_date IS '启用日期';
@@ -1623,15 +1629,25 @@ CREATE TABLE repair_workorder_process (
     device_id UUID,
     device_code VARCHAR(50),
     device_name VARCHAR(200),
+    wo_no VARCHAR(30),
+    operator_name VARCHAR(100),
+    user_name VARCHAR(100),
+    from_user_name VARCHAR(100),
+    to_user_name VARCHAR(100),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by UUID,
     updated_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
     is_deleted SMALLINT NOT NULL DEFAULT 0,
     deleted_at TIMESTAMP WITH TIME ZONE,
     deleted_by UUID
 );
 COMMENT ON TABLE repair_workorder_process IS '维修工单流程业务记录（派工/维修/验收等操作明细）';
+COMMENT ON COLUMN repair_workorder_process.wo_no IS '工单号快照（W.6）';
+COMMENT ON COLUMN repair_workorder_process.created_by_name IS '创建人姓名快照（W.5）';
+COMMENT ON COLUMN repair_workorder_process.updated_by_name IS '更新人姓名快照（W.5）';
 COMMENT ON COLUMN repair_workorder_process.id IS '主键';
 COMMENT ON COLUMN repair_workorder_process.workorder_id IS '关联维修工单';
 COMMENT ON COLUMN repair_workorder_process.action_type IS '操作类型：dispatch/accept/transfer/start_repair/sub_status/complete/verify_pass/verify_fail/suspend/resume/cancel';
@@ -1734,10 +1750,14 @@ CREATE TABLE repair_workorder_segment_user (
     is_primary BOOLEAN NOT NULL DEFAULT FALSE,
     work_content TEXT,
     labor_cost DECIMAL(10,2),
+    user_name VARCHAR(100),
+    wo_no VARCHAR(30),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by UUID,
     updated_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
     is_deleted SMALLINT NOT NULL DEFAULT 0,
     deleted_at TIMESTAMP WITH TIME ZONE,
     deleted_by UUID,
@@ -1749,6 +1769,10 @@ COMMENT ON COLUMN repair_workorder_segment_user.user_id IS '参与工程师';
 COMMENT ON COLUMN repair_workorder_segment_user.is_primary IS '是否主责（同步段 user_id）';
 COMMENT ON COLUMN repair_workorder_segment_user.work_content IS '工程师工作内容（选填）';
 COMMENT ON COLUMN repair_workorder_segment_user.labor_cost IS '工程师人工费（选填）';
+COMMENT ON COLUMN repair_workorder_segment_user.user_name IS '工程师姓名快照（W.5）';
+COMMENT ON COLUMN repair_workorder_segment_user.wo_no IS '工单号快照（W.6）';
+COMMENT ON COLUMN repair_workorder_segment_user.created_by_name IS '创建人姓名快照（W.5）';
+COMMENT ON COLUMN repair_workorder_segment_user.updated_by_name IS '更新人姓名快照（W.5）';
 
 -- 5.4 备件库表
 CREATE TABLE spare_part (
@@ -2978,6 +3002,10 @@ CREATE TABLE shared_device_loan (
     loan_time TIMESTAMP WITH TIME ZONE,
     return_time TIMESTAMP WITH TIME ZONE,
     remark TEXT,
+    create_channel VARCHAR(20),
+    update_channel VARCHAR(20),
+    submit_channel VARCHAR(20),
+    confirm_channel VARCHAR(20),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -2985,6 +3013,10 @@ COMMENT ON TABLE shared_device_loan IS '公用设备借调单';
 COMMENT ON COLUMN shared_device_loan.loan_no IS '借调单号';
 COMMENT ON COLUMN shared_device_loan.status IS '单据状态';
 COMMENT ON COLUMN shared_device_loan.approved_by_name IS '审核人姓名快照（W.5）';
+COMMENT ON COLUMN shared_device_loan.create_channel IS '制单途径 web/app/mp';
+COMMENT ON COLUMN shared_device_loan.update_channel IS '修改途径 web/app/mp';
+COMMENT ON COLUMN shared_device_loan.submit_channel IS '提交途径 web/app/mp';
+COMMENT ON COLUMN shared_device_loan.confirm_channel IS '审核/借出途径 web/app/mp';
 
 
 -- 9.7 公用设备归还单
@@ -3002,11 +3034,19 @@ CREATE TABLE shared_device_return (
     approved_by_name VARCHAR(100),
     approved_at TIMESTAMP WITH TIME ZONE,
     remark TEXT,
+    create_channel VARCHAR(20),
+    update_channel VARCHAR(20),
+    submit_channel VARCHAR(20),
+    confirm_channel VARCHAR(20),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 COMMENT ON TABLE shared_device_return IS '公用设备归还单';
 COMMENT ON COLUMN shared_device_return.approved_by_name IS '审核人姓名快照（W.5）';
+COMMENT ON COLUMN shared_device_return.create_channel IS '制单途径 web/app/mp';
+COMMENT ON COLUMN shared_device_return.update_channel IS '修改途径 web/app/mp';
+COMMENT ON COLUMN shared_device_return.submit_channel IS '提交途径 web/app/mp';
+COMMENT ON COLUMN shared_device_return.confirm_channel IS '审核途径 web/app/mp';
 
 
 -- 9.8 公用设备借调收费
@@ -3014,6 +3054,10 @@ CREATE TABLE shared_device_fee (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     fee_no VARCHAR(30) UNIQUE NOT NULL,
     loan_id UUID REFERENCES shared_device_loan(id),
+    loan_no VARCHAR(30),
+    device_id UUID,
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
     fee_amount DECIMAL(12,2) NOT NULL,
     fee_date DATE NOT NULL,
     paid_status VARCHAR(20) DEFAULT 'unpaid',
@@ -3022,6 +3066,10 @@ CREATE TABLE shared_device_fee (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 COMMENT ON TABLE shared_device_fee IS '公用设备借调收费单';
+COMMENT ON COLUMN shared_device_fee.loan_no IS '借调单号快照（W.6）';
+COMMENT ON COLUMN shared_device_fee.device_id IS '设备ID冗余（W.6 / AST-W01）';
+COMMENT ON COLUMN shared_device_fee.device_code IS '设备编码快照';
+COMMENT ON COLUMN shared_device_fee.device_name IS '设备名称快照';
 
 -- 9.9 预防性维护（PM）模块
 CREATE TABLE pm_type (
