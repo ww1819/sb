@@ -1,4 +1,4 @@
-# MEIS service list (shared by start/stop/restart scripts)
+﻿# MEIS service list (shared by start/stop/restart scripts)
 $script:MeisRoot = Split-Path $PSScriptRoot -Parent
 
 function Resolve-MeisJavaHome {

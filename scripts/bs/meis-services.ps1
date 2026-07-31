@@ -1,5 +1,24 @@
-# MEIS service list (shared by start/stop/restart scripts)
-$script:MeisRoot = Split-Path $PSScriptRoot -Parent
+﻿# MEIS service list (shared by start/stop/restart scripts)
+$_meisRootCandidates = @(
+    (Join-Path (Split-Path $PSScriptRoot -Parent) 'common\meis-root.ps1'),
+    (Join-Path $PSScriptRoot 'meis-root.ps1')
+)
+$_meisRootLoaded = $false
+foreach ($_c in $_meisRootCandidates) {
+    if (Test-Path -LiteralPath $_c) {
+        . $_c
+        $_meisRootLoaded = $true
+        break
+    }
+}
+if (-not $_meisRootLoaded) {
+    $script:MeisRoot = Split-Path $PSScriptRoot -Parent
+    $script:MeisScriptsRoot = $PSScriptRoot
+    $script:MeisScriptsCommon = $PSScriptRoot
+    $script:MeisScriptsBs = $PSScriptRoot
+    $script:MeisScriptsApp = $PSScriptRoot
+}
+Remove-Variable _meisRootCandidates, _meisRootLoaded, _c -ErrorAction SilentlyContinue
 
 function Resolve-MeisJavaHome {
     foreach ($jdkHome in @($env:MEIS_JAVA_HOME, 'E:\workspace\jdk-17', 'C:\Program Files\Java\jdk-17', 'D:\Program Files\Java\jdk-17')) {
@@ -321,7 +340,7 @@ function Start-MeisServices {
         }
         $jar = Join-Path $root "$($s.name)\target\$($s.name)-1.0.0-SNAPSHOT.jar"
         if (-not (Test-Path $jar)) {
-            throw "Missing $jar - run scripts\build.ps1 first"
+            throw "Missing $jar - run scripts\bs\build.ps1 first"
         }
         $suffix = if ($EnableJdwp) { '.debug' } else { '' }
         $stdout = Join-Path $logDir "$($s.name)$suffix.out.log"
@@ -410,9 +429,9 @@ function Start-MeisServices {
     Write-Host "  $logDir\*.out.log"
     Write-Host ''
     Write-Host 'Commands:' -ForegroundColor Cyan
-    Write-Host '  powershell -File scripts\status.ps1'
-    Write-Host '  powershell -File scripts\logs.ps1 -Service gateway -Follow'
-    Write-Host '  powershell -File scripts\logs.ps1 -List'
+    Write-Host '  powershell -File scripts\bs\status.ps1'
+    Write-Host '  powershell -File scripts\bs\logs.ps1 -Service gateway -Follow'
+    Write-Host '  powershell -File scripts\bs\logs.ps1 -List'
 
     if ($FollowLogs) {
         $gwLog = Join-Path $logDir 'meis-gateway.out.log'
@@ -1433,10 +1452,10 @@ function Start-MeisMobile {
     if (-not (Test-Path (Join-Path $mobileDir 'pubspec.yaml'))) {
         throw "meis-mobile not found: $mobileDir"
     }
-    . (Join-Path $PSScriptRoot 'mobile-env.ps1')
+    . (Join-Path $script:MeisScriptsCommon 'mobile-env.ps1')
     if (-not (Test-Path (Join-Path $mobileDir 'windows'))) {
         Add-MeisPanelEvent 'meis-mobile: windows/ missing, running setup-mobile.ps1'
-        & (Join-Path $PSScriptRoot 'setup-mobile.ps1')
+        & (Join-Path $script:MeisScriptsApp 'setup-mobile.ps1')
         if (-not (Test-Path (Join-Path $mobileDir 'windows'))) {
             throw 'meis-mobile windows/ still missing after setup-mobile.ps1'
         }

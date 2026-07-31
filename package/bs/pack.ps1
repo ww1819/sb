@@ -1,4 +1,4 @@
-# Full build: all backend JARs -> package\jars\ + meis-web dist -> package\www\
+﻿# Full build: all backend JARs -> package\jars\ + meis-web dist -> package\www\
 # Configure paths in package\env.txt (see env.example.txt)
 param(
     [switch]$SkipBuild,
@@ -6,9 +6,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$script:MeisPkgDir = $PSScriptRoot
+$script:MeisPkgDir = Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'pack-lib.ps1')
-. (Join-Path $PSScriptRoot 'load-env.ps1')
+. (Join-Path $script:MeisPkgDir 'common\load-env.ps1')
 
 $paths = Get-MeisPackagePaths
 Import-MeisPackageEnv -EnvFile (Join-Path $paths.PkgDir 'env.txt')

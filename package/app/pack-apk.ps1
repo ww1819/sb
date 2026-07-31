@@ -1,4 +1,4 @@
-# Build meis-mobile Android release APK -> package\apk\
+﻿# Build meis-mobile Android release APK -> package\apk\
 # Configure FLUTTER_ROOT in package\env.txt if flutter is not on PATH.
 param(
     [ValidateSet('release', 'debug', 'profile')]
@@ -7,12 +7,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$pkgDir = $PSScriptRoot
+$pkgDir = Split-Path $PSScriptRoot -Parent
 $root = Split-Path $pkgDir -Parent
 $mobileDir = Join-Path $root 'meis-mobile'
 $apkOutDir = Join-Path $pkgDir 'apk'
 
-. (Join-Path $pkgDir 'load-env.ps1')
+. (Join-Path $pkgDir 'common\load-env.ps1')
 Import-MeisPackageEnv -EnvFile (Join-Path $pkgDir 'env.txt')
 
 function Find-MeisFlutterBat {
@@ -56,7 +56,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $mobileDir 'pubspec.yaml'))) {
     throw "pubspec.yaml missing under $mobileDir"
 }
 if (-not (Test-Path -LiteralPath (Join-Path $mobileDir 'android'))) {
-    throw "android/ missing. Run scripts\setup-mobile.bat once, then retry."
+    throw "android/ missing. Run scripts\app\setup-mobile.bat once, then retry."
 }
 
 $flutterBat = Find-MeisFlutterBat

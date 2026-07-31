@@ -1,6 +1,7 @@
 # Generate db/source/create/tenant_tables.sql from Flyway V1 (idempotent CREATE)
 $ErrorActionPreference = 'Stop'
-$root = Split-Path $PSScriptRoot -Parent
+. (Join-Path (Split-Path $PSScriptRoot -Parent) 'common\meis-root.ps1')
+$root = $script:MeisRoot
 $src = Join-Path $root 'meis-tenant\src\main\resources\db\migrations\tenant\V1__tables.sql'
 $out = Join-Path $root 'db\source\create\tenant_tables.sql'
 
