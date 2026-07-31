@@ -59,7 +59,7 @@ html.dark .menu-link {
 
 html.dark .menu-link:hover,
 html.dark .menu-link.active {
-  background: rgba(22, 119, 255, 0.15);
+  background: rgba(var(--el-color-primary-rgb), 0.15);
 }
 
 html.dark .feed-item:hover {
@@ -98,8 +98,8 @@ html.dark .search-trigger:not(.dark) .search-kbd {
 
 html.dark .menu-search-dialog .result-item:hover,
 html.dark .menu-search-dialog .result-item.active {
-  background: rgba(22, 119, 255, 0.15);
-  border-color: rgba(22, 119, 255, 0.35);
+  background: rgba(var(--el-color-primary-rgb), 0.15);
+  border-color: rgba(var(--el-color-primary-rgb), 0.35);
 }
 
 html.dark .app-footer {

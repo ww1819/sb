@@ -43,16 +43,10 @@ body {
 
 #layout-content-root .layout-content-modal {
   position: absolute !important;
-  top: -8px;
-  right: -16px;
-  bottom: 0;
-  left: -16px;
+  inset: 0 !important;
   height: auto !important;
+  overflow: hidden !important;
   z-index: 100 !important;
-}
-
-.layout--top #layout-content-root .layout-content-modal {
-  top: -4px;
 }
 
 #layout-content-root .layout-content-modal .el-overlay-dialog {
@@ -63,6 +57,7 @@ body {
   justify-content: stretch;
   overflow: hidden;
   padding: 6px 12px 0;
+  box-sizing: border-box;
 }
 
 #layout-content-root .layout-content-modal .app-modal--lg.el-dialog,
@@ -202,8 +197,8 @@ body {
   gap: 20px;
 }
 
-#layout-content-root .layout-content-modal .app-modal--sm.el-dialog,
-#layout-content-root .layout-content-modal .app-modal--md.el-dialog {
+#layout-content-root .layout-content-modal .app-modal--sm.el-dialog:not(.app-modal--right),
+#layout-content-root .layout-content-modal .app-modal--md.el-dialog:not(.app-modal--right) {
   width: auto !important;
   height: auto !important;
   max-height: calc(100% - 32px);
@@ -213,38 +208,57 @@ body {
 }
 
 /* 右侧贴边抽屉（仍挂在内容区，不遮挡顶栏/菜单状态栏） */
-#layout-content-root .layout-content-modal .app-modal--right.el-dialog {
-  height: 100% !important;
-  max-height: 100% !important;
-  align-self: stretch;
-  margin: 0 0 0 auto !important;
-  border-radius: var(--el-dialog-border-radius, 8px) 0 0 var(--el-dialog-border-radius, 8px);
-  box-shadow: -4px 0 16px rgba(0, 21, 41, 0.08);
+#layout-content-root .layout-content-modal .el-overlay-dialog:has(.app-modal--right),
+#layout-content-root .layout-content-modal--right > .el-overlay-dialog,
+#layout-content-root .el-overlay.layout-content-modal--right > .el-overlay-dialog {
+  padding: 0 !important;
+  justify-content: flex-end !important;
+  align-items: stretch !important;
 }
 
-#layout-content-root .layout-content-modal .app-modal--right.app-modal--sm.el-dialog {
+#layout-content-root .layout-content-modal .app-modal--right.el-dialog,
+#layout-content-root .layout-content-modal--right .app-modal.el-dialog {
+  --el-dialog-padding-primary: 0px;
+  position: absolute !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: auto !important;
+  height: 100% !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  align-self: auto !important;
+  border-radius: 0 !important;
+  box-shadow: -4px 0 16px rgba(0, 21, 41, 0.08);
+  overflow: hidden;
+  display: flex !important;
+  flex-direction: column;
+}
+
+#layout-content-root .layout-content-modal .app-modal--right.app-modal--sm.el-dialog,
+#layout-content-root .layout-content-modal--right .app-modal--sm.el-dialog {
   width: 480px !important;
 }
 
-#layout-content-root .layout-content-modal .app-modal--right.app-modal--md.el-dialog {
+#layout-content-root .layout-content-modal .app-modal--right.app-modal--md.el-dialog,
+#layout-content-root .layout-content-modal--right .app-modal--md.el-dialog {
   width: 640px !important;
 }
 
-#layout-content-root .layout-content-modal .app-modal--right.app-modal--lg.el-dialog {
+#layout-content-root .layout-content-modal .app-modal--right.app-modal--lg.el-dialog,
+#layout-content-root .layout-content-modal--right .app-modal--lg.el-dialog {
   width: min(720px, 92vw) !important;
 }
 
-#layout-content-root .layout-content-modal .app-modal--right.app-modal--xl.el-dialog {
+#layout-content-root .layout-content-modal .app-modal--right.app-modal--xl.el-dialog,
+#layout-content-root .layout-content-modal--right .app-modal--xl.el-dialog {
   width: min(960px, 96vw) !important;
 }
 
-#layout-content-root .layout-content-modal .app-modal--right.el-dialog .el-dialog__header {
-  border-radius: var(--el-dialog-border-radius, 8px) 0 0 0;
-}
-
-#layout-content-root .layout-content-modal .el-overlay-dialog:has(.app-modal--right) {
-  padding: 6px 0 0 12px;
-  justify-content: flex-end;
+#layout-content-root .layout-content-modal .app-modal--right.el-dialog .el-dialog__header,
+#layout-content-root .layout-content-modal--right .app-modal.el-dialog .el-dialog__header {
+  border-radius: 0 !important;
 }
 
 .app-modal--xl .el-dialog__body,
