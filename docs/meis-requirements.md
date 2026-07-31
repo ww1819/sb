@@ -2228,6 +2228,8 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
 | 2.168 | 2026-07-31 12:10:00 | — | 脚本分区：`scripts/{common,bs,app}` + `package/{common,bs,app}`；根入口薄转发；约定包附录 A |
+| 2.170 | 2026-07-31 15:25:00 | — | MOB-SCAN-04：App/小程序摄像头与扫码入口全量统一加固 |
+| 2.169 | 2026-07-31 15:20:00 | — | MOB-SCAN-03：扫码页 CameraX NPE（延迟 start + 关 Impeller + 中文错误） |
 | 2.167 | 2026-07-31 10:30:00 | — | PLT-STATUS-CN-01 三端状态中文 + PLT-I18N-01 国际化架构预留；附录 R 修订；约定包 §5.1/§5.13 |
 | 2.166 | 2026-07-30 15:40:00 | — | PKG-VCS-01：package/www 等构建产物移出版本库；.gitignore 加固 |
 | 2.165 | 2026-07-30 14:55:00 | — | PLT-DT-01 扩至 App/小程序：统一日期时间工具与展示入参 |
@@ -3614,7 +3616,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 开发面板生产构建 | [PKG-WEB-02](#pkg-web-02-开发面板生产构建--现场打包定稿2026-07-30) |
 | VS Code 生产打包 launch | [PKG-WEB-03](#pkg-web-03-vs-code-launch-生产打包定稿2026-07-30) |
 | 生产打包失败/调试器说明 | [PKG-WEB-04](#pkg-web-04-生产打包前端阻塞说明定稿2026-07-30) |
-| 安卓扫码相机权限 | [MOB-SCAN-01](#mob-scan-01-安卓扫码相机无预览定稿2026-07-30) |
+| 安卓扫码/拍照入口 | [MOB-SCAN-01](#mob-scan-01-安卓扫码相机无预览定稿2026-07-30)、[MOB-SCAN-02](#mob-scan-02-app-相机扫码入口全量排查定稿2026-07-30)、[MOB-SCAN-03](#mob-scan-03-扫码页-camerax-npe定稿2026-07-31)、[MOB-SCAN-04](#mob-scan-04-全量摄像头扫码入口加固定稿2026-07-31) |
 | App 相机扫码全量排查 | [MOB-SCAN-02](#mob-scan-02-app-相机扫码入口全量排查定稿2026-07-30) |
 | 多端日期时间格式 | [PLT-DT-01](#plt-dt-01-多端日期时间显示与查询入参定稿2026-07-30)、约定包 §5.12 |
 | 现场包构建产物不入库 | [PKG-VCS-01](#pkg-vcs-01-现场包构建产物移出版本库定稿2026-07-30) |
@@ -6401,6 +6403,36 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 
 **状态**：已完成（需重新打安卓包安装验证）。
 
+### MOB-SCAN-03 扫码页 CameraX NPE（定稿·2026-07-31）
+
+> 来源：已授权相机后仍黑屏感叹号，文案为  
+> `Attempt to invoke virtual method 'java.lang.Class java.lang.Object.getClass()' on a null object reference`。
+
+#### 1. 根因
+
+| 项 | 说明 |
+|----|------|
+| 现象 | 权限已过，仍走 `errorBuilder`；属 CameraX / Surface 初始化 NPE（非权限） |
+| 诱因 | 新 Flutter（Impeller）+ `mobile_scanner` 5.x 过早 `start`；Surface 未就绪 |
+| 与 SCAN-01 关系 | SCAN-01 解决「未授权就开预览」；本项解决「授权后仍 NPE」 |
+
+#### 2. 定稿修补
+
+| 项 | 做法 |
+|----|------|
+| 控制器 | `autoStart: false`；权限通过且**首帧挂载后**再 `start()`，并短延迟 |
+| 生命周期 | `inactive`→`stop`；`resumed`→安全 `start`；重开前 dispose 旧控制器 |
+| Impeller | Android `EnableImpeller=false`（规避 SurfaceProducer 相关崩溃） |
+| 文案 | NPE 显示中文指引，勿原样抛 Java 堆栈 |
+
+#### 3. 验收
+
+- [ ] 授权后出现相机预览，可扫码返回编码
+- [ ] 点「重新打开相机」可恢复；切后台再回前台预览仍可用
+- [ ] 失败时为中文说明，不再只显示 `getClass()` 英文 NPE
+
+**状态**：已完成（需重新打安卓包安装验证）。
+
 ### MOB-SCAN-02 App 相机/扫码入口全量排查（定稿·2026-07-30）
 
 > 来源：检查 App 其他使用摄像头和扫码的功能是否有同样问题，一并处理。
@@ -6565,3 +6597,38 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 
 **状态**：约定已落地；语言切换列为后续能力（无需 BACKLOG 编号，随产品排期）。
 
+### MOB-SCAN-04 全量摄像头/扫码入口加固（定稿·2026-07-31）
+
+> 来源：用户要求在 MOB-SCAN-03 后检查其它调用摄像头与扫码的功能并一并加固。
+
+#### 1. 定稿原则
+
+| 项 | 约定 |
+|----|------|
+| **App 扫码** | 唯一预览页 `RepairScanPage`（SCAN-01/03）；业务页一律 `openBarcodeScanner()`，禁止再直连 `MobileScanner` |
+| **App 拍照** | 一律 `pickImageWithPermission()`（内含权限 + 打开失败中文提示） |
+| **小程序扫码** | 一律 `scanBarcode()`（统一取消/失败提示）；禁止页面散落 `uni.scanCode` |
+| **小程序选图** | `chooseAndUploadImage` 区分取消与权限/失败文案 |
+| **新增入口** | 只挂上述统一方法，勿复制旧扫码/拍照样板 |
+
+#### 2. 排查与落地
+
+| 端 | 入口 | 处理 |
+|----|------|------|
+| App | 报修/运维 Hub/盘点/电流标签 Hub·改绑/公用借调扫码 | → `openBarcodeScanner` |
+| App | 报修故障图、运维执行拍照 | → `pickImageWithPermission` |
+| App | 签名板 | 无摄像头，不动 |
+| App | 电流基站 | 无扫码，不动 |
+| 小程序 | 台账扫码、报修扫码、运维执行、借调、不良事件、电流标签 Hub/改绑 | → `scanBarcode` |
+| 小程序 | 报修/运维选图上传 | 强化 `chooseAndUploadImage` 失败提示 |
+
+代码：`meis-mobile/lib/shared/utils/barcode_scan.dart`、`image_pick.dart`；`meis-mp/src/utils/scanCode.ts`。
+
+#### 3. 验收
+
+- [ ] App 内无第二套 `MobileScanner` 页面；扫码均进「扫码锁定设备」页
+- [ ] App 拍照拒绝/失败有中文提示（非静默）
+- [ ] 小程序各扫码入口取消不打扰、失败有权限类提示
+- [ ] 新功能 Code Review：禁止直接 `uni.scanCode` / 直连 `MobileScanner`
+
+**状态**：已完成（需重新打包 App / 小程序验证）。

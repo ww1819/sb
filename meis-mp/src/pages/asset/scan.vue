@@ -17,6 +17,7 @@ import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { http } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
+import { scanBarcode } from '@/utils/scanCode'
 
 const auth = useAuthStore()
 const code = ref('')
@@ -48,20 +49,11 @@ function lookup() {
   openByCode(code.value)
 }
 
-function scan() {
-  uni.scanCode({
-    onlyFromCamera: false,
-    success: (res) => {
-      const raw = (res.result || '').trim()
-      if (!raw) {
-        uni.showToast({ title: '未识别到内容', icon: 'none' })
-        return
-      }
-      code.value = raw
-      openByCode(raw)
-    },
-    fail: () => uni.showToast({ title: '扫码取消或失败', icon: 'none' })
-  })
+async function scan() {
+  const raw = await scanBarcode()
+  if (!raw) return
+  code.value = raw
+  openByCode(raw)
 }
 </script>
 

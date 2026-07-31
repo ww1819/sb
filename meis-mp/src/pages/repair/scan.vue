@@ -109,6 +109,7 @@ import { chooseAndUploadImage } from '@/api/upload'
 import { useAuthStore } from '@/stores/auth'
 import { requestSubscribe } from '@/utils/subscribe'
 import { resolveStatusLabel } from '@/utils/statusLabels'
+import { scanBarcode } from '@/utils/scanCode'
 
 interface DeviceInfo {
   id: string
@@ -260,23 +261,12 @@ function lookupManual() {
   fetchByQuery(deviceCode.value)
 }
 
-function scan() {
+async function scan() {
   if (readonly.value) return
-  uni.scanCode({
-    onlyFromCamera: false,
-    success: (res) => {
-      const raw = (res.result || '').trim()
-      if (!raw) {
-        uni.showToast({ title: '未识别到内容', icon: 'none' })
-        return
-      }
-      deviceCode.value = raw
-      fetchByQuery(raw)
-    },
-    fail: () => {
-      uni.showToast({ title: '扫码取消或失败', icon: 'none' })
-    }
-  })
+  const raw = await scanBarcode()
+  if (!raw) return
+  deviceCode.value = raw
+  fetchByQuery(raw)
 }
 
 function preview(index: number) {

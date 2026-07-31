@@ -89,6 +89,7 @@ import { OPS_MODULES, type OpsModule, type OpsModuleConfig } from '@/config/ops'
 import { useAuthStore } from '@/stores/auth'
 import { calcCycleDays, todayYmd } from '@/utils/cycleDays'
 import { formatDisplayDate, toDateParam } from '@/utils/datetime'
+import { scanBarcode } from '@/utils/scanCode'
 
 const auth = useAuthStore()
 const moduleKey = ref<OpsModule>('maintain')
@@ -184,19 +185,10 @@ async function loadDue() {
   }
 }
 
-function scanAndExecute() {
-  uni.scanCode({
-    onlyFromCamera: false,
-    success: (res) => {
-      const code = (res.result || '').trim()
-      if (!code) {
-        uni.showToast({ title: '未识别到内容', icon: 'none' })
-        return
-      }
-      openByQuery(code)
-    },
-    fail: () => uni.showToast({ title: '扫码取消或失败', icon: 'none' })
-  })
+async function scanAndExecute() {
+  const code = await scanBarcode()
+  if (!code) return
+  openByQuery(code)
 }
 
 function manualSearch() {
