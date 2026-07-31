@@ -162,6 +162,13 @@ public class AssetDeviceController {
                             ELSE GREATEST(0, (d.service_expiry_date - CURRENT_DATE)) END AS service_expiry_remaining_days,
                        CASE WHEN pt.tag_code IS NOT NULL THEN TRUE ELSE FALSE END AS has_power_tag,
                        pt.tag_code AS power_tag_code,
+                       d.use_dept_head AS responsible_person_name,
+                       NULLIF(TRIM(CONCAT_WS(' ',
+                         (SELECT NULLIF(TRIM(b.building_name), '') FROM building b
+                          WHERE b.id = d.building_id AND COALESCE(b.is_deleted, 0) = 0 LIMIT 1),
+                         NULLIF(TRIM(d.location_floor), ''),
+                         NULLIF(TRIM(d.room_number), '')
+                       )), '') AS install_location,
                        EXISTS (
                          SELECT 1 FROM device_warranty_device wd
                          JOIN device_warranty w ON w.id = wd.warranty_id
@@ -702,6 +709,45 @@ public class AssetDeviceController {
                 body.get("campusCode"), body.get("buildingCode"), body.get("deptCode"),
                 body.get("countryCode"), body.get("categoryCode"));
         return Result.ok(Map.of("deviceCode", code));
+    }
+
+    /**
+     * AST-UI-21：设备配件更换记录（复用维修进程段配件明细，按 device_id）。
+     */
+    @GetMapping("/{id}/spare-replacements")
+    public Result<List<Map<String, Object>>> spareReplacements(@PathVariable UUID id) {
+        var device = jdbc.queryForList(
+                "SELECT 1 FROM medical_device WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", null), id);
+        if (device.isEmpty()) throw new BizException(404, "not found");
+        return Result.ok(jdbc.queryForList("""
+                SELECT p.id,
+                       p.created_at AS replaced_at,
+                       p.quantity,
+                       p.unit_price,
+                       p.total_price,
+                       p.remark,
+                       p.wo_no,
+                       sp.part_code,
+                       sp.part_name,
+                       sp.specification AS part_specification,
+                       sp.model AS part_model,
+                       sup.supplier_name,
+                       w.id AS workorder_id,
+                       w.wo_no AS workorder_no,
+                       w.status AS workorder_status,
+                       t.type_name AS process_type_name
+                FROM repair_workorder_segment_part p
+                LEFT JOIN spare_part sp ON sp.id = p.spare_part_id
+                LEFT JOIN supplier sup ON sup.id = p.supplier_id AND COALESCE(sup.is_deleted, 0) = 0
+                LEFT JOIN repair_workorder_segment s ON s.id = p.segment_id AND COALESCE(s.is_deleted, 0) = 0
+                LEFT JOIN repair_process_type t ON t.id = s.process_type_id AND COALESCE(t.is_deleted, 0) = 0
+                LEFT JOIN repair_workorder w ON w.id = s.workorder_id
+                WHERE p.device_id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment_part", "p") + """
+                 ORDER BY p.created_at DESC NULLS LAST
+                 LIMIT 200
+                """, id));
     }
 
     @GetMapping("/{id}/label")

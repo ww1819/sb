@@ -47,29 +47,7 @@
           <el-radio :model-value="selectedId" :value="String(row.id)" @change="selectRow(row)" />
         </template>
       </el-table-column>
-      <el-table-column prop="device_code" label="资产编码" width="120" fixed="left" show-overflow-tooltip />
-      <el-table-column prop="device_name" label="资产名称" min-width="140" show-overflow-tooltip />
-      <el-table-column prop="brand" label="品牌" width="90" show-overflow-tooltip />
-      <el-table-column prop="specification" label="规格" width="100" show-overflow-tooltip />
-      <el-table-column prop="model" label="型号" width="100" show-overflow-tooltip />
-      <el-table-column prop="registration_no" label="注册证号" width="120" show-overflow-tooltip />
-      <el-table-column prop="production_date" label="生产日期" width="110" />
-      <el-table-column prop="serial_number" label="序列号" width="120" show-overflow-tooltip />
-      <el-table-column prop="has_power_tag" label="电流标签" width="90">
-        <template #default="{ row }">{{ row.has_power_tag ? '是' : '否' }}</template>
-      </el-table-column>
-      <el-table-column prop="power_tag_code" label="电流监测编码" width="120" show-overflow-tooltip />
-      <el-table-column prop="dept_name" label="科室" width="110" show-overflow-tooltip />
-      <el-table-column prop="warehouse_name" label="仓库" width="110" show-overflow-tooltip />
-      <el-table-column prop="manufacturer_code" label="厂家编码" width="110" show-overflow-tooltip />
-      <el-table-column prop="manufacturer_name" label="厂家名称" width="120" show-overflow-tooltip />
-      <el-table-column prop="supplier_code" label="供应商编码" width="110" show-overflow-tooltip />
-      <el-table-column prop="supplier_name" label="供应商名称" width="120" show-overflow-tooltip />
-      <el-table-column prop="device_status" label="设备状态" width="90" fixed="right">
-        <template #default="{ row }">
-          <TableCellValue :field="{ prop: 'device_status', dictType: 'device_status' }" :value="row.device_status" />
-        </template>
-      </el-table-column>
+      <DeviceLedgerTableColumns code-fixed="left" />
     </el-table>
 
     <template #footer>
@@ -84,7 +62,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/api/http'
 import AppModal from '@/components/AppModal.vue'
-import TableCellValue from '@/components/table/TableCellValue.vue'
+import DeviceLedgerTableColumns from '@/components/table/DeviceLedgerTableColumns.vue'
 import { useDict } from '@/composables/useDict'
 
 const props = defineProps<{ modelValue: boolean }>()

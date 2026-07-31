@@ -32,9 +32,13 @@
         <el-table-column prop="total_amount" label="总价" width="110" align="right" />
         <el-table-column prop="unit_price" label="本机单价" width="110" align="right" />
         <el-table-column prop="coverage_content" label="维保内容" min-width="160" show-overflow-tooltip />
-        <el-table-column prop="created_at" label="创建时间" width="160" show-overflow-tooltip />
+        <el-table-column prop="created_at" label="创建时间" width="170" show-overflow-tooltip>
+          <template #default="{ row }">{{ formatDisplayDateTime(row.created_at) }}</template>
+        </el-table-column>
         <el-table-column prop="created_by_name" label="创建人" width="100" show-overflow-tooltip />
-        <el-table-column prop="updated_at" label="修改时间" width="160" show-overflow-tooltip />
+        <el-table-column prop="updated_at" label="修改时间" width="170" show-overflow-tooltip>
+          <template #default="{ row }">{{ formatDisplayDateTime(row.updated_at) }}</template>
+        </el-table-column>
         <el-table-column prop="updated_by_name" label="修改人" width="100" show-overflow-tooltip />
         <el-table-column label="操作" :width="readonly ? 160 : 360" fixed="right">
           <template #default="{ row }">
@@ -191,6 +195,7 @@ import RefSelect from '@/components/form/RefSelect.vue'
 import AssetDevicePicker from '@/components/form/AssetDevicePicker.vue'
 import EntityChangeHistoryDrawer from '@/components/EntityChangeHistoryDrawer.vue'
 import DeviceLedgerTableColumns from '@/components/table/DeviceLedgerTableColumns.vue'
+import { formatDisplayDateTime } from '@/utils/datetime'
 
 const props = defineProps<{
   deviceId?: string

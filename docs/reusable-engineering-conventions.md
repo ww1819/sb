@@ -4,7 +4,7 @@
 > **来源**：`docs/meis-requirements.md` 附录 Q / C / D / E / F / G / H / I / R / S / T 等。  
 > **用法**：新系统可整份复制后，按「落地映射」改路径与模块名；MEIS 专属细节见文末附录。
 
-**版本**：1.36（2026-08-01）
+**版本**：1.37（2026-08-01）
 
 ---
 
@@ -440,13 +440,13 @@ USB 外设（如文档高拍仪）**勿**由浏览器直连硬件；经厂商本
 
 | 项 | 要求 |
 |----|------|
-| **必显列** | 资产编码、资产名称、品牌、规格、型号、注册证号、生产日期、序列号、是否有电流标签、电流标签编码、科室、仓库、厂家编码/名称、供应商编码/名称、设备状态 |
+| **必显列** | 资产编码、资产名称、品牌、规格、型号、注册证号、生产/验收/启用日期、序列号、是否有电流标签、电流标签编码、科室、仓库、安装位置、存放位置、责任人、厂家编码/名称、供应商编码/名称、设备状态 |
 | **场景列** | 可按业务追加（如维保单价、计划到期日）；勿挤掉必显列，允许横滚 |
 | **必选筛选** | 资产编码、名称（文字+拼音简码模糊）、规格、型号、序列号、电流标签编码、所属科室 |
 | **建议筛选** | 设备状态、仓库、厂家、供应商（按页面侧重点） |
 | **新功能** | 默认按本条设计；存量页分批对齐 |
 
-落地映射：MEIS PLT-DEV-LIST-01；`AssetDevicePicker`、`DeviceLedgerPicker`、`RepairDevicePicker`、`DeviceLedgerTableColumns`、`deviceLedgerFields` / `deviceLedgerSnapshot`、`DeviceLedgerSelectSupport`；维保/三计划/执行/纳入/出入库/盘点/报修选择器已落地。
+落地映射：MEIS [PLT-DEV-LIST-01](meis-requirements.md#plt-dev-list-01-定稿2026-07-31)（含公共字段/筛选两表）；`AssetDevicePicker`、`DeviceLedgerPicker`、`RepairDevicePicker`、`DeviceLedgerTableColumns`、`deviceLedgerFields` / `deviceLedgerSnapshot`、`DeviceLedgerSelectSupport`；维保/三计划/执行/纳入/出入库/盘点/报修选择器已落地。
 
 ---
 

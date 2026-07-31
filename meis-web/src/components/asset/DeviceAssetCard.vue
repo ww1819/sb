@@ -1,14 +1,29 @@
 <template>
   <div class="device-asset-card-wrap">
     <div class="device-asset-card-wrap__toolbar">
+      <el-radio-group v-model="orientation" size="small">
+        <el-radio-button value="portrait">纵向</el-radio-button>
+        <el-radio-button value="landscape">横向</el-radio-button>
+      </el-radio-group>
       <el-button type="primary" :disabled="!deviceCode" :loading="printing" @click="doPrint">
         打印卡片
       </el-button>
+      <el-dropdown :disabled="!deviceCode" @command="onExport">
+        <el-button :loading="exporting" :disabled="!deviceCode">
+          导出<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+        </el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="png">导出 PNG 图片</el-dropdown-item>
+            <el-dropdown-item command="pdf">导出 PDF</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
       <el-button :disabled="!deviceId" :loading="historyLoading" @click="loadPrints">刷新打印记录</el-button>
       <el-button :disabled="!deviceCode || !qrDataUrl" @click="browserPrint">浏览器打印预览</el-button>
     </div>
 
-    <div ref="printAreaRef" class="device-asset-card">
+    <div ref="printAreaRef" class="device-asset-card" :class="`device-asset-card--${orientation}`">
       <div class="device-asset-card__header">
         <div class="device-asset-card__org">{{ campusLabel }}</div>
         <div class="device-asset-card__title">医疗设备资产卡片</div>
@@ -91,7 +106,9 @@
     <div class="device-asset-card-wrap__history">
       <h4>卡片打印记录</h4>
       <el-table v-loading="historyLoading" :data="cardPrints" border stripe size="small" max-height="280">
-        <el-table-column prop="printed_at" label="打印时间" min-width="160" />
+        <el-table-column prop="printed_at" label="打印时间" min-width="170">
+          <template #default="{ row }">{{ formatDisplayDateTime(row.printed_at) }}</template>
+        </el-table-column>
         <el-table-column prop="printed_by_name" label="打印人" min-width="100" />
         <el-table-column prop="template_code" label="模板" width="110" />
         <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
@@ -107,9 +124,11 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import QRCode from 'qrcode'
 import { ElMessage } from 'element-plus'
+import { ArrowDown } from '@element-plus/icons-vue'
 import http from '@/api/http'
 import { ensureRefLabelMap, resolveRefLabel } from '@/composables/useRefLabelMap'
 import { useDict } from '@/composables/useDict'
+import { formatDisplayDate, formatDisplayDateTime } from '@/utils/datetime'
 
 const props = defineProps<{
   model: Record<string, unknown>
@@ -120,8 +139,10 @@ const { loadDict, getCached } = useDict()
 const qrDataUrl = ref('')
 const printAreaRef = ref<HTMLElement | null>(null)
 const printing = ref(false)
+const exporting = ref(false)
 const historyLoading = ref(false)
 const prints = ref<Record<string, unknown>[]>([])
+const orientation = ref<'portrait' | 'landscape'>('portrait')
 
 const deviceCode = computed(() => {
   const c = props.model.device_code
@@ -164,16 +185,28 @@ const warehouseLabel = computed(() => {
   return resolveRefLabel('warehouse', props.model.warehouse_id) || '-'
 })
 
-const manufacturerCode = computed(() => display(props.model.manufacturer_code))
+const installLocation = computed(() => {
+  const direct = props.model.install_location
+  if (direct != null && String(direct).trim()) return String(direct).trim()
+  const building = resolveRefLabel('building', props.model.building_id)
+  const parts = [building, props.model.location_floor, props.model.room_number]
+    .map((v) => (v == null || String(v).trim() === '' ? '' : String(v).trim()))
+    .filter(Boolean)
+  return parts.length ? parts.join(' ') : '-'
+})
 
+const responsibleName = computed(() => {
+  const n = props.model.responsible_person_name ?? props.model.use_dept_head
+  return n != null && String(n).trim() ? String(n).trim() : '-'
+})
+
+const manufacturerCode = computed(() => display(props.model.manufacturer_code))
 const manufacturerName = computed(() => {
   const name = props.model.manufacturer_name
   if (name != null && String(name).trim()) return String(name).trim()
   return resolveRefLabel('manufacturer', props.model.manufacturer_id) || '-'
 })
-
 const supplierCode = computed(() => display(props.model.supplier_code))
-
 const supplierName = computed(() => {
   const name = props.model.supplier_name
   if (name != null && String(name).trim()) return String(name).trim()
@@ -186,16 +219,18 @@ const basicItems = computed(() => [
   { label: '型号', value: display(props.model.model) },
   { label: '序列号', value: display(props.model.serial_number), mono: true },
   { label: '医疗器械注册证号', value: display(props.model.registration_no), mono: true },
-  { label: '生产日期', value: display(props.model.production_date) },
-  { label: '设备状态', value: statusLabel.value },
-  { label: '启用日期', value: display(props.model.enable_date) },
-  { label: '验收日期', value: display(props.model.acceptance_date) }
+  { label: '生产日期', value: formatDisplayDate(props.model.production_date) },
+  { label: '验收日期', value: formatDisplayDate(props.model.acceptance_date) },
+  { label: '启用日期', value: formatDisplayDate(props.model.enable_date) },
+  { label: '设备状态', value: statusLabel.value }
 ])
 
 const locationItems = computed(() => [
   { label: '领用科室', value: deptLabel.value },
   { label: '仓库', value: warehouseLabel.value },
-  { label: '存放位置', value: display(props.model.location_detail) }
+  { label: '安装位置', value: installLocation.value },
+  { label: '存放位置', value: display(props.model.location_detail) },
+  { label: '责任人', value: responsibleName.value }
 ])
 
 const vendorItems = computed(() => [
@@ -208,7 +243,7 @@ const vendorItems = computed(() => [
 const financeItems = computed(() => [
   { label: '原值', value: formatNumber(props.model.original_value) },
   { label: '净值', value: formatNumber(props.model.net_value) },
-  { label: '购置日期', value: display(props.model.purchase_date) }
+  { label: '购置日期', value: formatDisplayDate(props.model.purchase_date) }
 ])
 
 function display(val: unknown) {
@@ -219,7 +254,9 @@ function display(val: unknown) {
 function formatNumber(val: unknown) {
   if (val === null || val === undefined || val === '') return '-'
   const num = Number(val)
-  return Number.isFinite(num) ? num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(val)
+  return Number.isFinite(num)
+    ? num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : String(val)
 }
 
 async function renderQr() {
@@ -264,42 +301,98 @@ async function doPrint() {
   }
 }
 
+function printCss() {
+  const page = orientation.value === 'landscape' ? 'A4 landscape' : 'A4'
+  const cols = orientation.value === 'landscape' ? 4 : 3
+  return `
+      @page { size: ${page}; margin: 12mm; }
+      * { box-sizing: border-box; }
+      body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #222; margin: 0; }
+      .device-asset-card { border: 1px solid #333; padding: 14px 16px; }
+      .device-asset-card__header { text-align: center; border-bottom: 2px solid #222; padding-bottom: 8px; margin-bottom: 12px; }
+      .device-asset-card__org { font-size: 13px; margin-bottom: 4px; }
+      .device-asset-card__title { font-size: 18px; font-weight: 700; letter-spacing: 0.08em; }
+      .device-asset-card__identity { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 10px; }
+      .device-asset-card__qr { width: 110px; text-align: center; flex-shrink: 0; }
+      .device-asset-card__qr img { width: 100px; height: 100px; }
+      .device-asset-card__qr-hint { display: block; font-size: 11px; color: #666; margin-top: 4px; }
+      .device-asset-card__id-meta { flex: 1; display: flex; flex-direction: column; gap: 8px; padding-top: 6px; }
+      .device-asset-card__section { margin-top: 10px; }
+      .device-asset-card__section h4 { margin: 0 0 6px; font-size: 12px; border-left: 3px solid #222; padding-left: 8px; }
+      .device-asset-card__grid { display: grid; grid-template-columns: repeat(${cols}, 1fr); gap: 6px 12px; }
+      .device-asset-card__field { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+      .device-asset-card__label { font-size: 11px; color: #666; }
+      .device-asset-card__value { font-size: 12px; border-bottom: 1px solid #ccc; min-height: 20px; padding-bottom: 2px; word-break: break-all; }
+      .device-asset-card__value.mono { font-family: ui-monospace, Consolas, monospace; }
+      .device-asset-card__sign { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 20px; padding-top: 10px; border-top: 1px dashed #999; }
+      .device-asset-card__sign-item { font-size: 12px; }
+      .device-asset-card__sign-line { display: block; margin-top: 24px; border-bottom: 1px solid #333; height: 1px; }
+    `
+}
+
 function browserPrint() {
   const node = printAreaRef.value
   if (!node) return
-  const win = window.open('', '_blank', 'width=900,height=1200')
+  const win = window.open('', '_blank', 'width=1000,height=800')
   if (!win) {
     ElMessage.warning('请允许弹出窗口以打印资产卡片')
     return
   }
   win.document.write(`<!doctype html><html><head><title>医疗设备资产卡片</title>
-    <style>
-      @page { size: A4; margin: 16mm; }
-      * { box-sizing: border-box; }
-      body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #222; margin: 0; }
-      .device-asset-card { border: 1px solid #333; padding: 16px 18px; }
-      .device-asset-card__header { text-align: center; border-bottom: 2px solid #222; padding-bottom: 10px; margin-bottom: 14px; }
-      .device-asset-card__org { font-size: 14px; margin-bottom: 4px; }
-      .device-asset-card__title { font-size: 20px; font-weight: 700; letter-spacing: 0.08em; }
-      .device-asset-card__identity { display: flex; gap: 18px; align-items: flex-start; margin-bottom: 12px; }
-      .device-asset-card__qr { width: 120px; text-align: center; flex-shrink: 0; }
-      .device-asset-card__qr img { width: 110px; height: 110px; }
-      .device-asset-card__qr-hint { display: block; font-size: 11px; color: #666; margin-top: 4px; }
-      .device-asset-card__id-meta { flex: 1; display: flex; flex-direction: column; gap: 10px; padding-top: 8px; }
-      .device-asset-card__section { margin-top: 12px; }
-      .device-asset-card__section h4 { margin: 0 0 8px; font-size: 13px; border-left: 3px solid #222; padding-left: 8px; }
-      .device-asset-card__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 14px; }
-      .device-asset-card__field { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-      .device-asset-card__label { font-size: 11px; color: #666; }
-      .device-asset-card__value { font-size: 13px; border-bottom: 1px solid #ccc; min-height: 22px; padding-bottom: 2px; word-break: break-all; }
-      .device-asset-card__value.mono { font-family: ui-monospace, Consolas, monospace; }
-      .device-asset-card__sign { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 28px; padding-top: 12px; border-top: 1px dashed #999; }
-      .device-asset-card__sign-item { font-size: 12px; }
-      .device-asset-card__sign-line { display: block; margin-top: 28px; border-bottom: 1px solid #333; height: 1px; }
-    </style></head><body>${node.outerHTML}</body></html>`)
+    <style>${printCss()}</style></head><body>${node.outerHTML}</body></html>`)
   win.document.close()
   win.focus()
   win.print()
+}
+
+async function captureCanvas() {
+  const node = printAreaRef.value
+  if (!node) throw new Error('无卡片内容')
+  const { default: html2canvas } = await import('html2canvas')
+  return html2canvas(node, { scale: 2, useCORS: true, backgroundColor: '#ffffff' })
+}
+
+async function onExport(cmd: string) {
+  if (!deviceCode.value) return
+  exporting.value = true
+  try {
+    const canvas = await captureCanvas()
+    const base = `资产卡片_${deviceCode.value}`
+    if (cmd === 'png') {
+      const a = document.createElement('a')
+      a.href = canvas.toDataURL('image/png')
+      a.download = `${base}.png`
+      a.click()
+      ElMessage.success('已导出 PNG')
+      return
+    }
+    const { jsPDF } = await import('jspdf')
+    const img = canvas.toDataURL('image/jpeg', 0.95)
+    const landscape = orientation.value === 'landscape'
+    const pdf = new jsPDF({
+      orientation: landscape ? 'landscape' : 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    })
+    const pageW = pdf.internal.pageSize.getWidth()
+    const pageH = pdf.internal.pageSize.getHeight()
+    const margin = 8
+    const maxW = pageW - margin * 2
+    const maxH = pageH - margin * 2
+    const ratio = Math.min(maxW / canvas.width, maxH / canvas.height)
+    const w = canvas.width * ratio
+    const h = canvas.height * ratio
+    const x = (pageW - w) / 2
+    const y = (pageH - h) / 2
+    pdf.addImage(img, 'JPEG', x, y, w, h)
+    pdf.save(`${base}.pdf`)
+    ElMessage.success('已导出 PDF')
+  } catch (e) {
+    console.error(e)
+    ElMessage.error('导出失败，请确认已安装依赖或改用浏览器打印')
+  } finally {
+    exporting.value = false
+  }
 }
 
 watch(
@@ -316,6 +409,7 @@ onMounted(async () => {
     ensureRefLabelMap('department'),
     ensureRefLabelMap('campus'),
     ensureRefLabelMap('warehouse'),
+    ensureRefLabelMap('building'),
     ensureRefLabelMap('manufacturer'),
     ensureRefLabelMap('supplier'),
     loadDict('device_status')
@@ -327,6 +421,7 @@ onMounted(async () => {
 .device-asset-card-wrap__toolbar {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -423,6 +518,10 @@ onMounted(async () => {
   gap: 10px 16px;
 }
 
+.device-asset-card--landscape .device-asset-card__grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .device-asset-card__field {
   display: flex;
   flex-direction: column;
@@ -482,6 +581,7 @@ onMounted(async () => {
   }
 
   .device-asset-card__grid,
+  .device-asset-card--landscape .device-asset-card__grid,
   .device-asset-card__sign {
     grid-template-columns: 1fr;
   }

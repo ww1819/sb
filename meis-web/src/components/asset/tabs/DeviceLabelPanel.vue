@@ -29,7 +29,9 @@
       <h4>打印记录</h4>
       <el-table :data="prints" border stripe size="small" max-height="280" v-loading="loading">
         <el-table-column prop="device_code" label="资产编码" min-width="120" />
-        <el-table-column prop="printed_at" label="打印时间" min-width="160" />
+        <el-table-column prop="printed_at" label="打印时间" min-width="170">
+          <template #default="{ row }">{{ formatDisplayDateTime(row.printed_at) }}</template>
+        </el-table-column>
         <el-table-column prop="template_code" label="模板" width="100" />
         <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
         <template #empty>
@@ -45,6 +47,7 @@ import { ref, watch } from 'vue'
 import QRCode from 'qrcode'
 import { ElMessage } from 'element-plus'
 import http from '@/api/http'
+import { formatDisplayDateTime } from '@/utils/datetime'
 
 const props = defineProps<{
   deviceId: string

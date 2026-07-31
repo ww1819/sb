@@ -23,8 +23,12 @@
         <el-table-column prop="task_type" label="任务类型" min-width="140" />
         <el-table-column prop="status" label="状态" width="100" />
         <el-table-column prop="result" label="结果" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="created_at" label="创建时间" min-width="160" />
-        <el-table-column prop="finished_at" label="完成时间" min-width="160" />
+        <el-table-column prop="created_at" label="创建时间" min-width="170">
+          <template #default="{ row }">{{ formatDisplayDateTime(row.created_at) }}</template>
+        </el-table-column>
+        <el-table-column prop="finished_at" label="完成时间" min-width="170">
+          <template #default="{ row }">{{ formatDisplayDateTime(row.finished_at) }}</template>
+        </el-table-column>
       </el-table>
     </SystemPageCard>
   </div>
@@ -36,6 +40,7 @@ import { ElMessage } from 'element-plus'
 import http from '@/api/http'
 import SystemPageCard from '@/components/system/SystemPageCard.vue'
 import PageFilterBar from '@/components/system/PageFilterBar.vue'
+import { formatDisplayDateTime } from '@/utils/datetime'
 
 const loading = ref(false)
 const syncing = ref(false)

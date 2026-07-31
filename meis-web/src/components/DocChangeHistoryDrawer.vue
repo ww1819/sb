@@ -27,6 +27,7 @@
 import { ref, watch } from 'vue'
 import http from '@/api/http'
 import AppModal from '@/components/AppModal.vue'
+import { formatDisplayDateTime } from '@/utils/datetime'
 
 const props = defineProps<{
   modelValue: boolean
@@ -85,9 +86,7 @@ async function load() {
 }
 
 function fmt(v: unknown) {
-  if (v == null) return ''
-  const s = String(v)
-  return s.length >= 19 ? s.slice(0, 19).replace('T', ' ') : s
+  return formatDisplayDateTime(v)
 }
 
 function eventLabel(v: unknown) {

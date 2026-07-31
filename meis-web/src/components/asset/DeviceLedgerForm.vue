@@ -54,6 +54,14 @@
         :device-id="deviceId"
       />
       <DeviceRecordTablePanel
+        v-show="activeTab === 'spare_replace'"
+        :columns="spareReplaceColumns"
+        empty-text="暂无配件更换记录"
+        filter-placeholder="配件编码 / 名称 / 工单号"
+        load-url="/asset/device/{deviceId}/spare-replacements"
+        :device-id="deviceId"
+      />
+      <DeviceRecordTablePanel
         v-show="activeTab === 'maintain'"
         :columns="opsExecColumns"
         empty-text="暂无保养记录"
@@ -213,6 +221,7 @@ const allTabs = [
   { key: 'warranty', label: '维保信息' },
   { key: 'label', label: '资产标签' },
   { key: 'repair', label: '维修记录' },
+  { key: 'spare_replace', label: '配件更换记录' },
   { key: 'maintain', label: '保养记录' },
   { key: 'maintain_plan', label: '保养计划' },
   { key: 'inspection', label: '巡检记录' },
@@ -419,6 +428,20 @@ const repairColumns: RecordColumn[] = [
   { prop: 'status', label: '状态', minWidth: 100 },
   { prop: 'assigned_user_name', label: '工程师', minWidth: 120 },
   { prop: 'report_time', label: '报修时间', minWidth: 160 }
+]
+
+const spareReplaceColumns: RecordColumn[] = [
+  { prop: 'replaced_at', label: '更换时间', minWidth: 170 },
+  { prop: 'part_code', label: '配件编码', minWidth: 120 },
+  { prop: 'part_name', label: '配件名称', minWidth: 140 },
+  { prop: 'part_specification', label: '规格', minWidth: 110 },
+  { prop: 'quantity', label: '数量', minWidth: 80 },
+  { prop: 'unit_price', label: '单价', minWidth: 90 },
+  { prop: 'total_price', label: '金额', minWidth: 90 },
+  { prop: 'supplier_name', label: '供应商', minWidth: 120 },
+  { prop: 'workorder_no', label: '工单号', minWidth: 130 },
+  { prop: 'process_type_name', label: '进程类型', minWidth: 100 },
+  { prop: 'remark', label: '备注', minWidth: 120 }
 ]
 
 const opsExecColumns: RecordColumn[] = [

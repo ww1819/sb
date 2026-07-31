@@ -265,6 +265,11 @@ function applyWarehouseStock(row: Record<string, unknown>, device: Record<string
   row.power_tag_code = device.power_tag_code ?? ''
   row.dept_name = device.dept_name ?? ''
   row.warehouse_name = device.warehouse_name ?? ''
+  row.acceptance_date = device.acceptance_date ?? null
+  row.enable_date = device.enable_date ?? null
+  row.install_location = device.install_location ?? ''
+  row.location_detail = device.location_detail ?? ''
+  row.responsible_person_name = device.responsible_person_name ?? device.use_dept_head ?? ''
   row.manufacturer_code = device.manufacturer_code ?? ''
   row.manufacturer_name = device.manufacturer_name ?? ''
   row.supplier_code = device.supplier_code ?? ''
@@ -295,10 +300,15 @@ function clearWarehouseStock(row: Record<string, unknown>) {
   row.brand = ''
   row.registration_no = ''
   row.production_date = null
+  row.acceptance_date = null
+  row.enable_date = null
   row.has_power_tag = false
   row.power_tag_code = ''
   row.dept_name = ''
   row.warehouse_name = ''
+  row.install_location = ''
+  row.location_detail = ''
+  row.responsible_person_name = ''
   row.manufacturer_code = ''
   row.manufacturer_name = ''
   row.supplier_code = ''

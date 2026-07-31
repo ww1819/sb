@@ -16,7 +16,9 @@
       <el-table-column label="确认途径" width="90">
         <template #default="{ row }">{{ channelLabel(row.confirm_channel) }}</template>
       </el-table-column>
-      <el-table-column prop="created_at" label="申请时间" width="160" />
+      <el-table-column prop="created_at" label="申请时间" width="170">
+        <template #default="{ row }">{{ formatDisplayDateTime(row.created_at) }}</template>
+      </el-table-column>
       <el-table-column label="状态" width="90">
         <template #default="{ row }">{{ statusLabel(row.status) }}</template>
       </el-table-column>
@@ -44,6 +46,7 @@ import http from '@/api/http'
 import FormSection from '@/components/form/FormSection.vue'
 import AssetDevicePicker from '@/components/form/AssetDevicePicker.vue'
 import DeviceLedgerTableColumns from '@/components/table/DeviceLedgerTableColumns.vue'
+import { formatDisplayDateTime } from '@/utils/datetime'
 
 const props = withDefaults(
   defineProps<{

@@ -19,7 +19,15 @@
   <el-table-column prop="specification" label="规格" width="100" show-overflow-tooltip />
   <el-table-column prop="model" label="型号" width="100" show-overflow-tooltip />
   <el-table-column prop="registration_no" label="医疗器械注册证号" width="140" show-overflow-tooltip />
-  <el-table-column prop="production_date" label="生产日期" width="110" />
+  <el-table-column prop="production_date" label="生产日期" width="110">
+    <template #default="{ row }">{{ formatDisplayDate(row.production_date) }}</template>
+  </el-table-column>
+  <el-table-column prop="acceptance_date" label="验收日期" width="110">
+    <template #default="{ row }">{{ formatDisplayDate(row.acceptance_date) }}</template>
+  </el-table-column>
+  <el-table-column prop="enable_date" label="启用日期" width="110">
+    <template #default="{ row }">{{ formatDisplayDate(row.enable_date) }}</template>
+  </el-table-column>
   <el-table-column prop="serial_number" label="序列号" width="120" show-overflow-tooltip />
   <el-table-column prop="has_power_tag" label="电流标签" width="90">
     <template #default="{ row }">
@@ -29,6 +37,9 @@
   <el-table-column prop="power_tag_code" label="电流监测编码" width="120" show-overflow-tooltip />
   <el-table-column prop="dept_name" label="科室" width="110" show-overflow-tooltip />
   <el-table-column prop="warehouse_name" label="仓库" width="110" show-overflow-tooltip />
+  <el-table-column prop="install_location" label="安装位置" width="140" show-overflow-tooltip />
+  <el-table-column prop="location_detail" label="存放位置" width="140" show-overflow-tooltip />
+  <el-table-column prop="responsible_person_name" label="责任人" width="100" show-overflow-tooltip />
   <el-table-column prop="manufacturer_code" label="厂家编码" width="110" show-overflow-tooltip />
   <el-table-column prop="manufacturer_name" label="厂家名称" width="130" show-overflow-tooltip />
   <el-table-column prop="supplier_code" label="供应商编码" width="110" show-overflow-tooltip />
@@ -42,6 +53,7 @@
 
 <script setup lang="ts">
 import TableCellValue from '@/components/table/TableCellValue.vue'
+import { formatDisplayDate } from '@/utils/datetime'
 
 withDefaults(
   defineProps<{

@@ -20,7 +20,9 @@
         :label="col.label"
         :min-width="col.minWidth ?? 120"
         show-overflow-tooltip
-      />
+      >
+        <template #default="{ row }">{{ formatCell(col.prop, row[col.prop]) }}</template>
+      </el-table-column>
       <template #empty>
         <PageEmpty :description="emptyText" :image-size="72" />
       </template>
@@ -32,6 +34,7 @@
 import { onMounted, ref, watch } from 'vue'
 import http from '@/api/http'
 import PageEmpty from '@/components/table/PageEmpty.vue'
+import { formatDisplayDate, formatDisplayDateTime } from '@/utils/datetime'
 
 export interface RecordColumn {
   prop: string
@@ -91,6 +94,24 @@ async function load() {
 function reset() {
   keyword.value = ''
   load()
+}
+
+function formatCell(prop: string, value: unknown) {
+  if (value === null || value === undefined || value === '') return '—'
+  const p = prop.toLowerCase()
+  if (
+    p.endsWith('_at') ||
+    p.endsWith('_time') ||
+    p === 'replaced_at' ||
+    p === 'report_time' ||
+    p === 'printed_at'
+  ) {
+    return formatDisplayDateTime(value)
+  }
+  if (p.endsWith('_date') || p === 'planned_date' || p === 'next_due_date') {
+    return formatDisplayDate(value)
+  }
+  return String(value)
 }
 
 onMounted(load)
