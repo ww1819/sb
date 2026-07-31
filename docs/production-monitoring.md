@@ -14,8 +14,8 @@
 
 | 层 | 看什么 | 工具 / 入口 |
 |----|--------|-------------|
-| 1. 进程 / 端口 | JAR 是否在听端口 | `scripts\status.ps1`；Windows 服务；`docker ps` / `kubectl get pods` |
-| 2. HTTP 存活 | Actuator / 业务 health | `scripts\health-check.ps1`；`/actuator/health` |
+| 1. 进程 / 端口 | JAR 是否在听端口 | `scripts\bs\status.ps1`（或根转发 `scripts\status.ps1`）；Windows 服务；`docker ps` / `kubectl get pods` |
+| 2. HTTP 存活 | Actuator / 业务 health | `scripts\bs\health-check.ps1`；`/actuator/health` |
 | 3. 网关连通 | 对外 API 是否通 | `GET /api/auth/health`（经 Gateway） |
 | 4. 中间件 | PG / Redis / MinIO | 本机连接探测 |
 | 5. 业务冒烟 | 登录 + 一条列表 | 运维验收清单 |

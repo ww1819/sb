@@ -8,13 +8,13 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$script:PkgRoot = $PSScriptRoot
+$script:PkgRoot = Split-Path $PSScriptRoot -Parent
 $script:JarsDir = Join-Path $script:PkgRoot 'jars'
 $script:LogsDir = Join-Path $script:PkgRoot 'logs'
 $script:ServicesFile = Join-Path $script:PkgRoot 'services.json'
 $htmlPath = Join-Path $script:PkgRoot 'index.html'
 
-. (Join-Path $script:PkgRoot 'load-env.ps1')
+. (Join-Path $script:PkgRoot 'common\load-env.ps1')
 Import-MeisPackageEnv -EnvFile (Join-Path $script:PkgRoot 'env.txt')
 
 if ($Port -le 0) {
@@ -186,7 +186,7 @@ function Start-PkgJob {
     $resultFile = Join-Path $jobsDir "$id.json"
     $outLog = Join-Path $jobsDir "$id.out.log"
     $errLog = Join-Path $jobsDir "$id.err.log"
-    $runner = Join-Path $root 'job-runner.ps1'
+    $runner = Join-Path $PSScriptRoot 'job-runner.ps1'
 
     $argLine = "-NoProfile -ExecutionPolicy Bypass -File `"$runner`" -Root `"$root`" -Action `"$action`" -ServiceName `"$serviceName`" -CoreOnlyFlag `"$coreOnlyFlag`" -ResultFile `"$resultFile`""
     $proc = Start-Process -FilePath 'powershell.exe' -ArgumentList $argLine `

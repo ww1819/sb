@@ -10,7 +10,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-Location $Root
 
-. (Join-Path $Root 'load-env.ps1')
+. (Join-Path $Root 'common\load-env.ps1')
 Import-MeisPackageEnv -EnvFile (Join-Path $Root 'env.txt')
 
 $javaHome = Resolve-MeisPackageJavaHome

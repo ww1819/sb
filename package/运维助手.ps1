@@ -1,2 +1,3 @@
-# Compatibility wrapper (Chinese filename). Prefer ops-helper.ps1
-& "$PSScriptRoot\ops-helper.ps1" @args
+﻿# Shim -> bs\运维助手.ps1
+& "$PSScriptRoot\bs\运维助手.ps1" @args
+exit $LASTEXITCODE

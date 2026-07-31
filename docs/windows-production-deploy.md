@@ -2,6 +2,8 @@
 
 本文档面向 **Windows Server**（不强制 Docker）。**现场实施优先走 `package\` 现场包**；正式上线再按后文做 NSSM 服务化、HTTPS 与防火墙收敛。
 
+> **脚本分区（2026-07-31）**：仓库 `scripts\` 已拆为 `common\` / `bs\`（后端+Web）/ `app\`（Flutter）；`package\` 同理拆 `common\` / `bs\` / `app\`。根目录旧入口 bat/ps1 仍为转发兼容。详见 `scripts\README.txt`、`package\README.txt`。
+
 | 场景 | 文档 |
 |------|------|
 | **实施环境快速部署（推荐）** | 本文 [§〇](#〇实施环境部署流程推荐) |
@@ -360,7 +362,7 @@ powershell -File scripts\build.ps1
 
 也可只在构建机打包，将 JAR + `dist` 拷贝到生产机 `D:\meis\`。
 
-**备选旧包：** `scripts\pack-windows-field-kit.ps1` 仍可打 `release\windows-field-kit\`。
+**备选旧包：** `scripts\bs\pack-windows-field-kit.ps1`（或根转发 `scripts\pack-windows-field-kit.ps1`）仍可打 `release\windows-field-kit\`（产物内 scripts 展平）。
 
 ---
 
@@ -414,7 +416,7 @@ powershell -File scripts\stop.ps1
 
 > 脚本面向「本机运维窗口」便捷启停。**正式生产**请改为 NSSM/WinSW 服务（见第七节），避免注销桌面会话后进程退出。
 
-仓库内另有 `scripts\ops-panel.ps1`（同为 localhost:5098），与 `package\启动运维.bat` 能力类似；**交付实施请优先给 `package\`**，勿把完整 `scripts` 目录当现场包。
+仓库内另有 `scripts\bs\ops-panel.ps1`（同为 localhost:5098），与 `package\启动运维.bat` 能力类似；**交付实施请优先给 `package\`**，勿把完整 `scripts` 目录当现场包。
 
 ### 6.4 手动启动单服务（排错）
 

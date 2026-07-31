@@ -2,6 +2,8 @@
 
 本文档面向 **Windows 物理机本地开发**（无 Docker Desktop）。涵盖软件安装、中间件配置、数据库初始化、后端/前端构建与启动、验证与排错。
 
+> 仓库脚本已分区：`scripts\bs\`（后端/Web）、`scripts\app\`（Flutter）、`scripts\common\`（共享）。根目录 `scripts\*.bat` 仍可转发调用。
+
 生产环境请阅读：
 
 - Linux（Docker / K8s）：[production-deploy.md](production-deploy.md)
