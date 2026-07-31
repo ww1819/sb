@@ -18,7 +18,8 @@ public class EntityChangeLogService {
     public static final Set<String> TRACKED_TABLES = Set.of(
             "medical_device", "manufacturer", "supplier", "department", "sys_user", "repair_workorder",
             "campus", "building", "warehouse", "asset_category", "medical_device_category",
-            "engineer", "fault_type_dict", "repair_process_type", "finance_category", "unit_dict", "sys_role"
+            "engineer", "fault_type_dict", "repair_process_type", "finance_category", "unit_dict", "sys_role",
+            "device_warranty", "device_warranty_device"
     );
 
     /** 附录 T.5：delete/submit/withdraw 精简快照字段（按实体） */
@@ -68,7 +69,12 @@ public class EntityChangeLogService {
             Map.entry("unit_dict", List.of(
                     "unit_code", "unit_name", "unit_type", "sort_order", "is_active")),
             Map.entry("sys_role", List.of(
-                    "role_code", "role_name", "description", "sort_order", "is_active"))
+                    "role_code", "role_name", "description", "sort_order", "is_active")),
+            Map.entry("device_warranty", List.of(
+                    "supplier_id", "supplier_name", "start_date", "end_date", "total_amount",
+                    "coverage_content", "contract_id", "contract_code", "remark")),
+            Map.entry("device_warranty_device", List.of(
+                    "warranty_id", "device_id", "device_code", "device_name", "unit_price", "remark"))
     );
 
     private static final Set<String> SENSITIVE = Set.of(

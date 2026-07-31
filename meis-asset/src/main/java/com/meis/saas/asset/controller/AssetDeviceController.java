@@ -163,10 +163,11 @@ public class AssetDeviceController {
                        CASE WHEN pt.tag_code IS NOT NULL THEN TRUE ELSE FALSE END AS has_power_tag,
                        pt.tag_code AS power_tag_code,
                        EXISTS (
-                         SELECT 1 FROM device_warranty_term wt
-                         WHERE wt.device_id = d.id
-                           AND wt.start_date <= CURRENT_DATE AND wt.end_date >= CURRENT_DATE
-                           AND wt.is_deleted = 0
+                         SELECT 1 FROM device_warranty_device wd
+                         JOIN device_warranty w ON w.id = wd.warranty_id
+                         WHERE wd.device_id = d.id
+                           AND w.start_date <= CURRENT_DATE AND w.end_date >= CURRENT_DATE
+                           AND wd.is_deleted = 0 AND w.is_deleted = 0
                        ) AS under_warranty
                 """ + fb.from + powerTagLateralJoin() + fb.where + buildOrderBy(query)
                 + " LIMIT ? OFFSET ?", args.toArray());

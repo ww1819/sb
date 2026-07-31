@@ -912,9 +912,11 @@ export const pageRegistry: Record<string, PageConfig> = {
   '/asset/warranty-term': {
     title: '设备维保信息',
     apiBase: '/asset',
-    table: 'device_warranty_term',
-    listPageUrl: '/asset/warranty-term/page',
-    saveUrl: '/asset/warranty-term',
+    table: 'device_warranty',
+    listPageUrl: '/asset/warranty/page',
+    saveUrl: '/asset/warranty',
+    loadFormDetail: true,
+    enableView: true,
     showRowIndex: true,
     listFilters: [
       { key: 'under_warranty', label: '是否在保', type: 'select', actionBar: true, options: [

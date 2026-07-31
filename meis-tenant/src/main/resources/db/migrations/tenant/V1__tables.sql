@@ -2592,17 +2592,14 @@ COMMENT ON COLUMN performance_test.updated_at IS '更新时间';
 -- ================================================================================
 -- 8. 维保管理模块
 -- ================================================================================
--- 8.0 设备维保时段（AST-WRN-01：一台设备多条时段；合同二期挂 contract_id）
-CREATE TABLE device_warranty_term (
+-- 8.0 设备维保信息头（AST-WRN-02：不含设备；合同二期挂 contract_id）
+CREATE TABLE device_warranty (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    device_id UUID NOT NULL REFERENCES medical_device(id),
-    device_code VARCHAR(50),
-    device_name VARCHAR(200),
     supplier_id UUID REFERENCES supplier(id),
     supplier_name VARCHAR(200),
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
-    amount DECIMAL(15,2),
+    total_amount DECIMAL(15,2),
     coverage_content TEXT,
     contract_id UUID,
     contract_code VARCHAR(50),
@@ -2617,31 +2614,66 @@ CREATE TABLE device_warranty_term (
     deleted_at TIMESTAMP WITH TIME ZONE,
     deleted_by UUID,
     deleted_by_name VARCHAR(100),
-    CONSTRAINT chk_device_warranty_term_dates CHECK (end_date >= start_date)
+    CONSTRAINT chk_device_warranty_dates CHECK (end_date >= start_date)
 );
-COMMENT ON TABLE device_warranty_term IS '设备维保时段（一台多条）';
-COMMENT ON COLUMN device_warranty_term.device_id IS '关联设备';
-COMMENT ON COLUMN device_warranty_term.device_code IS '设备编码冗余';
-COMMENT ON COLUMN device_warranty_term.device_name IS '设备名称冗余';
-COMMENT ON COLUMN device_warranty_term.supplier_id IS '维保公司（供应商；院内可空）';
-COMMENT ON COLUMN device_warranty_term.supplier_name IS '维保公司名称快照';
-COMMENT ON COLUMN device_warranty_term.start_date IS '维保开始日期';
-COMMENT ON COLUMN device_warranty_term.end_date IS '维保结束日期';
-COMMENT ON COLUMN device_warranty_term.amount IS '维保金额';
-COMMENT ON COLUMN device_warranty_term.coverage_content IS '维保内容';
-COMMENT ON COLUMN device_warranty_term.contract_id IS '维保合同预留';
-COMMENT ON COLUMN device_warranty_term.contract_code IS '合同编码冗余预留';
-COMMENT ON COLUMN device_warranty_term.remark IS '备注';
-COMMENT ON COLUMN device_warranty_term.created_at IS '创建时间';
-COMMENT ON COLUMN device_warranty_term.updated_at IS '更新时间';
-COMMENT ON COLUMN device_warranty_term.created_by IS '创建人';
-COMMENT ON COLUMN device_warranty_term.updated_by IS '更新人';
-COMMENT ON COLUMN device_warranty_term.created_by_name IS '创建人姓名快照';
-COMMENT ON COLUMN device_warranty_term.updated_by_name IS '更新人姓名快照';
-COMMENT ON COLUMN device_warranty_term.is_deleted IS '软删标志';
-COMMENT ON COLUMN device_warranty_term.deleted_at IS '删除时间';
-COMMENT ON COLUMN device_warranty_term.deleted_by IS '删除人';
-COMMENT ON COLUMN device_warranty_term.deleted_by_name IS '删除人姓名快照';
+COMMENT ON TABLE device_warranty IS '设备维保信息（头表，不含设备）';
+COMMENT ON COLUMN device_warranty.supplier_id IS '维保公司（供应商；院内可空）';
+COMMENT ON COLUMN device_warranty.supplier_name IS '维保公司名称快照';
+COMMENT ON COLUMN device_warranty.start_date IS '维保开始日期';
+COMMENT ON COLUMN device_warranty.end_date IS '维保结束日期';
+COMMENT ON COLUMN device_warranty.total_amount IS '维保总价';
+COMMENT ON COLUMN device_warranty.coverage_content IS '维保内容';
+COMMENT ON COLUMN device_warranty.contract_id IS '维保合同预留';
+COMMENT ON COLUMN device_warranty.contract_code IS '合同编码冗余预留';
+COMMENT ON COLUMN device_warranty.remark IS '备注';
+COMMENT ON COLUMN device_warranty.created_at IS '创建时间';
+COMMENT ON COLUMN device_warranty.updated_at IS '更新时间';
+COMMENT ON COLUMN device_warranty.created_by IS '创建人';
+COMMENT ON COLUMN device_warranty.updated_by IS '更新人';
+COMMENT ON COLUMN device_warranty.created_by_name IS '创建人姓名快照';
+COMMENT ON COLUMN device_warranty.updated_by_name IS '更新人姓名快照';
+COMMENT ON COLUMN device_warranty.is_deleted IS '软删标志';
+COMMENT ON COLUMN device_warranty.deleted_at IS '删除时间';
+COMMENT ON COLUMN device_warranty.deleted_by IS '删除人';
+COMMENT ON COLUMN device_warranty.deleted_by_name IS '删除人姓名快照';
+
+-- 8.0.1 维保覆盖设备明细（AST-WRN-02）
+CREATE TABLE device_warranty_device (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    warranty_id UUID NOT NULL REFERENCES device_warranty(id),
+    device_id UUID NOT NULL REFERENCES medical_device(id),
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
+    unit_price DECIMAL(15,2),
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100)
+);
+COMMENT ON TABLE device_warranty_device IS '维保覆盖设备明细';
+COMMENT ON COLUMN device_warranty_device.warranty_id IS '维保信息头';
+COMMENT ON COLUMN device_warranty_device.device_id IS '设备';
+COMMENT ON COLUMN device_warranty_device.device_code IS '设备编码冗余';
+COMMENT ON COLUMN device_warranty_device.device_name IS '设备名称冗余';
+COMMENT ON COLUMN device_warranty_device.unit_price IS '单台单价';
+COMMENT ON COLUMN device_warranty_device.remark IS '备注';
+COMMENT ON COLUMN device_warranty_device.created_at IS '创建时间';
+COMMENT ON COLUMN device_warranty_device.updated_at IS '更新时间';
+COMMENT ON COLUMN device_warranty_device.created_by IS '创建人';
+COMMENT ON COLUMN device_warranty_device.updated_by IS '更新人';
+COMMENT ON COLUMN device_warranty_device.created_by_name IS '创建人姓名快照';
+COMMENT ON COLUMN device_warranty_device.updated_by_name IS '更新人姓名快照';
+COMMENT ON COLUMN device_warranty_device.is_deleted IS '软删标志';
+COMMENT ON COLUMN device_warranty_device.deleted_at IS '删除时间';
+COMMENT ON COLUMN device_warranty_device.deleted_by IS '删除人';
+COMMENT ON COLUMN device_warranty_device.deleted_by_name IS '删除人姓名快照';
 
 -- 8.1 维保合同表
 CREATE TABLE maintenance_contract (

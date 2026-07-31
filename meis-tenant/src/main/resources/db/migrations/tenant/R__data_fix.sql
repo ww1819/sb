@@ -1051,3 +1051,6 @@ SET dict_label = EXCLUDED.dict_label,
     dict_value = EXCLUDED.dict_value,
     sort_order = EXCLUDED.sort_order;
 
+-- AST-WRN-02：废止扁平行维保时段（测试数据可清；头/明细由 V1 SchemaTableEnsuring 建表）
+DROP TABLE IF EXISTS device_warranty_term CASCADE;
+

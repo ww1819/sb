@@ -209,10 +209,15 @@ CREATE INDEX IF NOT EXISTS idx_metro_exec_result_exec_no ON metrology_execution_
 CREATE INDEX IF NOT EXISTS idx_wo_segment_user_wo_no ON repair_workorder_segment_user(wo_no);
 CREATE INDEX IF NOT EXISTS idx_insp_record_device_code ON inspection_record(device_code);
 
--- ---------- AST-WRN-01：设备维保时段 ----------
-CREATE INDEX IF NOT EXISTS idx_device_warranty_term_device ON device_warranty_term(device_id);
-COMMENT ON INDEX idx_device_warranty_term_device IS '索引：设备维保时段.设备';
-CREATE INDEX IF NOT EXISTS idx_device_warranty_term_dates ON device_warranty_term(start_date, end_date);
-COMMENT ON INDEX idx_device_warranty_term_dates IS '索引：设备维保时段.起止日期';
-CREATE INDEX IF NOT EXISTS idx_device_warranty_term_supplier ON device_warranty_term(supplier_id);
-COMMENT ON INDEX idx_device_warranty_term_supplier IS '索引：设备维保时段.维保公司';
+-- ---------- AST-WRN-02：设备维保信息主从 ----------
+CREATE INDEX IF NOT EXISTS idx_device_warranty_dates ON device_warranty(start_date, end_date);
+COMMENT ON INDEX idx_device_warranty_dates IS '索引：维保信息.起止日期';
+CREATE INDEX IF NOT EXISTS idx_device_warranty_supplier ON device_warranty(supplier_id);
+COMMENT ON INDEX idx_device_warranty_supplier IS '索引：维保信息.维保公司';
+CREATE INDEX IF NOT EXISTS idx_device_warranty_device_warranty ON device_warranty_device(warranty_id);
+COMMENT ON INDEX idx_device_warranty_device_warranty IS '索引：维保覆盖设备.维保头';
+CREATE INDEX IF NOT EXISTS idx_device_warranty_device_device ON device_warranty_device(device_id);
+COMMENT ON INDEX idx_device_warranty_device_device IS '索引：维保覆盖设备.设备';
+CREATE UNIQUE INDEX IF NOT EXISTS uk_device_warranty_device_active
+    ON device_warranty_device(warranty_id, device_id) WHERE is_deleted = 0;
+COMMENT ON INDEX uk_device_warranty_device_active IS '唯一：同一维保包内设备不重复（未软删）';

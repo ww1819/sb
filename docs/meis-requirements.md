@@ -774,7 +774,7 @@
 | └ 科室盘点申请 | `/asset/dept-inventory-apply` | 菜单已挂；业务见 BACKLOG-AST-07 |
 | └ 设备盘点报表 | `/asset/dept-inventory-report` | 菜单已挂；业务见 BACKLOG-AST-07 |
 | **维保管理**（二级） | — | 分组 `asset_maint_mgmt`（AST-UI-09） |
-| └ 设备维保信息 | `/asset/warranty-term` | AST-WRN-01：设备维保时段 |
+| └ 设备维保信息 | `/asset/warranty-term` | AST-WRN-02：维保信息头 + 覆盖设备明细 |
 | └ 维保合同 | `/maintenance-contract/list` | 自质控合规迁入 |
 | └ 履约记录 | `/maintenance-contract/fulfillment` | 自质控合规迁入 |
 | └ 性能检测 | `/qc/performance` | 自质控合规迁入；路由不变 |
@@ -797,20 +797,33 @@
 - [x] AST-UI-15 资产登记列表：全选查询结果/取消全选、批量修改、追加列
 - [x] AST-UI-16 资产登记列表：启用日期起止命名；电流监测标签/录入/生产日期筛选与列表列
 - [x] AST-UI-17 资产登记：验收日期筛选/列；编辑态「电流监测」Tab（绑已有标签/待机上下限/监测记录）
-- [x] AST-WRN-01 设备维保时段：多条维护、在保查询、台账回写；合同预留
+- [x] AST-WRN-01 设备维保时段（扁平行；已被 AST-WRN-02 取代）
+- [x] AST-WRN-02 维保信息主从：头表 + 覆盖设备；总价/单价校验；变更记录；台账回写
 
-**AST-WRN-01 定稿（2026-07-31）**
+**AST-WRN-01 定稿（2026-07-31，已被 AST-WRN-02 取代）**
 
 | 项 | 定稿 |
 |----|------|
-| **范围** | 表 `device_warranty_term`；菜单 `/asset/warranty-term`；资产登记 Tab「维保信息」 |
-| **维保公司** | 供应商主数据；院内自主 `supplier_id` 可空，名称快照「院内自主」 |
-| **原厂** | 不选生产厂家列表；原厂/授权售后建在供应商中选择（可选按设备厂家名匹配带出供应商） |
-| **模式/包型/混合** | 一期不落库；混合用多行时段表达 |
-| **字段** | 设备、供应商、起止、金额、维保内容、备注、`contract_id` 预留 |
-| **在保** | 存在未软删且 `start_date≤今天≤end_date` 的时段 |
-| **回写** | `medical_device.warranty_end_date` = 当前覆盖时段 `max(end_date)`；无覆盖则清空 |
-| **二期** | 维保合同主从与覆盖设备（MC）；字典增强另议 |
+| **范围** | 原表 `device_warranty_term`（扁平行：设备+时段同表） |
+| **状态** | **废止**：测试数据可清；表由 AST-WRN-02 删除并由头/明细替代 |
+
+**AST-WRN-02 定稿（2026-07-31）**
+
+| 项 | 定稿 |
+|----|------|
+| **范围** | 头表 `device_warranty` + 明细 `device_warranty_device`；菜单 `/asset/warranty-term`；API `/api/asset/warranty`；资产登记 Tab「维保信息」 |
+| **拆分** | 头：维保公司/起止/总价/内容/备注（**不含设备**）；明细：`warranty_id`+`device_id`+单价与设备编码名称冗余 |
+| **维保公司** | 供应商；院内自主 `supplier_id` 可空，名称快照「院内自主」；可选「带出设备生产厂家」按名匹配供应商 |
+| **金额** | 头 `total_amount`=整包总价；明细 `unit_price`=单台单价；保存时 `Σ COALESCE(unit_price,0) ≤ total_amount`（`total_amount` 为空则不做上限校验）；金额不得为负 |
+| **防重复** | 未软删下 `(warranty_id, device_id)` 唯一 |
+| **在保（设备）** | 存在未软删关联，且所属头 `start_date≤今天≤end_date` |
+| **在保（维保包列表）** | 头自身起止覆盖今天 |
+| **回写** | `medical_device.warranty_end_date` = 该设备当前在保包的 `max(end_date)`；无则清空 |
+| **台账 Tab** | 展示本机所属维保包；允许**新建维保包并加入本机**；允许加入已有包 / 移出 / 改本机单价 |
+| **变更记录** | 头、明细均接入 `EntityChangeLog`（附录 T.5 / `TRACKED_TABLES`）；查看态可看修改记录 |
+| **迁库** | `V1` 建新表；`R__data_fix` `DROP device_warranty_term`（测试数据不迁）；清理旧字段/索引 |
+| **预留** | 头表 `contract_id` / `contract_code` 二期挂合同 |
+| **模式字典** | 一期不落；混合=多条维保包（可重叠） |
 
 **AST-UI-17 定稿（2026-07-31）**
 
@@ -859,7 +872,7 @@
 | 项 | 定稿 |
 |----|------|
 | **范围** | 仅资产登记 `/asset/device`（`DeviceLedgerForm`）；**不含**资产综合查询 `DeviceDetailTabs`（入 `BACKLOG-AST-14`） |
-| **新增** | 基本信息 + 设备档案 + 设备图片 + **电流监测** + **维保信息**（AST-UI-17 / AST-WRN-01；无设备 id 时不可绑标签/维保） |
+| **新增** | 基本信息 + 设备档案 + 设备图片 + **电流监测** + **维保信息**（AST-UI-17 / AST-WRN-02；无设备 id 时不可绑标签/维保） |
 | **编辑** | 基本信息 + 设备档案 + 设备图片 + **电流监测** + **维保信息**（**不含**资产卡片与其余业务 Sheet） |
 | **查看 Tab 顺序** | 基本信息 → 资产卡片 → 设备档案 → 设备图片 → 资产标签 → 维修记录 → 保养记录 → **保养计划** → 巡检记录 → **巡检计划** → 计量记录 → **计量计划** → **PM维护记录** → **PM维护计划** → 借调记录 → 借调费用 → 盘点记录 → 不良事件 → **电流读数** → **电流标签绑定记录** |
 | **数据** | 各业务 Sheet 按设备查询并展示；空壳 Tab 须接通 `loadUrl`/设备侧 API |
@@ -2272,6 +2285,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+| 2.175 | 2026-07-31 17:40:00 | — | AST-WRN-02：维保信息头/明细拆分、总价单价校验、双表变更记录；废止 device_warranty_term |
 | 2.174 | 2026-07-31 17:00:00 | — | AST-WRN-01：设备维保时段明细、在保查询、台账回写；菜单设备维保信息 |
 | 2.173 | 2026-07-31 16:25:00 | — | PLT-STATUS-CN-01 修订：状态/字典才「未知(码)」；编码名称规格等属性原样展示 |
 | 2.172 | 2026-07-31 16:10:00 | — | AST-UI-17：验收日期筛选/列；编辑态电流监测 Tab（绑已有标签/待机上下限/读数） |
@@ -3658,7 +3672,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 资产登记编辑/查看 Tab | [AST-UI-14](#ast-ui-14-定稿2026-07-28)、[AST-UI-17](#ast-ui-17-定稿2026-07-31)、[附录 P.2](#p2-编辑-vs-查看-tab) |
 | 资产登记列表全选/批量改/追加列 | [AST-UI-15](#ast-ui-15-定稿2026-07-28) |
 | 资产登记验收日期与编辑电流监测 | [AST-UI-17](#ast-ui-17-定稿2026-07-31) |
-| 设备维保时段 / 在保 | [AST-WRN-01](#ast-wrn-01-定稿2026-07-31) |
+| 设备维保信息主从 / 在保 | [AST-WRN-02](#ast-wrn-02-定稿2026-07-31) |
 | 移动端公用设备借调 | [MOB-SHR-01](#mob-shr-01-定稿2026-07-28) |
 | 移动端电流标签维护 | [MOB-PWR-01](#mob-pwr-01-移动端电流监测标签维护定稿2026-07-29) |
 | 移动端电流基站维护 | [MOB-PWR-02](#mob-pwr-02-移动端电流监测基站维护定稿2026-07-29) |
@@ -3850,6 +3864,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | P0 | `medical_device`、`manufacturer`、`supplier`、`department`、`sys_user`、`repair_workorder` |
 | P1 | `campus`、`building`、`warehouse`、`asset_category`、`medical_device_category` |
 | P2 | `engineer`、`fault_type_dict`、`finance_category`、`unit_dict`、`sys_role` |
+| P3 | `device_warranty`、`device_warranty_device`（AST-WRN-02） |
 
 ### T.4 前端
 
@@ -4074,6 +4089,31 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | `description` | `TEXT` | 描述 |
 | `sort_order` | `INTEGER` | 排序号 |
 | `is_active` | `BOOLEAN` | 是否启用 |
+
+#### `device_warranty`（设备维保信息头，AST-WRN-02）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `supplier_id` | `UUID` | 维保公司（供应商；院内可空） |
+| `supplier_name` | `VARCHAR(200)` | 维保公司名称快照 |
+| `start_date` | `DATE` | 维保开始日期 |
+| `end_date` | `DATE` | 维保结束日期 |
+| `total_amount` | `DECIMAL(15,2)` | 维保总价 |
+| `coverage_content` | `TEXT` | 维保内容 |
+| `contract_id` | `UUID` | 维保合同预留 |
+| `contract_code` | `VARCHAR(50)` | 合同编码冗余预留 |
+| `remark` | `TEXT` | 备注 |
+
+#### `device_warranty_device`（维保覆盖设备明细，AST-WRN-02）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `warranty_id` | `UUID` | 维保信息头 |
+| `device_id` | `UUID` | 设备 |
+| `device_code` | `VARCHAR(50)` | 设备编码冗余 |
+| `device_name` | `VARCHAR(200)` | 设备名称冗余 |
+| `unit_price` | `DECIMAL(15,2)` | 单台单价 |
+| `remark` | `TEXT` | 备注 |
 
 ### T.6 后续主数据约定（强制）
 
@@ -6698,4 +6738,4 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 > **PLT-STATUS-CN-01 修订（v2.173）**：标签维护等页编码/名称被打成「未知(…)」已修复——仅状态与 `dictType` 分类字段走中文/`未知(码)`；编码、规格、型号等属性原样显示。
 
 
-> 已定稿并实现：**AST-WRN-01**（设备维保时段；见上文资产登记/维保管理清单）。行业原厂/第三方/院内/混合策略作运营参考，一期不落模式字典；混合靠多行表达；服务主体仅供应商（院内可空）。
+> 已定稿并实现：**AST-WRN-02**（维保信息头 `device_warranty` + 覆盖设备 `device_warranty_device`；废止扁平行 `device_warranty_term`）。确认要点：① 主从拆分 ② 总价在头、单价在明细且 Σ单价≤总价 ③ 台账 Tab 允许新建维保包 ④ 测试数据可删、旧表字段不保留 ⑤ 头与明细均接变更记录。

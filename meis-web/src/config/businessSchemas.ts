@@ -1508,17 +1508,24 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'update_channel', label: '修改途径', dictType: 'execution_channel', list: true, readonly: true, form: true, width: 90 },
     { prop: 'remark', label: '备注', type: 'textarea' }
   ],
-  device_warranty_term: [
-    { prop: 'device_code', label: '资产编码', list: true, readonly: true, width: 140 },
-    { prop: 'device_name', label: '资产名称', list: true, readonly: true, width: 160 },
-    { prop: 'device_id', label: '设备', linkTable: 'medical_device', required: true },
-    { prop: 'supplier_name', label: '维保公司', list: true, readonly: true, width: 140 },
+  device_warranty: [
+    { prop: 'supplier_name', label: '维保公司', list: true, readonly: true, form: false, width: 140 },
     { prop: 'supplier_id', label: '维保公司', linkTable: 'supplier' },
     { prop: 'start_date', label: '开始日期', type: 'date', list: true, required: true, width: 120 },
     { prop: 'end_date', label: '结束日期', type: 'date', list: true, required: true, width: 120 },
     { prop: 'under_warranty', label: '是否在保', type: 'boolean', list: true, readonly: true, form: false, width: 100 },
-    { prop: 'amount', label: '金额', type: 'number', list: true, width: 120 },
+    { prop: 'total_amount', label: '总价', type: 'number', list: true, width: 120 },
+    { prop: 'device_count', label: '覆盖台数', type: 'number', list: true, readonly: true, form: false, width: 100 },
+    { prop: 'unit_price_sum', label: '单价合计', type: 'number', list: true, readonly: true, form: false, width: 110 },
     { prop: 'coverage_content', label: '维保内容', list: true, type: 'textarea' },
+    { prop: 'remark', label: '备注', type: 'textarea' }
+  ],
+  device_warranty_device: [
+    { prop: 'warranty_id', label: '维保信息' },
+    { prop: 'device_id', label: '设备', linkTable: 'medical_device' },
+    { prop: 'device_code', label: '资产编码' },
+    { prop: 'device_name', label: '资产名称' },
+    { prop: 'unit_price', label: '单价', type: 'number' },
     { prop: 'remark', label: '备注', type: 'textarea' }
   ],
   power_tag: [
