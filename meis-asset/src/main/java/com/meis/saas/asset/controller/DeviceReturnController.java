@@ -100,10 +100,15 @@ public class DeviceReturnController {
             """ + SoftDeleteSupport.notDeletedClause(jdbc, "device_return", "r"), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> r = rows.get(0);
-        r.put("items", jdbc.queryForList(
-                "SELECT * FROM device_return_item WHERE return_id = ?::uuid"
-                        + SoftDeleteSupport.notDeletedClause(jdbc, "device_return_item", null)
-                        + " ORDER BY created_at ASC NULLS LAST", id));
+        r.put("items", jdbc.queryForList("""
+                SELECT i.*,
+                       dept.dept_name,
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.SELECT_FIELDS + """
+                FROM device_return_item i
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.joins("i.device_id") + """
+                WHERE i.return_id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "device_return_item", "i")
+                + " ORDER BY i.created_at ASC NULLS LAST", id));
         return Result.ok(r);
     }
 

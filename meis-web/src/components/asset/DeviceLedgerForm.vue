@@ -16,7 +16,7 @@
       />
 
       <div v-show="activeTab === 'card'" class="device-ledger-form__card-pane">
-        <DeviceAssetCard :model="model" />
+        <DeviceAssetCard :model="model" :device-id="deviceId" />
       </div>
 
       <DeviceArchivePanel v-show="activeTab === 'archive'" :readonly="isView" />

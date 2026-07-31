@@ -248,6 +248,7 @@ function applyWarehouseStock(row: Record<string, unknown>, device: Record<string
   row.device_code = device.device_code ?? ''
   row.device_name = device.device_name ?? ''
   row.specification = device.specification ?? device.model ?? ''
+  row.model = device.model ?? ''
   row.unit = device.unit_name ?? device.unit ?? ''
   if (row.quantity == null || row.quantity === '' || Number(row.quantity) <= 0) {
     row.quantity = 1
@@ -258,6 +259,17 @@ function applyWarehouseStock(row: Record<string, unknown>, device: Record<string
   row.supplier_id = idOrNull(device.supplier_id)
   row.serial_number = device.serial_number ?? ''
   row.brand = device.brand ?? ''
+  row.registration_no = device.registration_no ?? ''
+  row.production_date = device.production_date ?? null
+  row.has_power_tag = device.has_power_tag ?? false
+  row.power_tag_code = device.power_tag_code ?? ''
+  row.dept_name = device.dept_name ?? ''
+  row.warehouse_name = device.warehouse_name ?? ''
+  row.manufacturer_code = device.manufacturer_code ?? ''
+  row.manufacturer_name = device.manufacturer_name ?? ''
+  row.supplier_code = device.supplier_code ?? ''
+  row.supplier_name = device.supplier_name ?? ''
+  row.device_status = device.device_status ?? ''
   row.category_id = idOrNull(device.category_id)
   row.category_name = device.category_name ?? ''
   row.asset_category_id = idOrNull(device.asset_category_id)
@@ -273,6 +285,7 @@ function clearWarehouseStock(row: Record<string, unknown>) {
   row.device_code = ''
   row.device_name = ''
   row.specification = ''
+  row.model = ''
   row.unit = ''
   row.unit_price = null
   row.total_price = null
@@ -280,6 +293,17 @@ function clearWarehouseStock(row: Record<string, unknown>) {
   row.supplier_id = null
   row.serial_number = ''
   row.brand = ''
+  row.registration_no = ''
+  row.production_date = null
+  row.has_power_tag = false
+  row.power_tag_code = ''
+  row.dept_name = ''
+  row.warehouse_name = ''
+  row.manufacturer_code = ''
+  row.manufacturer_name = ''
+  row.supplier_code = ''
+  row.supplier_name = ''
+  row.device_status = ''
   row.category_id = null
   row.category_name = ''
   row.asset_category_id = null

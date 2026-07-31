@@ -331,8 +331,13 @@ public class DeviceWarrantyController {
 
     private List<Map<String, Object>> loadActiveDevices(UUID warrantyId) {
         return jdbc.queryForList("""
-                SELECT wd.*
+                SELECT wd.*,
+                       COALESCE(wd.device_code, d.device_code) AS device_code,
+                       COALESCE(wd.device_name, d.device_name) AS device_name,
+                       dept.dept_name,
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.SELECT_FIELDS + """
                 FROM device_warranty_device wd
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.joins("wd.device_id") + """
                 WHERE wd.warranty_id = ?::uuid
                 """ + SoftDeleteSupport.notDeletedClause(jdbc, "device_warranty_device", "wd") + """
                 ORDER BY wd.device_code NULLS LAST, wd.created_at

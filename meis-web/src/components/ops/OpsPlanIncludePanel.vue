@@ -5,8 +5,7 @@
       <el-button v-if="canInitiate" type="primary" size="small" @click="openApply">发起纳入</el-button>
     </div>
     <el-table :data="rows" border size="small" empty-text="暂无纳入申请">
-      <el-table-column prop="device_code" label="设备编码" width="110" />
-      <el-table-column prop="device_name" label="设备名称" min-width="120" />
+      <DeviceLedgerTableColumns code-label="资产编码" name-label="资产名称" />
       <el-table-column prop="applicant_name" label="申请人" width="90" />
       <el-table-column label="申请途径" width="90">
         <template #default="{ row }">{{ channelLabel(row.create_channel) }}</template>
@@ -44,6 +43,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import FormSection from '@/components/form/FormSection.vue'
 import AssetDevicePicker from '@/components/form/AssetDevicePicker.vue'
+import DeviceLedgerTableColumns from '@/components/table/DeviceLedgerTableColumns.vue'
 
 const props = withDefaults(
   defineProps<{

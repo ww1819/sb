@@ -95,6 +95,11 @@ export interface PageConfig {
   loadFormDetail?: boolean
   /** 隐藏新增按钮（过滤列表等） */
   hideAdd?: boolean
+  /**
+   * 列表底栏金额小计/总计（AST-UI-18）：
+   * 小计=当前页字段求和；总计取接口 aggregates.sum_{prop}
+   */
+  listValueSummary?: { prop: string; label: string }[]
 }
 
 export const pageRegistry: Record<string, PageConfig> = {
@@ -401,7 +406,11 @@ export const pageRegistry: Record<string, PageConfig> = {
       { key: 'finance_category_kw', label: '财务分类模糊', placeholder: '编码/名称' },
       { key: 'serial_number', label: '序列号(SN)', placeholder: '序列号模糊' }
     ],
-    enableView: true
+    enableView: true,
+    listValueSummary: [
+      { prop: 'original_value', label: '原值' },
+      { prop: 'net_value', label: '净值' }
+    ]
   },
   '/asset/entry': {
     title: '设备入库',

@@ -99,10 +99,15 @@ public class DeviceOutboundController {
             """ + SoftDeleteSupport.notDeletedClause(jdbc, "device_outbound", "o"), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> o = rows.get(0);
-        o.put("items", jdbc.queryForList(
-                "SELECT * FROM device_outbound_item WHERE outbound_id = ?"
-                        + SoftDeleteSupport.notDeletedClause(jdbc, "device_outbound_item", null)
-                        + " ORDER BY created_at ASC NULLS LAST", id));
+        o.put("items", jdbc.queryForList("""
+                SELECT i.*,
+                       dept.dept_name,
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.SELECT_FIELDS + """
+                FROM device_outbound_item i
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.joins("i.device_id") + """
+                WHERE i.outbound_id = ?
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "device_outbound_item", "i")
+                + " ORDER BY i.created_at ASC NULLS LAST", id));
         return Result.ok(o);
     }
 

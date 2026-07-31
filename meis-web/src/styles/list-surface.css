@@ -190,6 +190,17 @@
   margin-left: auto;
 }
 
+.meis-table-footer .table-footer-summary {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--meis-text-primary, #303133);
+}
+
 .meis-table-footer .el-pagination {
   margin-left: auto;
 }

@@ -34,10 +34,9 @@
               </template>
             </span>
           </div>
-          <el-table :data="ensureDevices(form)" border size="small" class="system-table">
-            <el-table-column prop="device_code" label="资产编码" width="140" show-overflow-tooltip />
-            <el-table-column prop="device_name" label="资产名称" min-width="160" show-overflow-tooltip />
-            <el-table-column label="单价" width="140">
+          <el-table :data="ensureDevices(form)" border size="small" class="system-table" max-height="360">
+            <DeviceLedgerTableColumns />
+            <el-table-column label="单价" width="130" fixed="right">
               <template #default="{ row }">
                 <el-input-number
                   v-if="mode !== 'view'"
@@ -49,7 +48,7 @@
                 <span v-else>{{ formatMoney(row.unit_price) }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="160" fixed="right">
+            <el-table-column label="操作" width="140" fixed="right">
               <template #default="{ row, $index }">
                 <el-button
                   v-if="row.id"
@@ -95,8 +94,10 @@ import FormSection from '@/components/form/FormSection.vue'
 import RefSelect from '@/components/form/RefSelect.vue'
 import AssetDevicePicker from '@/components/form/AssetDevicePicker.vue'
 import PageEmpty from '@/components/table/PageEmpty.vue'
+import DeviceLedgerTableColumns from '@/components/table/DeviceLedgerTableColumns.vue'
 import EntityChangeHistoryDrawer from '@/components/EntityChangeHistoryDrawer.vue'
 import { getPageConfig } from '@/config/pageRegistry'
+import { deviceLedgerSnapshot } from '@/utils/deviceLedgerSnapshot'
 
 const config = getPageConfig('/asset/warranty-term')!
 
@@ -133,9 +134,7 @@ function onPicked(device: Record<string, unknown>) {
     return
   }
   devices.push({
-    device_id: id,
-    device_code: device.device_code ?? null,
-    device_name: device.device_name ?? null,
+    ...deviceLedgerSnapshot(device),
     unit_price: undefined
   })
   pickerVisible.value = false

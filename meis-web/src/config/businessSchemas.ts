@@ -1,4 +1,5 @@
 import type { FieldSchema } from './pageSchemas'
+import { deviceLedgerDetailFields } from './deviceLedgerFields'
 
 /** 第一期核心业务完整字段 schema */
 export const businessSchemas: Record<string, FieldSchema[]> = {
@@ -271,7 +272,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
       form: false,
       width: 140
     },
-    { prop: 'serial_number', label: '序列号(SN)', group: 'basic' },
+    { prop: 'serial_number', label: '序列号(SN)', list: true, group: 'basic', width: 140 },
     { prop: 'unit_id', label: '单位', linkTable: 'unit_dict', group: 'basic' },
     { prop: 'category_id', label: '设备分类(68)', linkTable: 'medical_device_category', group: 'basic' },
     { prop: 'asset_category_id', label: '资产分类', linkTable: 'asset_category', group: 'basic' },
@@ -499,6 +500,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   device_outbound_item: [
     { prop: 'device_code', label: '资产编码', list: true, detail: true, width: 140 },
     { prop: 'device_name', label: '资产名称', list: true, detail: true, width: 140 },
+    ...deviceLedgerDetailFields,
     { prop: 'specification', label: '规格型号', detail: true, readonly: true, width: 120 },
     { prop: 'unit', label: '单位', detail: true, readonly: true, width: 72 },
     { prop: 'quantity', label: '数量', type: 'number', detail: true, width: 80 },
@@ -506,8 +508,6 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'total_price', label: '金额', type: 'number', detail: true, readonly: true, width: 100 },
     { prop: 'manufacturer_id', label: '生产厂家', linkTable: 'manufacturer', detail: true, readonly: true, width: 140 },
     { prop: 'supplier_id', label: '供应商', linkTable: 'supplier', detail: true, readonly: true, width: 160 },
-    { prop: 'serial_number', label: '序列号(SN)', detail: true, readonly: true, width: 120 },
-    { prop: 'brand', label: '品牌', detail: true, readonly: true, width: 100 },
     { prop: 'category_id', label: '设备分类(68)', linkTable: 'medical_device_category', detail: true, readonly: true, width: 130 },
     { prop: 'asset_category_id', label: '资产分类', linkTable: 'asset_category', detail: true, readonly: true, width: 120 },
     { prop: 'finance_category_id', label: '财务分类', linkTable: 'finance_category', detail: true, readonly: true, width: 120 },
@@ -561,8 +561,9 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'remark', label: '备注', type: 'textarea' }
   ],
   inventory_check_item: [
-    { prop: 'device_code', label: '设备编码', list: true, detail: true, readonly: true },
-    { prop: 'device_name', label: '设备名称', list: true, detail: true, readonly: true },
+    { prop: 'device_code', label: '资产编码', list: true, detail: true, readonly: true, width: 120 },
+    { prop: 'device_name', label: '资产名称', list: true, detail: true, readonly: true, width: 140 },
+    ...deviceLedgerDetailFields,
     { prop: 'expected_location', label: '账面位置', detail: true, readonly: true },
     { prop: 'actual_location', label: '实盘位置', detail: true },
     { prop: 'is_found', label: '是否找到', type: 'boolean', detail: true },
@@ -603,6 +604,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   device_return_item: [
     { prop: 'device_code', label: '资产编码', list: true, detail: true, width: 140 },
     { prop: 'device_name', label: '资产名称', list: true, detail: true, width: 140 },
+    ...deviceLedgerDetailFields,
     { prop: 'specification', label: '规格型号', detail: true, readonly: true, width: 120 },
     { prop: 'unit', label: '单位', detail: true, readonly: true, width: 72 },
     { prop: 'quantity', label: '数量', type: 'number', detail: true, width: 80 },
@@ -610,8 +612,6 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'total_price', label: '金额', type: 'number', detail: true, readonly: true, width: 100 },
     { prop: 'manufacturer_id', label: '生产厂家', linkTable: 'manufacturer', detail: true, readonly: true, width: 140 },
     { prop: 'supplier_id', label: '供应商', linkTable: 'supplier', detail: true, readonly: true, width: 160 },
-    { prop: 'serial_number', label: '序列号(SN)', detail: true, readonly: true, width: 120 },
-    { prop: 'brand', label: '品牌', detail: true, readonly: true, width: 100 },
     { prop: 'category_id', label: '设备分类(68)', linkTable: 'medical_device_category', detail: true, readonly: true, width: 130 },
     { prop: 'asset_category_id', label: '资产分类', linkTable: 'asset_category', detail: true, readonly: true, width: 120 },
     { prop: 'finance_category_id', label: '财务分类', linkTable: 'finance_category', detail: true, readonly: true, width: 120 },
@@ -644,14 +644,13 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   device_goods_return_item: [
     { prop: 'device_code', label: '资产编码', list: true, detail: true, width: 140 },
     { prop: 'device_name', label: '资产名称', list: true, detail: true, width: 140 },
+    ...deviceLedgerDetailFields,
     { prop: 'specification', label: '规格型号', detail: true, readonly: true, width: 120 },
     { prop: 'unit', label: '单位', detail: true, readonly: true, width: 72 },
     { prop: 'quantity', label: '数量', type: 'number', detail: true, width: 80 },
     { prop: 'unit_price', label: '单价', type: 'number', detail: true, readonly: true, width: 100 },
     { prop: 'total_price', label: '金额', type: 'number', detail: true, readonly: true, width: 100 },
     { prop: 'manufacturer_id', label: '生产厂家', linkTable: 'manufacturer', detail: true, readonly: true, width: 140 },
-    { prop: 'serial_number', label: '序列号(SN)', detail: true, readonly: true, width: 120 },
-    { prop: 'brand', label: '品牌', detail: true, readonly: true, width: 100 },
     { prop: 'category_id', label: '设备分类(68)', linkTable: 'medical_device_category', detail: true, readonly: true, width: 130 },
     { prop: 'asset_category_id', label: '资产分类', linkTable: 'asset_category', detail: true, readonly: true, width: 120 },
     { prop: 'finance_category_id', label: '财务分类', linkTable: 'finance_category', detail: true, readonly: true, width: 120 },
@@ -1518,7 +1517,11 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'device_count', label: '覆盖台数', type: 'number', list: true, readonly: true, form: false, width: 100 },
     { prop: 'unit_price_sum', label: '单价合计', type: 'number', list: true, readonly: true, form: false, width: 110 },
     { prop: 'coverage_content', label: '维保内容', list: true, type: 'textarea' },
-    { prop: 'remark', label: '备注', type: 'textarea' }
+    { prop: 'remark', label: '备注', type: 'textarea' },
+    { prop: 'created_at', label: '创建时间', type: 'datetime', list: true, readonly: true, form: false, width: 160 },
+    { prop: 'created_by_name', label: '创建人', list: true, readonly: true, form: false, width: 100 },
+    { prop: 'updated_at', label: '修改时间', type: 'datetime', list: true, readonly: true, form: false, width: 160 },
+    { prop: 'updated_by_name', label: '修改人', list: true, readonly: true, form: false, width: 100 }
   ],
   device_warranty_device: [
     { prop: 'warranty_id', label: '维保信息' },

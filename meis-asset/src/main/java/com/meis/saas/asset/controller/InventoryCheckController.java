@@ -72,26 +72,39 @@ public class InventoryCheckController {
             @RequestParam(required = false) String deptId,
             @RequestParam(required = false) String campusId,
             @RequestParam(required = false) String checkId,
-            @RequestParam(required = false) List<String> excludeIds) {
+            @RequestParam(required = false) List<String> excludeIds,
+            @RequestParam(required = false) String deviceCode,
+            @RequestParam(required = false) String deviceName,
+            @RequestParam(required = false) String specification,
+            @RequestParam(required = false) String model,
+            @RequestParam(required = false) String serialNumber,
+            @RequestParam(required = false) String powerTagCode,
+            @RequestParam(required = false) String deviceStatus) {
         StringBuilder sql = new StringBuilder("""
-                SELECT id, device_code, device_name, brand, model, specification,
-                       dept_id, campus_id, location_detail, device_status
-                FROM medical_device
-                WHERE is_active = true
+                SELECT d.id, d.device_code, d.device_name, d.dept_id, d.campus_id, d.location_detail,
+                       dept.dept_name,
                 """);
-        sql.append(SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", null));
+        sql.append(com.meis.saas.common.asset.DeviceLedgerSelectSupport.SELECT_FIELDS);
+        sql.append("""
+                FROM medical_device d
+                """);
+        sql.append(com.meis.saas.common.asset.DeviceLedgerSelectSupport.relatedJoins("d"));
+        sql.append("""
+                WHERE d.is_active = true
+                """);
+        sql.append(SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d"));
         List<Object> args = new ArrayList<>();
-        if (deptId != null && !deptId.toString().isBlank()) {
-            sql.append(" AND dept_id = ?::uuid ");
+        if (deptId != null && !deptId.isBlank()) {
+            sql.append(" AND d.dept_id = ?::uuid ");
             args.add(deptId);
         }
-        if (campusId != null && !campusId.toString().isBlank()) {
-            sql.append(" AND campus_id = ?::uuid ");
+        if (campusId != null && !campusId.isBlank()) {
+            sql.append(" AND d.campus_id = ?::uuid ");
             args.add(campusId);
         }
-        if (checkId != null && !checkId.toString().isBlank()) {
+        if (checkId != null && !checkId.isBlank()) {
             sql.append("""
-                     AND id NOT IN (
+                     AND d.id NOT IN (
                          SELECT device_id FROM inventory_check_item
                          WHERE check_id = ?::uuid AND device_id IS NOT NULL
                     """);
@@ -102,13 +115,34 @@ public class InventoryCheckController {
         List<String> excludes = excludeIds == null ? List.of()
                 : excludeIds.stream().filter(id -> id != null && !id.isBlank()).distinct().toList();
         if (!excludes.isEmpty()) {
-            sql.append(" AND id NOT IN (");
+            sql.append(" AND d.id NOT IN (");
             sql.append(String.join(",", Collections.nCopies(excludes.size(), "?::uuid")));
             sql.append(") ");
             args.addAll(excludes);
         }
-        sql.append(" ORDER BY device_code LIMIT 500");
+        appendIlike(sql, args, "d.device_code", deviceCode);
+        if (deviceName != null && !deviceName.isBlank()) {
+            String like = "%" + deviceName.trim() + "%";
+            sql.append(" AND (d.device_name ILIKE ? OR COALESCE(d.pinyin_code, '') ILIKE ?) ");
+            args.add(like);
+            args.add(like);
+        }
+        appendIlike(sql, args, "d.specification", specification);
+        appendIlike(sql, args, "d.model", model);
+        appendIlike(sql, args, "d.serial_number", serialNumber);
+        appendIlike(sql, args, "pt.tag_code", powerTagCode);
+        if (deviceStatus != null && !deviceStatus.isBlank()) {
+            sql.append(" AND d.device_status = ? ");
+            args.add(deviceStatus.trim());
+        }
+        sql.append(" ORDER BY d.device_code LIMIT 500");
         return Result.ok(jdbc.queryForList(sql.toString(), args.toArray()));
+    }
+
+    private static void appendIlike(StringBuilder sql, List<Object> args, String column, String value) {
+        if (value == null || value.isBlank()) return;
+        sql.append(" AND ").append(column).append(" ILIKE ? ");
+        args.add("%" + value.trim() + "%");
     }
 
     @GetMapping("/{id:" + UUID_PATH + "}")
@@ -118,10 +152,15 @@ public class InventoryCheckController {
                         + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check", null), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> t = rows.get(0);
-        t.put("items", jdbc.queryForList(
-                "SELECT * FROM inventory_check_item WHERE check_id = ?::uuid"
-                        + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check_item", null)
-                        + " ORDER BY device_code", id));
+        t.put("items", jdbc.queryForList("""
+                SELECT i.*,
+                       dept.dept_name,
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.SELECT_FIELDS + """
+                FROM inventory_check_item i
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.joins("i.device_id") + """
+                WHERE i.check_id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check_item", "i")
+                + " ORDER BY i.device_code", id));
         return Result.ok(t);
     }
 

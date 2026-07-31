@@ -77,6 +77,9 @@
             </div>
           </div>
           <div v-if="isReport && showPager" class="meis-table-footer">
+            <div v-if="$slots.footerSummary" class="table-footer-summary">
+              <slot name="footerSummary" />
+            </div>
             <el-pagination
               :current-page="page"
               :page-size="size"
@@ -93,6 +96,9 @@
         </div>
 
         <div v-if="!isReport && showPager" class="system-pager">
+          <div v-if="$slots.footerSummary" class="table-footer-summary">
+            <slot name="footerSummary" />
+          </div>
           <el-pagination
             :current-page="page"
             :page-size="size"
@@ -328,11 +334,25 @@ const showHeader = computed(
 
 .system-pager {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 16px;
   flex-shrink: 0;
   margin-top: 0;
   padding: 4px 0 2px;
   border-top: 1px solid var(--meis-border-light);
+}
+
+.table-footer-summary {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--meis-text-primary, #303133);
+  padding-left: 4px;
 }
 
 .system-empty {

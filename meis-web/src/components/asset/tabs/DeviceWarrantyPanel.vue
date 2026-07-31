@@ -13,12 +13,16 @@
         <el-tag :type="anyInWarranty ? 'success' : 'info'" effect="light">
           {{ anyInWarranty ? '当前在保' : '当前不在保' }}
         </el-tag>
+        <el-select v-model="warrantyFilter" clearable placeholder="是否在保" style="width: 120px" @change="load">
+          <el-option label="在保" value="true" />
+          <el-option label="不在保" value="false" />
+        </el-select>
         <el-button v-if="!readonly" type="primary" @click="openCreate">新建维保包</el-button>
         <el-button v-if="!readonly" @click="openJoin">加入已有维保包</el-button>
         <el-button :icon="Refresh" @click="load">刷新</el-button>
       </div>
 
-      <el-table v-loading="loading" :data="rows" border stripe class="system-table">
+      <el-table v-loading="loading" :data="displayRows" border stripe class="system-table">
         <el-table-column prop="supplier_name" label="维保公司" min-width="140" show-overflow-tooltip />
         <el-table-column prop="start_date" label="开始日期" width="120" />
         <el-table-column prop="end_date" label="结束日期" width="120" />
@@ -28,11 +32,19 @@
         <el-table-column prop="total_amount" label="总价" width="110" align="right" />
         <el-table-column prop="unit_price" label="本机单价" width="110" align="right" />
         <el-table-column prop="coverage_content" label="维保内容" min-width="160" show-overflow-tooltip />
-        <el-table-column v-if="!readonly" label="操作" width="220" fixed="right">
+        <el-table-column prop="created_at" label="创建时间" width="160" show-overflow-tooltip />
+        <el-table-column prop="created_by_name" label="创建人" width="100" show-overflow-tooltip />
+        <el-table-column prop="updated_at" label="修改时间" width="160" show-overflow-tooltip />
+        <el-table-column prop="updated_by_name" label="修改人" width="100" show-overflow-tooltip />
+        <el-table-column label="操作" :width="readonly ? 160 : 360" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
-            <el-button link type="primary" @click="openHeaderLog(row)">变更记录</el-button>
-            <el-button link type="danger" @click="onLeave(row)">移出</el-button>
+            <el-button link type="primary" @click="openDevices(row)">包内设备</el-button>
+            <template v-if="!readonly">
+              <el-button link type="primary" @click="openAppend(row)">追加设备</el-button>
+              <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
+              <el-button link type="primary" @click="openHeaderLog(row)">变更记录</el-button>
+              <el-button link type="danger" @click="onLeave(row)">移出</el-button>
+            </template>
           </template>
         </el-table-column>
         <template #empty>
@@ -114,6 +126,52 @@
       </template>
     </AppModal>
 
+    <AppModal v-model="devicesVisible" title="包内设备" size="lg">
+      <div v-if="devicesMeta" class="devices-meta">
+        {{ devicesMeta.supplier_name || '院内自主' }}
+        · {{ devicesMeta.start_date }} ~ {{ devicesMeta.end_date }}
+        <template v-if="devicesMeta.total_amount != null && devicesMeta.total_amount !== ''">
+          · 总价 {{ devicesMeta.total_amount }}
+        </template>
+      </div>
+      <el-table v-loading="devicesLoading" :data="packageDevices" border max-height="420">
+        <DeviceLedgerTableColumns />
+        <el-table-column prop="unit_price" label="单价" width="100" align="right" fixed="right" />
+        <template #empty>
+          <PageEmpty description="该维保包暂无覆盖设备" :image-size="64" />
+        </template>
+      </el-table>
+      <template #footer>
+        <el-button type="primary" @click="devicesVisible = false">关闭</el-button>
+      </template>
+    </AppModal>
+
+    <AppModal v-model="appendVisible" title="追加设备到维保包" size="sm">
+      <el-form label-width="90px">
+        <el-form-item label="目标设备" required>
+          <div class="append-device-row">
+            <el-input
+              :model-value="appendDeviceLabel"
+              readonly
+              placeholder="请选择设备"
+            />
+            <el-button type="primary" @click="pickerVisible = true">选择</el-button>
+          </div>
+        </el-form-item>
+        <el-form-item label="单价">
+          <el-input-number v-model="appendUnitPrice" :controls="true" :min="0" style="width: 100%" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="appendVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" :disabled="!appendDeviceId" @click="confirmAppend">
+          追加
+        </el-button>
+      </template>
+    </AppModal>
+
+    <AssetDevicePicker v-model="pickerVisible" @confirm="onAppendPicked" />
+
     <EntityChangeHistoryDrawer
       v-model="headerLogVisible"
       entity-type="device_warranty"
@@ -130,7 +188,9 @@ import http from '@/api/http'
 import AppModal from '@/components/AppModal.vue'
 import PageEmpty from '@/components/table/PageEmpty.vue'
 import RefSelect from '@/components/form/RefSelect.vue'
+import AssetDevicePicker from '@/components/form/AssetDevicePicker.vue'
 import EntityChangeHistoryDrawer from '@/components/EntityChangeHistoryDrawer.vue'
+import DeviceLedgerTableColumns from '@/components/table/DeviceLedgerTableColumns.vue'
 
 const props = defineProps<{
   deviceId?: string
@@ -143,6 +203,7 @@ const props = defineProps<{
 const loading = ref(false)
 const saving = ref(false)
 const rows = ref<Record<string, unknown>[]>([])
+const warrantyFilter = ref<string | undefined>()
 const formVisible = ref(false)
 const form = reactive<Record<string, unknown>>({})
 const joinVisible = ref(false)
@@ -153,10 +214,30 @@ const joinSelected = ref<Record<string, unknown> | null>(null)
 const joinUnitPrice = ref<number | undefined>()
 const headerLogVisible = ref(false)
 const headerLogId = ref('')
+const devicesVisible = ref(false)
+const devicesLoading = ref(false)
+const packageDevices = ref<Record<string, unknown>[]>([])
+const devicesMeta = ref<Record<string, unknown> | null>(null)
+const appendVisible = ref(false)
+const appendWarrantyId = ref('')
+const appendDeviceId = ref('')
+const appendDeviceLabel = ref('')
+const appendUnitPrice = ref<number | undefined>()
+const pickerVisible = ref(false)
 
 const anyInWarranty = computed(() =>
   rows.value.some((r) => r.under_warranty === true || r.under_warranty === 'true')
 )
+
+const displayRows = computed(() => {
+  if (warrantyFilter.value === 'true') {
+    return rows.value.filter((r) => r.under_warranty === true || r.under_warranty === 'true')
+  }
+  if (warrantyFilter.value === 'false') {
+    return rows.value.filter((r) => !(r.under_warranty === true || r.under_warranty === 'true'))
+  }
+  return rows.value
+})
 
 async function load() {
   if (!props.deviceId) {
@@ -312,6 +393,69 @@ function openHeaderLog(row: Record<string, unknown>) {
   headerLogVisible.value = true
 }
 
+async function openDevices(row: Record<string, unknown>) {
+  devicesVisible.value = true
+  devicesLoading.value = true
+  packageDevices.value = []
+  devicesMeta.value = {
+    supplier_name: row.supplier_name,
+    start_date: row.start_date,
+    end_date: row.end_date,
+    total_amount: row.total_amount
+  }
+  try {
+    const { data } = await http.get(`/asset/warranty/${row.id}`)
+    const detail = (data.data ?? {}) as Record<string, unknown>
+    devicesMeta.value = {
+      supplier_name: detail.supplier_name ?? row.supplier_name,
+      start_date: detail.start_date ?? row.start_date,
+      end_date: detail.end_date ?? row.end_date,
+      total_amount: detail.total_amount ?? row.total_amount
+    }
+    packageDevices.value = (detail.devices as Record<string, unknown>[]) ?? []
+  } catch {
+    /* 拦截器 */
+  } finally {
+    devicesLoading.value = false
+  }
+}
+
+function openAppend(row: Record<string, unknown>) {
+  appendWarrantyId.value = String(row.id ?? '')
+  appendDeviceId.value = ''
+  appendDeviceLabel.value = ''
+  appendUnitPrice.value = undefined
+  appendVisible.value = true
+}
+
+function onAppendPicked(device: Record<string, unknown>) {
+  appendDeviceId.value = String(device.id ?? '')
+  const code = String(device.device_code ?? '')
+  const name = String(device.device_name ?? '')
+  appendDeviceLabel.value = [code, name].filter(Boolean).join(' / ')
+}
+
+async function confirmAppend() {
+  if (!appendWarrantyId.value || !appendDeviceId.value) {
+    ElMessage.warning('请选择要追加的设备')
+    return
+  }
+  saving.value = true
+  try {
+    await http.post(`/asset/warranty/${appendWarrantyId.value}/devices`, {
+      device_id: appendDeviceId.value,
+      unit_price: appendUnitPrice.value
+    })
+    ElMessage.success('已追加设备')
+    appendVisible.value = false
+    await load()
+  } catch {
+    /* 拦截器：如单价合计超总价、设备已在包内 */
+  } finally {
+    saving.value = false
+  }
+}
+
 async function fillFromMfr() {
   let name = String(props.manufacturerName ?? '').trim()
   if (!name && props.deviceId) {
@@ -375,5 +519,18 @@ watch(
 }
 .join-price {
   margin-top: 12px;
+}
+.devices-meta {
+  margin-bottom: 10px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+.append-device-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+.append-device-row .el-input {
+  flex: 1;
 }
 </style>

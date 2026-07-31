@@ -172,7 +172,15 @@ public class AssetDeviceController {
                 """ + fb.from + powerTagLateralJoin() + fb.where + buildOrderBy(query)
                 + " LIMIT ? OFFSET ?", args.toArray());
         MedicalDeviceDeleteGuard.enrichCanDelete(jdbc, rows);
-        return Result.ok(new PageResult<>(rows, total, query.getPage(), query.getSize()));
+        Map<String, Object> sum = jdbc.queryForMap(
+                "SELECT COALESCE(SUM(d.original_value), 0) AS sum_original_value, "
+                        + "COALESCE(SUM(d.net_value), 0) AS sum_net_value "
+                        + fb.from + fb.where,
+                fb.args.toArray());
+        Map<String, Object> aggregates = new LinkedHashMap<>();
+        aggregates.put("sum_original_value", sum.get("sum_original_value"));
+        aggregates.put("sum_net_value", sum.get("sum_net_value"));
+        return Result.ok(new PageResult<>(rows, total, query.getPage(), query.getSize()).withAggregates(aggregates));
     }
 
     /** AST-UI-15：当前筛选条件下全部设备 id（全选查询结果） */
@@ -707,7 +715,7 @@ public class AssetDeviceController {
         String code = Objects.toString(d.get("device_code"), "");
         d.put("qr_payload", code);
         d.put("prints", jdbc.queryForList("""
-                SELECT id, device_code, device_name, printed_by, printed_at, template_code, remark
+                SELECT id, device_code, device_name, printed_by, printed_by_name, printed_at, template_code, remark
                 FROM device_label_print_log WHERE device_id = ?::uuid
                 """ + SoftDeleteSupport.notDeletedClause(jdbc, "device_label_print_log", null) + """
                  ORDER BY printed_at DESC LIMIT 50
@@ -717,7 +725,7 @@ public class AssetDeviceController {
 
     @PostMapping("/{id}/label/print")
     @Transactional
-    @OperationLog(module = "asset", description = "打印资产标签")
+    @OperationLog(module = "asset", description = "打印资产标签或卡片")
     public Result<Map<String, Object>> printLabel(@PathVariable UUID id, @RequestBody(required = false) Map<String, Object> body) {
         var rows = jdbc.queryForList(
                 "SELECT id, device_code, device_name FROM medical_device WHERE id = ?::uuid"
@@ -746,9 +754,12 @@ public class AssetDeviceController {
                 (id, device_id, device_code, device_name, printed_by, printed_by_name, template_code, biz_type, biz_id, remark)
                 VALUES (?::uuid, ?::uuid, ?, ?, ?::uuid, ?, ?, 'device', ?::uuid, ?)
                 """, logId, id, code, device.get("device_name"), printedBy, printedByName, template, id, remark);
-        jdbc.update("""
-                UPDATE medical_device SET label_printed = TRUE, qr_code_url = ?, updated_at = NOW() WHERE id = ?::uuid
-                """, code, id);
+        // AST-UI-19：资产卡片打印只写流水，不回写贴纸「已打印」标志
+        if (!"asset_card".equalsIgnoreCase(template)) {
+            jdbc.update("""
+                    UPDATE medical_device SET label_printed = TRUE, qr_code_url = ?, updated_at = NOW() WHERE id = ?::uuid
+                    """, code, id);
+        }
         return Result.ok(jdbc.queryForList(
                 "SELECT * FROM device_label_print_log WHERE id = ?::uuid"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "device_label_print_log", null), logId).get(0));

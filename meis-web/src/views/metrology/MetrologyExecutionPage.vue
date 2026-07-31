@@ -6,8 +6,7 @@
         <GroupedFormFields :table="config.table" :model="exec" />
         <FormSection title="设备明细" class="items-section">
           <el-table :data="execItems" border size="small">
-            <el-table-column prop="device_code" label="设备编码" width="120" />
-            <el-table-column prop="device_name" label="设备名称" min-width="140" />
+            <DeviceLedgerTableColumns code-label="资产编码" name-label="资产名称" />
             <el-table-column prop="certificate_no" label="证书编号" width="120" />
             <el-table-column prop="cost" label="费用" width="80" />
             <el-table-column prop="status" label="状态" width="100">
@@ -79,6 +78,7 @@ import GroupedFormFields from '@/components/form/GroupedFormFields.vue'
 import FormSection from '@/components/form/FormSection.vue'
 import AppModal from '@/components/AppModal.vue'
 import TableCellValue from '@/components/table/TableCellValue.vue'
+import DeviceLedgerTableColumns from '@/components/table/DeviceLedgerTableColumns.vue'
 import type { PageConfig } from '@/config/pageRegistry'
 
 const config: PageConfig = {

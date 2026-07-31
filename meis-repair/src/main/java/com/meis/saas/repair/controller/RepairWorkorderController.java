@@ -73,15 +73,21 @@ public class RepairWorkorderController {
             @RequestParam(required = false) String deptName,
             @RequestParam(required = false) String deviceName,
             @RequestParam(required = false) String specification,
+            @RequestParam(required = false) String model,
             @RequestParam(required = false) String deviceCode,
             @RequestParam(required = false) String financialCode,
-            @RequestParam(required = false) String serialNumber) {
+            @RequestParam(required = false) String serialNumber,
+            @RequestParam(required = false) String powerTagCode,
+            @RequestParam(required = false) String deviceStatus) {
         StringBuilder sql = new StringBuilder("""
-                SELECT d.id, d.device_code, d.device_name, d.specification, d.serial_number,
-                       d.financial_code, d.dept_id, d.device_status, dept.dept_name
+                SELECT d.id, d.device_code, d.device_name, d.financial_code, d.dept_id,
+                       dept.dept_name,
+                """);
+        sql.append(com.meis.saas.common.asset.DeviceLedgerSelectSupport.SELECT_FIELDS);
+        sql.append("""
                 FROM medical_device d
-                LEFT JOIN department dept ON dept.id = d.dept_id""");
-        sql.append(SoftDeleteSupport.notDeletedClause(jdbc, "department", "dept"));
+                """);
+        sql.append(com.meis.saas.common.asset.DeviceLedgerSelectSupport.relatedJoins("d"));
         sql.append("""
                 WHERE d.is_active = true
                   AND COALESCE(d.device_status, '') NOT IN ('maintenance', 'pending_verify', 'scrap')
@@ -95,11 +101,22 @@ public class RepairWorkorderController {
         sql.append(SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d"));
         List<Object> args = new ArrayList<>();
         appendIlike(sql, args, "dept.dept_name", deptName);
-        appendIlike(sql, args, "d.device_name", deviceName);
+        if (deviceName != null && !deviceName.isBlank()) {
+            String like = "%" + deviceName.trim() + "%";
+            sql.append(" AND (d.device_name ILIKE ? OR COALESCE(d.pinyin_code, '') ILIKE ?) ");
+            args.add(like);
+            args.add(like);
+        }
         appendIlike(sql, args, "d.specification", specification);
+        appendIlike(sql, args, "d.model", model);
         appendIlike(sql, args, "d.device_code", deviceCode);
         appendIlike(sql, args, "d.financial_code", financialCode);
         appendIlike(sql, args, "d.serial_number", serialNumber);
+        appendIlike(sql, args, "pt.tag_code", powerTagCode);
+        if (deviceStatus != null && !deviceStatus.isBlank()) {
+            sql.append(" AND d.device_status = ? ");
+            args.add(deviceStatus.trim());
+        }
         sql.append(" ORDER BY d.device_code LIMIT 500");
         return Result.ok(jdbc.queryForList(sql.toString(), args.toArray()));
     }

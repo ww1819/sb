@@ -106,9 +106,11 @@ public class InspectionExecutionController {
         if (rows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> result = new LinkedHashMap<>(rows.get(0));
         var items = jdbc.queryForList("""
-                SELECT ei.*, COALESCE(ei.dept_name, d.dept_name) AS dept_name
+                SELECT ei.*,
+                       COALESCE(ei.dept_name, dept.dept_name) AS dept_name,
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.SELECT_FIELDS + """
                 FROM inspection_execution_item ei
-                LEFT JOIN department d ON d.id = ei.dept_id
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.joins("ei.device_id") + """
                 WHERE ei.execution_id = ?::uuid
                 """ + SoftDeleteSupport.notDeletedClause(jdbc, "inspection_execution_item", "ei")
                 + " ORDER BY ei.created_at", id);

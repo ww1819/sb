@@ -85,8 +85,7 @@
             type="selection"
             width="48"
           />
-          <el-table-column prop="device_code" label="设备编码" width="120" />
-          <el-table-column prop="device_name" label="设备名称" min-width="140" />
+          <DeviceLedgerTableColumns code-label="资产编码" name-label="资产名称" />
           <el-table-column label="上次完成" width="140">
             <template #default="{ row }">
               <el-date-picker
@@ -151,14 +150,7 @@
     </template>
   </WorkflowCrudPage>
 
-  <el-dialog v-model="pickerVisible" title="选择设备" width="640px" destroy-on-close append-to-body>
-    <el-input v-model="pickerKw" placeholder="编码/名称" clearable style="margin-bottom: 8px" @keyup.enter="searchDevices" />
-    <el-table :data="pickerRows" border size="small" max-height="360" @row-click="pickDevice">
-      <el-table-column prop="device_code" label="编码" width="120" />
-      <el-table-column prop="device_name" label="名称" min-width="160" />
-      <el-table-column prop="dept_name" label="科室" width="120" />
-    </el-table>
-  </el-dialog>
+  <AssetDevicePicker v-model="pickerVisible" @confirm="pickDevice" />
 
   <OpsPlanBackfillDialog ref="backfillRef" />
 </template>
@@ -170,9 +162,12 @@ import http from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 import WorkflowCrudPage from '@/components/WorkflowCrudPage.vue'
 import FormSection from '@/components/form/FormSection.vue'
+import AssetDevicePicker from '@/components/form/AssetDevicePicker.vue'
+import DeviceLedgerTableColumns from '@/components/table/DeviceLedgerTableColumns.vue'
 import OpsPlanBackfillDialog from '@/views/ops/OpsPlanBackfillDialog.vue'
 import OpsPlanIncludePanel from '@/components/ops/OpsPlanIncludePanel.vue'
 import { calcItemNextDueDate } from '@/utils/cycleDays'
+import { deviceLedgerSnapshot } from '@/utils/deviceLedgerSnapshot'
 import type { PageConfig } from '@/config/pageRegistry'
 
 const auth = useAuthStore()
@@ -197,8 +192,6 @@ const config: PageConfig = {
 }
 const dueList = ref<Record<string, unknown>[]>([])
 const pickerVisible = ref(false)
-const pickerKw = ref('')
-const pickerRows = ref<Record<string, unknown>[]>([])
 const activeForm = ref<Record<string, unknown> | null>(null)
 
 function isDraft(row: Record<string, unknown>) {
@@ -333,14 +326,6 @@ function addDevice(form: Record<string, unknown>) {
   activeForm.value = form
   ensureItems(form)
   pickerVisible.value = true
-  searchDevices()
-}
-
-async function searchDevices() {
-  const { data } = await http.get('/asset/device/page', {
-    params: { page: 1, size: 50, keyword: pickerKw.value || undefined }
-  })
-  pickerRows.value = data.data?.records ?? data.data?.list ?? data.data?.rows ?? []
 }
 
 function pickDevice(row: Record<string, unknown>) {
@@ -351,15 +336,11 @@ function pickDevice(row: Record<string, unknown>) {
     return
   }
   items.push({
-    device_id: row.id,
-    device_code: row.device_code,
-    device_name: row.device_name,
-    dept_id: row.dept_id,
+    ...deviceLedgerSnapshot(row),
     last_done_date: null,
     next_due_date: calcItemNextDueDate(activeForm.value, null),
     item_status: 'active'
   })
-  pickerVisible.value = false
 }
 
 function removeItem(form: Record<string, unknown>, index: number) {

@@ -70,9 +70,7 @@
         </div>
         <FormSection title="设备明细" class="items-section">
           <el-table :data="execItems" border size="small">
-            <el-table-column prop="device_code" label="设备编码" width="110" />
-            <el-table-column prop="device_name" label="设备名称" min-width="120" />
-            <el-table-column prop="dept_name" label="科室" width="100" />
+            <DeviceLedgerTableColumns code-label="资产编码" name-label="资产名称" />
             <el-table-column prop="executor_name" label="执行人" width="90" />
             <el-table-column prop="end_time" label="执行时间" width="160" />
             <el-table-column label="确认状态" width="90">
@@ -177,6 +175,7 @@ import http from '@/api/http'
 import CrudPage from '@/components/CrudPage.vue'
 import GroupedFormFields from '@/components/form/GroupedFormFields.vue'
 import FormSection from '@/components/form/FormSection.vue'
+import DeviceLedgerTableColumns from '@/components/table/DeviceLedgerTableColumns.vue'
 import AppModal from '@/components/AppModal.vue'
 import DocChangeHistoryDrawer from '@/components/DocChangeHistoryDrawer.vue'
 import type { PageConfig } from '@/config/pageRegistry'

@@ -799,6 +799,46 @@
 - [x] AST-UI-17 资产登记：验收日期筛选/列；编辑态「电流监测」Tab（绑已有标签/待机上下限/监测记录）
 - [x] AST-WRN-01 设备维保时段（扁平行；已被 AST-WRN-02 取代）
 - [x] AST-WRN-02 维保信息主从：头表 + 覆盖设备；总价/单价校验；变更记录；台账回写
+- [x] AST-UI-18 资产登记列表：序列号列；底栏原值/净值小计与总计
+- [x] AST-UI-19 资产登记查看态：三甲档案式资产卡片 + 打印 + 打印记录（复用标签流水）
+- [x] PLT-DEV-LIST-01 从属设备列表字段与筛选约定（选择器/维保/计划执行/出入库盘点报修已对齐）
+
+**AST-UI-19 定稿（2026-08-01）**
+
+| 项 | 定稿 |
+|----|------|
+| **范围** | 资产登记 `/asset/device` **查看态**「资产卡片」Tab（编辑/新增不含，延续 AST-UI-14）；综合查询不跟（`BACKLOG-AST-14`） |
+| **形态** | A4 档案式一页一机；屏幕预览与浏览器打印共用布局 |
+| **页眉** | 院区名称 +「医疗设备资产卡片」 |
+| **识别区** | 真实 QR（载荷=`device_code`）+ 资产编码/名称 |
+| **字段区** | 品牌/规格/型号/序列号/注册证号/生产日期/设备状态/启用/验收；科室/仓库/存放位置；厂家与供应商编码名称；原值/净值/购置日期 |
+| **页脚** | 使用科室确认 / 设备科确认 / 日期（空白签字线，不落库） |
+| **打印** | 先写流水再浏览器打印；`template_code=asset_card` |
+| **流水** | 复用 `device_label_print_log`；卡片 Tab **仅展示** `asset_card` 记录 |
+| **与标签边界** | 贴纸仍走「资产标签」Tab（`default`/`asset_sticker`）；打卡片 **不**回写 `medical_device.label_printed` |
+
+**AST-UI-18 定稿（2026-07-31）**
+
+| 项 | 定稿 |
+|----|------|
+| **范围** | 资产登记列表 `/asset/device` |
+| **序列号** | 列表展示 `serial_number`（序列号(SN)） |
+| **底栏金额** | 小计=**当前页**原值/净值合计；总计=**当前查询全部结果**原值/净值合计（与筛选条件一致，非仅勾选） |
+| **字段** | 原值=`original_value`；净值=`net_value`；空值按 0 参与合计 |
+| **展示** | 分页左侧：`小计原值 / 小计净值；总计原值 / 总计净值`（金额格式两位小数） |
+
+**PLT-DEV-LIST-01 定稿（2026-07-31）**
+
+| 项 | 定稿 |
+|----|------|
+| **适用范围** | 弹窗/Sheet/从表中的**从属设备列表**与**设备选择器**（非资产登记主列表本身） |
+| **必显列** | 资产编码、资产名称、品牌、规格、型号、医疗器械注册证号、生产日期、序列号、是否有电流标签、电流监测编码、科室、仓库、生产厂家编码/名称、供应商编码/名称、设备状态 |
+| **按场景追加** | 维保包内设备追加「单价」；计划/执行明细可追加到期日等业务列；横向滚动，勿挤掉必显列 |
+| **必选筛选**（可检索列表/选择器） | 资产编码、名称（文字+拼音简码模糊）、规格、型号、序列号、电流标签编码、所属科室 |
+| **建议筛选** | 设备状态、仓库、生产厂家、供应商（按页面侧重点酌加） |
+| **本期落地** | `AssetDevicePicker`；维保包内/覆盖设备；保养/巡检/PM 计划选设备与明细；四类执行明细；纳入申请；出入库库存选设备+明细联查；盘点 `DeviceLedgerPicker`；报修 `RepairDevicePicker`；共用 `DeviceLedgerTableColumns` / `deviceLedgerDetailFields` / `DeviceLedgerSelectSupport` |
+| **公共清单** | 前端 `deviceLedgerFields.ts` + `deviceLedgerSnapshot.ts`；后端 `DeviceLedgerSelectSupport`；约定包 §5.15；后续增删字段双改此处与共用组件 |
+| **推广** | 新功能默认按本约定；入库新建台账明细（`device_entry_item`）不以台账选择为主，不强制全列 |
 
 **AST-WRN-01 定稿（2026-07-31，已被 AST-WRN-02 取代）**
 
@@ -819,7 +859,7 @@
 | **在保（设备）** | 存在未软删关联，且所属头 `start_date≤今天≤end_date` |
 | **在保（维保包列表）** | 头自身起止覆盖今天 |
 | **回写** | `medical_device.warranty_end_date` = 该设备当前在保包的 `max(end_date)`；无则清空 |
-| **台账 Tab** | 展示本机所属维保包；允许**新建维保包并加入本机**；允许加入已有包 / 移出 / 改本机单价 |
+| **台账 Tab** | 展示本机所属维保包；允许**新建维保包并加入本机**；允许加入已有包 / 移出 / 改本机单价；行操作**追加设备**（选其他设备入本包，可填单价）、**包内设备**（只读列表查看覆盖设备） |
 | **变更记录** | 头、明细均接入 `EntityChangeLog`（附录 T.5 / `TRACKED_TABLES`）；查看态可看修改记录 |
 | **迁库** | `V1` 建新表；`R__data_fix` `DROP device_warranty_term`（测试数据不迁）；清理旧字段/索引 |
 | **预留** | 头表 `contract_id` / `contract_code` 二期挂合同 |
@@ -2298,6 +2338,12 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+| 2.187 | 2026-08-01 00:10:00 | — | AST-UI-19：三甲 A4 资产卡片重做、打印与 asset_card 流水；文末草稿 1–4 收口 |
+| 2.186 | 2026-07-31 23:59:30 | — | 维保包列表/台账 Tab：是否在保筛选；展示创建/修改人时 |
+| 2.185 | 2026-07-31 23:59:00 | — | PLT-DEV-LIST-01 收尾：出入库明细联查+盘点/报修选择器对齐；BACKLOG-AST-18 完成 |
+| 2.184 | 2026-07-31 23:50:00 | — | PLT-DEV-LIST-01 推广：三计划选设备+明细/执行明细/纳入申请联查台账字段；共用 DeviceLedgerTableColumns |
+| 2.183 | 2026-07-31 23:35:00 | — | AST-UI-18 列表序列号+原值净值小计总计；PLT-DEV-LIST-01 从属设备列表约定（选择器/包内设备） |
+| 2.182 | 2026-07-31 22:55:00 | — | AST-WRN-02 补：台账维保 Tab 行操作「追加设备」「包内设备」 |
 | 2.181 | 2026-07-31 17:40:00 | — | AST-WRN-02：维保信息头/明细拆分、总价单价校验、双表变更记录；废止 device_warranty_term |
 | 2.180 | 2026-07-31 17:00:00 | — | AST-WRN-01：设备维保时段明细、在保查询、台账回写；菜单设备维保信息 |
 | 2.179 | 2026-07-31 16:30:00 | — | PLT-UI-SURFACE-01 全站：SystemPageCard/AppModal/FormDrawer 默认 report；PageFilterBar 纳入查询色条 |
@@ -2624,6 +2670,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | BACKLOG-AST-10 | 资产 | 报废审核 / 报废查询完整业务（状态流转、列表筛选） | AST-UI-10 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-AST-11 | 资产 | 铭牌识别：小程序腾讯 OCR 采集 → 结果落从表 → Web 确认回填台账 | [PLT-OCR-01](#plt-ocr-01-铭牌图像识别回填台账待开发2026-07-24) | P1 | 引擎倾向腾讯 API；密钥走后端；表结构/字段映射排期时定 | 可排期 |
 | BACKLOG-AST-14 | 资产 | 资产综合查询 `DeviceDetailTabs` 与 AST-UI-14 查看 Tab 对齐 | AST-UI-14 本轮仅资产登记 | P2 | 双轨详情，本轮不同步 | 可排期 |
+| BACKLOG-AST-18 | 资产/跨模块 | 出入库/盘点等剩余从属设备列表对齐 PLT-DEV-LIST-01 | 计划/执行/纳入/维保已对齐；余出入库·盘点·报修选择器 | P2 | 分批推广 | 部分完成 |
 | BACKLOG-ANA-01 | 效益 | 效率分析完整业务（指标、图表、导出） | ANA-UI-01/02 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-ANA-02 | 效益 | 效益分析查询完整业务 | ANA-UI-02 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-ANA-03 | 效益 | 收费项目审核完整业务 | ANA-UI-02 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
@@ -3590,11 +3637,12 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 设备编码 | **创建后禁止修改**（前端只读 + 后端 update 忽略改码） |
 | 禁止 | 不得用设备名称、科室、财务编码、出厂序列号等可改字段作二维码 |
 
-### P.4 标签打印
+### P.4 标签 / 卡片打印
 
-- 标签预览 / 打印（载荷 = `device_code`）
-- 打印记录表 `device_label_print_log`（设备、编码快照、打印人、时间）
-- `label_printed` 在至少打印一次后置 true
+- 标签预览 / 打印（载荷 = `device_code`）；模板 `default` / `asset_sticker`
+- **资产卡片**打印（AST-UI-19）：模板 `asset_card`；A4 档案卡；写同一流水表
+- 打印记录表 `device_label_print_log`（设备、编码快照、打印人/姓名、时间、`template_code`）
+- `label_printed`：仅贴纸类模板（`default` / `asset_sticker`）至少打印一次后置 true；**`asset_card` 不回写**
 
 ### P.5 删除业务校验
 
@@ -3658,7 +3706,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 | 主题 | 位置 |
 |------|------|
-| **跨项目可复用约定全集** | [reusable-engineering-conventions.md](reusable-engineering-conventions.md)（**v1.30**） |
+| **跨项目可复用约定全集** | [reusable-engineering-conventions.md](reusable-engineering-conventions.md)（**v1.34**） |
 | 数据库迁移双轨 / **固定槽位** / 串库防护 | [附录 D](#附录-d数据库迁移规范必读)（含 D.5 / D.6） |
 | 开发完成验收清单 | [附录 E](#附录-e开发完成验收清单必读) |
 | public schema 迁移 / **菜单唯一脚本** | [附录 F](#附录-fpublic-schema-迁移规范2026-07-11)、[PLT-MENU-01](#plt-menu-01-菜单唯一维护脚本2026-07-24) |
@@ -3693,6 +3741,8 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 资产登记编辑/查看 Tab | [AST-UI-14](#ast-ui-14-定稿2026-07-28)、[AST-UI-17](#ast-ui-17-定稿2026-07-31)、[附录 P.2](#p2-编辑-vs-查看-tab) |
 | 资产登记列表全选/批量改/追加列 | [AST-UI-15](#ast-ui-15-定稿2026-07-28) |
 | 资产登记验收日期与编辑电流监测 | [AST-UI-17](#ast-ui-17-定稿2026-07-31) |
+| 资产登记序列号与金额底栏 | [AST-UI-18](#ast-ui-18-定稿2026-07-31) |
+| 从属设备列表字段/筛选约定 | [PLT-DEV-LIST-01](#plt-dev-list-01-定稿2026-07-31)、约定包 §5.15、`BACKLOG-AST-18` |
 | 设备维保信息主从 / 在保 | [AST-WRN-02](#ast-wrn-02-定稿2026-07-31) |
 | 移动端公用设备借调 | [MOB-SHR-01](#mob-shr-01-定稿2026-07-28) |
 | 移动端电流标签维护 | [MOB-PWR-01](#mob-pwr-01-移动端电流监测标签维护定稿2026-07-29) |
@@ -4974,6 +5024,8 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 |----|------|
 | 原有 | `device_id`、`device_code`、`device_name`、`printed_by`、`printed_at`、`template_code`… |
 | **新增** | `printed_by_name`（W.5）；`biz_type`（`device` / `inventory_check`…）；`biz_id`、`biz_no`、`biz_item_id` |
+
+`template_code` 取值：`default` / `asset_sticker`（贴纸标签）；`asset_card`（A4 资产卡片，AST-UI-19）。
 
 台账打印：`biz_type=device`（或空，兼容旧数据）。盘点补打：`biz_type=inventory_check`，填盘点单 id/单号/明细 id。
 
@@ -6759,4 +6811,4 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 > **PLT-STATUS-CN-01 修订（v2.178）**：标签维护等页编码/名称被打成「未知(…)」已修复——仅状态与 `dictType` 分类字段走中文/`未知(码)`；编码、规格、型号等属性原样显示。
 
 
-> 已定稿并实现：**AST-WRN-02**（维保信息头 `device_warranty` + 覆盖设备 `device_warranty_device`；废止扁平行 `device_warranty_term`）。确认要点：① 主从拆分 ② 总价在头、单价在明细且 Σ单价≤总价 ③ 台账 Tab 允许新建维保包 ④ 测试数据可删、旧表字段不保留 ⑤ 头与明细均接变更记录。
+> 已定稿并实现：**AST-WRN-02**（v2.186）；**AST-UI-18**；**AST-UI-19**（v2.187 A4 资产卡片打印）；**PLT-DEV-LIST-01**（含 `BACKLOG-AST-18`）。公共字段/筛选清单见 PLT-DEV-LIST-01「公共清单」与约定包 §5.15。
