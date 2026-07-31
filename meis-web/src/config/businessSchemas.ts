@@ -252,6 +252,25 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'model', label: '型号', list: true, group: 'basic' },
     { prop: 'registration_no', label: '医疗器械注册证号', list: true, group: 'basic', width: 140 },
     { prop: 'production_date', label: '生产日期', type: 'date', list: true, group: 'basic', width: 120 },
+    {
+      prop: 'has_power_tag',
+      label: '是否有电流监测标签',
+      type: 'boolean',
+      list: true,
+      group: 'basic',
+      readonly: true,
+      form: false,
+      width: 150
+    },
+    {
+      prop: 'power_tag_code',
+      label: '电流监测标签编码',
+      list: true,
+      group: 'basic',
+      readonly: true,
+      form: false,
+      width: 140
+    },
     { prop: 'serial_number', label: '序列号(SN)', group: 'basic' },
     { prop: 'unit_id', label: '单位', linkTable: 'unit_dict', group: 'basic' },
     { prop: 'category_id', label: '设备分类(68)', linkTable: 'medical_device_category', group: 'basic' },
@@ -308,6 +327,26 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'contract_price', label: '合同价格', type: 'number', group: 'time' },
     { prop: 'purchase_date', label: '购置日期', type: 'date', group: 'time' },
     { prop: 'enable_date', label: '启用日期', type: 'date', list: true, group: 'time' },
+    {
+      prop: 'created_at',
+      label: '录入时间',
+      type: 'datetime',
+      list: true,
+      group: 'time',
+      readonly: true,
+      form: false,
+      width: 160
+    },
+    {
+      prop: 'under_warranty',
+      label: '是否在保',
+      type: 'boolean',
+      list: true,
+      group: 'time',
+      readonly: true,
+      form: false,
+      width: 100
+    },
     { prop: 'service_life_years', label: '使用年限', type: 'number', group: 'time' },
     { prop: 'service_expiry_reached', label: '使用日期是否已到', type: 'boolean', list: true, group: 'time', readonly: true, form: false, width: 130 },
     { prop: 'service_expiry_date', label: '使用到期日期', type: 'date', list: true, group: 'time', readonly: true, width: 120 },
@@ -326,7 +365,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'material_group', label: '物料分组', group: 'accounting' },
     { prop: 'asset_class_code', label: '资产类别编码', group: 'accounting' },
     { prop: 'asset_class_name', label: '资产类别', group: 'accounting' },
-    { prop: 'acceptance_date', label: '验收日期', type: 'date', group: 'accounting' },
+    { prop: 'acceptance_date', label: '验收日期', type: 'date', list: true, group: 'accounting', width: 120 },
     { prop: 'kingdee_asset_code', label: '金蝶资产编码', group: 'accounting', readonly: true },
     { prop: 'invoice_no', label: '发票号', group: 'accounting' },
     { prop: 'invoice_date', label: '发票日期', type: 'date', group: 'accounting' },
@@ -1467,6 +1506,19 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'is_active', label: '启用', type: 'boolean', list: true },
     { prop: 'create_channel', label: '制单途径', dictType: 'execution_channel', list: true, readonly: true, form: true, width: 90 },
     { prop: 'update_channel', label: '修改途径', dictType: 'execution_channel', list: true, readonly: true, form: true, width: 90 },
+    { prop: 'remark', label: '备注', type: 'textarea' }
+  ],
+  device_warranty_term: [
+    { prop: 'device_code', label: '资产编码', list: true, readonly: true, width: 140 },
+    { prop: 'device_name', label: '资产名称', list: true, readonly: true, width: 160 },
+    { prop: 'device_id', label: '设备', linkTable: 'medical_device', required: true },
+    { prop: 'supplier_name', label: '维保公司', list: true, readonly: true, width: 140 },
+    { prop: 'supplier_id', label: '维保公司', linkTable: 'supplier' },
+    { prop: 'start_date', label: '开始日期', type: 'date', list: true, required: true, width: 120 },
+    { prop: 'end_date', label: '结束日期', type: 'date', list: true, required: true, width: 120 },
+    { prop: 'under_warranty', label: '是否在保', type: 'boolean', list: true, readonly: true, form: false, width: 100 },
+    { prop: 'amount', label: '金额', type: 'number', list: true, width: 120 },
+    { prop: 'coverage_content', label: '维保内容', list: true, type: 'textarea' },
     { prop: 'remark', label: '备注', type: 'textarea' }
   ],
   power_tag: [

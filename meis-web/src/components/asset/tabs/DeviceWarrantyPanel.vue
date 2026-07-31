@@ -1,0 +1,221 @@
+<template>
+  <div class="device-warranty-panel">
+    <el-alert
+      v-if="!deviceId"
+      type="warning"
+      :closable="false"
+      show-icon
+      title="请先保存设备后再维护维保信息"
+      class="device-warranty-panel__alert"
+    />
+    <template v-else>
+      <div class="device-warranty-panel__toolbar">
+        <el-tag :type="anyInWarranty ? 'success' : 'info'" effect="light">
+          {{ anyInWarranty ? '当前在保' : '当前不在保' }}
+        </el-tag>
+        <el-button v-if="!readonly" type="primary" @click="openCreate">新增维保时段</el-button>
+        <el-button :icon="Refresh" @click="load">刷新</el-button>
+      </div>
+
+      <el-table v-loading="loading" :data="rows" border stripe class="system-table">
+        <el-table-column prop="supplier_name" label="维保公司" min-width="140" show-overflow-tooltip />
+        <el-table-column prop="start_date" label="开始日期" width="120" />
+        <el-table-column prop="end_date" label="结束日期" width="120" />
+        <el-table-column prop="under_warranty" label="在保" width="80">
+          <template #default="{ row }">{{ row.under_warranty ? '是' : '否' }}</template>
+        </el-table-column>
+        <el-table-column prop="amount" label="金额" width="110" align="right" />
+        <el-table-column prop="coverage_content" label="维保内容" min-width="160" show-overflow-tooltip />
+        <el-table-column v-if="!readonly" label="操作" width="140" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
+            <el-button link type="danger" @click="onDelete(row)">删除</el-button>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <PageEmpty description="暂无维保时段" :image-size="72" />
+        </template>
+      </el-table>
+    </template>
+
+    <AppModal v-model="formVisible" :title="form.id ? '编辑维保时段' : '新增维保时段'" size="md">
+      <el-form label-width="110px">
+        <el-form-item label="维保公司">
+          <div class="supplier-row">
+            <RefSelect
+              v-model="form.supplier_id"
+              link-table="supplier"
+              placeholder="选择维保公司；清空=院内自主"
+            />
+            <el-button link type="primary" @click="fillFromMfr">带出设备生产厂家</el-button>
+          </div>
+        </el-form-item>
+        <el-form-item label="开始日期" required>
+          <el-date-picker v-model="form.start_date" type="date" value-format="YYYY-MM-DD" />
+        </el-form-item>
+        <el-form-item label="结束日期" required>
+          <el-date-picker v-model="form.end_date" type="date" value-format="YYYY-MM-DD" />
+        </el-form-item>
+        <el-form-item label="金额">
+          <el-input-number v-model="form.amount" :controls="true" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="维保内容">
+          <el-input v-model="form.coverage_content" type="textarea" :rows="3" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="form.remark" type="textarea" :rows="2" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="formVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="save">保存</el-button>
+      </template>
+    </AppModal>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, reactive, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Refresh } from '@element-plus/icons-vue'
+import http from '@/api/http'
+import AppModal from '@/components/AppModal.vue'
+import PageEmpty from '@/components/table/PageEmpty.vue'
+import RefSelect from '@/components/form/RefSelect.vue'
+
+const props = defineProps<{
+  deviceId?: string
+  deviceCode?: string
+  deviceName?: string
+  manufacturerName?: string
+  readonly?: boolean
+}>()
+
+const loading = ref(false)
+const saving = ref(false)
+const rows = ref<Record<string, unknown>[]>([])
+const formVisible = ref(false)
+const form = reactive<Record<string, unknown>>({})
+
+const anyInWarranty = computed(() => rows.value.some((r) => r.under_warranty === true || r.under_warranty === 'true'))
+
+async function load() {
+  if (!props.deviceId) {
+    rows.value = []
+    return
+  }
+  loading.value = true
+  try {
+    const { data } = await http.get(`/asset/warranty-term/by-device/${props.deviceId}`)
+    rows.value = data.data ?? []
+  } finally {
+    loading.value = false
+  }
+}
+
+function openCreate() {
+  Object.keys(form).forEach((k) => delete form[k])
+  form.device_id = props.deviceId
+  form.device_code = props.deviceCode
+  form.device_name = props.deviceName
+  form.supplier_id = null
+  formVisible.value = true
+}
+
+function openEdit(row: Record<string, unknown>) {
+  Object.keys(form).forEach((k) => delete form[k])
+  Object.assign(form, {
+    id: row.id,
+    device_id: props.deviceId,
+    device_code: props.deviceCode,
+    device_name: props.deviceName,
+    supplier_id: row.supplier_id,
+    start_date: row.start_date,
+    end_date: row.end_date,
+    amount: row.amount != null ? Number(row.amount) : undefined,
+    coverage_content: row.coverage_content,
+    remark: row.remark
+  })
+  formVisible.value = true
+}
+
+async function save() {
+  if (!form.start_date || !form.end_date) {
+    ElMessage.warning('请填写维保起止日期')
+    return
+  }
+  saving.value = true
+  try {
+    await http.post('/asset/warranty-term', {
+      ...form,
+      device_id: props.deviceId,
+      supplier_id: form.supplier_id || null
+    })
+    ElMessage.success('保存成功')
+    formVisible.value = false
+    await load()
+  } catch {
+    // 拦截器
+  } finally {
+    saving.value = false
+  }
+}
+
+async function onDelete(row: Record<string, unknown>) {
+  try {
+    await ElMessageBox.confirm('确定删除该维保时段？', '删除确认', { type: 'warning' })
+  } catch {
+    return
+  }
+  await http.delete(`/asset/warranty-term/${row.id}`)
+  ElMessage.success('已删除')
+  await load()
+}
+
+async function fillFromMfr() {
+  const name = String(props.manufacturerName ?? '').trim()
+  if (!name) {
+    ElMessage.warning('该设备未维护生产厂家名称')
+    return
+  }
+  const { data } = await http.get('/system/supplier/page', {
+    params: { page: 1, size: 10, keyword: name }
+  })
+  const list = (data.data?.records ?? []) as Record<string, unknown>[]
+  if (!list.length) {
+    ElMessage.warning(`未在供应商中找到「${name}」，请先建档`)
+    return
+  }
+  form.supplier_id = String(list[0].id)
+  ElMessage.success(`已带出：${list[0].supplier_name ?? name}`)
+}
+
+watch(
+  () => props.deviceId,
+  () => void load(),
+  { immediate: true }
+)
+</script>
+
+<style scoped>
+.device-warranty-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 240px;
+}
+.device-warranty-panel__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.supplier-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.supplier-row :deep(.el-select) {
+  flex: 1;
+}
+</style>
