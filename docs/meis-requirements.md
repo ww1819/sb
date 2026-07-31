@@ -820,6 +820,15 @@
 | **老租户** | 重启 `meis-tenant`（或触发租户 Flyway）执行 `R__columns_biz.sql`；`shared_device_fee` 四列本已在 R__ L964+，未跑迁移则仍缺列 |
 | **余量** | R__ 中尚有约 200 列未回写 V1（台账扩展、途径列等），记 `BACKLOG-PLT-DB-SYNC-01`，按模块分批回填，禁止碎片脚本 |
 
+**FAQ：tenant_demo 跑种子仍报「字段不存在」？**
+
+| 问 | 答 |
+|----|-----|
+| 是迁库脚本没有这些字段吗？ | **不是。** 对照 `demo_asset_ledger.sql` 全部 INSERT/UPDATE 列：无一列在「V1+R__」之外；此前报错的 `shared_device_fee.loan_no` 在 `R__columns_biz.sql` 早有 `ADD COLUMN`（现已双写回 V1）。 |
+| 那为什么 tenant_demo 缺列？ | Schema 里**表已在**（V1/`SchemaTableEnsuring`），但 **Flyway R__ 补列未成功应用到该 schema**（服务未重启、迁移失败、连错库等）。`CREATE TABLE IF NOT EXISTS` **不会**给已有表加新列。 |
+| 如何处理？ | 1）确认 `SET search_path TO tenant_demo`；2）**重启 meis-tenant** 让 `TenantSchemaMigrator` 跑 R__；3）再执行种子。种子开头有**预检**：仍缺列会直接列出表.列名。 |
+| 自检 SQL | `SELECT column_name FROM information_schema.columns WHERE table_schema='tenant_demo' AND table_name='shared_device_fee' AND column_name='loan_no';` 无行即未补列。 |
+
 **AST-UI-19 定稿（2026-08-01）**
 
 | 项 | 定稿 |
@@ -2440,6 +2449,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+| 2.194 | 2026-08-01 01:20:00 | — | AST-DEMO-01 FAQ：tenant_demo 缺列因未跑 R__ 非脚本无字段；种子预检；种子依赖列回写 V1 |
 | 2.193 | 2026-08-01 01:15:00 | — | PLT-DB-SYNC-01：shared_device_fee 等双轨补列；维修子表 W.5 姓名；余量入 BACKLOG |
 | 2.192 | 2026-08-01 01:05:00 | — | AST-DEMO-01：先物理删除再插入可重跑；文案去「演示/测试」；样板机改为 SD24080001 |
 | 2.191 | 2026-08-01 01:10:00 | — | AST-DEMO-01 扩展：DEMO-AST-001 覆盖查看态可落库 Sheet；档案/图片注明不可 SQL 填充 |
@@ -6933,5 +6943,5 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 > **PLT-STATUS-CN-01 修订（v2.178）**：标签维护等页编码/名称被打成「未知(…)」已修复——仅状态与 `dictType` 分类字段走中文/`未知(码)`；编码、规格、型号等属性原样显示。
 
 
-> 已定稿并实现：**AST-WRN-02**；**AST-UI-18～21**；**AST-GAP-01**；**AST-DEMO-01**；**PLT-DEV-LIST-01**；**PLT-DB-SYNC-01**（`shared_device_fee` 等双轨补列，见附录 D.3.1）。
-> 缺口全文：[meis-requirements-asset-ledger-gap.md](meis-requirements-asset-ledger-gap.md)。老租户需重启 `meis-tenant` 使 R__ 补列生效后再跑种子脚本。
+> 已定稿并实现：**AST-WRN-02**；**AST-UI-18～21**；**AST-GAP-01**；**AST-DEMO-01**；**PLT-DEV-LIST-01**；**PLT-DB-SYNC-01**。
+> **种子执行**：Web 登录「系统管理员」默认租户 schema 为 **`tenant_demo`**（`public.sys_tenant`：`tenant_code=demo`）。pgAdmin/psql 跑种子时**不会**自动跟登录态，须先 `SET search_path TO tenant_demo;`；落在 `public` 会预检失败（与界面看到 954 台台账无关）。

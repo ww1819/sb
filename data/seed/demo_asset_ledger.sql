@@ -1,14 +1,73 @@
 -- =============================================================================
 -- AST-DEMO-01：资产登记列表 + 查看态各 Sheet 样例数据
--- 用法（在目标租户 schema 下执行）：
---   SET search_path TO <tenant_schema>;
+-- 用法（必须在租户 schema 下执行，禁止 public）：
+--   SET search_path TO tenant_demo;   -- ★ 先切租户，再执行本文件
 --   \i data/seed/demo_asset_ledger.sql
--- 策略：先按种子命名空间物理删除 → 再全量插入（可反复执行）
+-- 或在 pgAdmin「查询工具」里先单独执行 SET search_path，再粘贴本脚本。
+--
+-- 【若提示 schema "public" 缺少列】
+--   说明当前连的是 public，不是 tenant_demo。业务表在租户 schema，public 没有这些补列。
+-- 【若提示 schema "tenant_demo" 缺少列】
+--   说明该租户未跑完 R__：重启 meis-tenant 后再执行。
+--
 -- 种子命名空间（仅用于圈定删除范围，界面文案不含「演示/测试」）：
 --   设备 SD2408**** / 旧版 DEMO-AST-***；配件 SDSP**** / DEMO-SP-*；
 --   业务单号以 SD 开头或历史 DEMO-* 前缀
 -- 不可 SQL 填充：设备档案、设备图片（前端内存态，无落库表）
 -- =============================================================================
+
+-- #############################################################################
+-- 0) 预检：本 schema 是否已具备种子所需关键列（缺则说明未跑 R__）
+-- #############################################################################
+DO $$
+DECLARE
+  v_schema TEXT := current_schema();
+  v_miss TEXT := '';
+  r RECORD;
+BEGIN
+  IF v_schema IS NULL OR v_schema IN ('public', 'pg_catalog', 'information_schema') THEN
+    RAISE EXCEPTION
+      '当前 search_path 落在 schema "%"，业务种子必须在租户 schema 执行。请先执行：SET search_path TO tenant_demo; 然后再跑本脚本。',
+      COALESCE(v_schema, '(null)');
+  END IF;
+
+  FOR r IN
+    SELECT * FROM (VALUES
+      ('shared_device_fee', 'loan_no'),
+      ('shared_device_fee', 'device_id'),
+      ('shared_device_fee', 'device_code'),
+      ('shared_device_fee', 'device_name'),
+      ('shared_device_fee', 'is_deleted'),
+      ('medical_device', 'is_deleted'),
+      ('medical_device', 'location_floor'),
+      ('medical_device', 'room_number'),
+      ('medical_device', 'use_dept_head'),
+      ('metrology_execution_item', 'execution_no'),
+      ('metrology_execution_item', 'is_deleted'),
+      ('maintenance_execution_item', 'is_deleted'),
+      ('inspection_execution_item', 'is_deleted'),
+      ('pm_execution_item', 'is_deleted'),
+      ('repair_workorder_segment_part', 'wo_no'),
+      ('repair_workorder_segment_part', 'is_deleted')
+    ) AS t(tbl, col)
+  LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = v_schema
+        AND table_name = r.tbl AND column_name = r.col
+    ) THEN
+      v_miss := v_miss || E'\n  - ' || r.tbl || '.' || r.col;
+    END IF;
+  END LOOP;
+
+  IF v_miss <> '' THEN
+    -- PG 的 RAISE 占位符是 %（不是 %s）；多写 s 会拼出 is_deleteds 这类乱码
+    RAISE EXCEPTION
+      'schema "%" 缺少种子所需列：%\n请先重启 meis-tenant 执行 R__columns_biz / R__columns_audit，再重跑本脚本。',
+      v_schema, v_miss;
+  END IF;
+END
+$$;
 
 -- #############################################################################
 -- 1) 物理删除（子表优先；兼容旧 DEMO-* 与当前 SD* 命名）
@@ -336,7 +395,7 @@ BEGIN
 
   -- 维修工单 + 换件
   IF v_ptype IS NOT NULL THEN
-    v_wo := uuid_generate_v4();
+    v_wo := gen_random_uuid();
     INSERT INTO repair_workorder (
       id, wo_no, device_id, device_code, device_name, report_time, fault_description,
       urgency_level, status, reporter_id
@@ -345,7 +404,7 @@ BEGIN
       '开机后屏幕间歇性黑屏，伴电源指示灯闪烁，重启可暂时恢复', 'normal', 'closed', v_user
     );
 
-    v_seg := uuid_generate_v4();
+    v_seg := gen_random_uuid();
     INSERT INTO repair_workorder_segment (
       id, workorder_id, process_type_id, user_id, started_at, ended_at,
       device_id, device_code, device_name, remark, is_deleted
@@ -373,7 +432,7 @@ BEGIN
   END IF;
 
   -- 维保
-  v_wid := uuid_generate_v4();
+  v_wid := gen_random_uuid();
   INSERT INTO device_warranty (
     id, supplier_id, supplier_name, start_date, end_date, total_amount,
     coverage_content, remark, created_by, created_by_name, is_deleted
@@ -400,7 +459,7 @@ BEGIN
     (v_dev, v_code, v_name, v_user, v_user_name, NOW() - INTERVAL '1 day', 'asset_card', 'device', '打印资产卡片', 0);
 
   -- 保养计划 + 执行
-  v_plan := uuid_generate_v4();
+  v_plan := gen_random_uuid();
   INSERT INTO maintenance_plan (
     id, plan_name, plan_no, plan_code, device_id, dept_id, campus_id,
     maintenance_level, cycle_type, cycle_value, cycle_days,
@@ -422,7 +481,7 @@ BEGIN
     'active', NULL, v_user, v_user_name, 0
   );
 
-  v_exec := uuid_generate_v4();
+  v_exec := gen_random_uuid();
   INSERT INTO maintenance_execution (
     id, execution_no, plan_id, plan_no, source_type, maintenance_level,
     planned_date, assigned_user_id, assigned_user_name, executor_id, executor_name,
@@ -444,7 +503,7 @@ BEGIN
   );
 
   -- 巡检计划 + 执行
-  v_plan := uuid_generate_v4();
+  v_plan := gen_random_uuid();
   INSERT INTO inspection_plan (
     id, plan_name, plan_no, plan_code, device_id, dept_id,
     cycle_type, cycle_value, cycle_days, next_due_date, last_inspected_at,
@@ -465,7 +524,7 @@ BEGIN
     'active', NULL, v_user, v_user_name, 0
   );
 
-  v_exec := uuid_generate_v4();
+  v_exec := gen_random_uuid();
   INSERT INTO inspection_execution (
     id, execution_no, plan_id, plan_no, source_type, planned_date,
     assigned_inspector_id, executor_id, executor_name,
@@ -496,7 +555,7 @@ BEGIN
     v_user, 'approved', v_user, 'active', '心电/无创血压/血氧通道'
   ) RETURNING id INTO v_plan;
 
-  v_exec := uuid_generate_v4();
+  v_exec := gen_random_uuid();
   INSERT INTO metrology_execution (
     id, execution_no, plan_id, planned_date, assigned_inspector_id, executor_id,
     execute_start_time, execute_end_time, status, created_by, remark
@@ -515,7 +574,7 @@ BEGIN
   );
 
   -- PM 计划 + 执行
-  v_plan := uuid_generate_v4();
+  v_plan := gen_random_uuid();
   INSERT INTO pm_plan (
     id, plan_name, plan_no, plan_code, device_id, dept_id, campus_id,
     cycle_type, cycle_value, cycle_days, next_due_date, last_maintained_at,
@@ -536,7 +595,7 @@ BEGIN
     'active', NULL, v_user, v_user_name, 0
   );
 
-  v_exec := uuid_generate_v4();
+  v_exec := gen_random_uuid();
   INSERT INTO pm_execution (
     id, execution_no, plan_id, plan_no, source_type, planned_date,
     assigned_user_id, assigned_user_name, executor_id, executor_name,
@@ -558,7 +617,7 @@ BEGIN
   );
 
   -- 借调 + 费用
-  v_loan := uuid_generate_v4();
+  v_loan := gen_random_uuid();
   INSERT INTO shared_device_loan (
     id, loan_no, device_id, device_code, device_name,
     from_dept_id, to_dept_id, applicant_id,
@@ -591,7 +650,7 @@ BEGIN
   );
 
   -- 盘点
-  v_check := uuid_generate_v4();
+  v_check := gen_random_uuid();
   INSERT INTO inventory_check (
     id, check_no, check_name, check_year, check_type, campus_id, dept_id,
     start_date, end_date, actual_start_at, actual_end_at, checker_id,
@@ -634,7 +693,7 @@ BEGIN
   );
 
   -- 电流标签 + 绑定 + 今日读数
-  v_tag := uuid_generate_v4();
+  v_tag := gen_random_uuid();
   INSERT INTO power_tag (
     id, tag_code, tag_name, device_id, device_code, device_name,
     station_id, rated_power, install_date, is_active, remark

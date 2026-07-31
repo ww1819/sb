@@ -978,7 +978,10 @@ CREATE TABLE medical_device (
     shared_fee_unit_price DECIMAL(12,2),
     is_pm_device BOOLEAN DEFAULT FALSE,
     standby_current_max_ma DECIMAL(10,2),
-    standby_current_min_ma DECIMAL(10,2)
+    standby_current_min_ma DECIMAL(10,2),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID
 );
 COMMENT ON TABLE medical_device IS '设备档案主表';
 COMMENT ON COLUMN medical_device.id IS '主键';
@@ -1854,6 +1857,7 @@ CREATE TABLE repair_workorder_segment_part (
     device_id UUID,
     device_code VARCHAR(50),
     device_name VARCHAR(200),
+    wo_no VARCHAR(30),
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -1866,6 +1870,7 @@ CREATE TABLE repair_workorder_segment_part (
 COMMENT ON TABLE repair_workorder_segment_part IS '维修进程段配件明细';
 COMMENT ON COLUMN repair_workorder_segment_part.supplier_id IS '配件行供应商';
 COMMENT ON COLUMN repair_workorder_segment_part.device_id IS '设备冗余（附录 W）';
+COMMENT ON COLUMN repair_workorder_segment_part.wo_no IS '工单号快照（W.6）';
 
 -- ================================================================================
 -- 6. 保养管理模块
@@ -2213,7 +2218,10 @@ CREATE TABLE maintenance_execution_item (
     row_version INTEGER NOT NULL DEFAULT 1,
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID
 );
 COMMENT ON TABLE maintenance_execution_item IS '保养执行明细（按设备）';
 COMMENT ON COLUMN maintenance_execution_item.execution_channel IS '执行途径 web/app/mp（OPS.16.10）';
@@ -2550,6 +2558,7 @@ CREATE TABLE metrology_execution_item (
     device_name VARCHAR(200),
     dept_id UUID REFERENCES department(id),
     plan_id UUID REFERENCES metrology_plan(id),
+    execution_no VARCHAR(30),
     certificate_no VARCHAR(100),
     certificate_url VARCHAR(500),
     cost DECIMAL(10,2),
@@ -2558,9 +2567,13 @@ CREATE TABLE metrology_execution_item (
     overall_result VARCHAR(20),
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID
 );
 COMMENT ON TABLE metrology_execution_item IS '计量执行明细（按设备）';
+COMMENT ON COLUMN metrology_execution_item.execution_no IS '计量执行单号快照（W.6）';
 
 CREATE TABLE metrology_execution_result (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -3063,7 +3076,12 @@ CREATE TABLE shared_device_fee (
     paid_status VARCHAR(20) DEFAULT 'unpaid',
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID
 );
 COMMENT ON TABLE shared_device_fee IS '公用设备借调收费单';
 COMMENT ON COLUMN shared_device_fee.loan_no IS '借调单号快照（W.6）';
@@ -3277,7 +3295,10 @@ CREATE TABLE pm_execution_item (
     row_version INTEGER NOT NULL DEFAULT 1,
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID
 );
 COMMENT ON TABLE pm_execution_item IS '预防性维护执行明细';
 COMMENT ON COLUMN pm_execution_item.execution_channel IS '执行途径 web/app/mp（OPS.16.10）';
@@ -4147,7 +4168,10 @@ CREATE TABLE IF NOT EXISTS inspection_execution_item (
     row_version INTEGER NOT NULL DEFAULT 1,
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID
 );
 COMMENT ON TABLE inspection_execution_item IS '巡检执行明细（按设备）';
 COMMENT ON COLUMN inspection_execution_item.execution_channel IS '执行途径 web/app/mp（OPS.16.10）';
