@@ -204,6 +204,7 @@ public class PmExecutionController {
                 start_time=COALESCE(start_time, NOW()), updated_at=NOW()
                 WHERE execution_id=?::uuid AND status='pending'
                 """, userId, name, id);
+        SoftDeleteSupport.applyChannels(jdbc, "pm_execution", id, body, "update_channel");
         docLog.event("pm", "execution", id, execNo(id), "start", clientOf(body), null);
         return get(id);
     }
@@ -376,6 +377,8 @@ public class PmExecutionController {
                     """, body.getOrDefault("overall_result", "pass"), body.get("remark"), channel, userId, name, itemId);
         }
 
+        SoftDeleteSupport.applyChannels(jdbc, "pm_execution_item", itemId, body, "update_channel");
+        SoftDeleteSupport.applyChannels(jdbc, "pm_execution", execId, body, "update_channel");
         docLog.event("pm", "execution", execId, execNo(execId), "complete_item", clientOf(body), itemId.toString());
         var failed = jdbc.queryForList("""
                 SELECT item_name, result_value, remark FROM pm_execution_result

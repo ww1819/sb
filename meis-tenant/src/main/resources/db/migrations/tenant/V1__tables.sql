@@ -972,6 +972,7 @@ CREATE TABLE medical_device (
     last_calibration_date DATE,
     next_calibration_date DATE,
     service_expiry_date DATE,
+    service_expiry_basis VARCHAR(30),
     is_shared_device BOOLEAN DEFAULT FALSE,
     shared_fee_mode VARCHAR(20),
     shared_fee_time_unit VARCHAR(10),
@@ -1053,6 +1054,7 @@ COMMENT ON COLUMN medical_device.calibration_period_days IS '计量检定周期�
 COMMENT ON COLUMN medical_device.last_calibration_date IS '上次检定日期';
 COMMENT ON COLUMN medical_device.next_calibration_date IS '下次检定日期';
 COMMENT ON COLUMN medical_device.service_expiry_date IS '使用年限到期日';
+COMMENT ON COLUMN medical_device.service_expiry_basis IS 'AST-EXP-01：使用到期推算锚点 enable/production/acceptance/purchase/created';
 COMMENT ON COLUMN medical_device.is_shared_device IS '是否公用设备';
 COMMENT ON COLUMN medical_device.is_pm_device IS '是否预防性维护设备';
 COMMENT ON COLUMN medical_device.standby_current_max_ma IS '待机电流上限(mA)';
@@ -1447,6 +1449,7 @@ CREATE TABLE device_label_print_log (
     biz_id UUID,
     biz_no VARCHAR(50),
     biz_item_id UUID,
+    create_channel VARCHAR(20),
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -1463,6 +1466,7 @@ COMMENT ON COLUMN device_label_print_log.biz_type IS '业务类型：device / in
 COMMENT ON COLUMN device_label_print_log.biz_id IS '业务主单ID';
 COMMENT ON COLUMN device_label_print_log.biz_no IS '业务单号快照';
 COMMENT ON COLUMN device_label_print_log.biz_item_id IS '业务明细ID';
+COMMENT ON COLUMN device_label_print_log.create_channel IS '打印途径：web/app/mp（MOB-CHANNEL-03）';
 
 -- ================================================================================
 -- 5. 维修管理模块

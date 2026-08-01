@@ -1,7 +1,9 @@
 package com.meis.saas.qc.controller;
 
+import com.meis.saas.common.audit.DocChangeLogService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.ops.OpsClientChannel;
 import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
@@ -25,6 +27,7 @@ public class AdverseEventController {
             "reviewed", Set.of("closed"));
 
     private final JdbcTemplate jdbc;
+    private final DocChangeLogService docLog;
 
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(
@@ -148,7 +151,8 @@ public class AdverseEventController {
                     body.get("event_description"), body.get("cause_analysis"), body.get("impact_description"),
                     body.get("photos"), body.get("remark"));
             SoftDeleteSupport.applyChannels(jdbc, "adverse_event", id, body,
-                    "create_channel", "update_channel");
+                    "create_channel", "submit_channel", "update_channel");
+            logAdverse(id, "create", body, null);
         } else {
             jdbc.update("""
                 UPDATE adverse_event SET device_id=?::uuid, device_code=?, device_name=?,
@@ -162,6 +166,7 @@ public class AdverseEventController {
                     body.get("event_description"), body.get("cause_analysis"), body.get("impact_description"),
                     body.get("photos"), body.get("remark"), id);
             SoftDeleteSupport.applyChannels(jdbc, "adverse_event", id, body, "update_channel");
+            logAdverse(id, "update", body, null);
         }
         return get(id);
     }
@@ -203,6 +208,8 @@ public class AdverseEventController {
             case "closed" -> jdbc.update("UPDATE adverse_event SET status='closed', updated_at=NOW() WHERE id=?::uuid", id);
             default -> jdbc.update("UPDATE adverse_event SET status=?, updated_at=NOW() WHERE id=?::uuid", target, id);
         }
+        SoftDeleteSupport.applyChannels(jdbc, "adverse_event", id, body, "update_channel");
+        logAdverse(id, "transition_" + target, body, cur + "→" + target);
         return get(id);
     }
 
@@ -215,7 +222,17 @@ public class AdverseEventController {
             UPDATE adverse_event SET reported_to_authority = true, report_date = COALESCE(?::date, CURRENT_DATE),
             authority_feedback = COALESCE(?, authority_feedback), updated_at = NOW() WHERE id = ?::uuid
             """, body.get("report_date"), body.get("authority_feedback"), id);
+        SoftDeleteSupport.applyChannels(jdbc, "adverse_event", id, body, "update_channel");
+        logAdverse(id, "report_regulator", body, null);
         return get(id);
+    }
+
+    private void logAdverse(UUID id, String event, Map<String, Object> body, String remark) {
+        var rows = jdbc.queryForList(
+                "SELECT event_no FROM adverse_event WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "adverse_event", null), id);
+        String eventNo = rows.isEmpty() ? null : Objects.toString(rows.get(0).get("event_no"), null);
+        docLog.event("qc", "adverse", id, eventNo, event, OpsClientChannel.of(body), remark);
     }
 
     private void fillDeviceSnapshot(Map<String, Object> body) {

@@ -1,5 +1,6 @@
 package com.meis.saas.asset.controller;
 
+import com.meis.saas.common.audit.DocChangeLogService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.FilterCsvSupport;
@@ -25,6 +26,7 @@ public class InventoryCheckController {
             "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
 
     private final JdbcTemplate jdbc;
+    private final DocChangeLogService docLog;
 
     /** AST-UI-14：按设备查盘点参与记录 */
     @GetMapping("/by-device/{deviceId}")
@@ -263,24 +265,35 @@ public class InventoryCheckController {
                 }).orElse(null);
         upsertItems(id, checkNo, items);
         refreshCheckedCount(id);
+        if (exists) {
+            SoftDeleteSupport.applyChannels(jdbc, "inventory_check", id, body, "update_channel");
+        } else {
+            SoftDeleteSupport.applyChannels(jdbc, "inventory_check", id, body, "create_channel", "update_channel");
+        }
+        logInventory(id, exists ? "update" : "create", body, null);
         return get(id);
     }
 
     @DeleteMapping("/{id:" + UUID_PATH + "}")
     @Transactional
     @OperationLog(module = "asset", description = "删除盘点任务")
-    public Result<Void> delete(@PathVariable UUID id) {
+    public Result<Void> delete(@PathVariable UUID id,
+                               @RequestParam(required = false) String client) {
         assertMutable(id);
+        String checkNo = resolveCheckNo(id);
         jdbc.update("DELETE FROM inventory_check_item WHERE check_id = ?::uuid", id);
-        int n = SoftDeleteSupport.softDelete(jdbc, "inventory_check", id.toString());
+        int n = SoftDeleteSupport.softDelete(jdbc, "inventory_check", id.toString(), client);
         if (n == 0) throw new BizException(404, "not found");
+        docLog.event("asset", "inventory", id, checkNo, "delete",
+                OpsClientChannel.normalize(client), null);
         return Result.ok();
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/approve")
     @Transactional
     @OperationLog(module = "asset", description = "审核盘点任务")
-    public Result<Map<String, Object>> approve(@PathVariable UUID id) {
+    public Result<Map<String, Object>> approve(@PathVariable UUID id,
+                                               @RequestBody(required = false) Map<String, Object> body) {
         var rows = jdbc.queryForList(
                 "SELECT audit_status FROM inventory_check WHERE id = ?::uuid"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check", null), id);
@@ -297,13 +310,18 @@ public class InventoryCheckController {
                     approved_at = NOW(), updated_at = NOW()
                 WHERE id = ?::uuid
                 """, approver, approverName, id);
+        SoftDeleteSupport.applyChannels(jdbc, "inventory_check", id, body, "audit_channel", "update_channel");
+        logInventory(id, "approve", body, null);
         return get(id);
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/start")
     @OperationLog(module = "asset", description = "开始盘点")
-    public Result<Map<String, Object>> start(@PathVariable UUID id) {
+    public Result<Map<String, Object>> start(@PathVariable UUID id,
+                                             @RequestBody(required = false) Map<String, Object> body) {
         jdbc.update("UPDATE inventory_check SET status = 'in_progress', actual_start_at = NOW(), updated_at = NOW() WHERE id = ?::uuid", id);
+        SoftDeleteSupport.applyChannels(jdbc, "inventory_check", id, body, "update_channel");
+        logInventory(id, "start", body, null);
         return get(id);
     }
 
@@ -397,6 +415,11 @@ public class InventoryCheckController {
         }
         if (sets.isEmpty()) throw new BizException(400, "无更新字段");
         SoftDeleteSupport.appendUpdateChannelFromBody(jdbc, "inventory_check_item", sets, args, body);
+        if (body.containsKey("is_found") && asBool(body.get("is_found"))
+                && TableColumnCache.hasColumn(jdbc, "inventory_check_item", "confirm_channel")) {
+            sets.add("confirm_channel = COALESCE(confirm_channel, ?)");
+            args.add(OpsClientChannel.of(body));
+        }
         sets.add("row_version = COALESCE(row_version,1) + 1");
         sets.add("updated_at = NOW()");
         args.add(itemId);
@@ -410,6 +433,7 @@ public class InventoryCheckController {
                     OpsClientChannel.of(body), id);
         }
         refreshCheckedCount(id);
+        logInventory(id, "patch_item", body, itemId.toString());
         return get(id);
     }
 
@@ -433,7 +457,10 @@ public class InventoryCheckController {
                 if (item.containsKey("need_reprint_label")) patch.put("need_reprint_label", item.get("need_reprint_label"));
                 if (item.containsKey("actual_location")) patch.put("actual_location", item.get("actual_location"));
                 if (item.containsKey("row_version")) patch.put("row_version", item.get("row_version"));
-                if (patch.isEmpty()) continue;
+                boolean hasBiz = patch.containsKey("is_found") || patch.containsKey("need_reprint_label")
+                        || patch.containsKey("actual_location");
+                if (!hasBiz) continue;
+                patch.put("client", body.get("client") != null ? body.get("client") : "app");
                 patchItem(id, itemId, patch);
                 ok++;
             } catch (BizException ex) {
@@ -443,6 +470,7 @@ public class InventoryCheckController {
         Map<String, Object> result = new LinkedHashMap<>(Objects.requireNonNull(get(id).getData()));
         result.put("synced", ok);
         result.put("conflicts", conflicts);
+        logInventory(id, "offline_sync", body, "synced=" + ok);
         return Result.ok(result);
     }
 
@@ -497,13 +525,24 @@ public class InventoryCheckController {
             if (code.isBlank()) throw new BizException(400, "设备编码为空，无法生成标签二维码");
 
             UUID logId = UUID.randomUUID();
-            jdbc.update("""
-                    INSERT INTO device_label_print_log
-                    (id, device_id, device_code, device_name, printed_by, printed_by_name, template_code,
-                     biz_type, biz_id, biz_no, biz_item_id, remark)
-                    VALUES (?::uuid, ?::uuid, ?, ?, ?::uuid, ?, ?, 'inventory_check', ?::uuid, ?, ?::uuid, ?)
-                    """, logId, deviceId, code, item.get("device_name"), userId, printedByName, template,
-                    id, checkNo, item.get("id"), remark);
+            String channel = OpsClientChannel.of(body);
+            if (TableColumnCache.hasColumn(jdbc, "device_label_print_log", "create_channel")) {
+                jdbc.update("""
+                        INSERT INTO device_label_print_log
+                        (id, device_id, device_code, device_name, printed_by, printed_by_name, template_code,
+                         biz_type, biz_id, biz_no, biz_item_id, remark, create_channel)
+                        VALUES (?::uuid, ?::uuid, ?, ?, ?::uuid, ?, ?, 'inventory_check', ?::uuid, ?, ?::uuid, ?, ?)
+                        """, logId, deviceId, code, item.get("device_name"), userId, printedByName, template,
+                        id, checkNo, item.get("id"), remark, channel);
+            } else {
+                jdbc.update("""
+                        INSERT INTO device_label_print_log
+                        (id, device_id, device_code, device_name, printed_by, printed_by_name, template_code,
+                         biz_type, biz_id, biz_no, biz_item_id, remark)
+                        VALUES (?::uuid, ?::uuid, ?, ?, ?::uuid, ?, ?, 'inventory_check', ?::uuid, ?, ?::uuid, ?)
+                        """, logId, deviceId, code, item.get("device_name"), userId, printedByName, template,
+                        id, checkNo, item.get("id"), remark);
+            }
             jdbc.update("""
                     UPDATE medical_device SET label_printed = TRUE, qr_code_url = ?, updated_at = NOW()
                     WHERE id = ?::uuid
@@ -516,13 +555,15 @@ public class InventoryCheckController {
                     """, item.get("id"));
             printed++;
         }
+        logInventory(id, "label_print", body, "printed=" + printed);
         return Result.ok(Map.of("printed", printed, "check_id", id.toString(), "check_no", checkNo));
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/complete")
     @Transactional
     @OperationLog(module = "asset", description = "完成盘点")
-    public Result<Map<String, Object>> complete(@PathVariable UUID id) {
+    public Result<Map<String, Object>> complete(@PathVariable UUID id,
+                                                @RequestBody(required = false) Map<String, Object> body) {
         assertExists(id);
         refreshDiffCounts(id);
         jdbc.update("""
@@ -530,6 +571,8 @@ public class InventoryCheckController {
                 SET status = 'completed', actual_end_at = NOW(), updated_at = NOW()
                 WHERE id = ?::uuid
                 """, id);
+        SoftDeleteSupport.applyChannels(jdbc, "inventory_check", id, body, "update_channel");
+        logInventory(id, "complete", body, null);
         return get(id);
     }
 
@@ -640,6 +683,17 @@ public class InventoryCheckController {
         if (!rows.isEmpty() && "approved".equals(String.valueOf(rows.get(0).get("audit_status")))) {
             throw new BizException(400, "已审核的盘点单不可修改或删除");
         }
+    }
+
+    private void logInventory(UUID id, String event, Map<String, Object> body, String remark) {
+        docLog.event("asset", "inventory", id, resolveCheckNo(id), event, OpsClientChannel.of(body), remark);
+    }
+
+    private String resolveCheckNo(UUID id) {
+        var rows = jdbc.queryForList("SELECT check_no FROM inventory_check WHERE id = ?::uuid", id);
+        if (rows.isEmpty() || rows.get(0).get("check_no") == null) return null;
+        String s = String.valueOf(rows.get(0).get("check_no")).trim();
+        return s.isEmpty() ? null : s;
     }
 
     private String resolveUserName(String userId) {

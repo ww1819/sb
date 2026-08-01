@@ -295,7 +295,7 @@ public abstract class GenericTableController {
         check(table);
         denyRepairWorkorderBypass(table);
         if ("medical_device".equals(table)) {
-            MedicalDeviceFieldHelper.applyDerivedFields(body);
+            MedicalDeviceFieldHelper.applyDerivedFields(body, null);
         }
         prepareInsertDefaults(table, body);
         applyOpsSystemDocNosOnCreate(table, body);
@@ -305,7 +305,7 @@ public abstract class GenericTableController {
         applyCategoryHierarchyDefaults(table, body);
         SoftDeleteSupport.applyInsertAudit(jdbc(), table, body);
         var cols = TableColumnCache.columns(jdbc(), table);
-        String clientHint = body.get("client") == null ? null : String.valueOf(body.get("client"));
+        String clientHint = OpsClientChannel.of(body);
         body.keySet().removeIf(k -> !cols.contains(k));
         var softDeletedId = SoftDeleteSupport.findSoftDeletedId(jdbc(), table, body);
         if (softDeletedId.isPresent()) {
@@ -313,7 +313,7 @@ public abstract class GenericTableController {
             Map<String, Object> before = loadTracked(table, existingId);
             body.put("id", existingId);
             SoftDeleteSupport.prepareRestore(body, cols);
-            if (clientHint != null) body.put("client", clientHint);
+            body.put("client", clientHint);
             executeUpdate(table, existingId, body);
             body.remove("client");
             Map<String, Object> after = loadTracked(table, existingId);
@@ -343,7 +343,11 @@ public abstract class GenericTableController {
         SoftDeleteSupport.stripClientUpdateFields(body);
         stripImmutableDocNos(body);
         if ("medical_device".equals(table)) {
-            MedicalDeviceFieldHelper.applyDerivedFields(body);
+            Map<String, Object> existingDevice = jdbc().queryForList(
+                    "SELECT * FROM medical_device WHERE id = ?::uuid"
+                            + SoftDeleteSupport.notDeletedClause(jdbc(), "medical_device", null),
+                    id).stream().findFirst().orElse(null);
+            MedicalDeviceFieldHelper.applyDerivedFields(body, existingDevice);
             // 附录 P：设备编码创建后禁止修改
             body.remove("device_code");
         }

@@ -1,6 +1,7 @@
 package com.meis.saas.analytics.controller;
 
 import com.meis.saas.analytics.service.PowerReadingQueryService;
+import com.meis.saas.common.audit.DocChangeLogService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.ops.OpsClientChannel;
@@ -47,6 +48,7 @@ public class PowerTagController {
 
     private final JdbcTemplate jdbc;
     private final PowerReadingQueryService readingQuery;
+    private final DocChangeLogService docLog;
 
     private String tagSelect() {
         boolean hasChannel = TableColumnCache.hasColumn(jdbc, "power_tag", "create_channel");
@@ -271,6 +273,8 @@ public class PowerTagController {
                     + String.join(", ", placeholders) + ")", args.toArray());
         }
         recordBindChange(id, oldDeviceId, newDeviceId, body);
+        docLog.event("power", "tag", id, Objects.toString(body.get("tag_code"), null),
+                exists ? "update" : "create", channel, null);
         return get(id);
     }
 

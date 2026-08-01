@@ -805,6 +805,9 @@
 - [x] AST-UI-20 资产卡片：打印横/纵向 + 导出 PNG/PDF
 - [x] AST-UI-21 资产登记查看态：配件更换记录 Sheet（复用维修进程段配件）
 - [x] AST-UI-24 资产登记查看态：左侧 Sheet 导航 + 现场操作习惯顺序
+- [x] AST-EXP-01 使用到期推算（启用优先）+ 推算方式列/备注
+- [x] MOB-CHANNEL-03 移动端增删改须扫描补强途径（约定；缺列必补+标签打印流水）
+- [x] MOB-CHANNEL-04 创建/改/删日志须写途径（与业务表同事务）
 - [x] AST-GAP-01 台账字段缺口分析（三甲/国际；批量加列入 BACKLOG）
 - [x] AST-GAP-REVIEW-01 三甲再审：标量字段 / 从表对象 / 流程缺口三分文档（只分析不开发）
 - [x] AST-DEMO-01 资产登记演示数据（删后插可重跑；前三页 60 台各 Sheet 齐套）
@@ -2637,6 +2640,10 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+| 2.211 | 2026-08-01 14:50:00 | — | MOB-CHANNEL-04：create/update/delete 日志同事务写 client；多端单据 DocLog + 历史回填 |
+| 2.210 | 2026-08-01 14:45:00 | — | MOB-CHANNEL-03 修订：扫描缺途径列须先补列再写落库；标签打印流水 create_channel |
+| 2.209 | 2026-08-01 14:30:00 | — | MOB-CHANNEL-03 扫描修补：工程师动作/盘点离线/运维 start·complete/借还驳回/不良上报写途径 |
+| 2.208 | 2026-08-01 14:20:00 | — | MOB-CHANNEL-03 移动端增删改须扫描补强途径；AST-EXP-01 使用到期推算（启用优先）+ 列表推算方式 |
 | 2.207 | 2026-08-01 14:00:00 | — | AST-DEMO-01 扩前三页 60 台 Sheet 种子；AST-UI-24 查看态左侧 Sheet 导航 + 操作习惯顺序 |
 | 2.206 | 2026-08-01 13:45:00 | — | PLT-DICT-SEED-01 + MOB-GAP-01：新状态强制种子/三端 catalog；App/MP 补 G1 标量与证照培训只读、盘点 check_type |
 | 2.205 | 2026-08-01 13:30:00 | — | AST-STATUS-CN-GAP-01：扫描台账 Sheet 状态/结果 dictType，补齐缺失字典与 catalog，避免未知(码) |
@@ -4050,7 +4057,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 | 主题 | 位置 |
 |------|------|
-| **跨项目可复用约定全集** | [reusable-engineering-conventions.md](reusable-engineering-conventions.md)（**v1.38**） |
+| **跨项目可复用约定全集** | [reusable-engineering-conventions.md](reusable-engineering-conventions.md)（**v1.46**） |
 | 数据库迁移双轨 / **固定槽位** / 串库防护 | [附录 D](#附录-d数据库迁移规范必读)（含 D.5 / D.6） |
 | 开发完成验收清单 | [附录 E](#附录-e开发完成验收清单必读) |
 | public schema 迁移 / **菜单唯一脚本** | [附录 F](#附录-fpublic-schema-迁移规范2026-07-11)、[PLT-MENU-01](#plt-menu-01-菜单唯一维护脚本2026-07-24) |
@@ -4094,7 +4101,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 移动端公用设备借调 | [MOB-SHR-01](#mob-shr-01-定稿2026-07-28) |
 | 移动端电流标签维护 | [MOB-PWR-01](#mob-pwr-01-移动端电流监测标签维护定稿2026-07-29) |
 | 移动端电流基站维护 | [MOB-PWR-02](#mob-pwr-02-移动端电流监测基站维护定稿2026-07-29) |
-| 多端操作途径补齐 | [MOB-CHANNEL-01](#mob-channel-01-多端操作途径补齐定稿2026-07-29) |
+| 多端操作途径补齐 | [MOB-CHANNEL-01](#mob-channel-01-多端操作途径补齐定稿2026-07-29) / [**MOB-CHANNEL-03**](#mob-channel-03-扫描缺列必补--标签打印途径定稿2026-08-01) / [**MOB-CHANNEL-04**](#mob-channel-04-变更日志途径齐套定稿2026-08-01) |
 | 历史途径回填 / 追加多端约定 | [MOB-CHANNEL-02](#mob-channel-02-历史途径回填--展示齐套--约定-5106定稿2026-07-29)、约定包 §5.10.6 |
 | 现场包前端生产构建 | [PKG-WEB-01](#pkg-web-01-现场包加入前端生产构建定稿2026-07-30) |
 | 开发面板生产构建 | [PKG-WEB-02](#pkg-web-02-开发面板生产构建--现场打包定稿2026-07-30) |
@@ -6932,6 +6939,69 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 
 **状态**：已完成。
 
+### MOB-CHANNEL-03 扫描缺列必补 + 标签打印途径（定稿·2026-08-01）
+
+> 来源：文末追加约定——扫描若发现没有途径列，须补齐途径列并生成落库逻辑（不可无列跳过）。
+
+#### 1. 约定修订（双写约定包 §5.10.4 → v1.45）
+
+| 项 | 定稿 |
+|----|------|
+| **触发** | App / 小程序新增或扩展增删改（含提交/审核/确认/软删/**打印流水**等） |
+| **扫描** | 写入口 → 目标表 → 应写动作列 |
+| **缺列必补** | 表上无对应 `*_channel` → 固定迁库槽位补列（R__ + V1）→ **再**写落库；禁止「无列跳过」或只记 BACKLOG |
+| **齐套** | 历史回填 §5.10.6 + 三端展示中文途径 |
+
+#### 2. 对照落地：`device_label_print_log`
+
+| 项 | 内容 |
+|----|------|
+| **列** | `create_channel`（打印即新建流水） |
+| **写** | `/asset/device/{id}/label/print`、`/asset/inventory/{id}/label/print` 写入 `OpsClientChannel.of(body)` |
+| **端** | Web 传 `client=web`；App 补打传 `client=app` |
+| **显** | 台账标签 Sheet / 资产卡片打印记录列「打印途径」 |
+| **回填** | `R__data_fix` 通用 `create_channel` NULL→`web` |
+
+#### 3. 验收
+
+- [ ] 重启 meis-tenant 后表有 `create_channel`；存量打印流水多为 Web
+- [ ] Web 打印后记录途径为 Web；App 补打为 App
+- [ ] 标签/卡片打印记录表可见「打印途径」列
+- [ ] 后续扫描发现缺列时按「补列→落库→回填→展示」执行，不得跳过
+
+**状态**：已完成。
+
+### MOB-CHANNEL-04 变更日志途径齐套（定稿·2026-08-01）
+
+> 来源：创建 / 删除 / 修改对应的日志记录也要途径补强，日志里体现操作途径。
+
+#### 1. 约定（双写约定包 §5.10.5 → v1.46）
+
+| 项 | 定稿 |
+|----|------|
+| **同事务** | 写业务表 `create`/`update`/`delete`（及 submit/confirm 等）途径时，须同事务写实体变更日志或单据事件日志的 `client` |
+| **一致** | 日志 `client` 与业务表该次动作途径同值（归一 web/app/mp） |
+| **展示** | 变更记录 / 修改记录 UI「途径」列（已有） |
+| **回填** | `sys_entity_change_log` / `sys_doc_change_log` 的 `client IS NULL` → `web` |
+
+#### 2. 本期落地
+
+| 范围 | 内容 |
+|------|------|
+| **报修** | grab/accept/complete/verify/进程段 → `EntityChangeLog.recordAction` + client |
+| **借还 / 不良 / 盘点 / 计量 / 电流** | 写动作同步 `DocChangeLogService.event` + client |
+| **通用 CRUD** | `GenericTableController` 创建与批量改台账传归一 client |
+| **迁库** | `R__data_fix` 两日志表 NULL→web |
+
+#### 3. 验收
+
+- [ ] App 抢单/完工后，报修变更记录途径为 App
+- [ ] App 借调/盘点/计量后，`sys_doc_change_log.client` 为 app
+- [ ] 重启租户迁库后，历史日志空途径多为 Web
+- [ ] 实体/单据修改记录 UI「途径」列可见
+
+**状态**：已完成。
+
 ### PKG-WEB-01 现场包加入前端生产构建（定稿·2026-07-30）
 
 > 来源：请在配置里添加前端的生产构建。
@@ -7300,6 +7370,21 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 
 > **AST-UI-24（2026-08-01）**：资产登记**查看态** Sheet 改为左侧纵向列表（可滚动）+ 右侧内容；顺序按现场操作习惯（台账核对→证照合规→运维闭环→流转处置→监测），**不是**按 Windows/Mac 操作系统。编辑态仍顶栏横向（Tab 较少）。
 
+> **MOB-CHANNEL-03（2026-08-01，v1.45）**：App/小程序增删改交付前须扫描途径；**缺 `*_channel` 列须先补列再写落库**（禁止无列跳过）。标签打印流水已补 `create_channel`。约定包 §5.10.4。
 
-1.添加约定：一旦移动端小程序和app做了增删改功能，则需要对途径做一次扫描补强。并且前端显示也要加上相应的途径
-2.使用到期日期：在启用日期，验收日期，入库日期，出库日期，生产日期等日期都为空的情况下，请根据录入日期加上使用年限推算，
+> **AST-EXP-01（2026-08-01）使用到期推算**：
+> - **默认优先级（客户未指定前）**：启用日期 → 生产日期 → 验收日期 → 购置日期 → 录入日期（`created_at`）
+> - **算式**：锚点日期 + `service_life_years`；落库 `service_expiry_date` + `service_expiry_basis`；备注写入/更新 `[使用到期推算] …`
+> - **列表**：显示「使用到期推算方式」列（字典中文）
+> - **经验说明**：生产日期最严（制造商寿命）；启用日期更贴近医院在用管理与折旧起算。默认启用优先，预留生产优先模式待租户配置
+> - **部署**：重启 meis-tenant（补列+字典+存量回填）→ meis-common/asset → 前端；演示种子已带年限与推算备注
+
+> **MOB-CHANNEL-03 扫描修补（2026-08-01）**：对照 App/MP 写入口与后端落库——
+> - **已齐套（前端）**：报修制单提交、运维执行、借还、不良、电流、盘点在线等均已传 `client`
+> - **本批后端补写**：工程师 grab/accept/complete/segments/withdraw → `update_channel`；盘点 offline-sync 注入 client、patch 盘到写 `confirm_channel`；巡检/保养/PM start+complete 写 `update_channel`；借还 reject 写 `confirm_channel`；不良新建写 `submit_channel`
+> - **2.210 补齐**：`device_label_print_log.create_channel`（缺列→补列→落库→回填→Web 展示）；App 补打传 `client=app`
+> - **余量**：`repair_workorder.audit_channel` 语义未用（审核路径未走该列时保持空）
+> **部署**：重启 meis-tenant（补列+回填）→ meis-asset → Web / App
+
+> **MOB-CHANNEL-04（2026-08-01，v1.46）**：写业务表途径时同事务写变更/单据日志 `client`（create/update/delete/动作）。报修工程师动作进 EntityChangeLog；借还/不良/盘点/计量/电流进 DocChangeLog；历史日志 NULL→web。
+> **部署**：重启 meis-tenant（回填）→ meis-repair / meis-special / meis-qc / meis-asset / meis-analytics / meis-common

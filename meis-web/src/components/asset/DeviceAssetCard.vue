@@ -110,6 +110,9 @@
           <template #default="{ row }">{{ formatDisplayDateTime(row.printed_at) }}</template>
         </el-table-column>
         <el-table-column prop="printed_by_name" label="打印人" min-width="100" />
+        <el-table-column prop="create_channel" label="打印途径" width="90">
+          <template #default="{ row }">{{ channelLabel(row.create_channel) }}</template>
+        </el-table-column>
         <el-table-column prop="template_code" label="模板" width="110" />
         <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
         <template #empty>
@@ -283,6 +286,14 @@ async function loadPrints() {
   }
 }
 
+function channelLabel(v: unknown) {
+  const s = String(v ?? '').trim().toLowerCase()
+  if (s === 'web') return 'Web'
+  if (s === 'app') return 'App'
+  if (s === 'mp') return '小程序'
+  return s ? String(v) : '—'
+}
+
 async function doPrint() {
   if (!deviceId.value || !deviceCode.value) {
     ElMessage.warning('设备编码为空，无法打印资产卡片')
@@ -290,7 +301,10 @@ async function doPrint() {
   }
   printing.value = true
   try {
-    await http.post(`/asset/device/${deviceId.value}/label/print`, { template_code: 'asset_card' })
+    await http.post(`/asset/device/${deviceId.value}/label/print`, {
+      template_code: 'asset_card',
+      client: 'web'
+    })
     ElMessage.success('已记录卡片打印')
     await loadPrints()
     browserPrint()

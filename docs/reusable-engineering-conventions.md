@@ -4,7 +4,7 @@
 > **来源**：`docs/meis-requirements.md` 附录 Q / C / D / E / F / G / H / I / R / S / T 等。  
 > **用法**：新系统可整份复制后，按「落地映射」改路径与模块名；MEIS 专属细节见文末附录。
 
-**版本**：1.43（2026-08-01）
+**版本**：1.46（2026-08-01）
 
 ---
 
@@ -356,14 +356,28 @@
 4. Web / App / 小程序列表与详情展示中文途径（有列则 `list`/`form`/`detail` 可见）；  
 5. 在需求摘要中点名途径字段，避免只做一端。
 
+**MOB-CHANNEL-03（强制扫描补强）**：一旦 App / 小程序新增或扩展了增删改（含提交/审核/确认/软删/打印流水等写动作），交付前必须对**该业务全路径**做一次途径扫描：
+
+| 步骤 | 要求 |
+|------|------|
+| 1. 对照 | 列出写入口 → 目标表 → 应写的动作列（`create`/`update`/`submit`/…） |
+| 2. **缺列必补** | 扫描发现表上**没有**对应 `*_channel` 列时：须先在固定迁库槽位补列（如 `R__columns_*` + `V1` 双轨），**再**写落库逻辑；禁止「无列则跳过」或只记 BACKLOG 了事 |
+| 3. 回填 | 同批按 §5.10.6 将存量 NULL 补为 `web`（仅有动作证据时） |
+| 4. 展示 | 三端列表/详情有列则显中文途径 |
+
+禁止只做业务接口而漏途径列或前端不显。
+
 #### 5.10.5 修改记录 / 变更流水中的途径
 
 | 项 | 要求 |
 |----|------|
 | **单据修改记录** | 字段级/事件流水（如 `sys_doc_change_log`）须存归一后的 `client`（web/app/mp）；UI 列名「途径」，中文展示 |
 | **实体变更记录** | 多端业务实体的变更流水须存 `client` 并展示；纯 Web 主数据可缺省为 web 或不强制展示 |
+| **create / update / delete** | 凡写业务表 `create_channel` / `update_channel` / `delete_channel`（或等价动作）时，**同事务**写入对应实体/单据日志的 `client`，与业务表途径一致；禁止只写业务表途径而日志缺途径 |
+| **submit / confirm / audit / execution 等** | 同理：动作写业务表途径时，日志 `event`/`recordAction` 须带同一归一 `client` |
 | **头表与明细** | 业务 UPDATE（含明细 patch）须写业务表 `update_channel`，且同次修改写入对应变更流水的 `client`，二者一致 |
 | **归一** | 写入前统一走归一工具；禁止落库原始 `miniprogram` 等别名 |
+| **历史回填** | 日志表 `client IS NULL` → `web`（与业务表途径回填同批） |
 
 #### 5.10.6 历史途径回填（追加多端时强制）
 
@@ -377,7 +391,7 @@
 | `delete_channel` | 仅已软删行 → `web` |
 | 未发生的动作 | **保持 NULL**，UI 显示「—」，禁止盲填造成虚假途径 |
 
-落地映射：MEIS OPS.16.10 / 16.26–16.30、MOB-CHANNEL-01/02、DEV-PANEL-MOB（面板启停与途径无关，仅同批交付）。
+落地映射：MEIS OPS.16.10 / 16.26–16.30、MOB-CHANNEL-01/02/03/**04**、`device_label_print_log.create_channel`、`sys_*_change_log.client`；DEV-PANEL-MOB（面板启停与途径无关，仅同批交付）。
 
 ### 5.11 本机外设（高拍仪等）经本地代理
 
@@ -682,7 +696,7 @@ USB 外设（如文档高拍仪）**勿**由浏览器直连硬件；经厂商本
 | 移动端扫码报修 | 附录 MOB | `meis-mobile` 扫码报修 |
 | 移动端本地 SQLite | 附录 MOB.7 / MOB.8、约定包 §8.1 | `sqlite_helper.dart`；离线盘点/台账缓存 |
 | 微信小程序 | 附录 MP、BACKLOG-MP-01 | `meis-mp`（uni-app，一期已落地） |
-| 统一打印流水 / 盘点补打 | 约定包 §6.6、附录 AST.INV / MOB.6 | `device_label_print_log`、`InventoryCheckController` |
+| 统一打印流水 / 盘点补打 | 约定包 §6.6、附录 AST.INV / MOB.6、**MOB-CHANNEL-03** | `device_label_print_log`（含 `create_channel`）、`InventoryCheckController` / `AssetDeviceController` |
 | 多端执行单追溯 | 约定包 §6.7、附录 OPS | 巡检/保养/PM 执行事件与明细变更 |
 | 业务单号系统生成 | 约定包 §6.8、OPS.14 | `DailyBizNoSupport`；计划/执行 Controller 与 Generator |
 | 维修列表功能分列 | 附录 U.14.2 | `WorkorderListPage`（handle/verify 取消操作列、功能分列） |

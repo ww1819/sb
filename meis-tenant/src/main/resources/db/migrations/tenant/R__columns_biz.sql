@@ -115,6 +115,8 @@ ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS calibration_period_days INTE
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS last_calibration_date DATE;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS next_calibration_date DATE;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS service_expiry_date DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS service_expiry_basis VARCHAR(30);
+COMMENT ON COLUMN medical_device.service_expiry_basis IS 'AST-EXP-01：使用到期推算锚点 enable/production/acceptance/purchase/created';
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS extension_data JSONB DEFAULT '{}'::jsonb;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS warehouse_id UUID;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_metrology BOOLEAN DEFAULT FALSE;
@@ -230,6 +232,8 @@ ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS biz_type VARCHAR(50)
 ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS biz_id UUID;
 ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS biz_no VARCHAR(50);
 ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS biz_item_id UUID;
+ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+COMMENT ON COLUMN device_label_print_log.create_channel IS '打印途径：web/app/mp（MOB-CHANNEL-03）';
 -- ---------- ??????????? N? ----------
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_shared_device BOOLEAN DEFAULT FALSE;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS metrology_type_code VARCHAR(50);

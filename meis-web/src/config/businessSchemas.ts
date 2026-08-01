@@ -381,6 +381,15 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'service_life_years', label: '使用年限', type: 'number', group: 'time' },
     { prop: 'service_expiry_reached', label: '使用日期是否已到', type: 'boolean', list: true, group: 'time', readonly: true, form: false, width: 130 },
     { prop: 'service_expiry_date', label: '使用到期日期', type: 'date', list: true, group: 'time', readonly: true, width: 120 },
+    {
+      prop: 'service_expiry_basis',
+      label: '使用到期推算方式',
+      dictType: 'service_expiry_basis',
+      list: true,
+      group: 'time',
+      readonly: true,
+      width: 140
+    },
     { prop: 'service_expiry_remaining_days', label: '使用到期剩余天数', type: 'number', list: true, group: 'time', readonly: true, form: false, width: 140 },
     { prop: 'warranty_end_date', label: '保修截止', type: 'date', group: 'time' },
     { prop: 'next_calibration_date', label: '下次计量日期', type: 'date', group: 'time', readonly: true },

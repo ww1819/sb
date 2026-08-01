@@ -103,6 +103,13 @@ const Map<String, Map<String, String>> _zhCatalog = {
     'correct': '纠错',
     'import': '导入',
   },
+  'service_expiry_basis': {
+    'enable': '启用日期+年限',
+    'production': '生产日期+年限',
+    'acceptance': '验收日期+年限',
+    'purchase': '购置日期+年限',
+    'created': '录入日期+年限',
+  },
   'maintain_exec_status': {
     'draft': '草稿',
     'pending': '待执行',

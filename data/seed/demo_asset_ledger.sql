@@ -334,7 +334,8 @@ BEGIN
       campus_id, dept_id, warehouse_id, location_detail, location_floor, room_number,
       use_dept_head, device_status, risk_level,
       original_value, net_value, purchase_date, enable_date, acceptance_date, production_date,
-      registration_no, is_active, is_deleted
+      service_life_years, service_expiry_date, service_expiry_basis,
+      registration_no, is_active, is_deleted, remark
     ) VALUES (
       v_code,
       v_names[((v_i - 1) % array_length(v_names, 1)) + 1],
@@ -355,8 +356,12 @@ BEGIN
       (CURRENT_DATE - (v_i * 15 + 60)),
       (CURRENT_DATE - (v_i * 15 + 70)),
       (CURRENT_DATE - (v_i * 40 + 400)),
+      8,
+      (CURRENT_DATE - (v_i * 15 + 60) + INTERVAL '8 years')::date,
+      'enable',
       '国械注准20193' || lpad((700 + v_i)::text, 5, '0'),
-      TRUE, 0
+      TRUE, 0,
+      '[使用到期推算] 启用日期+8年 → ' || to_char((CURRENT_DATE - (v_i * 15 + 60) + INTERVAL '8 years')::date, 'YYYY-MM-DD')
     );
   END LOOP;
 END

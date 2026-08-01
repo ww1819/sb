@@ -415,7 +415,11 @@ public class RepairWorkorderController {
         }
         Map<String, Object> seg = segmentService.addEngineerSegment(
                 id, wo, typeId, str(body.get("remark")), parts, engineers, startedAt, endedAt);
-        addEvent(id, "add_segment", str(wo.get("status")), str(loadWorkorder(id).get("status")),
+        SoftDeleteSupport.applyChannels(jdbc, "repair_workorder", id, body, "update_channel");
+        Map<String, Object> afterSeg = loadWorkorder(id);
+        changeLog.recordAction("repair_workorder", id, "add_segment", wo, afterSeg,
+                "添加进程段: " + seg.get("type_name"), OpsClientChannel.of(body));
+        addEvent(id, "add_segment", str(wo.get("status")), str(afterSeg.get("status")),
                 null, null, seg.get("user_id"), null, null,
                 "添加进程段: " + seg.get("type_name"), null);
         return Result.ok(seg);
@@ -434,6 +438,10 @@ public class RepairWorkorderController {
         assertRepairEngineer();
         List<Map<String, Object>> engineers = resolveEngineers(body);
         Map<String, Object> seg = segmentService.updateSegment(id, segmentId, body, engineers);
+        SoftDeleteSupport.applyChannels(jdbc, "repair_workorder", id, body, "update_channel");
+        Map<String, Object> afterSeg = loadWorkorder(id);
+        changeLog.recordAction("repair_workorder", id, "update_segment", wo, afterSeg,
+                "编辑进程段: " + seg.get("type_name"), OpsClientChannel.of(body));
         addEvent(id, "update_segment", str(wo.get("status")), str(wo.get("status")),
                 null, null, seg.get("user_id"), null, null,
                 "编辑进程段: " + seg.get("type_name"), null);
@@ -683,10 +691,11 @@ public class RepairWorkorderController {
             WHERE id = ?::uuid
             """, id);
         syncDeviceStatus(before.get("device_id"), "normal");
-        Map<String, Object> after = requireWo(id);
+        SoftDeleteSupport.applyChannels(jdbc, "repair_workorder", id, body, "update_channel");
         String remark = body != null ? str(body.get("remark")) : "撤回报修";
         if (remark.isBlank()) remark = "撤回报修";
         addEvent(id, "withdraw", "reported", "draft", null, null, null, null, null, remark, null);
+        Map<String, Object> after = requireWo(id);
         changeLog.recordAction("repair_workorder", id, "withdraw", before, after, remark, OpsClientChannel.of(body));
         return Result.ok(after);
     }
@@ -825,7 +834,11 @@ public class RepairWorkorderController {
             processService.syncWorkorderState(id, "accepted", null, null);
             addEvent(id, "accept", current, "accepted", null, null, userId, null, null, "接单", null);
         }
-        return Result.ok(loadWorkorder(id));
+        SoftDeleteSupport.applyChannels(jdbc, "repair_workorder", id, body, "update_channel");
+        Map<String, Object> afterAccept = loadWorkorder(id);
+        changeLog.recordAction("repair_workorder", id, "accept", wo, afterAccept,
+                startNow ? "接单并开始维修" : "接单", OpsClientChannel.of(body));
+        return Result.ok(afterAccept);
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/grab")
@@ -874,7 +887,10 @@ public class RepairWorkorderController {
         addEvent(id, "start_repair", current, "repairing", null, "internal", userId, null, null, "抢单并开始维修", null);
         syncDeviceStatus(wo.get("device_id"), "maintenance");
         segmentService.openSegmentByCode(id, "internal", userId, remark);
-        return Result.ok(loadWorkorder(id));
+        SoftDeleteSupport.applyChannels(jdbc, "repair_workorder", id, body, "update_channel");
+        Map<String, Object> afterGrab = loadWorkorder(id);
+        changeLog.recordAction("repair_workorder", id, "grab", wo, afterGrab, remark, OpsClientChannel.of(body));
+        return Result.ok(afterGrab);
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/transfer")
@@ -1003,7 +1019,11 @@ public class RepairWorkorderController {
             syncDeviceStatus(wo.get("device_id"), "pending_verify");
             segmentService.openSystemSegment(id, "pending_verify", wo.get("assigned_user_id"), "完工提交验收", null);
         }
-        return Result.ok(loadWorkorder(id));
+        SoftDeleteSupport.applyChannels(jdbc, "repair_workorder", id, body, "update_channel");
+        Map<String, Object> afterComplete = loadWorkorder(id);
+        changeLog.recordAction("repair_workorder", id, "complete", wo, afterComplete,
+                skipVerify ? "完工直接结案" : "完工提交验收", OpsClientChannel.of(body));
+        return Result.ok(afterComplete);
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/verify")
@@ -1068,7 +1088,10 @@ public class RepairWorkorderController {
             jdbc.update("UPDATE repair_workorder SET confirm_channel = ?, updated_at = NOW() WHERE id = ?::uuid",
                     OpsClientChannel.of(body), id);
         }
-        return Result.ok(loadWorkorder(id));
+        Map<String, Object> afterVerify = loadWorkorder(id);
+        changeLog.recordAction("repair_workorder", id, "verify", wo, afterVerify,
+                "验收", OpsClientChannel.of(body));
+        return Result.ok(afterVerify);
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/suspend")

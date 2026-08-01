@@ -6,6 +6,7 @@ import com.meis.saas.common.audit.EntityChangeLogService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.code.DeviceCodeGenerator;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.ops.OpsClientChannel;
 import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
@@ -307,7 +308,8 @@ public class AssetDeviceController {
             jdbc.update("UPDATE medical_device SET " + String.join(", ", sets)
                     + " WHERE id = ?::uuid"
                     + SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", null), args.toArray());
-            changeLog.recordUpdate("medical_device", idStr, before, changeLog.loadRow("medical_device", idStr));
+            changeLog.recordUpdate("medical_device", idStr, before, changeLog.loadRow("medical_device", idStr),
+                    OpsClientChannel.of(body));
             updated++;
         }
         return Result.ok(Map.of("updated", updated));
@@ -838,11 +840,21 @@ public class AssetDeviceController {
                 printedByName = nameRows.get(0).get("name").toString();
             }
         }
-        jdbc.update("""
-                INSERT INTO device_label_print_log
-                (id, device_id, device_code, device_name, printed_by, printed_by_name, template_code, biz_type, biz_id, remark)
-                VALUES (?::uuid, ?::uuid, ?, ?, ?::uuid, ?, ?, 'device', ?::uuid, ?)
-                """, logId, id, code, device.get("device_name"), printedBy, printedByName, template, id, remark);
+        String channel = OpsClientChannel.of(body);
+        if (TableColumnCache.hasColumn(jdbc, "device_label_print_log", "create_channel")) {
+            jdbc.update("""
+                    INSERT INTO device_label_print_log
+                    (id, device_id, device_code, device_name, printed_by, printed_by_name, template_code,
+                     biz_type, biz_id, remark, create_channel)
+                    VALUES (?::uuid, ?::uuid, ?, ?, ?::uuid, ?, ?, 'device', ?::uuid, ?, ?)
+                    """, logId, id, code, device.get("device_name"), printedBy, printedByName, template, id, remark, channel);
+        } else {
+            jdbc.update("""
+                    INSERT INTO device_label_print_log
+                    (id, device_id, device_code, device_name, printed_by, printed_by_name, template_code, biz_type, biz_id, remark)
+                    VALUES (?::uuid, ?::uuid, ?, ?, ?::uuid, ?, ?, 'device', ?::uuid, ?)
+                    """, logId, id, code, device.get("device_name"), printedBy, printedByName, template, id, remark);
+        }
         // AST-UI-19：资产卡片打印只写流水，不回写贴纸「已打印」标志
         if (!"asset_card".equalsIgnoreCase(template)) {
             jdbc.update("""

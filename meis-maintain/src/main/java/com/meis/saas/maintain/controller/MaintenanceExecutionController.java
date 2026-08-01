@@ -204,6 +204,7 @@ public class MaintenanceExecutionController {
                 start_time=COALESCE(start_time, NOW()), updated_at=NOW()
                 WHERE execution_id=?::uuid AND status='pending'
                 """, userId, name, id);
+        SoftDeleteSupport.applyChannels(jdbc, "maintenance_execution", id, body, "update_channel");
         docLog.event("maintain", "execution", id, execNo(id), "start", clientOf(body), null);
         return get(id);
     }
@@ -376,6 +377,8 @@ public class MaintenanceExecutionController {
                     """, body.getOrDefault("overall_result", "pass"), body.get("remark"), channel, userId, name, itemId);
         }
 
+        SoftDeleteSupport.applyChannels(jdbc, "maintenance_execution_item", itemId, body, "update_channel");
+        SoftDeleteSupport.applyChannels(jdbc, "maintenance_execution", execId, body, "update_channel");
         docLog.event("maintain", "execution", execId, execNo(execId), "complete_item", clientOf(body), itemId.toString());
         maybeAutoRepair("maintain", execId, itemId, item.get("device_id"));
         return get(execId);

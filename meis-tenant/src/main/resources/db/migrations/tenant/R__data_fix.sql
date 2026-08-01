@@ -1004,6 +1004,10 @@ BEGIN
   END LOOP;
 END $$;
 
+-- ========== MOB-CHANNEL-04：变更/单据日志 client NULL → web ==========
+UPDATE sys_entity_change_log SET client = 'web' WHERE client IS NULL;
+UPDATE sys_doc_change_log SET client = 'web' WHERE client IS NULL;
+
 -- ========== PLT-STATUS-CN-01：补齐运维执行/招标/健康检查等状态字典 ==========
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('maintain_exec_status', 'draft', '草稿', 'draft', 1),
@@ -1262,5 +1266,31 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('inspection_status', 'completed', '已完成', 'completed', 2),
 ('inspection_status', 'in_progress', '巡检中', 'in_progress', 3),
 ('wo_status', 'in_progress', '进行中', 'in_progress', 20),
-('wo_status', 'completed', '已完成', 'completed', 21)
+('wo_status', 'completed', '已完成', 'completed', 21),
+-- AST-EXP-01：使用到期推算方式
+('service_expiry_basis', 'enable', '启用日期+年限', 'enable', 1),
+('service_expiry_basis', 'production', '生产日期+年限', 'production', 2),
+('service_expiry_basis', 'acceptance', '验收日期+年限', 'acceptance', 3),
+('service_expiry_basis', 'purchase', '购置日期+年限', 'purchase', 4),
+('service_expiry_basis', 'created', '录入日期+年限', 'created', 5)
 ON CONFLICT (dict_type, dict_code) DO NOTHING;
+
+-- AST-EXP-01：存量台账按默认优先级回填使用到期（有年限且到期为空时）
+UPDATE medical_device d
+SET service_expiry_date = (
+        COALESCE(d.enable_date, d.production_date, d.acceptance_date, d.purchase_date, d.created_at::date)
+        + (d.service_life_years * INTERVAL '1 year')
+      )::date,
+    service_expiry_basis = CASE
+        WHEN d.enable_date IS NOT NULL THEN 'enable'
+        WHEN d.production_date IS NOT NULL THEN 'production'
+        WHEN d.acceptance_date IS NOT NULL THEN 'acceptance'
+        WHEN d.purchase_date IS NOT NULL THEN 'purchase'
+        ELSE 'created'
+      END,
+    updated_at = COALESCE(d.updated_at, NOW())
+WHERE COALESCE(d.is_deleted, 0) = 0
+  AND d.service_life_years IS NOT NULL
+  AND d.service_life_years > 0
+  AND d.service_expiry_date IS NULL
+  AND COALESCE(d.enable_date, d.production_date, d.acceptance_date, d.purchase_date, d.created_at::date) IS NOT NULL;

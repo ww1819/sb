@@ -1,6 +1,8 @@
 package com.meis.saas.qc.metrology;
 
+import com.meis.saas.common.audit.DocChangeLogService;
 import com.meis.saas.common.code.DailyBizNoSupport;
+import com.meis.saas.common.ops.OpsClientChannel;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -12,6 +14,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class MetrologyExecutionGenerator {
     private final JdbcTemplate jdbc;
+    private final DocChangeLogService docLog;
 
     public List<Map<String, Object>> generateBatch(Map<String, Object> body) {
         @SuppressWarnings("unchecked")
@@ -47,6 +50,7 @@ public class MetrologyExecutionGenerator {
                 body.getOrDefault("planned_date", p.get("next_due_date")),
                 p.get("assigned_inspector_id"), "pending", body.get("created_by"));
         SoftDeleteSupport.applyChannels(jdbc, "metrology_execution", execId, body, "create_channel", "update_channel");
+        docLog.event("metrology", "execution", execId, execNo, "create", OpsClientChannel.of(body), null);
 
         UUID itemId = UUID.randomUUID();
         var device = jdbc.queryForList(

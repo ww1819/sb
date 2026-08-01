@@ -1,7 +1,9 @@
 package com.meis.saas.special.controller;
 
+import com.meis.saas.common.audit.DocChangeLogService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.ops.OpsClientChannel;
 import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
@@ -22,6 +24,7 @@ import java.util.*;
 public class SharedLoanController {
     private final JdbcTemplate jdbc;
     private final ApprovalInstanceService approvalService;
+    private final DocChangeLogService docLog;
 
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(
@@ -65,6 +68,7 @@ public class SharedLoanController {
                     body.getOrDefault("status", "draft"), body.getOrDefault("approval_status", "draft"));
             SoftDeleteSupport.applyChannels(jdbc, "shared_device_loan", id, body,
                     "create_channel", "update_channel");
+            logLoan(id, "create", body, null);
         } else {
             jdbc.update("""
                 UPDATE shared_device_loan SET to_dept_id=?::uuid, loan_start=?, loan_end=?,
@@ -73,6 +77,7 @@ public class SharedLoanController {
                 """, body.get("to_dept_id"), body.get("loan_start"), body.get("loan_end"),
                     body.get("reason"), body.get("remark"), id);
             SoftDeleteSupport.applyChannels(jdbc, "shared_device_loan", id, body, "update_channel");
+            logLoan(id, "update", body, null);
         }
         return get(id);
     }
@@ -95,6 +100,7 @@ public class SharedLoanController {
                 "submit_channel", "update_channel");
         approvalService.submit("shared_device_loan", id, loan.get("loan_no").toString(),
                 "公用设备借调 " + loan.get("loan_no"), applicantId, 0);
+        logLoan(id, "submit", body, null);
         return get(id);
     }
 
@@ -112,6 +118,7 @@ public class SharedLoanController {
             """, approver, approverName, id);
         SoftDeleteSupport.applyChannels(jdbc, "shared_device_loan", id, body,
                 "confirm_channel", "update_channel");
+        logLoan(id, "approve", body, null);
         return get(id);
     }
 
@@ -123,7 +130,9 @@ public class SharedLoanController {
             UPDATE shared_device_loan SET status='rejected', approval_status='rejected', updated_at=NOW()
             WHERE id=?::uuid
             """, id);
-        SoftDeleteSupport.applyChannels(jdbc, "shared_device_loan", id, body, "update_channel");
+        SoftDeleteSupport.applyChannels(jdbc, "shared_device_loan", id, body,
+                "confirm_channel", "update_channel");
+        logLoan(id, "reject", body, null);
         return get(id);
     }
 
@@ -145,7 +154,14 @@ public class SharedLoanController {
             jdbc.update("UPDATE medical_device SET dept_id = ?::uuid, updated_at = NOW() WHERE id = ?::uuid",
                     loan.get("to_dept_id"), loan.get("device_id"));
         }
+        logLoan(id, "lend", body, null);
         return get(id);
+    }
+
+    private void logLoan(UUID id, String event, Map<String, Object> body, String remark) {
+        Map<String, Object> loan = loadLoan(id);
+        docLog.event("shared", "loan", id, Objects.toString(loan.get("loan_no"), null),
+                event, OpsClientChannel.of(body), remark);
     }
 
     private PageResult<Map<String, Object>> queryLoans(

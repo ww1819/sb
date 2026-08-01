@@ -416,6 +416,13 @@ const ZH: Record<string, Record<string, string>> = {
     inspection: '强检证书',
     other: '其他',
   },
+  service_expiry_basis: {
+    enable: '启用日期+年限',
+    production: '生产日期+年限',
+    acceptance: '验收日期+年限',
+    purchase: '购置日期+年限',
+    created: '录入日期+年限',
+  },
   inspection_status: {
     pending: '待巡检',
     completed: '已完成',

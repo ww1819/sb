@@ -125,7 +125,15 @@ public final class MedicalDeviceImporter {
                 if (active == null) active = true;
 
                 String nextCalibrationDate = DeviceDateCalculator.nextCalibrationDate(lastCalibrationDate, calibrationPeriodDays);
-                String serviceExpiryDate = DeviceDateCalculator.serviceExpiryDate(acceptanceDate, productionDate, serviceLifeYears);
+                var expiry = DeviceDateCalculator.resolveServiceExpiry(
+                        enableDate, productionDate, acceptanceDate, purchaseDate,
+                        java.time.LocalDate.now().toString(), serviceLifeYears,
+                        DeviceDateCalculator.Mode.ENABLE_FIRST);
+                String serviceExpiryDate = expiry == null ? null : expiry.expiryDate();
+                String serviceExpiryBasis = expiry == null ? null : expiry.basis();
+                if (expiry != null) {
+                    remark = MedicalDeviceFieldHelper.upsertExpiryRemark(remark, expiry);
+                }
 
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("id", id);
@@ -159,6 +167,7 @@ public final class MedicalDeviceImporter {
                 putValue(row, extension, dbColumns, "last_calibration_date", lastCalibrationDate);
                 putValue(row, extension, dbColumns, "next_calibration_date", nextCalibrationDate);
                 putValue(row, extension, dbColumns, "service_expiry_date", serviceExpiryDate);
+                putValue(row, extension, dbColumns, "service_expiry_basis", serviceExpiryBasis);
                 putValue(row, extension, dbColumns, "remark", remark);
                 putValue(row, extension, dbColumns, "is_active", active);
                 putValue(row, extension, dbColumns, "is_metrology", isMetrology);
