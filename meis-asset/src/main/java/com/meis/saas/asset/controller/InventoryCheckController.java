@@ -30,8 +30,8 @@ public class InventoryCheckController {
     @GetMapping("/by-device/{deviceId}")
     public Result<List<Map<String, Object>>> byDevice(@PathVariable UUID deviceId) {
         return Result.ok(jdbc.queryForList("""
-                SELECT c.check_no, c.check_name, c.check_type, c.status, c.audit_status,
-                       c.dept_id, dept.dept_name, i.check_date, i.is_found, i.is_matched,
+                SELECT c.id, c.check_no, c.check_name, c.check_type, c.status, c.audit_status,
+                       c.dept_id, dept.dept_name, i.id AS item_id, i.check_date, i.is_found, i.is_matched,
                        i.actual_location, i.condition_status
                 FROM inventory_check_item i
                 INNER JOIN inventory_check c ON c.id = i.check_id

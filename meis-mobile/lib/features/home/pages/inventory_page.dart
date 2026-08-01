@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -83,6 +85,27 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
     final v = row[key]?.toString().trim();
     if (v == null || v.isEmpty || v == 'null') return '—';
     return v;
+  }
+
+  String _checkTypeLabel(Map row) {
+    var type = row['check_type']?.toString();
+    var dept = row['dept_name']?.toString();
+    final payload = row['payload_json']?.toString();
+    if ((type == null || type.isEmpty) && payload != null && payload.isNotEmpty) {
+      try {
+        final m = jsonDecode(payload);
+        if (m is Map) {
+          type ??= m['check_type']?.toString();
+          dept ??= m['dept_name']?.toString();
+        }
+      } catch (_) {}
+    }
+    final typeLabel = resolveStatusLabel('check_type', type);
+    final d = dept?.trim();
+    if (d != null && d.isNotEmpty && d != 'null') {
+      return '$typeLabel · $d';
+    }
+    return typeLabel;
   }
 
   Future<void> openDetail(String id, {required bool localOnly}) async {
@@ -183,6 +206,10 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
             ],
           ),
           const SizedBox(height: 8),
+          Text(
+            _checkTypeLabel(row),
+            style: const TextStyle(fontSize: 13, color: AppColors.textPrimary, height: 1.35),
+          ),
           Text(
             '${_text(row, 'check_no')} · ${_text(row, 'checked_count')} / ${_text(row, 'total_count')}',
             style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),

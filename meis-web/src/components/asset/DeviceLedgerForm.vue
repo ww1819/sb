@@ -1,6 +1,10 @@
 <template>
-  <el-form label-width="96px" class="device-ledger-form" :class="{ 'device-ledger-form--view': isView }">
-    <FormTabNav v-model="activeTab" :tabs="visibleTabs" />
+  <el-form
+    label-width="96px"
+    class="device-ledger-form"
+    :class="{ 'device-ledger-form--view': isView, 'device-ledger-form--side-nav': isView }"
+  >
+    <FormTabNav v-model="activeTab" :tabs="visibleTabs" :layout="isView ? 'side' : 'top'" />
 
     <div class="device-ledger-form__panel">
       <div v-show="activeTab === 'basic'">
@@ -85,6 +89,7 @@
         filter-placeholder="工单号 / 故障描述"
         load-url="/repair/workorder/page"
         :device-id="deviceId"
+        :drill="repairDrill"
       />
       <DeviceRecordTablePanel
         v-show="activeTab === 'spare_replace'"
@@ -96,11 +101,12 @@
       />
       <DeviceRecordTablePanel
         v-show="activeTab === 'maintain'"
-        :columns="opsExecColumns"
+        :columns="maintainExecColumns"
         empty-text="暂无保养记录"
         filter-placeholder="执行单号 / 计划单号"
         load-url="/maintain/device/{deviceId}/executions"
         :device-id="deviceId"
+        :drill="maintainExecDrill"
       />
       <DeviceRecordTablePanel
         v-show="activeTab === 'maintain_plan'"
@@ -109,14 +115,16 @@
         filter-placeholder="计划单号 / 计划名称"
         load-url="/maintain/device/{deviceId}/plans"
         :device-id="deviceId"
+        :drill="maintainPlanDrill"
       />
       <DeviceRecordTablePanel
         v-show="activeTab === 'inspection'"
-        :columns="opsExecColumns"
+        :columns="inspectExecColumns"
         empty-text="暂无巡检记录"
         filter-placeholder="执行单号 / 计划单号"
         load-url="/inspect/device/{deviceId}/executions"
         :device-id="deviceId"
+        :drill="inspectExecDrill"
       />
       <DeviceRecordTablePanel
         v-show="activeTab === 'inspection_plan'"
@@ -125,6 +133,7 @@
         filter-placeholder="计划单号 / 计划名称"
         load-url="/inspect/device/{deviceId}/plans"
         :device-id="deviceId"
+        :drill="inspectPlanDrill"
       />
       <DeviceRecordTablePanel
         v-show="activeTab === 'metrology'"
@@ -133,6 +142,7 @@
         filter-placeholder="执行单号 / 证书号"
         load-url="/metrology/query/page"
         :device-id="deviceId"
+        :drill="metrologyExecDrill"
       />
       <DeviceRecordTablePanel
         v-show="activeTab === 'metrology_plan'"
@@ -141,14 +151,16 @@
         filter-placeholder="计划编号 / 计划名称"
         load-url="/metrology/device/{deviceId}/plans"
         :device-id="deviceId"
+        :drill="metrologyPlanDrill"
       />
       <DeviceRecordTablePanel
         v-show="activeTab === 'pm'"
-        :columns="opsExecColumns"
+        :columns="pmExecColumns"
         empty-text="暂无PM维护记录"
         filter-placeholder="执行单号 / 计划单号"
         load-url="/pm/device/{deviceId}/executions"
         :device-id="deviceId"
+        :drill="pmExecDrill"
       />
       <DeviceRecordTablePanel
         v-show="activeTab === 'pm_plan'"
@@ -157,6 +169,7 @@
         filter-placeholder="计划单号 / 计划名称"
         load-url="/pm/device/{deviceId}/plans"
         :device-id="deviceId"
+        :drill="pmPlanDrill"
       />
       <DeviceRecordTablePanel
         v-show="activeTab === 'shared_loan'"
@@ -181,6 +194,7 @@
         filter-placeholder="盘点单号"
         load-url="/asset/inventory/by-device/{deviceId}"
         :device-id="deviceId"
+        :drill="inventoryDrill"
       />
       <DeviceRecordTablePanel
         v-show="activeTab === 'ownership'"
@@ -282,7 +296,10 @@ import DevicePartReplacementPanel from '@/components/asset/tabs/DevicePartReplac
 import DeviceRecordTablePanel from '@/components/asset/tabs/DeviceRecordTablePanel.vue'
 import DeviceCurrentReadingPanel from '@/components/asset/tabs/DeviceCurrentReadingPanel.vue'
 import DeviceLabelPanel from '@/components/asset/tabs/DeviceLabelPanel.vue'
-import type { RecordColumn } from '@/components/asset/tabs/DeviceRecordTablePanel.vue'
+import type {
+  RecordColumn,
+  SheetDrillConfig
+} from '@/components/asset/tabs/DeviceRecordTablePanel.vue'
 import { getSchema, type FieldSchema } from '@/config/pageSchemas'
 import { toPinyinShortCode } from '@/utils/pinyinCode'
 
@@ -307,18 +324,30 @@ type CrudBeforeSaveApi = {
 }
 const crudBeforeSave = inject<CrudBeforeSaveApi | null>('crudBeforeSave', null)
 
-/** AST-UI-14 / 附录 P.2：查看态完整顺序；编辑态见 AST-UI-17 */
-const allTabs = [
+/** 编辑态 Tab（少而精）；查看态顺序见 viewTabOrder（现场操作习惯） */
+const editTabs = [
   { key: 'basic', label: '基本信息' },
-  { key: 'card', label: '资产卡片' },
   { key: 'archive', label: '设备档案' },
   { key: 'images', label: '设备图片' },
   { key: 'power_monitor', label: '电流监测' },
   { key: 'warranty', label: '维保信息' },
-  { key: 'label', label: '资产标签' },
+  { key: 'license', label: '设备证照' },
+  { key: 'training_auth', label: '培训授权' },
+  { key: 'ownership_backfill', label: '补录归属历史' },
+  { key: 'part_replace_edit', label: '非维修配件更换' }
+]
+
+/** AST-UI-24：查看态左侧导航顺序——台账核对 → 证照合规 → 运维闭环 → 流转处置 → 监测 */
+const viewTabs = [
+  { key: 'basic', label: '基本信息' },
+  { key: 'card', label: '资产卡片' },
   { key: 'license', label: '设备证照' },
   { key: 'training_auth', label: '培训授权' },
   { key: 'udi_hist', label: 'UDI历史' },
+  { key: 'archive', label: '设备档案' },
+  { key: 'images', label: '设备图片' },
+  { key: 'warranty', label: '维保信息' },
+  { key: 'label', label: '资产标签' },
   { key: 'repair', label: '维修记录' },
   { key: 'spare_replace', label: '配件更换记录' },
   { key: 'maintain', label: '保养记录' },
@@ -329,39 +358,18 @@ const allTabs = [
   { key: 'metrology_plan', label: '计量计划' },
   { key: 'pm', label: 'PM维护记录' },
   { key: 'pm_plan', label: 'PM维护计划' },
-  { key: 'shared_loan', label: '借调记录' },
-  { key: 'shared_fee', label: '借调费用' },
   { key: 'inventory', label: '盘点记录' },
   { key: 'ownership', label: '归属历史' },
   { key: 'location_hist', label: '位置历史' },
   { key: 'disposition', label: '处置记录' },
+  { key: 'shared_loan', label: '借调记录' },
+  { key: 'shared_fee', label: '借调费用' },
   { key: 'adverse', label: '不良事件' },
   { key: 'current', label: '电流读数' },
-  { key: 'current_bind', label: '电流标签绑定记录' },
-  { key: 'ownership_backfill', label: '补录归属历史' },
-  { key: 'part_replace_edit', label: '非维修配件更换' }
+  { key: 'current_bind', label: '电流标签绑定记录' }
 ]
 
-/** 编辑/新增：台账维护 Tab；查看态排除编辑专用 Tab */
-const ledgerKeys = new Set([
-  'basic',
-  'archive',
-  'images',
-  'power_monitor',
-  'warranty',
-  'license',
-  'training_auth',
-  'ownership_backfill',
-  'part_replace_edit'
-])
-const editOnlyKeys = new Set(['power_monitor', 'ownership_backfill', 'part_replace_edit'])
-
-const visibleTabs = computed(() => {
-  if (isView.value) {
-    return allTabs.filter((t) => !editOnlyKeys.has(t.key))
-  }
-  return allTabs.filter((t) => ledgerKeys.has(t.key))
-})
+const visibleTabs = computed(() => (isView.value ? viewTabs : editTabs))
 
 watch(
   () => props.mode,
@@ -543,7 +551,7 @@ const basicFields = computed(() => {
 })
 
 const repairColumns: RecordColumn[] = [
-  { prop: 'wo_no', label: '工单号', minWidth: 140 },
+  { prop: 'wo_no', label: '工单号', minWidth: 140, link: true },
   { prop: 'fault_description', label: '故障描述', minWidth: 180 },
   { prop: 'status', label: '状态', minWidth: 100, dictType: 'wo_status' },
   { prop: 'assigned_user_name', label: '工程师', minWidth: 120 },
@@ -565,16 +573,23 @@ const spareReplaceColumns: RecordColumn[] = [
   { prop: 'source_mode', label: '生成方式', minWidth: 110, dictType: 'source_mode' }
 ]
 
-const opsExecColumns: RecordColumn[] = [
-  { prop: 'execution_no', label: '执行单号', minWidth: 140 },
-  { prop: 'plan_no', label: '计划单号', minWidth: 140 },
-  { prop: 'execution_status', label: '执行状态', minWidth: 100, dictType: 'execution_status' },
-  { prop: 'status', label: '明细状态', minWidth: 100, dictType: 'execution_item_status' },
-  { prop: 'planned_date', label: '计划日期', minWidth: 120 }
-]
+function opsExecColumns(execDict: string, itemDict: string, resultDict = 'maintain_result'): RecordColumn[] {
+  return [
+    { prop: 'execution_no', label: '执行单号', minWidth: 140, link: true },
+    { prop: 'plan_no', label: '计划单号', minWidth: 140 },
+    { prop: 'execution_status', label: '执行状态', minWidth: 100, dictType: execDict },
+    { prop: 'status', label: '明细状态', minWidth: 100, dictType: itemDict },
+    { prop: 'overall_result', label: '结果', minWidth: 90, dictType: resultDict },
+    { prop: 'planned_date', label: '计划日期', minWidth: 120 }
+  ]
+}
+
+const maintainExecColumns = opsExecColumns('maintain_exec_status', 'maintain_exec_item_status')
+const inspectExecColumns = opsExecColumns('inspect_exec_status', 'inspect_exec_item_status')
+const pmExecColumns = opsExecColumns('pm_exec_status', 'pm_exec_item_status')
 
 const opsPlanColumns: RecordColumn[] = [
-  { prop: 'plan_no', label: '计划单号', minWidth: 140 },
+  { prop: 'plan_no', label: '计划单号', minWidth: 140, link: true },
   { prop: 'plan_name', label: '计划名称', minWidth: 160 },
   { prop: 'approval_status', label: '审核状态', minWidth: 100, dictType: 'approval_status' },
   { prop: 'plan_status', label: '计划状态', minWidth: 100, dictType: 'plan_status' },
@@ -582,7 +597,7 @@ const opsPlanColumns: RecordColumn[] = [
 ]
 
 const metrologyColumns: RecordColumn[] = [
-  { prop: 'execution_no', label: '执行单号', minWidth: 140 },
+  { prop: 'execution_no', label: '执行单号', minWidth: 140, link: true },
   { prop: 'template_name', label: '模板', minWidth: 140 },
   { prop: 'overall_result', label: '计量结果', minWidth: 100, dictType: 'metrology_result' },
   { prop: 'org_name', label: '计量机构', minWidth: 140 },
@@ -590,7 +605,7 @@ const metrologyColumns: RecordColumn[] = [
 ]
 
 const metrologyPlanColumns: RecordColumn[] = [
-  { prop: 'plan_code', label: '计划编号', minWidth: 140 },
+  { prop: 'plan_code', label: '计划编号', minWidth: 140, link: true },
   { prop: 'plan_name', label: '计划名称', minWidth: 160 },
   { prop: 'approval_status', label: '审核状态', minWidth: 100, dictType: 'approval_status' },
   { prop: 'status', label: '状态', minWidth: 100, dictType: 'plan_status' },
@@ -599,9 +614,9 @@ const metrologyPlanColumns: RecordColumn[] = [
 ]
 
 const inventoryColumns: RecordColumn[] = [
-  { prop: 'check_no', label: '盘点单号', minWidth: 140 },
-  { prop: 'check_type', label: '盘点类型', minWidth: 120, dictType: 'inventory_check_type' },
-  { prop: 'status', label: '状态', minWidth: 100, dictType: 'inventory_check_status' },
+  { prop: 'check_no', label: '盘点单号', minWidth: 140, link: true },
+  { prop: 'check_type', label: '盘点类型', minWidth: 120, dictType: 'check_type' },
+  { prop: 'status', label: '状态', minWidth: 100, dictType: 'check_status' },
   { prop: 'dept_name', label: '盘点科室', minWidth: 140 },
   { prop: 'check_date', label: '盘点日期', minWidth: 140 }
 ]
@@ -609,7 +624,7 @@ const inventoryColumns: RecordColumn[] = [
 const sharedLoanColumns: RecordColumn[] = [
   { prop: 'loan_no', label: '借调单号', minWidth: 140 },
   { prop: 'to_dept_name', label: '借入科室', minWidth: 120 },
-  { prop: 'status', label: '状态', minWidth: 100, dictType: 'shared_loan_status' },
+  { prop: 'status', label: '状态', minWidth: 100, dictType: 'loan_status' },
   { prop: 'fee_mode', label: '计费方式', minWidth: 100, dictType: 'shared_fee_mode' },
   { prop: 'fee_unit_price', label: '单价', minWidth: 90 },
   { prop: 'loan_start', label: '计划开始', minWidth: 120 },
@@ -621,8 +636,87 @@ const sharedFeeColumns: RecordColumn[] = [
   { prop: 'loan_no', label: '借调单号', minWidth: 140 },
   { prop: 'fee_amount', label: '金额', minWidth: 100 },
   { prop: 'fee_date', label: '收费日期', minWidth: 120 },
-  { prop: 'paid_status', label: '状态', minWidth: 100, dictType: 'shared_fee_paid_status' }
+  { prop: 'paid_status', label: '状态', minWidth: 100, dictType: 'paid_status' }
 ]
+
+const repairDrill: SheetDrillConfig = {
+  detailUrl: '/repair/workorder/{id}',
+  idProp: 'id',
+  titleProp: 'wo_no',
+  titlePrefix: '维修工单',
+  kind: 'repair'
+}
+const maintainExecDrill: SheetDrillConfig = {
+  detailUrl: '/maintain/execution/{id}',
+  idProp: 'execution_id',
+  titleProp: 'execution_no',
+  titlePrefix: '保养执行单',
+  kind: 'execution',
+  itemStatusDict: 'maintain_exec_item_status',
+  resultDict: 'maintain_result'
+}
+const inspectExecDrill: SheetDrillConfig = {
+  detailUrl: '/inspect/execution/{id}',
+  idProp: 'execution_id',
+  titleProp: 'execution_no',
+  titlePrefix: '巡检执行单',
+  kind: 'execution',
+  itemStatusDict: 'inspect_exec_item_status',
+  resultDict: 'maintain_result'
+}
+const pmExecDrill: SheetDrillConfig = {
+  detailUrl: '/pm/execution/{id}',
+  idProp: 'execution_id',
+  titleProp: 'execution_no',
+  titlePrefix: 'PM执行单',
+  kind: 'execution',
+  itemStatusDict: 'pm_exec_item_status',
+  resultDict: 'maintain_result'
+}
+const metrologyExecDrill: SheetDrillConfig = {
+  detailUrl: '/metrology/query/{id}',
+  idProp: 'id',
+  titleProp: 'execution_no',
+  titlePrefix: '计量执行',
+  kind: 'item',
+  itemStatusDict: 'metrology_exec_item_status',
+  resultDict: 'metrology_result'
+}
+const maintainPlanDrill: SheetDrillConfig = {
+  detailUrl: '/maintain/plan/{id}',
+  idProp: 'plan_id',
+  titleProp: 'plan_no',
+  titlePrefix: '保养计划',
+  kind: 'plan'
+}
+const inspectPlanDrill: SheetDrillConfig = {
+  detailUrl: '/inspect/plan/{id}',
+  idProp: 'plan_id',
+  titleProp: 'plan_no',
+  titlePrefix: '巡检计划',
+  kind: 'plan'
+}
+const pmPlanDrill: SheetDrillConfig = {
+  detailUrl: '/pm/plan/{id}',
+  idProp: 'plan_id',
+  titleProp: 'plan_no',
+  titlePrefix: 'PM计划',
+  kind: 'plan'
+}
+const metrologyPlanDrill: SheetDrillConfig = {
+  detailUrl: '/metrology/plan/{id}',
+  idProp: 'id',
+  titleProp: 'plan_code',
+  titlePrefix: '计量计划',
+  kind: 'plan'
+}
+const inventoryDrill: SheetDrillConfig = {
+  detailUrl: '/asset/inventory/{id}',
+  idProp: 'id',
+  titleProp: 'check_no',
+  titlePrefix: '盘点单',
+  kind: 'inventory'
+}
 
 const adverseColumns: RecordColumn[] = [
   { prop: 'event_no', label: '事件编号', minWidth: 140 },
@@ -637,7 +731,7 @@ const udiHistColumns: RecordColumn[] = [
   { prop: 'udi_pi', label: 'UDI-PI', minWidth: 140 },
   { prop: 'effective_from', label: '开始', minWidth: 160 },
   { prop: 'effective_to', label: '结束', minWidth: 160 },
-  { prop: 'change_reason', label: '原因', minWidth: 120 },
+  { prop: 'change_reason', label: '原因', minWidth: 120, dictType: 'udi_change_reason' },
   { prop: 'remark', label: '备注', minWidth: 120 }
 ]
 
@@ -669,7 +763,7 @@ const dispositionColumns: RecordColumn[] = [
   { prop: 'occurred_at', label: '发生时间', minWidth: 160 },
   { prop: 'disposition_type_label', label: '类型', minWidth: 100 },
   { prop: 'biz_no', label: '单号', minWidth: 140 },
-  { prop: 'biz_status', label: '单据状态', minWidth: 100 },
+  { prop: 'biz_status', label: '单据状态', minWidth: 100, dictType: 'disposition_biz_status' },
   { prop: 'remark', label: '备注', minWidth: 140 },
   { prop: 'source_mode', label: '生成方式', minWidth: 110, dictType: 'source_mode' }
 ]
@@ -773,7 +867,12 @@ async function submitChangeLocation() {
   overflow: hidden;
 }
 
-.device-ledger-form :deep(.form-tab-nav) {
+.device-ledger-form--side-nav {
+  flex-direction: row;
+  align-items: stretch;
+}
+
+.device-ledger-form :deep(.form-tab-nav--top) {
   flex-shrink: 0;
 }
 

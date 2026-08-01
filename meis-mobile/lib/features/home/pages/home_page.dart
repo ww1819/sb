@@ -8,6 +8,7 @@ import '../../../shared/utils/permission_util.dart';
 import '../../../shared/widgets/meis_nav_tile.dart';
 import '../../../shared/widgets/meis_section_label.dart';
 import '../../auth/providers/auth_provider.dart';
+import 'device_lookup_page.dart';
 import 'engineer_hub_page.dart';
 import 'inspection_page.dart';
 import 'inventory_page.dart';
@@ -117,6 +118,12 @@ class HomePage extends ConsumerWidget {
               ],
               const SizedBox(height: AppSpacing.xl),
               const MeisSectionLabel('常用功能'),
+              MeisNavTile(
+                icon: Icons.search,
+                title: '扫码查台账',
+                subtitle: 'UDI / 责任人 / 证照授权只读',
+                onTap: () => _push(context, const DeviceLookupPage()),
+              ),
               MeisNavTile(
                 icon: Icons.qr_code_scanner,
                 title: '扫码报修',
