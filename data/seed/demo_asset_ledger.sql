@@ -57,7 +57,10 @@ BEGIN
       ('device_udi_history', 'udi_di'),
       ('device_archive_file', 'file_url'),
       ('medical_device', 'udi_di'),
-      ('medical_device', 'eq_class')
+      ('medical_device', 'eq_class'),
+      ('medical_device', 'service_life_years'),
+      ('medical_device', 'service_expiry_date'),
+      ('medical_device', 'service_expiry_basis')
     ) AS t(tbl, col)
   LOOP
     IF NOT EXISTS (

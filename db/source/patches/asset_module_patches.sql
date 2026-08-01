@@ -7,6 +7,8 @@ ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS calibration_period_days INTE
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS last_calibration_date DATE;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS next_calibration_date DATE;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS service_expiry_date DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS service_expiry_basis VARCHAR(30);
+COMMENT ON COLUMN medical_device.service_expiry_basis IS 'AST-EXP-01：使用到期推算锚点 enable/production/acceptance/purchase/created';
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS extension_data JSONB DEFAULT '{}'::jsonb;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS warehouse_id UUID;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_metrology BOOLEAN DEFAULT FALSE;
