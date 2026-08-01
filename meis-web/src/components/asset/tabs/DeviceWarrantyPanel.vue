@@ -108,7 +108,7 @@
         border
         max-height="360"
         highlight-current-row
-        @current-change="(row) => (joinSelected = row)"
+        @current-change="(row: Record<string, unknown> | undefined) => (joinSelected = row ?? null)"
       >
         <el-table-column prop="supplier_name" label="维保公司" min-width="120" />
         <el-table-column prop="start_date" label="开始" width="110" />

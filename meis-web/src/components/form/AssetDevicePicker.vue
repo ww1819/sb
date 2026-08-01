@@ -162,7 +162,10 @@ watch(
 
 onMounted(async () => {
   const opts = await loadDict('device_status')
-  statusOptions.value = opts.map((o) => ({ label: o.label, value: o.value }))
+  statusOptions.value = opts.map((o: { label: string; value: string }) => ({
+    label: o.label,
+    value: o.value
+  }))
 })
 </script>
 

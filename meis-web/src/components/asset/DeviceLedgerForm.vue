@@ -19,7 +19,7 @@
           :fields="basicFields"
           :group-columns="{ basic: 5, finance: 5, location: 5, vendor: 5, time: 5, accounting: 5, status: 5, compliance: 5, other: 5 }"
           :group-rows="{ basic: basicFormRows, vendor: vendorFormRows, accounting: accountingFormRows, location: locationFormRows }"
-          :group-panels="{ basic: basicFormPanels, status: statusFormPanels }"
+          :group-panels="{ basic: basicFormPanel, status: statusFormPanel }"
           :highlight-labels="highlightLabels"
           :group-titles="{ finance: '折旧信息', time: '合同信息', accounting: '财务信息', status: '设备属性', compliance: '动态监测' }"
         />

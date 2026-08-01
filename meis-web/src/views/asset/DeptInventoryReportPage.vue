@@ -15,7 +15,12 @@
             class="year-input"
             @change="load"
           />
-          <RefSelect v-model="deptId" table="department" placeholder="科室" clearable @change="load" />
+          <RefSelect
+            v-model="deptId"
+            link-table="department"
+            placeholder="科室"
+            @update:model-value="load"
+          />
           <el-select v-model="checkType" clearable placeholder="盘点类型" style="width: 140px" @change="load">
             <el-option v-for="o in checkTypeOptions" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
@@ -62,8 +67,8 @@
 import { onMounted, ref } from 'vue'
 import { RefreshLeft, Search } from '@element-plus/icons-vue'
 import http from '@/api/http'
-import SystemPageCard from '@/components/SystemPageCard.vue'
-import PageFilterBar from '@/components/PageFilterBar.vue'
+import SystemPageCard from '@/components/system/SystemPageCard.vue'
+import PageFilterBar from '@/components/system/PageFilterBar.vue'
 import RefSelect from '@/components/form/RefSelect.vue'
 import { useDict } from '@/composables/useDict'
 
