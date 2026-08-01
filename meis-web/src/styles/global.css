@@ -187,14 +187,27 @@ body {
   display: flex;
   flex-direction: column;
   padding-top: 0;
+  min-height: 0;
 }
 
-#layout-content-root .app-modal__body:has(.device-ledger-form) .form-tab-nav {
+/* 顶栏 Tab：拉通全宽底边；勿套到侧栏导航（负 margin 会撑破内容区盖住滚动条） */
+#layout-content-root .app-modal__body:has(.device-ledger-form) .form-tab-nav--top {
   margin: 0 -20px 16px;
   padding: 10px 20px 0;
   background: #fff;
   border-bottom: 1px solid var(--meis-border-light);
   gap: 20px;
+}
+
+#layout-content-root .app-modal__body:has(.device-ledger-form--side-nav) {
+  padding-left: 12px;
+  padding-right: 8px;
+}
+
+#layout-content-root .app-modal__body:has(.device-ledger-form--side-nav) .device-ledger-form--side-nav {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
 }
 
 #layout-content-root .layout-content-modal .app-modal--sm.el-dialog:not(.app-modal--right),

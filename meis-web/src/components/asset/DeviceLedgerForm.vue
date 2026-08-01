@@ -870,18 +870,26 @@ async function submitChangeLocation() {
 .device-ledger-form--side-nav {
   flex-direction: row;
   align-items: stretch;
+  min-width: 0;
 }
 
 .device-ledger-form :deep(.form-tab-nav--top) {
   flex-shrink: 0;
 }
 
+.device-ledger-form--side-nav :deep(.form-tab-nav--side) {
+  flex-shrink: 0;
+  max-height: 100%;
+}
+
 .device-ledger-form__panel {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-right: 4px;
+  scrollbar-gutter: stable;
+  padding-right: 12px;
   padding-bottom: 8px;
 }
 

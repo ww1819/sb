@@ -4,7 +4,7 @@
 > **来源**：`docs/meis-requirements.md` 附录 Q / C / D / E / F / G / H / I / R / S / T 等。  
 > **用法**：新系统可整份复制后，按「落地映射」改路径与模块名；MEIS 专属细节见文末附录。
 
-**版本**：1.48（2026-08-01）
+**版本**：1.49（2026-08-01）
 
 ---
 
@@ -523,6 +523,19 @@ USB 外设（如文档高拍仪）**勿**由浏览器直连硬件；经厂商本
 
 落地映射：MEIS [MOB-SYNC-01](meis-requirements.md#mob-sync-01-多端功能演进同批定稿2026-08-01)；`meis-web` / `meis-mobile` / `meis-mp`。
 
+### 5.19 侧栏表单导航与内容区滚动（强制）
+
+主数据/复杂表单采用「左侧 Sheet 导航 + 右侧内容」时：
+
+| 项 | 要求 |
+|----|------|
+| **样式隔离** | 顶栏横向 Tab 的全宽拉通（负 margin、底边线等）**禁止**套到侧栏导航 |
+| **高度链** | 弹层 body → 表单根 → 侧栏/内容 均 `min-height: 0`（及横向 `min-width: 0`），避免 flex 子项撑破父级 |
+| **滚动归属** | 侧栏与内容区**各自**纵向滚动；父级 `overflow: hidden`，勿让整页或内容盖住滚动条 |
+| **滚动条占位** | 内容区建议 `scrollbar-gutter: stable`，右内边距不少于滚动条宽度 |
+
+落地映射：MEIS [AST-UI-25](meis-requirements.md#ast-ui-25-查看态侧栏内容滚动定稿2026-08-01)；`FormTabNav`、`DeviceLedgerForm`、`global.css`（`:has(.device-ledger-form)`）。
+
 ---
 
 ## 6. 单据草稿 / 提交 / 撤回（业务模式）
@@ -632,7 +645,8 @@ USB 外设（如文档高拍仪）**勿**由浏览器直连硬件；经厂商本
 - [ ] 列 `prop` 与 API 字段一致，无旧别名  
 - [ ] 字典/外键显示中文，无裸 UUID  
 - [ ] 有勾选列则具备跨页缓存；导出/批量变更先选作用域（§5.4）；勿再挂「已选/全选当页」提示条  
-- [ ] 若属 Web/移动端**已共有**能力的字段或业务分支扩展：App/小程序已同批跟上，或已入 BACKLOG 点名（§5.18）
+- [ ] 若属 Web/移动端**已共有**能力的字段或业务分支扩展：App/小程序已同批跟上，或已入 BACKLOG 点名（§5.18）  
+- [ ] 若为侧栏导航 + 内容区表单：顶栏样式未误套侧栏，滚动条未被内容覆盖（§5.19）
 
 ### 7.3 库表改完
 
@@ -723,6 +737,7 @@ USB 外设（如文档高拍仪）**勿**由浏览器直连硬件；经厂商本
 | 新表 CRUD 清单 | 附录 M.7 | DomainController / CrudPage |
 | 外键中文 / 强业务拼编码 | 附录 H、**PLT-REF-CODE-01**、§5.2.1 | `refSelectConfig.showCode`、`formatRefRowLabel`、`useRefLabelMap`、`linkHideCode` |
 | 多端功能演进同批 | **MOB-SYNC-01**、约定包 **§5.18** | 交付自检；`meis-web` / `meis-mobile` / `meis-mp` |
+| 侧栏表单导航与内容滚动 | **AST-UI-25**、约定包 **§5.19** | `FormTabNav`、`DeviceLedgerForm`、`global.css` |
 | 字典中文 / I18N 预留 / 新状态种子 | 附录 R、PLT-STATUS-CN-01、**PLT-DICT-SEED-01**、PLT-I18N-01、§5.1 / **§5.13** | `R__data_dict.sql`；`meis-web/src/i18n/`、`useDict`、`StatusTag`；App/MP `status_labels`；新枚举同批三端 catalog |
 | 报修草稿/撤回 / 故障图片 | 附录 S（含 S.6）、约定包 §6.4 / §6.5 | `RepairWorkorderController`、`fault_photos` |
 | 移动端扫码报修 | 附录 MOB | `meis-mobile` 扫码报修 |

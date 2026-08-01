@@ -59,15 +59,18 @@ defineEmits<{ 'update:modelValue': [value: string] }>()
   flex-direction: column;
   align-items: stretch;
   gap: 2px;
-  width: 148px;
+  width: 156px;
   flex-shrink: 0;
   margin: 0 12px 0 0;
-  padding: 4px 6px 8px 0;
+  padding: 4px 8px 8px 0;
   border-right: 1px solid var(--meis-border-light);
   overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   min-height: 0;
+  max-height: 100%;
   align-self: stretch;
+  box-sizing: border-box;
 }
 
 .form-tab-nav--side::-webkit-scrollbar {
