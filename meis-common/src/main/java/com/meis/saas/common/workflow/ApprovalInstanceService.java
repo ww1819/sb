@@ -1,9 +1,11 @@
 package com.meis.saas.common.workflow;
 
+import com.meis.saas.common.asset.DeviceOwnershipWriteback;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.notify.NotificationHelper;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +17,7 @@ import java.util.*;
 public class ApprovalInstanceService {
     private final JdbcTemplate jdbc;
     private final ApprovalFlowService flowService;
+    private final ObjectProvider<DeviceOwnershipWriteback> ownershipWriteback;
 
     @Transactional
     public Map<String, Object> submit(String businessType, UUID businessId, String businessNo,
@@ -310,28 +313,42 @@ public class ApprovalInstanceService {
         var row = jdbc.queryForList("SELECT * FROM asset_transfer WHERE id = ?::uuid", id);
         if (row.isEmpty()) return;
         Map<String, Object> t = row.get(0);
-        if (t.get("to_dept_id") != null && t.get("device_id") != null) {
-            jdbc.update("UPDATE medical_device SET dept_id = ?::uuid, updated_at = NOW() WHERE id = ?::uuid",
-                    t.get("to_dept_id"), t.get("device_id"));
+        UUID deviceId = toUuidOrNull(t.get("device_id"));
+        if (t.get("to_dept_id") != null && deviceId != null) {
+            jdbc.update("UPDATE medical_device SET dept_id = ?::uuid, warehouse_id = NULL, updated_at = NOW() WHERE id = ?::uuid",
+                    t.get("to_dept_id"), deviceId);
         }
-        if (t.get("to_warehouse_id") != null && t.get("device_id") != null) {
+        if (t.get("to_warehouse_id") != null && deviceId != null) {
             jdbc.update("UPDATE medical_device SET warehouse_id = ?::uuid, updated_at = NOW() WHERE id = ?::uuid",
-                    t.get("to_warehouse_id"), t.get("device_id"));
+                    t.get("to_warehouse_id"), deviceId);
+        }
+        if (t.get("to_campus_id") != null && deviceId != null) {
+            jdbc.update("UPDATE medical_device SET campus_id = ?::uuid, updated_at = NOW() WHERE id = ?::uuid",
+                    t.get("to_campus_id"), deviceId);
+        }
+        if (deviceId != null && (t.get("to_dept_id") != null || t.get("to_warehouse_id") != null
+                || t.get("to_campus_id") != null)) {
+            String transferNo = t.get("transfer_no") != null ? String.valueOf(t.get("transfer_no")) : null;
+            openOwnershipPeriod(deviceId, "biz_doc", "biz_doc", "asset_transfer", id, transferNo);
         }
         jdbc.update("UPDATE asset_transfer SET status = 'completed', updated_at = NOW() WHERE id = ?::uuid", id);
     }
 
     private void autoCompleteReturn(UUID id, UUID actorId, String actorName) {
-        var row = jdbc.queryForList("SELECT warehouse_id FROM device_return WHERE id = ?::uuid", id);
+        var row = jdbc.queryForList("SELECT warehouse_id, return_no FROM device_return WHERE id = ?::uuid", id);
         if (row.isEmpty()) return;
         Object warehouseId = row.get(0).get("warehouse_id");
+        String returnNo = row.get(0).get("return_no") != null
+                ? String.valueOf(row.get(0).get("return_no")) : null;
         var items = jdbc.queryForList("SELECT device_id FROM device_return_item WHERE return_id = ?::uuid", id);
         for (Map<String, Object> item : items) {
-            if (item.get("device_id") != null) {
+            UUID deviceId = toUuidOrNull(item.get("device_id"));
+            if (deviceId != null) {
                 jdbc.update("""
                     UPDATE medical_device SET device_status = 'normal', warehouse_id = ?::uuid, updated_at = NOW()
                     WHERE id = ?::uuid
-                    """, warehouseId, item.get("device_id"));
+                    """, warehouseId, deviceId);
+                openOwnershipPeriod(deviceId, "biz_doc", "biz_doc", "device_return", id, returnNo);
             }
         }
         jdbc.update("""
@@ -412,17 +429,21 @@ public class ApprovalInstanceService {
     }
 
     private void autoIssueOutbound(UUID id, UUID actorId, String actorName) {
-        var outs = jdbc.queryForList("SELECT dept_id FROM device_outbound WHERE id = ?::uuid", id);
+        var outs = jdbc.queryForList("SELECT dept_id, outbound_no FROM device_outbound WHERE id = ?::uuid", id);
         Object deptId = outs.isEmpty() ? null : outs.get(0).get("dept_id");
+        String outboundNo = outs.isEmpty() || outs.get(0).get("outbound_no") == null
+                ? null : String.valueOf(outs.get(0).get("outbound_no"));
         var items = jdbc.queryForList("SELECT device_id FROM device_outbound_item WHERE outbound_id = ?::uuid", id);
         for (Map<String, Object> item : items) {
-            if (item.get("device_id") != null) {
+            UUID deviceId = toUuidOrNull(item.get("device_id"));
+            if (deviceId != null) {
                 jdbc.update("""
                     UPDATE medical_device
                     SET device_status = 'in_use', warehouse_id = NULL, dept_id = COALESCE(?::uuid, dept_id),
                         updated_at = NOW()
                     WHERE id = ?::uuid
-                    """, deptId, item.get("device_id"));
+                    """, deptId, deviceId);
+                openOwnershipPeriod(deviceId, "biz_doc", "biz_doc", "device_outbound", id, outboundNo);
             }
         }
         jdbc.update("""
@@ -433,6 +454,13 @@ public class ApprovalInstanceService {
                 updated_at = NOW()
                 WHERE id = ?::uuid
                 """, actorId, actorName, id);
+    }
+
+    private void openOwnershipPeriod(UUID deviceId, String changeReason, String sourceMode,
+                                     String sourceBizType, UUID sourceBizId, String sourceBizNo) {
+        DeviceOwnershipWriteback writeback = ownershipWriteback.getIfAvailable();
+        if (writeback == null || deviceId == null) return;
+        writeback.openPeriodFromLedger(deviceId, changeReason, sourceMode, sourceBizType, sourceBizId, sourceBizNo);
     }
 
     private void autoDisposeScrap(UUID id) {

@@ -1,5 +1,6 @@
 package com.meis.saas.asset.controller;
 
+import com.meis.saas.asset.service.DeviceOwnershipPeriodService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.code.DeviceCodeGenerator;
 import com.meis.saas.common.exception.BizException;
@@ -23,6 +24,7 @@ import java.util.*;
 public class DeviceEntryController {
     private final JdbcTemplate jdbc;
     private final DeviceCodeGenerator codeGenerator;
+    private final DeviceOwnershipPeriodService ownershipService;
 
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(PageQuery query,
@@ -279,16 +281,19 @@ public class DeviceEntryController {
                 "SELECT * FROM device_entry_item WHERE entry_id = ?"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "device_entry_item", null), id);
         List<UUID> deviceIds = new ArrayList<>();
+        String entryNo = entry.get("entry_no") != null ? String.valueOf(entry.get("entry_no")) : null;
         for (Map<String, Object> item : items) {
             int qty = item.get("quantity") instanceof Number n ? Math.max(1, n.intValue()) : 1;
             Object itemDept = item.get("dept_id") != null ? item.get("dept_id") : deptId;
             String firstCode = null;
+            UUID firstDeviceId = null;
             for (int i = 0; i < qty; i++) {
                 String code = codeGenerator.generate(
                         str(body, "campusCode"), str(body, "buildingCode"), str(body, "deptCode"),
                         str(body, "countryCode"), str(body, "categoryCode"));
                 if (firstCode == null) firstCode = code;
                 UUID deviceId = UUID.randomUUID();
+                if (firstDeviceId == null) firstDeviceId = deviceId;
                 String model = blankToNull(item.get("specification"));
                 if (model == null) model = blankToNull(item.get("model"));
                 String deviceName = blankToNull(item.get("device_name"));
@@ -315,10 +320,16 @@ public class DeviceEntryController {
                         toIntOrNull(item.get("depreciation_years")), toDateOrNull(item.get("production_date")),
                         item.get("storage_location"));
                 deviceIds.add(deviceId);
+                ownershipService.openPeriodFromLedger(
+                        deviceId, "biz_doc", "biz_doc", "device_entry", id, entryNo);
             }
-            if (firstCode != null && item.get("id") != null) {
-                jdbc.update("UPDATE device_entry_item SET device_code = COALESCE(NULLIF(TRIM(device_code), ''), ?) WHERE id = ?",
-                        firstCode, item.get("id"));
+            if (item.get("id") != null && (firstCode != null || firstDeviceId != null)) {
+                jdbc.update("""
+                        UPDATE device_entry_item
+                        SET device_code = COALESCE(NULLIF(TRIM(device_code), ''), ?),
+                            device_id = COALESCE(device_id, ?::uuid)
+                        WHERE id = ?
+                        """, firstCode, firstDeviceId, item.get("id"));
             }
         }
         var ctx = com.meis.saas.common.rbac.PermissionInterceptor.CTX.get();

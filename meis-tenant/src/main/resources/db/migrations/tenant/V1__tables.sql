@@ -2712,6 +2712,212 @@ COMMENT ON COLUMN device_warranty_device.deleted_at IS '删除时间';
 COMMENT ON COLUMN device_warranty_device.deleted_by IS '删除人';
 COMMENT ON COLUMN device_warranty_device.deleted_by_name IS '删除人姓名快照';
 
+-- AST-OWN-01 / AST-BF-01：设备归属区间
+CREATE TABLE device_ownership_period (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    device_id UUID NOT NULL REFERENCES medical_device(id),
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
+    campus_id UUID,
+    campus_name VARCHAR(100),
+    owner_type VARCHAR(20) NOT NULL,
+    warehouse_id UUID,
+    warehouse_name VARCHAR(100),
+    dept_id UUID,
+    dept_name VARCHAR(100),
+    effective_from TIMESTAMPTZ NOT NULL,
+    effective_to TIMESTAMPTZ,
+    change_reason VARCHAR(40),
+    source_mode VARCHAR(40),
+    source_biz_type VARCHAR(40),
+    source_biz_id UUID,
+    source_biz_no VARCHAR(50),
+    confirm_status VARCHAR(20) NOT NULL DEFAULT 'confirmed',
+    confirmed_at TIMESTAMPTZ,
+    confirmed_by UUID,
+    confirmed_by_name VARCHAR(100),
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100)
+);
+COMMENT ON TABLE device_ownership_period IS '设备归属区间（AST-OWN-01）';
+COMMENT ON COLUMN device_ownership_period.device_id IS '设备';
+COMMENT ON COLUMN device_ownership_period.device_code IS '设备编码冗余';
+COMMENT ON COLUMN device_ownership_period.device_name IS '设备名称冗余';
+COMMENT ON COLUMN device_ownership_period.campus_id IS '院区';
+COMMENT ON COLUMN device_ownership_period.campus_name IS '院区名称快照';
+COMMENT ON COLUMN device_ownership_period.owner_type IS '归属类型 warehouse|dept';
+COMMENT ON COLUMN device_ownership_period.warehouse_id IS '仓库';
+COMMENT ON COLUMN device_ownership_period.warehouse_name IS '仓库名称快照';
+COMMENT ON COLUMN device_ownership_period.dept_id IS '科室';
+COMMENT ON COLUMN device_ownership_period.dept_name IS '科室名称快照';
+COMMENT ON COLUMN device_ownership_period.effective_from IS '生效起';
+COMMENT ON COLUMN device_ownership_period.effective_to IS '生效止（空=当前开放段）';
+COMMENT ON COLUMN device_ownership_period.change_reason IS '变更原因';
+COMMENT ON COLUMN device_ownership_period.source_mode IS '生成方式';
+COMMENT ON COLUMN device_ownership_period.source_biz_type IS '来源业务类型';
+COMMENT ON COLUMN device_ownership_period.source_biz_id IS '来源业务主键';
+COMMENT ON COLUMN device_ownership_period.source_biz_no IS '来源业务单号';
+COMMENT ON COLUMN device_ownership_period.confirm_status IS '确认状态 draft|confirmed';
+COMMENT ON COLUMN device_ownership_period.confirmed_at IS '确认时间';
+COMMENT ON COLUMN device_ownership_period.confirmed_by IS '确认人';
+COMMENT ON COLUMN device_ownership_period.confirmed_by_name IS '确认人姓名快照';
+COMMENT ON COLUMN device_ownership_period.remark IS '备注';
+COMMENT ON COLUMN device_ownership_period.created_at IS '创建时间';
+COMMENT ON COLUMN device_ownership_period.updated_at IS '更新时间';
+COMMENT ON COLUMN device_ownership_period.created_by IS '创建人';
+COMMENT ON COLUMN device_ownership_period.updated_by IS '更新人';
+COMMENT ON COLUMN device_ownership_period.created_by_name IS '创建人姓名快照';
+COMMENT ON COLUMN device_ownership_period.updated_by_name IS '更新人姓名快照';
+COMMENT ON COLUMN device_ownership_period.is_deleted IS '软删标志';
+COMMENT ON COLUMN device_ownership_period.deleted_at IS '删除时间';
+COMMENT ON COLUMN device_ownership_period.deleted_by IS '删除人';
+COMMENT ON COLUMN device_ownership_period.deleted_by_name IS '删除人姓名快照';
+
+-- AST-PART-01 / AST-BF-01：非维修配件更换
+CREATE TABLE device_part_replacement (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    device_id UUID NOT NULL REFERENCES medical_device(id),
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
+    spare_part_id UUID,
+    part_code VARCHAR(50),
+    part_name VARCHAR(200),
+    part_specification TEXT,
+    part_model VARCHAR(100),
+    quantity DECIMAL(15,4),
+    unit_price DECIMAL(15,2),
+    total_price DECIMAL(15,2),
+    supplier_id UUID,
+    supplier_name VARCHAR(200),
+    replaced_at TIMESTAMPTZ NOT NULL,
+    source_mode VARCHAR(40) DEFAULT 'manual_backfill',
+    confirm_status VARCHAR(20) NOT NULL DEFAULT 'draft',
+    confirmed_at TIMESTAMPTZ,
+    confirmed_by UUID,
+    confirmed_by_name VARCHAR(100),
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100)
+);
+COMMENT ON TABLE device_part_replacement IS '非维修配件更换（AST-PART-01）';
+COMMENT ON COLUMN device_part_replacement.device_id IS '设备';
+COMMENT ON COLUMN device_part_replacement.device_code IS '设备编码冗余';
+COMMENT ON COLUMN device_part_replacement.device_name IS '设备名称冗余';
+COMMENT ON COLUMN device_part_replacement.spare_part_id IS '备件';
+COMMENT ON COLUMN device_part_replacement.part_code IS '配件编码冗余';
+COMMENT ON COLUMN device_part_replacement.part_name IS '配件名称冗余';
+COMMENT ON COLUMN device_part_replacement.part_specification IS '配件规格冗余';
+COMMENT ON COLUMN device_part_replacement.part_model IS '配件型号冗余';
+COMMENT ON COLUMN device_part_replacement.quantity IS '数量';
+COMMENT ON COLUMN device_part_replacement.unit_price IS '单价';
+COMMENT ON COLUMN device_part_replacement.total_price IS '金额';
+COMMENT ON COLUMN device_part_replacement.supplier_id IS '供应商';
+COMMENT ON COLUMN device_part_replacement.supplier_name IS '供应商名称快照';
+COMMENT ON COLUMN device_part_replacement.replaced_at IS '更换时间';
+COMMENT ON COLUMN device_part_replacement.source_mode IS '生成方式';
+COMMENT ON COLUMN device_part_replacement.confirm_status IS '确认状态 draft|confirmed';
+COMMENT ON COLUMN device_part_replacement.confirmed_at IS '确认时间';
+COMMENT ON COLUMN device_part_replacement.confirmed_by IS '确认人';
+COMMENT ON COLUMN device_part_replacement.confirmed_by_name IS '确认人姓名快照';
+COMMENT ON COLUMN device_part_replacement.remark IS '备注';
+COMMENT ON COLUMN device_part_replacement.created_at IS '创建时间';
+COMMENT ON COLUMN device_part_replacement.updated_at IS '更新时间';
+COMMENT ON COLUMN device_part_replacement.created_by IS '创建人';
+COMMENT ON COLUMN device_part_replacement.updated_by IS '更新人';
+COMMENT ON COLUMN device_part_replacement.created_by_name IS '创建人姓名快照';
+COMMENT ON COLUMN device_part_replacement.updated_by_name IS '更新人姓名快照';
+COMMENT ON COLUMN device_part_replacement.is_deleted IS '软删标志';
+COMMENT ON COLUMN device_part_replacement.deleted_at IS '删除时间';
+COMMENT ON COLUMN device_part_replacement.deleted_by IS '删除人';
+COMMENT ON COLUMN device_part_replacement.deleted_by_name IS '删除人姓名快照';
+
+-- AST-LOC-01：设备位置区间（楼层/房间）
+CREATE TABLE device_location_period (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    device_id UUID NOT NULL REFERENCES medical_device(id),
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
+    location_floor VARCHAR(50),
+    room_number VARCHAR(50),
+    location_detail VARCHAR(200),
+    building_id UUID,
+    building_name VARCHAR(100),
+    campus_id UUID,
+    campus_name VARCHAR(100),
+    effective_from TIMESTAMPTZ NOT NULL,
+    effective_to TIMESTAMPTZ,
+    change_reason VARCHAR(40),
+    source_mode VARCHAR(40),
+    source_biz_type VARCHAR(40),
+    source_biz_id UUID,
+    source_biz_no VARCHAR(50),
+    confirm_status VARCHAR(20) NOT NULL DEFAULT 'confirmed',
+    confirmed_at TIMESTAMPTZ,
+    confirmed_by UUID,
+    confirmed_by_name VARCHAR(100),
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100)
+);
+COMMENT ON TABLE device_location_period IS '设备位置区间（AST-LOC-01）';
+COMMENT ON COLUMN device_location_period.device_id IS '设备';
+COMMENT ON COLUMN device_location_period.device_code IS '设备编码冗余';
+COMMENT ON COLUMN device_location_period.device_name IS '设备名称冗余';
+COMMENT ON COLUMN device_location_period.location_floor IS '楼层快照';
+COMMENT ON COLUMN device_location_period.room_number IS '房间号快照';
+COMMENT ON COLUMN device_location_period.location_detail IS '位置详情快照';
+COMMENT ON COLUMN device_location_period.building_id IS '建筑物';
+COMMENT ON COLUMN device_location_period.building_name IS '建筑物名称快照';
+COMMENT ON COLUMN device_location_period.campus_id IS '院区';
+COMMENT ON COLUMN device_location_period.campus_name IS '院区名称快照';
+COMMENT ON COLUMN device_location_period.effective_from IS '生效起';
+COMMENT ON COLUMN device_location_period.effective_to IS '生效止（空=当前开放段）';
+COMMENT ON COLUMN device_location_period.change_reason IS '变更原因';
+COMMENT ON COLUMN device_location_period.source_mode IS '生成方式';
+COMMENT ON COLUMN device_location_period.source_biz_type IS '来源业务类型';
+COMMENT ON COLUMN device_location_period.source_biz_id IS '来源业务主键';
+COMMENT ON COLUMN device_location_period.source_biz_no IS '来源业务单号';
+COMMENT ON COLUMN device_location_period.confirm_status IS '确认状态 draft|confirmed';
+COMMENT ON COLUMN device_location_period.confirmed_at IS '确认时间';
+COMMENT ON COLUMN device_location_period.confirmed_by IS '确认人';
+COMMENT ON COLUMN device_location_period.confirmed_by_name IS '确认人姓名快照';
+COMMENT ON COLUMN device_location_period.remark IS '备注';
+COMMENT ON COLUMN device_location_period.created_at IS '创建时间';
+COMMENT ON COLUMN device_location_period.updated_at IS '更新时间';
+COMMENT ON COLUMN device_location_period.created_by IS '创建人';
+COMMENT ON COLUMN device_location_period.updated_by IS '更新人';
+COMMENT ON COLUMN device_location_period.created_by_name IS '创建人姓名快照';
+COMMENT ON COLUMN device_location_period.updated_by_name IS '更新人姓名快照';
+COMMENT ON COLUMN device_location_period.is_deleted IS '软删标志';
+COMMENT ON COLUMN device_location_period.deleted_at IS '删除时间';
+COMMENT ON COLUMN device_location_period.deleted_by IS '删除人';
+COMMENT ON COLUMN device_location_period.deleted_by_name IS '删除人姓名快照';
+
 -- 8.1 维保合同表
 CREATE TABLE maintenance_contract (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

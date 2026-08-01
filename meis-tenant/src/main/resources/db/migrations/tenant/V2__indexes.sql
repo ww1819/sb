@@ -221,3 +221,25 @@ COMMENT ON INDEX idx_device_warranty_device_device IS '索引：维保覆盖设�
 CREATE UNIQUE INDEX IF NOT EXISTS uk_device_warranty_device_active
     ON device_warranty_device(warranty_id, device_id) WHERE is_deleted = 0;
 COMMENT ON INDEX uk_device_warranty_device_active IS '唯一：同一维保包内设备不重复（未软删）';
+
+-- ---------- AST-OWN-01 / AST-PART-01 / AST-LOC-01 ----------
+CREATE INDEX IF NOT EXISTS idx_own_period_device ON device_ownership_period(device_id);
+COMMENT ON INDEX idx_own_period_device IS '索引：归属区间.设备';
+CREATE INDEX IF NOT EXISTS idx_own_period_from ON device_ownership_period(effective_from);
+COMMENT ON INDEX idx_own_period_from IS '索引：归属区间.生效起';
+CREATE INDEX IF NOT EXISTS idx_own_period_confirm ON device_ownership_period(confirm_status);
+COMMENT ON INDEX idx_own_period_confirm IS '索引：归属区间.确认状态';
+
+CREATE INDEX IF NOT EXISTS idx_part_repl_device ON device_part_replacement(device_id);
+COMMENT ON INDEX idx_part_repl_device IS '索引：非维修换件.设备';
+CREATE INDEX IF NOT EXISTS idx_part_repl_replaced_at ON device_part_replacement(replaced_at);
+COMMENT ON INDEX idx_part_repl_replaced_at IS '索引：非维修换件.更换时间';
+CREATE INDEX IF NOT EXISTS idx_part_repl_confirm ON device_part_replacement(confirm_status);
+COMMENT ON INDEX idx_part_repl_confirm IS '索引：非维修换件.确认状态';
+
+CREATE INDEX IF NOT EXISTS idx_loc_period_device ON device_location_period(device_id);
+COMMENT ON INDEX idx_loc_period_device IS '索引：位置区间.设备';
+CREATE INDEX IF NOT EXISTS idx_loc_period_from ON device_location_period(effective_from);
+COMMENT ON INDEX idx_loc_period_from IS '索引：位置区间.生效起';
+CREATE INDEX IF NOT EXISTS idx_loc_period_confirm ON device_location_period(confirm_status);
+COMMENT ON INDEX idx_loc_period_confirm IS '索引：位置区间.确认状态';

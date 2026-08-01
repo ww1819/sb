@@ -1054,3 +1054,41 @@ SET dict_label = EXCLUDED.dict_label,
 -- AST-WRN-02：废止扁平行维保时段（测试数据可清；头/明细由 V1 SchemaTableEnsuring 建表）
 DROP TABLE IF EXISTS device_warranty_term CASCADE;
 
+-- ========== AST-OWN / AST-BF / AST-PART / AST-SRC / AST-DISP：归属/换件/处置字典 ==========
+DELETE FROM sys_dict WHERE dict_type = 'confirm_status';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('confirm_status', 'draft', '待确认', 'draft', 1),
+('confirm_status', 'confirmed', '已确认', 'confirmed', 2);
+
+DELETE FROM sys_dict WHERE dict_type = 'source_mode';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('source_mode', 'biz_doc', '业务单据', 'biz_doc', 1),
+('source_mode', 'biz_op', '业务操作写回', 'biz_op', 2),
+('source_mode', 'manual_backfill', '手工补录', 'manual_backfill', 3),
+('source_mode', 'system', '系统生成', 'system', 4),
+('source_mode', 'manual_transfer', '手工真变更', 'manual_transfer', 5);
+
+DELETE FROM sys_dict WHERE dict_type = 'owner_type';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('owner_type', 'warehouse', '仓库', 'warehouse', 1),
+('owner_type', 'dept', '科室', 'dept', 2);
+
+DELETE FROM sys_dict WHERE dict_type = 'ownership_change_reason';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('ownership_change_reason', 'biz_doc', '业务单据', 'biz_doc', 1),
+('ownership_change_reason', 'manual_transfer', '手工真变更', 'manual_transfer', 2),
+('ownership_change_reason', 'manual_correct', '手工纠错', 'manual_correct', 3),
+('ownership_change_reason', 'manual_backfill', '手工补录', 'manual_backfill', 4),
+('ownership_change_reason', 'import', '导入', 'import', 5);
+
+DELETE FROM sys_dict WHERE dict_type = 'disposition_type';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('disposition_type', 'entry', '入库', 'entry', 1),
+('disposition_type', 'outbound', '出库', 'outbound', 2),
+('disposition_type', 'return', '退库', 'return', 3),
+('disposition_type', 'transfer', '调拨/转仓', 'transfer', 4),
+('disposition_type', 'goods_return', '退货', 'goods_return', 5),
+('disposition_type', 'scrap', '报废', 'scrap', 6),
+('disposition_type', 'inventory_loss', '盘亏', 'inventory_loss', 7),
+('disposition_type', 'ownership_transfer', '手工归属变更', 'ownership_transfer', 8);
+

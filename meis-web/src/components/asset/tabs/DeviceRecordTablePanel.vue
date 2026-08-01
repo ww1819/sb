@@ -21,7 +21,15 @@
         :min-width="col.minWidth ?? 120"
         show-overflow-tooltip
       >
-        <template #default="{ row }">{{ formatCell(col.prop, row[col.prop]) }}</template>
+        <template #default="{ row }">
+          <StatusTag
+            v-if="col.dictType"
+            :value="row[col.prop]"
+            :prop="col.prop"
+            :dict-type="col.dictType"
+          />
+          <template v-else>{{ formatCell(col.prop, row[col.prop]) }}</template>
+        </template>
       </el-table-column>
       <template #empty>
         <PageEmpty :description="emptyText" :image-size="72" />
@@ -34,12 +42,16 @@
 import { onMounted, ref, watch } from 'vue'
 import http from '@/api/http'
 import PageEmpty from '@/components/table/PageEmpty.vue'
+import StatusTag from '@/components/table/StatusTag.vue'
+import { useDict } from '@/composables/useDict'
 import { formatDisplayDate, formatDisplayDateTime } from '@/utils/datetime'
 
 export interface RecordColumn {
   prop: string
   label: string
   minWidth?: number
+  /** AST-UI-22：字典类型，有则中文展示 */
+  dictType?: string
 }
 
 const props = withDefaults(
@@ -50,6 +62,8 @@ const props = withDefaults(
     filterPlaceholder?: string
     loadUrl?: string
     deviceId?: string
+    /** 额外查询参数，如 include_draft */
+    extraParams?: Record<string, unknown>
   }>(),
   {
     emptyText: '暂无数据',
@@ -61,18 +75,21 @@ const props = withDefaults(
 const keyword = ref('')
 const rows = ref<Record<string, unknown>[]>([])
 const loading = ref(false)
+const { preloadDictTypes } = useDict()
 
 async function load() {
   if (!props.loadUrl || !props.deviceId) return
   loading.value = true
   try {
+    await preloadDictTypes(props.columns.map((c) => c.dictType))
     const url = props.loadUrl.split('{deviceId}').join(props.deviceId)
     const { data } = await http.get(url, {
       params: {
         page: 1,
         size: 50,
         deviceId: props.deviceId,
-        keyword: keyword.value || undefined
+        keyword: keyword.value || undefined,
+        ...(props.extraParams ?? {})
       }
     })
     const payload = data.data
@@ -104,7 +121,10 @@ function formatCell(prop: string, value: unknown) {
     p.endsWith('_time') ||
     p === 'replaced_at' ||
     p === 'report_time' ||
-    p === 'printed_at'
+    p === 'printed_at' ||
+    p === 'effective_from' ||
+    p === 'effective_to' ||
+    p === 'occurred_at'
   ) {
     return formatDisplayDateTime(value)
   }
@@ -116,32 +136,23 @@ function formatCell(prop: string, value: unknown) {
 
 onMounted(load)
 watch(() => props.deviceId, load)
+watch(() => props.extraParams, load, { deep: true })
+
+defineExpose({ load })
 </script>
 
 <style scoped>
-.device-record-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-height: 280px;
-}
-
 .device-record-panel__toolbar {
   display: flex;
-  align-items: center;
   gap: 8px;
+  margin-bottom: 12px;
   flex-wrap: wrap;
 }
-
 .device-record-panel__input {
-  width: 240px;
+  width: 260px;
+  max-width: 100%;
 }
-
 .device-record-panel__table {
   width: 100%;
-}
-
-.device-record-panel__table :deep(.el-table__empty-block) {
-  min-height: 220px;
 }
 </style>
