@@ -27,7 +27,7 @@ import {
   isStatusField
 } from '@/utils/tableCell'
 import { formatDisplayDate, formatDisplayDateTime } from '@/utils/datetime'
-import { resolveRefLabel, labelCacheVersion } from '@/composables/useRefLabelMap'
+import { ensureRefLabelMap, resolveRefLabel, labelCacheVersion } from '@/composables/useRefLabelMap'
 import { useDict } from '@/composables/useDict'
 import { openFilePreview } from '@/composables/useFilePreview'
 import { resolveCodedLabel } from '@/i18n/resolveCodedLabel'
@@ -45,11 +45,20 @@ const previewing = ref(false)
 
 onMounted(() => {
   if (props.field.dictType) void loadDict(props.field.dictType)
+  if (props.field.linkTable) {
+    void ensureRefLabelMap(props.field.linkTable, !!props.field.linkHideCode)
+  }
 })
 watch(
   () => props.field.dictType,
   (t) => {
     if (t) void loadDict(t)
+  }
+)
+watch(
+  () => [props.field.linkTable, props.field.linkHideCode] as const,
+  ([t, hide]) => {
+    if (t) void ensureRefLabelMap(t, !!hide)
   }
 )
 
@@ -89,7 +98,8 @@ const displayText = computed(() => {
   const fromDict = resolveDictLabel(props.field.dictType, props.value)
   if (fromDict) return fromDict
   if (props.field.linkTable) {
-    const label = resolveRefLabel(props.field.linkTable, props.value)
+    const hideCode = !!props.field.linkHideCode
+    const label = resolveRefLabel(props.field.linkTable, props.value, { hideCode })
     if (label && label !== String(props.value)) return label
     const hint = (props.labelHint ?? '').trim()
     if (hint) return hint

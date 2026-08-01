@@ -1,32 +1,25 @@
 import { ref } from 'vue'
 import http from '@/api/http'
 import { refSelectConfig, type RefSelectMeta } from '@/config/refSelectConfig'
+import { formatRefRowLabel } from '@/utils/refLabel'
 
 const labelCache = new Map<string, Map<string, string>>()
+/** hideCode=true 时的名称-only 缓存（采购计划等例外） */
+const labelCacheNameOnly = new Map<string, Map<string, string>>()
 const loading = new Map<string, Promise<Map<string, string>>>()
 export const labelCacheVersion = ref(0)
 
-function refRowLabel(row: Record<string, unknown>, meta: RefSelectMeta): string {
-  const valueKey = meta.valueKey ?? 'id'
-  const id = row[valueKey] ?? row.id
-  const name = row[meta.labelKey]
-  if (name != null && name !== '') return String(name)
-  if (meta.codeKey) {
-    const code = row[meta.codeKey]
-    if (code != null && code !== '') return String(code)
-  }
-  return String(id ?? '')
-}
-
-export async function ensureRefLabelMap(linkTable: string): Promise<Map<string, string>> {
-  if (labelCache.has(linkTable)) return labelCache.get(linkTable)!
-  if (loading.has(linkTable)) return loading.get(linkTable)!
+async function loadMap(linkTable: string, hideCode: boolean): Promise<Map<string, string>> {
+  const cache = hideCode ? labelCacheNameOnly : labelCache
+  if (cache.has(linkTable)) return cache.get(linkTable)!
+  const loadKey = `${linkTable}:${hideCode ? 'n' : 'c'}`
+  if (loading.has(loadKey)) return loading.get(loadKey)!
 
   const promise = (async () => {
     const meta = refSelectConfig[linkTable]
     const map = new Map<string, string>()
     if (!meta) {
-      labelCache.set(linkTable, map)
+      cache.set(linkTable, map)
       return map
     }
     try {
@@ -36,29 +29,39 @@ export async function ensureRefLabelMap(linkTable: string): Promise<Map<string, 
       for (const row of rows as Record<string, unknown>[]) {
         const id = row[valueKey] ?? row.id
         if (id == null || id === '') continue
-        map.set(String(id), refRowLabel(row, meta))
+        map.set(String(id), formatRefRowLabel(row, meta, hideCode))
       }
     } catch {
       // keep empty map
     }
-    labelCache.set(linkTable, map)
+    cache.set(linkTable, map)
     labelCacheVersion.value++
-    loading.delete(linkTable)
+    loading.delete(loadKey)
     return map
   })()
 
-  loading.set(linkTable, promise)
+  loading.set(loadKey, promise)
   return promise
+}
+
+export async function ensureRefLabelMap(linkTable: string, hideCode = false): Promise<Map<string, string>> {
+  return loadMap(linkTable, hideCode)
 }
 
 export async function preloadRefLabelMaps(linkTables: string[]) {
   const unique = [...new Set(linkTables.filter(Boolean))]
-  await Promise.all(unique.map((t) => ensureRefLabelMap(t)))
+  await Promise.all(unique.map((t) => ensureRefLabelMap(t, false)))
 }
 
-export function resolveRefLabel(linkTable: string | undefined, value: unknown): string {
+export function resolveRefLabel(
+  linkTable: string | undefined,
+  value: unknown,
+  opts?: { hideCode?: boolean }
+): string {
   if (!linkTable || value === null || value === undefined || value === '') return ''
-  const map = labelCache.get(linkTable)
+  const hideCode = !!opts?.hideCode
+  const cache = hideCode ? labelCacheNameOnly : labelCache
+  const map = cache.get(linkTable)
   if (!map) return String(value)
   return map.get(String(value)) ?? String(value)
 }
@@ -66,3 +69,5 @@ export function resolveRefLabel(linkTable: string | undefined, value: unknown): 
 export function useRefLabelMaps() {
   return { ensureRefLabelMap, preloadRefLabelMaps, resolveRefLabel, labelCache }
 }
+
+export type { RefSelectMeta }

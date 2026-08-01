@@ -163,10 +163,15 @@ const cardPrints = computed(() =>
 )
 
 const campusLabel = computed(() => {
-  const name = props.model.campus_name
-  if (name != null && String(name).trim()) return String(name).trim()
   const fromMap = resolveRefLabel('campus', props.model.campus_id)
-  return fromMap || '医疗机构'
+  if (fromMap) return fromMap
+  const code = props.model.campus_code
+  const name = props.model.campus_name
+  if (code != null && String(code).trim() && name != null && String(name).trim()) {
+    return `${String(code).trim()} ${String(name).trim()}`
+  }
+  if (name != null && String(name).trim()) return String(name).trim()
+  return '医疗机构'
 })
 
 const statusLabel = computed(() => {
@@ -177,15 +182,25 @@ const statusLabel = computed(() => {
 })
 
 const deptLabel = computed(() => {
+  const fromMap = resolveRefLabel('department', props.model.dept_id)
+  if (fromMap) return fromMap
+  const code = props.model.dept_code
   const name = props.model.dept_name
-  if (name != null && String(name).trim()) return String(name).trim()
-  return resolveRefLabel('department', props.model.dept_id) || '-'
+  if (code != null && String(code).trim() && name != null && String(name).trim()) {
+    return `${String(code).trim()} ${String(name).trim()}`
+  }
+  return name != null && String(name).trim() ? String(name).trim() : '-'
 })
 
 const warehouseLabel = computed(() => {
+  const fromMap = resolveRefLabel('warehouse', props.model.warehouse_id)
+  if (fromMap) return fromMap
+  const code = props.model.warehouse_code
   const name = props.model.warehouse_name
-  if (name != null && String(name).trim()) return String(name).trim()
-  return resolveRefLabel('warehouse', props.model.warehouse_id) || '-'
+  if (code != null && String(code).trim() && name != null && String(name).trim()) {
+    return `${String(code).trim()} ${String(name).trim()}`
+  }
+  return name != null && String(name).trim() ? String(name).trim() : '-'
 })
 
 const installLocation = computed(() => {

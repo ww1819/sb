@@ -130,14 +130,22 @@ const linkExcludeValues = computed(() => {
   return id != null && id !== '' ? [String(id)] : []
 })
 
-/** 详情带回的名称快照，供下拉在选项未加载/未命中时回显 */
+/** 详情带回的名称快照，供下拉在选项未加载/未命中时回显（强业务可拼编码） */
 const linkFallbackLabel = computed(() => {
   if (!props.field.linkTable || !props.model) return ''
   const prop = props.field.prop
   if (!prop.endsWith('_id')) return ''
   const nameKey = prop.slice(0, -3) + '_name'
+  const codeKey = prop.slice(0, -3) + '_code'
   const name = props.model[nameKey]
-  return name != null && String(name).trim() !== '' ? String(name).trim() : ''
+  const code = props.model[codeKey]
+  const nameStr = name != null && String(name).trim() !== '' ? String(name).trim() : ''
+  if (!nameStr) return ''
+  if (props.field.linkHideCode) return nameStr
+  const codeStr = code != null && String(code).trim() !== '' ? String(code).trim() : ''
+  const meta = refSelectConfig[props.field.linkTable]
+  if (meta?.showCode !== false && codeStr) return `${codeStr} ${nameStr}`
+  return nameStr
 })
 
 function onPickerModel(v: Record<string, unknown>) {
