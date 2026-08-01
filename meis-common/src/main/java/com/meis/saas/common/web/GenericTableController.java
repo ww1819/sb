@@ -359,7 +359,14 @@ public abstract class GenericTableController {
         if (changeLogService != null) {
             changeLogService.recordUpdate(table, id, before, after, client);
         }
+        afterUpdate(table, id, before, after, body);
         return Result.ok();
+    }
+
+    /** 子类可覆盖：通用 UPDATE 成功后的业务钩子（如 UDI 历史）。 */
+    protected void afterUpdate(String table, String id,
+                               Map<String, Object> before, Map<String, Object> after,
+                               Map<String, Object> body) {
     }
 
     @GetMapping("/{table}/export")

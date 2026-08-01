@@ -1320,3 +1320,35 @@ COMMENT ON COLUMN shared_device_return.create_channel IS '制单途径 web/app/m
 COMMENT ON COLUMN shared_device_return.update_channel IS '修改途径 web/app/mp';
 COMMENT ON COLUMN shared_device_return.submit_channel IS '提交途径 web/app/mp';
 COMMENT ON COLUMN shared_device_return.confirm_channel IS '审核途径 web/app/mp';
+
+-- AST-GAP-REVIEW-01 / G1：台账标量补列（老租户）
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS udi_di VARCHAR(100);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS udi_pi VARCHAR(100);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS asset_manager_user_id UUID;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS asset_manager_name VARCHAR(100);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS clinical_owner_user_id UUID;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS clinical_owner_name VARCHAR(100);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS eq_class VARCHAR(20);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS criticality VARCHAR(20);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS depreciation_method VARCHAR(40);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS acquisition_mode VARCHAR(40);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS ip_address VARCHAR(64);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS mac_address VARCHAR(64);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS gs1_gtin VARCHAR(32);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS lot_no VARCHAR(64);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS energy_class VARCHAR(20);
+COMMENT ON COLUMN medical_device.udi_di IS 'UDI 产品标识 DI';
+COMMENT ON COLUMN medical_device.udi_pi IS 'UDI 生产标识 PI';
+COMMENT ON COLUMN medical_device.asset_manager_user_id IS '资产管理员（设备科责任人）';
+COMMENT ON COLUMN medical_device.asset_manager_name IS '资产管理员姓名快照';
+COMMENT ON COLUMN medical_device.clinical_owner_user_id IS '临床责任人';
+COMMENT ON COLUMN medical_device.clinical_owner_name IS '临床责任人姓名快照';
+COMMENT ON COLUMN medical_device.eq_class IS '医疗器械管理类别 class_1/2/3';
+COMMENT ON COLUMN medical_device.criticality IS '临床关键等级 high/medium/low';
+COMMENT ON COLUMN medical_device.depreciation_method IS '折旧方法';
+COMMENT ON COLUMN medical_device.acquisition_mode IS '购置方式';
+COMMENT ON COLUMN medical_device.ip_address IS '设备 IP 地址';
+COMMENT ON COLUMN medical_device.mac_address IS '设备 MAC 地址';
+COMMENT ON COLUMN medical_device.gs1_gtin IS 'GS1 GTIN';
+COMMENT ON COLUMN medical_device.lot_no IS '生产批号';
+COMMENT ON COLUMN medical_device.energy_class IS '能效等级';

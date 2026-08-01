@@ -937,6 +937,27 @@ export const pageRegistry: Record<string, PageConfig> = {
       { key: 'supplier_id', label: '维保公司', linkTable: 'supplier', actionBar: true }
     ]
   },
+  '/asset/device-license': {
+    title: '设备证照',
+    apiBase: '/asset',
+    table: 'device_license',
+    listPageUrl: '/asset/device-license/page',
+    saveUrl: '/asset/device-license',
+    enableView: true,
+    showRowIndex: true,
+    listFilters: [
+      { key: 'license_type', label: '证照类型', dictType: 'device_license_type', actionBar: true }
+    ]
+  },
+  '/asset/device-training-auth': {
+    title: '培训授权',
+    apiBase: '/asset',
+    table: 'device_training_auth',
+    listPageUrl: '/asset/device-training-auth/page',
+    saveUrl: '/asset/device-training-auth',
+    enableView: true,
+    showRowIndex: true
+  },
   '/maintenance-contract/list': { title: '维保合同', apiBase: '/maintenance-contract', table: 'maintenance_contract' },
   '/maintenance-contract/fulfillment': { title: '履约记录', apiBase: '/maintenance-contract', table: 'maintenance_contract_fulfillment' },
   '/special/life': {

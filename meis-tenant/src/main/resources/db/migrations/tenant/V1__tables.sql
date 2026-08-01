@@ -979,6 +979,22 @@ CREATE TABLE medical_device (
     is_pm_device BOOLEAN DEFAULT FALSE,
     standby_current_max_ma DECIMAL(10,2),
     standby_current_min_ma DECIMAL(10,2),
+    -- AST-GAP-REVIEW-01 / G1：三甲标量（UDI/责任人/管理类别等）
+    udi_di VARCHAR(100),
+    udi_pi VARCHAR(100),
+    asset_manager_user_id UUID,
+    asset_manager_name VARCHAR(100),
+    clinical_owner_user_id UUID,
+    clinical_owner_name VARCHAR(100),
+    eq_class VARCHAR(20),
+    criticality VARCHAR(20),
+    depreciation_method VARCHAR(40),
+    acquisition_mode VARCHAR(40),
+    ip_address VARCHAR(64),
+    mac_address VARCHAR(64),
+    gs1_gtin VARCHAR(32),
+    lot_no VARCHAR(64),
+    energy_class VARCHAR(20),
     is_deleted SMALLINT NOT NULL DEFAULT 0,
     deleted_at TIMESTAMP WITH TIME ZONE,
     deleted_by UUID
@@ -1041,6 +1057,21 @@ COMMENT ON COLUMN medical_device.is_shared_device IS '是否公用设备';
 COMMENT ON COLUMN medical_device.is_pm_device IS '是否预防性维护设备';
 COMMENT ON COLUMN medical_device.standby_current_max_ma IS '待机电流上限(mA)';
 COMMENT ON COLUMN medical_device.standby_current_min_ma IS '待机电流下限(mA)';
+COMMENT ON COLUMN medical_device.udi_di IS 'UDI 产品标识 DI';
+COMMENT ON COLUMN medical_device.udi_pi IS 'UDI 生产标识 PI';
+COMMENT ON COLUMN medical_device.asset_manager_user_id IS '资产管理员（设备科责任人）';
+COMMENT ON COLUMN medical_device.asset_manager_name IS '资产管理员姓名快照';
+COMMENT ON COLUMN medical_device.clinical_owner_user_id IS '临床责任人';
+COMMENT ON COLUMN medical_device.clinical_owner_name IS '临床责任人姓名快照';
+COMMENT ON COLUMN medical_device.eq_class IS '医疗器械管理类别 class_1/2/3';
+COMMENT ON COLUMN medical_device.criticality IS '临床关键等级 high/medium/low';
+COMMENT ON COLUMN medical_device.depreciation_method IS '折旧方法';
+COMMENT ON COLUMN medical_device.acquisition_mode IS '购置方式';
+COMMENT ON COLUMN medical_device.ip_address IS '设备 IP 地址';
+COMMENT ON COLUMN medical_device.mac_address IS '设备 MAC 地址';
+COMMENT ON COLUMN medical_device.gs1_gtin IS 'GS1 GTIN';
+COMMENT ON COLUMN medical_device.lot_no IS '生产批号';
+COMMENT ON COLUMN medical_device.energy_class IS '能效等级';
 
 -- 4.2 设备附属低值品表
 CREATE TABLE device_accessory (
@@ -2917,6 +2948,194 @@ COMMENT ON COLUMN device_location_period.is_deleted IS '软删标志';
 COMMENT ON COLUMN device_location_period.deleted_at IS '删除时间';
 COMMENT ON COLUMN device_location_period.deleted_by IS '删除人';
 COMMENT ON COLUMN device_location_period.deleted_by_name IS '删除人姓名快照';
+
+-- AST-GAP-REVIEW-01 / O-02：设备证照
+CREATE TABLE device_license (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    device_id UUID NOT NULL REFERENCES medical_device(id),
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
+    license_type VARCHAR(40) NOT NULL,
+    license_no VARCHAR(100),
+    issue_date DATE,
+    expiry_date DATE,
+    issuer_name VARCHAR(200),
+    file_url VARCHAR(500),
+    file_name VARCHAR(200),
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100)
+);
+COMMENT ON TABLE device_license IS '设备证照（AST-GAP O-02）';
+COMMENT ON COLUMN device_license.device_id IS '设备';
+COMMENT ON COLUMN device_license.device_code IS '设备编码冗余';
+COMMENT ON COLUMN device_license.device_name IS '设备名称冗余';
+COMMENT ON COLUMN device_license.license_type IS '证照类型 registration|metrology|special|inspection|other';
+COMMENT ON COLUMN device_license.license_no IS '证照编号';
+COMMENT ON COLUMN device_license.issue_date IS '发证日期';
+COMMENT ON COLUMN device_license.expiry_date IS '有效期至';
+COMMENT ON COLUMN device_license.issuer_name IS '发证机关';
+COMMENT ON COLUMN device_license.file_url IS '附件地址';
+COMMENT ON COLUMN device_license.file_name IS '附件文件名';
+COMMENT ON COLUMN device_license.remark IS '备注';
+COMMENT ON COLUMN device_license.created_at IS '创建时间';
+COMMENT ON COLUMN device_license.updated_at IS '更新时间';
+COMMENT ON COLUMN device_license.created_by IS '创建人';
+COMMENT ON COLUMN device_license.updated_by IS '更新人';
+COMMENT ON COLUMN device_license.created_by_name IS '创建人姓名快照';
+COMMENT ON COLUMN device_license.updated_by_name IS '更新人姓名快照';
+COMMENT ON COLUMN device_license.is_deleted IS '软删标志';
+COMMENT ON COLUMN device_license.deleted_at IS '删除时间';
+COMMENT ON COLUMN device_license.deleted_by IS '删除人';
+COMMENT ON COLUMN device_license.deleted_by_name IS '删除人姓名快照';
+
+-- AST-GAP-REVIEW-01 / O-03：培训与授权使用人
+CREATE TABLE device_training_auth (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    device_id UUID NOT NULL REFERENCES medical_device(id),
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
+    user_id UUID,
+    user_name VARCHAR(100),
+    cert_name VARCHAR(200),
+    cert_no VARCHAR(100),
+    trained_at DATE,
+    expiry_date DATE,
+    auth_scope VARCHAR(100),
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100)
+);
+COMMENT ON TABLE device_training_auth IS '设备培训授权（AST-GAP O-03）';
+COMMENT ON COLUMN device_training_auth.device_id IS '设备（暂必填；后续可空表示科室级）';
+COMMENT ON COLUMN device_training_auth.device_code IS '设备编码冗余';
+COMMENT ON COLUMN device_training_auth.device_name IS '设备名称冗余';
+COMMENT ON COLUMN device_training_auth.user_id IS '授权人员';
+COMMENT ON COLUMN device_training_auth.user_name IS '授权人员姓名快照';
+COMMENT ON COLUMN device_training_auth.cert_name IS '证书名称';
+COMMENT ON COLUMN device_training_auth.cert_no IS '证书编号';
+COMMENT ON COLUMN device_training_auth.trained_at IS '培训/取证日期';
+COMMENT ON COLUMN device_training_auth.expiry_date IS '授权有效期至';
+COMMENT ON COLUMN device_training_auth.auth_scope IS '授权范围 operate|maintain';
+COMMENT ON COLUMN device_training_auth.remark IS '备注';
+COMMENT ON COLUMN device_training_auth.created_at IS '创建时间';
+COMMENT ON COLUMN device_training_auth.updated_at IS '更新时间';
+COMMENT ON COLUMN device_training_auth.created_by IS '创建人';
+COMMENT ON COLUMN device_training_auth.updated_by IS '更新人';
+COMMENT ON COLUMN device_training_auth.created_by_name IS '创建人姓名快照';
+COMMENT ON COLUMN device_training_auth.updated_by_name IS '更新人姓名快照';
+COMMENT ON COLUMN device_training_auth.is_deleted IS '软删标志';
+COMMENT ON COLUMN device_training_auth.deleted_at IS '删除时间';
+COMMENT ON COLUMN device_training_auth.deleted_by IS '删除人';
+COMMENT ON COLUMN device_training_auth.deleted_by_name IS '删除人姓名快照';
+
+-- AST-GAP-REVIEW-01 / O-04：设备档案/图片附件
+CREATE TABLE device_archive_file (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    device_id UUID NOT NULL REFERENCES medical_device(id),
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
+    archive_type VARCHAR(40),
+    title VARCHAR(200),
+    file_url VARCHAR(500) NOT NULL,
+    file_name VARCHAR(200),
+    file_size BIGINT,
+    content_type VARCHAR(100),
+    version_no INTEGER DEFAULT 1,
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100)
+);
+COMMENT ON TABLE device_archive_file IS '设备档案附件（AST-GAP O-04）';
+COMMENT ON COLUMN device_archive_file.device_id IS '设备';
+COMMENT ON COLUMN device_archive_file.device_code IS '设备编码冗余';
+COMMENT ON COLUMN device_archive_file.device_name IS '设备名称冗余';
+COMMENT ON COLUMN device_archive_file.archive_type IS '档案类型 archive|image|manual|other';
+COMMENT ON COLUMN device_archive_file.title IS '标题';
+COMMENT ON COLUMN device_archive_file.file_url IS '文件地址';
+COMMENT ON COLUMN device_archive_file.file_name IS '文件名';
+COMMENT ON COLUMN device_archive_file.file_size IS '文件大小（字节）';
+COMMENT ON COLUMN device_archive_file.content_type IS 'MIME 类型';
+COMMENT ON COLUMN device_archive_file.version_no IS '版本号';
+COMMENT ON COLUMN device_archive_file.remark IS '备注';
+COMMENT ON COLUMN device_archive_file.created_at IS '创建时间';
+COMMENT ON COLUMN device_archive_file.updated_at IS '更新时间';
+COMMENT ON COLUMN device_archive_file.created_by IS '创建人';
+COMMENT ON COLUMN device_archive_file.updated_by IS '更新人';
+COMMENT ON COLUMN device_archive_file.created_by_name IS '创建人姓名快照';
+COMMENT ON COLUMN device_archive_file.updated_by_name IS '更新人姓名快照';
+COMMENT ON COLUMN device_archive_file.is_deleted IS '软删标志';
+COMMENT ON COLUMN device_archive_file.deleted_at IS '删除时间';
+COMMENT ON COLUMN device_archive_file.deleted_by IS '删除人';
+COMMENT ON COLUMN device_archive_file.deleted_by_name IS '删除人姓名快照';
+
+-- AST-GAP-REVIEW-01 / O-01：UDI 变更历史
+CREATE TABLE device_udi_history (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    device_id UUID NOT NULL REFERENCES medical_device(id),
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
+    udi_di VARCHAR(100),
+    udi_pi VARCHAR(100),
+    effective_from TIMESTAMPTZ NOT NULL,
+    effective_to TIMESTAMPTZ,
+    change_reason VARCHAR(40),
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100)
+);
+COMMENT ON TABLE device_udi_history IS '设备 UDI 变更历史（AST-GAP O-01）';
+COMMENT ON COLUMN device_udi_history.device_id IS '设备';
+COMMENT ON COLUMN device_udi_history.device_code IS '设备编码冗余';
+COMMENT ON COLUMN device_udi_history.device_name IS '设备名称冗余';
+COMMENT ON COLUMN device_udi_history.udi_di IS 'UDI DI 快照';
+COMMENT ON COLUMN device_udi_history.udi_pi IS 'UDI PI 快照';
+COMMENT ON COLUMN device_udi_history.effective_from IS '生效起';
+COMMENT ON COLUMN device_udi_history.effective_to IS '生效止（空=当前开放段）';
+COMMENT ON COLUMN device_udi_history.change_reason IS '变更原因';
+COMMENT ON COLUMN device_udi_history.remark IS '备注';
+COMMENT ON COLUMN device_udi_history.created_at IS '创建时间';
+COMMENT ON COLUMN device_udi_history.updated_at IS '更新时间';
+COMMENT ON COLUMN device_udi_history.created_by IS '创建人';
+COMMENT ON COLUMN device_udi_history.updated_by IS '更新人';
+COMMENT ON COLUMN device_udi_history.created_by_name IS '创建人姓名快照';
+COMMENT ON COLUMN device_udi_history.updated_by_name IS '更新人姓名快照';
+COMMENT ON COLUMN device_udi_history.is_deleted IS '软删标志';
+COMMENT ON COLUMN device_udi_history.deleted_at IS '删除时间';
+COMMENT ON COLUMN device_udi_history.deleted_by IS '删除人';
+COMMENT ON COLUMN device_udi_history.deleted_by_name IS '删除人姓名快照';
 
 -- 8.1 维保合同表
 CREATE TABLE maintenance_contract (

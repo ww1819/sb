@@ -25,7 +25,7 @@
         <DeviceAssetCard :model="model" :device-id="deviceId" />
       </div>
 
-      <DeviceArchivePanel v-show="activeTab === 'archive'" :readonly="isView" />
+      <DeviceArchivePanel v-show="activeTab === 'archive'" :device-id="deviceId" :readonly="isView" />
       <DeviceImagePanel v-show="activeTab === 'images'" :readonly="isView" />
       <DevicePowerMonitorPanel
         v-show="activeTab === 'power_monitor'"
@@ -57,6 +57,25 @@
         :device-id="deviceId"
         :device-code="String(model.device_code ?? '')"
         :device-name="String(model.device_name ?? '')"
+      />
+
+      <DeviceLicensePanel
+        v-show="activeTab === 'license'"
+        :device-id="deviceId"
+        :readonly="isView"
+      />
+      <DeviceTrainingAuthPanel
+        v-show="activeTab === 'training_auth'"
+        :device-id="deviceId"
+        :readonly="isView"
+      />
+      <DeviceRecordTablePanel
+        v-show="activeTab === 'udi_hist'"
+        :columns="udiHistColumns"
+        empty-text="暂无UDI变更历史"
+        filter-placeholder="UDI"
+        load-url="/asset/device-udi-history/by-device/{deviceId}"
+        :device-id="deviceId"
       />
 
       <DeviceRecordTablePanel
@@ -257,6 +276,8 @@ import DeviceImagePanel from '@/components/asset/tabs/DeviceImagePanel.vue'
 import DevicePowerMonitorPanel from '@/components/asset/tabs/DevicePowerMonitorPanel.vue'
 import DeviceWarrantyPanel from '@/components/asset/tabs/DeviceWarrantyPanel.vue'
 import DeviceOwnershipBackfillPanel from '@/components/asset/tabs/DeviceOwnershipBackfillPanel.vue'
+import DeviceLicensePanel from '@/components/asset/tabs/DeviceLicensePanel.vue'
+import DeviceTrainingAuthPanel from '@/components/asset/tabs/DeviceTrainingAuthPanel.vue'
 import DevicePartReplacementPanel from '@/components/asset/tabs/DevicePartReplacementPanel.vue'
 import DeviceRecordTablePanel from '@/components/asset/tabs/DeviceRecordTablePanel.vue'
 import DeviceCurrentReadingPanel from '@/components/asset/tabs/DeviceCurrentReadingPanel.vue'
@@ -295,6 +316,9 @@ const allTabs = [
   { key: 'power_monitor', label: '电流监测' },
   { key: 'warranty', label: '维保信息' },
   { key: 'label', label: '资产标签' },
+  { key: 'license', label: '设备证照' },
+  { key: 'training_auth', label: '培训授权' },
+  { key: 'udi_hist', label: 'UDI历史' },
   { key: 'repair', label: '维修记录' },
   { key: 'spare_replace', label: '配件更换记录' },
   { key: 'maintain', label: '保养记录' },
@@ -325,6 +349,8 @@ const ledgerKeys = new Set([
   'images',
   'power_monitor',
   'warranty',
+  'license',
+  'training_auth',
   'ownership_backfill',
   'part_replace_edit'
 ])
@@ -349,9 +375,11 @@ const basicGroupKeys = new Set(['basic', 'finance', 'location', 'vendor', 'time'
 const basicFormRows = [
   ['device_code', 'card_code', 'device_name', 'pinyin_code', 'brand'],
   ['specification', 'model', 'serial_number', 'unit_id', 'category_id'],
-  ['asset_category_id', 'finance_category_id', 'standby_current_max_ma', 'standby_current_min_ma'],
-  ['country_of_origin', 'use_dept_head', 'dept_id', 'manage_dept_head', 'manage_dept_id'],
-  ['registration_no', 'production_date']
+  ['asset_category_id', 'finance_category_id', 'eq_class', 'criticality', 'acquisition_mode'],
+  ['standby_current_max_ma', 'standby_current_min_ma', 'country_of_origin'],
+  ['clinical_owner_user_id', 'use_dept_head', 'dept_id', 'asset_manager_user_id', 'manage_dept_head'],
+  ['manage_dept_id', 'registration_no', 'udi_di', 'udi_pi', 'production_date'],
+  ['gs1_gtin', 'lot_no']
 ]
 
 const basicFormPanel = {
@@ -374,7 +402,7 @@ const accountingFormRows = [
 
 const locationFormRows = [
   ['campus_id', 'building_id', 'warehouse_id', 'location_floor', 'room_number'],
-  ['location_detail']
+  ['location_detail', 'ip_address', 'mac_address', 'energy_class']
 ]
 
 const statusFormPanel = {
@@ -602,6 +630,15 @@ const adverseColumns: RecordColumn[] = [
   { prop: 'event_type', label: '事件类型', minWidth: 120, dictType: 'adverse_event_type' },
   { prop: 'status', label: '处理状态', minWidth: 100, dictType: 'adverse_status' },
   { prop: 'report_time', label: '上报时间', minWidth: 160 }
+]
+
+const udiHistColumns: RecordColumn[] = [
+  { prop: 'udi_di', label: 'UDI-DI', minWidth: 140 },
+  { prop: 'udi_pi', label: 'UDI-PI', minWidth: 140 },
+  { prop: 'effective_from', label: '开始', minWidth: 160 },
+  { prop: 'effective_to', label: '结束', minWidth: 160 },
+  { prop: 'change_reason', label: '原因', minWidth: 120 },
+  { prop: 'remark', label: '备注', minWidth: 120 }
 ]
 
 const ownershipColumns: RecordColumn[] = [

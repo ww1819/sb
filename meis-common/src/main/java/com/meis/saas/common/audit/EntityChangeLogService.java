@@ -19,7 +19,8 @@ public class EntityChangeLogService {
             "medical_device", "manufacturer", "supplier", "department", "sys_user", "repair_workorder",
             "campus", "building", "warehouse", "asset_category", "medical_device_category",
             "engineer", "fault_type_dict", "repair_process_type", "finance_category", "unit_dict", "sys_role",
-            "device_warranty", "device_warranty_device"
+            "device_warranty", "device_warranty_device",
+            "device_license", "device_training_auth", "device_archive_file", "device_udi_history"
     );
 
     /** 附录 T.5：delete/submit/withdraw 精简快照字段（按实体） */
@@ -27,7 +28,12 @@ public class EntityChangeLogService {
             Map.entry("medical_device", List.of(
                     "device_code", "device_name", "pinyin_code", "brand", "model", "serial_number",
                     "device_status", "risk_level", "dept_id", "campus_id",
-                    "original_value", "enable_date", "is_active")),
+                    "original_value", "enable_date", "is_active",
+                    "udi_di", "udi_pi",
+                    "asset_manager_user_id", "asset_manager_name",
+                    "clinical_owner_user_id", "clinical_owner_name",
+                    "eq_class", "criticality", "depreciation_method", "acquisition_mode",
+                    "ip_address", "mac_address", "gs1_gtin", "lot_no", "energy_class")),
             Map.entry("manufacturer", List.of(
                     "manufacturer_code", "manufacturer_name", "pinyin_code", "country",
                     "is_domestic", "contact_phone", "is_active")),
@@ -74,7 +80,19 @@ public class EntityChangeLogService {
                     "supplier_id", "supplier_name", "start_date", "end_date", "total_amount",
                     "coverage_content", "contract_id", "contract_code", "remark")),
             Map.entry("device_warranty_device", List.of(
-                    "warranty_id", "device_id", "device_code", "device_name", "unit_price", "remark"))
+                    "warranty_id", "device_id", "device_code", "device_name", "unit_price", "remark")),
+            Map.entry("device_license", List.of(
+                    "device_id", "device_code", "device_name", "license_type", "license_no",
+                    "issue_date", "expiry_date", "issuer_name", "file_url", "file_name", "remark")),
+            Map.entry("device_training_auth", List.of(
+                    "device_id", "device_code", "device_name", "user_id", "user_name",
+                    "cert_name", "cert_no", "trained_at", "expiry_date", "auth_scope", "remark")),
+            Map.entry("device_archive_file", List.of(
+                    "device_id", "device_code", "device_name", "archive_type", "title",
+                    "file_url", "file_name", "file_size", "content_type", "version_no", "remark")),
+            Map.entry("device_udi_history", List.of(
+                    "device_id", "device_code", "device_name", "udi_di", "udi_pi",
+                    "effective_from", "effective_to", "change_reason", "remark"))
     );
 
     private static final Set<String> SENSITIVE = Set.of(

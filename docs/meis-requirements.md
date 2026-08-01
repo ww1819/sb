@@ -1052,8 +1052,8 @@
 | **第一部分** | **标量字段**（数值/字符串/日期/布尔/字典）：S-01～S-18；P0 为 UDI + 双责任人 UUID |
 | **第二部分** | **从表/独立对象**（含是否需单独维护菜单）：O-01～O-12；P0 为证照对象、培训授权、档案落库 |
 | **第三部分** | **业务流程缺口**：P-01～P-12（计量/不良/特种持证、报废盘点、效益报表、财务同步等） |
-| **原则** | 已实现的归属/位置/换件/处置/维保等标「已有」，勿重复开对象；**本期只文档，不开发** |
-| **实施** | 标量分批 → `BACKLOG-AST-GAP-01`；对象/流程对齐既有 BACKLOG 或按专文 §4 批次 |
+| **原则** | 已实现的归属/位置/换件/处置/维保等标「已有」，勿重复开对象；效益（O-09/O-11/P-08）另线 |
+| **实施** | **已落地（除效益）**：G1 标量列+字典；O-02 证照 / O-03 培训授权 / O-04 档案 / O-01 UDI 史 API；台账 `PUT medical_device` 变更 UDI 时写历史。前端菜单/Sheet、G5 流程另排 |
 
 **AST-DEMO-01 定稿（2026-08-01；可重复种子 2026-08-01）**
 
@@ -2636,6 +2636,8 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+| 2.202 | 2026-08-01 09:15:00 | — | AST-GAP-REVIEW 非效益项落地：UDI/责任人/证照/培训/档案/UDI史；排除 ANA |
+| 2.201 | 2026-08-01 09:20:00 | — | AST-GAP-REVIEW-01 后端：G1 标量+字典；O-01～O-04 表/API/变更记录；台账 UDI 钩子；排除效益 |
 | 2.200 | 2026-08-01 09:05:00 | — | AST-GAP-REVIEW-01：三甲缺口复核文档（标量/对象/流程）；只分析不开发 |
 | 2.199 | 2026-08-01 09:00:00 | — | 开工落地：OWN/BF/PART/LOC/DISP/UI-22/23/SRC；三表+写回+前端 Sheet；调拨 campus；入库 device_id |
 | 2.198 | 2026-08-01 08:50:00 | — | AST-PART-01 非维修配件更换（确认生效）；AST-SRC-01 混合来源「生成方式」列；约定包 §5.16 |
@@ -2983,7 +2985,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | BACKLOG-AST-11 | 资产 | 铭牌识别：小程序腾讯 OCR 采集 → 结果落从表 → Web 确认回填台账 | [PLT-OCR-01](#plt-ocr-01-铭牌图像识别回填台账待开发2026-07-24) | P1 | 引擎倾向腾讯 API；密钥走后端；表结构/字段映射排期时定 | 可排期 |
 | BACKLOG-AST-14 | 资产 | 资产综合查询 `DeviceDetailTabs` 与 AST-UI-14 查看 Tab 对齐 | AST-UI-14 本轮仅资产登记 | P2 | 双轨详情，本轮不同步 | 可排期 |
 | BACKLOG-AST-18 | 资产/跨模块 | 出入库/盘点等剩余从属设备列表对齐 PLT-DEV-LIST-01 | 出入库/盘点/报修已落地（v2.185） | P2 | — | 已完成 |
-| BACKLOG-AST-GAP-01 | 资产 | 台账主表/从表缺口按 AST-GAP-01 / 三甲复核专文分批加列与对象 | [GAP-01](meis-requirements-asset-ledger-gap.md)、[复核](meis-requirements-tertiary-gap-review.md) | P1 | G1：UDI+责任人 | 可排期 |
+| BACKLOG-AST-GAP-01 | 资产 | 台账主表/从表缺口按 AST-GAP-01 / 三甲复核专文分批加列与对象 | [GAP-01](meis-requirements-asset-ledger-gap.md)、[复核](meis-requirements-tertiary-gap-review.md) | P1 | G1～G4 后端已落地（除效益）；前端菜单/Sheet 待挂 | 进行中 |
 | BACKLOG-AST-OWN-01 | 资产 | 归属区间 +「归属历史」+ 改科室/补录 + **确认生效** | 已实现 | P1 | 可选：Sheet 下钻路由增强 | 已完成 |
 | BACKLOG-AST-PART-01 | 资产 | 非维修配件更换表 + 编辑 Sheet + 查看聚合/生成方式 | 已实现 | P1 | 不强制扣库存 | 已完成 |
 | BACKLOG-AST-DISP-01 | 资产 | 处置记录聚合 Sheet | 已实现 | P1 | — | 已完成 |
@@ -2991,7 +2993,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | BACKLOG-AST-LOC-01 | 资产 | 位置区间 + 按钮真变更/纠错 +「位置历史」 | 主路径已实现 | P2 | 补录位置历史 Sheet 可选未做 | 部分完成 |
 | BACKLOG-AST-DISP-FIN-01 | 资产/集成 | 财务/金蝶等外部资产处置同步 | AST-DISP-01 P3 | P2 | 接口与冲突策略未定 | 可排期 |
 | BACKLOG-AST-ENTRY-DID-01 | 资产 | 入库完成可靠回写 `device_entry_item.device_id` | 已随 OWN 实现 | P1 | — | 已完成 |
-| BACKLOG-AST-GAP-REVIEW-01 | 资产 | 三甲再审文档（标量/对象/流程） | [复核专文](meis-requirements-tertiary-gap-review.md) | P2 | **分析已定稿**；实施跟 GAP-01 批次 | 分析完成 |
+| BACKLOG-AST-GAP-REVIEW-01 | 资产 | 三甲再审文档 + 非效益实施 | [复核专文](meis-requirements-tertiary-gap-review.md) | P2 | 效益排除；G5 报废盘点财务待排 | 部分完成 |
 | BACKLOG-ANA-01 | 效益 | 效率分析完整业务（指标、图表、导出） | ANA-UI-01/02 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-ANA-02 | 效益 | 效益分析查询完整业务 | ANA-UI-02 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-ANA-03 | 效益 | 收费项目审核完整业务 | ANA-UI-02 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
@@ -4340,6 +4342,83 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | `original_value` | `DECIMAL(15,2)` | 原值 |
 | `enable_date` | `DATE` | 启用日期 |
 | `is_active` | `BOOLEAN` | 是否启用 |
+| `udi_di` | `VARCHAR(100)` | UDI 产品标识 DI |
+| `udi_pi` | `VARCHAR(100)` | UDI 生产标识 PI |
+| `asset_manager_user_id` | `UUID` | 资产管理员 |
+| `asset_manager_name` | `VARCHAR(100)` | 资产管理员姓名快照 |
+| `clinical_owner_user_id` | `UUID` | 临床责任人 |
+| `clinical_owner_name` | `VARCHAR(100)` | 临床责任人姓名快照 |
+| `eq_class` | `VARCHAR(20)` | 医疗器械管理类别 |
+| `criticality` | `VARCHAR(20)` | 临床关键等级 |
+| `depreciation_method` | `VARCHAR(40)` | 折旧方法 |
+| `acquisition_mode` | `VARCHAR(40)` | 购置方式 |
+| `ip_address` | `VARCHAR(64)` | 设备 IP |
+| `mac_address` | `VARCHAR(64)` | 设备 MAC |
+| `gs1_gtin` | `VARCHAR(32)` | GS1 GTIN |
+| `lot_no` | `VARCHAR(64)` | 生产批号 |
+| `energy_class` | `VARCHAR(20)` | 能效等级 |
+
+#### `device_license`（设备证照，AST-GAP O-02）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `device_id` | `UUID` | 设备 |
+| `device_code` | `VARCHAR(50)` | 设备编码冗余 |
+| `device_name` | `VARCHAR(200)` | 设备名称冗余 |
+| `license_type` | `VARCHAR(40)` | 证照类型 |
+| `license_no` | `VARCHAR(100)` | 证照编号 |
+| `issue_date` | `DATE` | 发证日期 |
+| `expiry_date` | `DATE` | 有效期至 |
+| `issuer_name` | `VARCHAR(200)` | 发证机关 |
+| `file_url` | `VARCHAR(500)` | 附件地址 |
+| `file_name` | `VARCHAR(200)` | 附件文件名 |
+| `remark` | `TEXT` | 备注 |
+
+#### `device_training_auth`（培训授权，AST-GAP O-03）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `device_id` | `UUID` | 设备 |
+| `device_code` | `VARCHAR(50)` | 设备编码冗余 |
+| `device_name` | `VARCHAR(200)` | 设备名称冗余 |
+| `user_id` | `UUID` | 授权人员 |
+| `user_name` | `VARCHAR(100)` | 授权人员姓名快照 |
+| `cert_name` | `VARCHAR(200)` | 证书名称 |
+| `cert_no` | `VARCHAR(100)` | 证书编号 |
+| `trained_at` | `DATE` | 培训/取证日期 |
+| `expiry_date` | `DATE` | 授权有效期至 |
+| `auth_scope` | `VARCHAR(100)` | 授权范围 |
+| `remark` | `TEXT` | 备注 |
+
+#### `device_archive_file`（设备档案附件，AST-GAP O-04）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `device_id` | `UUID` | 设备 |
+| `device_code` | `VARCHAR(50)` | 设备编码冗余 |
+| `device_name` | `VARCHAR(200)` | 设备名称冗余 |
+| `archive_type` | `VARCHAR(40)` | 档案类型 |
+| `title` | `VARCHAR(200)` | 标题 |
+| `file_url` | `VARCHAR(500)` | 文件地址 |
+| `file_name` | `VARCHAR(200)` | 文件名 |
+| `file_size` | `BIGINT` | 文件大小 |
+| `content_type` | `VARCHAR(100)` | MIME 类型 |
+| `version_no` | `INTEGER` | 版本号 |
+| `remark` | `TEXT` | 备注 |
+
+#### `device_udi_history`（UDI 变更历史，AST-GAP O-01）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `device_id` | `UUID` | 设备 |
+| `device_code` | `VARCHAR(50)` | 设备编码冗余 |
+| `device_name` | `VARCHAR(200)` | 设备名称冗余 |
+| `udi_di` | `VARCHAR(100)` | UDI DI 快照 |
+| `udi_pi` | `VARCHAR(100)` | UDI PI 快照 |
+| `effective_from` | `TIMESTAMPTZ` | 生效起 |
+| `effective_to` | `TIMESTAMPTZ` | 生效止 |
+| `change_reason` | `VARCHAR(40)` | 变更原因 |
+| `remark` | `TEXT` | 备注 |
 
 #### `manufacturer`（生产厂家）
 
@@ -7185,3 +7264,5 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 > **种子执行**：须 `SET search_path TO tenant_demo;`（Web 登录态不会自动带到 pgAdmin）。
 
 > **三甲再审文档**：[meis-requirements-tertiary-gap-review.md](meis-requirements-tertiary-gap-review.md)（标量 S-* / 对象 O-* / 流程 P-*；只分析不开发）。
+> **AST-GAP-REVIEW-01 后端（2026-08-01）**：已落地 G1 标量列 + 字典、O-02 证照、O-03 培训授权、O-04 档案附件、O-01 UDI 史（台账更新钩子）；**未做** O-09/O-11/P-08 效益与 G5 报废/盘点流程。部署：重启 **meis-tenant** 建表补列灌字典，再重启 meis-asset / meis-common。
+> **G5 开工（2026-08-01）**：报废审批/查询（P-05）、科室盘点（P-06）、外部财务处置预留（P-12）；**不含效益 P-08**。

@@ -1092,3 +1092,51 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('disposition_type', 'inventory_loss', '盘亏', 'inventory_loss', 7),
 ('disposition_type', 'ownership_transfer', '手工归属变更', 'ownership_transfer', 8);
 
+-- ========== AST-GAP-REVIEW-01：三甲标量/证照/档案字典 ==========
+DELETE FROM sys_dict WHERE dict_type = 'eq_class';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('eq_class', 'class_1', 'Ⅰ类', 'class_1', 1),
+('eq_class', 'class_2', 'Ⅱ类', 'class_2', 2),
+('eq_class', 'class_3', 'Ⅲ类', 'class_3', 3);
+
+DELETE FROM sys_dict WHERE dict_type = 'device_criticality';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('device_criticality', 'high', '高', 'high', 1),
+('device_criticality', 'medium', '中', 'medium', 2),
+('device_criticality', 'low', '低', 'low', 3);
+
+DELETE FROM sys_dict WHERE dict_type = 'depreciation_method';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('depreciation_method', 'straight_line', '平均年限法', 'straight_line', 1),
+('depreciation_method', 'units_of_production', '工作量法', 'units_of_production', 2),
+('depreciation_method', 'other', '其他', 'other', 9);
+
+DELETE FROM sys_dict WHERE dict_type = 'acquisition_mode';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('acquisition_mode', 'purchase', '购入', 'purchase', 1),
+('acquisition_mode', 'donation', '捐赠', 'donation', 2),
+('acquisition_mode', 'transfer_in', '划拨', 'transfer_in', 3),
+('acquisition_mode', 'finance_lease', '融资租赁', 'finance_lease', 4),
+('acquisition_mode', 'other', '其他', 'other', 9);
+
+DELETE FROM sys_dict WHERE dict_type = 'energy_class';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('energy_class', 'A', 'A', 'A', 1),
+('energy_class', 'B', 'B', 'B', 2),
+('energy_class', 'C', 'C', 'C', 3);
+
+DELETE FROM sys_dict WHERE dict_type = 'device_license_type';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('device_license_type', 'registration', '注册证', 'registration', 1),
+('device_license_type', 'metrology', '计量证书', 'metrology', 2),
+('device_license_type', 'special', '特种许可', 'special', 3),
+('device_license_type', 'inspection', '强检证书', 'inspection', 4),
+('device_license_type', 'other', '其他', 'other', 9);
+
+DELETE FROM sys_dict WHERE dict_type = 'device_archive_type';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('device_archive_type', 'archive', '档案', 'archive', 1),
+('device_archive_type', 'image', '图片', 'image', 2),
+('device_archive_type', 'manual', '说明书', 'manual', 3),
+('device_archive_type', 'other', '其他', 'other', 9);
+

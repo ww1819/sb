@@ -243,3 +243,28 @@ CREATE INDEX IF NOT EXISTS idx_loc_period_from ON device_location_period(effecti
 COMMENT ON INDEX idx_loc_period_from IS '索引：位置区间.生效起';
 CREATE INDEX IF NOT EXISTS idx_loc_period_confirm ON device_location_period(confirm_status);
 COMMENT ON INDEX idx_loc_period_confirm IS '索引：位置区间.确认状态';
+
+-- ---------- AST-GAP-REVIEW-01：证照/培训/档案/UDI 史 ----------
+CREATE INDEX IF NOT EXISTS idx_device_license_device ON device_license(device_id);
+COMMENT ON INDEX idx_device_license_device IS '索引：设备证照.设备';
+CREATE INDEX IF NOT EXISTS idx_device_license_type ON device_license(license_type);
+COMMENT ON INDEX idx_device_license_type IS '索引：设备证照.类型';
+CREATE INDEX IF NOT EXISTS idx_device_license_expiry ON device_license(expiry_date);
+COMMENT ON INDEX idx_device_license_expiry IS '索引：设备证照.有效期';
+
+CREATE INDEX IF NOT EXISTS idx_device_training_device ON device_training_auth(device_id);
+COMMENT ON INDEX idx_device_training_device IS '索引：培训授权.设备';
+CREATE INDEX IF NOT EXISTS idx_device_training_user ON device_training_auth(user_id);
+COMMENT ON INDEX idx_device_training_user IS '索引：培训授权.人员';
+CREATE INDEX IF NOT EXISTS idx_device_training_expiry ON device_training_auth(expiry_date);
+COMMENT ON INDEX idx_device_training_expiry IS '索引：培训授权.有效期';
+
+CREATE INDEX IF NOT EXISTS idx_device_archive_device ON device_archive_file(device_id);
+COMMENT ON INDEX idx_device_archive_device IS '索引：设备档案.设备';
+CREATE INDEX IF NOT EXISTS idx_device_archive_type ON device_archive_file(archive_type);
+COMMENT ON INDEX idx_device_archive_type IS '索引：设备档案.类型';
+
+CREATE INDEX IF NOT EXISTS idx_device_udi_hist_device ON device_udi_history(device_id);
+COMMENT ON INDEX idx_device_udi_hist_device IS '索引：UDI 历史.设备';
+CREATE INDEX IF NOT EXISTS idx_device_udi_hist_from ON device_udi_history(effective_from);
+COMMENT ON INDEX idx_device_udi_hist_from IS '索引：UDI 历史.生效起';
