@@ -1352,3 +1352,44 @@ COMMENT ON COLUMN medical_device.mac_address IS '设备 MAC 地址';
 COMMENT ON COLUMN medical_device.gs1_gtin IS 'GS1 GTIN';
 COMMENT ON COLUMN medical_device.lot_no IS '生产批号';
 COMMENT ON COLUMN medical_device.energy_class IS '能效等级';
+
+-- AST-GAP-REVIEW G5 / P-05：报废处置去向与姓名快照（老租户）
+ALTER TABLE device_scrap ADD COLUMN IF NOT EXISTS disposal_destination VARCHAR(200);
+ALTER TABLE device_scrap ADD COLUMN IF NOT EXISTS disposal_proof_url VARCHAR(500);
+ALTER TABLE device_scrap ADD COLUMN IF NOT EXISTS applicant_name VARCHAR(100);
+ALTER TABLE device_scrap ADD COLUMN IF NOT EXISTS evaluator_name VARCHAR(100);
+ALTER TABLE device_scrap ADD COLUMN IF NOT EXISTS approver_name VARCHAR(100);
+COMMENT ON COLUMN device_scrap.disposal_destination IS '处置去向（单位/渠道说明）';
+COMMENT ON COLUMN device_scrap.disposal_proof_url IS '处置证明附件URL';
+COMMENT ON COLUMN device_scrap.applicant_name IS '申请人姓名快照（W.5）';
+COMMENT ON COLUMN device_scrap.evaluator_name IS '评估人姓名快照（W.5）';
+COMMENT ON COLUMN device_scrap.approver_name IS '审批人姓名快照（W.5）';
+
+-- AST-GAP-REVIEW G5 / P-12：外部财务处置预留（老租户）
+CREATE TABLE IF NOT EXISTS external_asset_disposition (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    device_id UUID NOT NULL REFERENCES medical_device(id),
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
+    source_system VARCHAR(40) NOT NULL DEFAULT 'manual',
+    external_ref VARCHAR(100),
+    disposition_type VARCHAR(40) NOT NULL DEFAULT 'scrap',
+    disposition_type_label VARCHAR(80),
+    amount DECIMAL(15,2),
+    occurred_at TIMESTAMPTZ,
+    sync_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    sync_message TEXT,
+    payload JSONB,
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100)
+);
+COMMENT ON TABLE external_asset_disposition IS '外部财务资产处置预留（AST-DISP-FIN / P-12）';

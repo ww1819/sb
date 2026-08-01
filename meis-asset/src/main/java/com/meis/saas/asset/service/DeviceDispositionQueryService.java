@@ -37,6 +37,7 @@ public class DeviceDispositionQueryService {
         String xferNotDel = SoftDeleteSupport.notDeletedClause(jdbc, "asset_transfer", "t");
         String chkNotDel = SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check", "h");
         String chkiNotDel = SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check_item", "i");
+        String extNotDel = SoftDeleteSupport.notDeletedClause(jdbc, "external_asset_disposition", "e");
 
         return jdbc.queryForList("""
                 SELECT * FROM (
@@ -123,10 +124,19 @@ public class DeviceDispositionQueryService {
                     AND p.confirm_status = 'confirmed'
                     AND p.change_reason = 'manual_transfer'
                   """ + ownNotDel + """
+
+                  UNION ALL
+                  SELECT e.id, e.id, COALESCE(e.disposition_type, 'external'),
+                         COALESCE(e.disposition_type_label, '外部财务处置'), e.external_ref,
+                         COALESCE(e.occurred_at, e.created_at), e.sync_status, 'external',
+                         '外部/财务', e.remark
+                  FROM external_asset_disposition e
+                  WHERE e.device_id = ?::uuid
+                  """ + extNotDel + """
                 ) u
                 ORDER BY occurred_at DESC NULLS LAST
                 LIMIT 500
                 """,
-                deviceId, deviceId, deviceId, deviceId, deviceId, deviceId, deviceId, deviceId);
+                deviceId, deviceId, deviceId, deviceId, deviceId, deviceId, deviceId, deviceId, deviceId);
     }
 }

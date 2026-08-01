@@ -67,7 +67,7 @@
               :options="filterOptions[f.key] ?? []"
               @change="onSearch"
             />
-            <el-button v-if="!hideAdd" v-permission="'add'" type="primary" @click="onAdd">新增</el-button>
+            <el-button v-if="!addHidden" v-permission="'add'" type="primary" @click="onAdd">新增</el-button>
             <slot name="toolbar-after-add" />
             <el-button @click="exportCsv">导出</el-button>
             <el-button v-if="showImport" @click="importVisible = true">导入</el-button>
@@ -86,7 +86,7 @@
             />
             <el-button type="primary" :icon="Search" @click="onSearch">查询</el-button>
             <el-button :icon="RefreshLeft" @click="onReset">重置</el-button>
-            <el-button v-if="!hideAdd" v-permission="'add'" type="primary" @click="onAdd">新增</el-button>
+            <el-button v-if="!addHidden" v-permission="'add'" type="primary" @click="onAdd">新增</el-button>
             <slot name="toolbar-after-add" />
             <el-button @click="exportCsv">导出</el-button>
             <slot name="actions-after" />
@@ -362,6 +362,7 @@ watch(tableHeight, () => {
 })
 
 const viewEnabled = computed(() => props.enableView === true || props.config.enableView === true)
+const addHidden = computed(() => props.hideAdd === true || props.config.hideAdd === true)
 const hideOperationColumn = computed(() => props.hideOperationColumn === true)
 const operationWidth = computed(() => {
   if (props.operationColumnWidth) return props.operationColumnWidth

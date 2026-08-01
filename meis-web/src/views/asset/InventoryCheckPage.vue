@@ -197,8 +197,9 @@ function canModify(row: Record<string, unknown>) {
 }
 
 function createNew() {
+  const defaultType = config.value.listParams?.check_type
   master.value = {
-    check_type: 'annual',
+    check_type: defaultType != null && defaultType !== '' ? String(defaultType) : 'annual',
     status: 'planning',
     audit_status: 'pending',
     check_year: new Date().getFullYear()

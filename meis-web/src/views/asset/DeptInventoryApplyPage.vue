@@ -1,12 +1,8 @@
 <template>
-  <FeaturePlaceholderPage
-    title="科室盘点申请"
-    subtitle="资产管理 / 科室盘点"
-    description="科室盘点申请功能开发中"
-    hint="菜单已开通（AST-UI-07）；完整业务见待开发池 BACKLOG-AST-07"
-  />
+  <InventoryCheckPage />
 </template>
 
 <script setup lang="ts">
-import FeaturePlaceholderPage from '@/components/FeaturePlaceholderPage.vue'
+/** 科室盘点申请：复用盘点页，pageRegistry 固定 check_type=dept */
+import InventoryCheckPage from './InventoryCheckPage.vue'
 </script>

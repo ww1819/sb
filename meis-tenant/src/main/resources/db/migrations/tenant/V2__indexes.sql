@@ -268,3 +268,7 @@ CREATE INDEX IF NOT EXISTS idx_device_udi_hist_device ON device_udi_history(devi
 COMMENT ON INDEX idx_device_udi_hist_device IS '索引：UDI 历史.设备';
 CREATE INDEX IF NOT EXISTS idx_device_udi_hist_from ON device_udi_history(effective_from);
 COMMENT ON INDEX idx_device_udi_hist_from IS '索引：UDI 历史.生效起';
+CREATE INDEX IF NOT EXISTS idx_ext_asset_disp_device ON external_asset_disposition(device_id);
+COMMENT ON INDEX idx_ext_asset_disp_device IS '索引：外部处置.设备';
+CREATE INDEX IF NOT EXISTS idx_ext_asset_disp_sync ON external_asset_disposition(sync_status);
+COMMENT ON INDEX idx_ext_asset_disp_sync IS '索引：外部处置.同步状态';

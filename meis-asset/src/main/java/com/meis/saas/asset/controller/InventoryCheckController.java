@@ -45,7 +45,9 @@ public class InventoryCheckController {
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(PageQuery query,
             @RequestParam(required = false) String audit_status,
-            @RequestParam(required = false) String dept_id) {
+            @RequestParam(required = false) String dept_id,
+            @RequestParam(required = false) String check_type,
+            @RequestParam(required = false) String status) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         List<Object> args = new ArrayList<>();
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
@@ -55,6 +57,8 @@ public class InventoryCheckController {
             args.add(kw);
         }
         FilterCsvSupport.appendStrIn(where, args, "audit_status", audit_status);
+        FilterCsvSupport.appendStrIn(where, args, "check_type", check_type);
+        FilterCsvSupport.appendStrIn(where, args, "status", status);
         FilterCsvSupport.appendUuidIn(where, args, "dept_id", dept_id);
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check", null));
         Long total = jdbc.queryForObject("SELECT COUNT(*) FROM inventory_check" + where, Long.class, args.toArray());
@@ -65,6 +69,43 @@ public class InventoryCheckController {
                 "SELECT * FROM inventory_check" + where + " ORDER BY created_at DESC NULLS LAST LIMIT ? OFFSET ?",
                 pageArgs.toArray());
         return Result.ok(PageResult.of(rows, total != null ? total : 0, query.getPage(), query.getSize()));
+    }
+
+    /** AST-UI-07 / BACKLOG-AST-07：科室盘点报表汇总 */
+    @GetMapping("/report")
+    public Result<List<Map<String, Object>>> report(
+            @RequestParam(required = false) Integer checkYear,
+            @RequestParam(required = false) String deptId,
+            @RequestParam(required = false) String checkType,
+            @RequestParam(required = false) String status) {
+        StringBuilder sql = new StringBuilder("""
+                SELECT c.id, c.check_no, c.check_name, c.check_year, c.check_type, c.dept_id,
+                       dept.dept_name, c.status, c.audit_status,
+                       c.total_count, c.checked_count, c.matched_count, c.mismatch_count, c.missing_count,
+                       c.start_date, c.end_date, c.actual_end_at, c.created_at
+                FROM inventory_check c
+                LEFT JOIN department dept ON dept.id = c.dept_id
+                WHERE 1=1
+                """);
+        sql.append(SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check", "c"));
+        List<Object> args = new ArrayList<>();
+        if (checkYear != null) {
+            sql.append(" AND c.check_year = ? ");
+            args.add(checkYear);
+        }
+        if (deptId != null && !deptId.isBlank()) {
+            sql.append(" AND c.dept_id = ?::uuid ");
+            args.add(deptId);
+        }
+        if (checkType != null && !checkType.isBlank()) {
+            sql.append(" AND c.check_type = ? ");
+            args.add(checkType.trim());
+        }
+        if (status != null && !status.isBlank()) {
+            FilterCsvSupport.appendStrIn(sql, args, "c.status", status);
+        }
+        sql.append(" ORDER BY c.check_year DESC NULLS LAST, c.created_at DESC NULLS LAST LIMIT 500");
+        return Result.ok(jdbc.queryForList(sql.toString(), args.toArray()));
     }
 
     @GetMapping("/devices/candidates")
@@ -479,14 +520,46 @@ public class InventoryCheckController {
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/complete")
+    @Transactional
     @OperationLog(module = "asset", description = "完成盘点")
     public Result<Map<String, Object>> complete(@PathVariable UUID id) {
+        assertExists(id);
+        refreshDiffCounts(id);
         jdbc.update("""
                 UPDATE inventory_check
                 SET status = 'completed', actual_end_at = NOW(), updated_at = NOW()
                 WHERE id = ?::uuid
                 """, id);
         return get(id);
+    }
+
+    /** 刷新盘实相符/不符/盘亏计数（差异展示；写回台账另议） */
+    private void refreshDiffCounts(UUID id) {
+        jdbc.update("""
+            UPDATE inventory_check SET
+              checked_count = (
+                SELECT COUNT(*) FROM inventory_check_item
+                WHERE check_id = ?::uuid AND is_found = true
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check_item", null) + """
+              ),
+              matched_count = (
+                SELECT COUNT(*) FROM inventory_check_item
+                WHERE check_id = ?::uuid AND is_found = true AND COALESCE(is_matched, true) = true
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check_item", null) + """
+              ),
+              mismatch_count = (
+                SELECT COUNT(*) FROM inventory_check_item
+                WHERE check_id = ?::uuid AND is_found = true AND is_matched = false
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check_item", null) + """
+              ),
+              missing_count = (
+                SELECT COUNT(*) FROM inventory_check_item
+                WHERE check_id = ?::uuid AND (is_found = false OR is_found IS NULL)
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check_item", null) + """
+              ),
+              updated_at = NOW()
+            WHERE id = ?::uuid
+            """, id, id, id, id, id);
     }
 
     private void upsertItems(UUID checkId, String checkNo, List<Map<String, Object>> items) {

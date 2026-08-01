@@ -1140,3 +1140,9 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 ('device_archive_type', 'manual', '说明书', 'manual', 3),
 ('device_archive_type', 'other', '其他', 'other', 9);
 
+-- AST-GAP-REVIEW G5：报废状态/处置方式补字典
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('scrap_status', 'rejected', '已驳回', 'rejected', 5),
+('disposal_method', 'donate', '捐赠', 'donate', 4),
+('disposal_method', 'return_supplier', '退供应商', 'return_supplier', 5)
+ON CONFLICT (dict_type, dict_code) DO NOTHING;

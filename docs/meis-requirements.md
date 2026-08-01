@@ -2636,6 +2636,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+| 2.203 | 2026-08-01 10:30:00 | — | AST-GAP-REVIEW G5（除效益）：P-05 报废审核/查询/处置去向；P-06 科室盘点申请+报表；P-12 外部处置预留 |
 | 2.202 | 2026-08-01 09:15:00 | — | AST-GAP-REVIEW 非效益项落地：UDI/责任人/证照/培训/档案/UDI史；排除 ANA |
 | 2.201 | 2026-08-01 09:20:00 | — | AST-GAP-REVIEW-01 后端：G1 标量+字典；O-01～O-04 表/API/变更记录；台账 UDI 钩子；排除效益 |
 | 2.200 | 2026-08-01 09:05:00 | — | AST-GAP-REVIEW-01：三甲缺口复核文档（标量/对象/流程）；只分析不开发 |
@@ -2979,9 +2980,9 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | BACKLOG-REP-F-03 | 维修 | 外协维修独立单据 | 附录 U.7 / REP-F-03 | P2 | 待真实用户、降低交付难度 | **长期搁置** |
 | BACKLOG-PLT-DB-SYNC-01 | 平台 | 将 R__ 中仍未回写 V1 的扩展列分批同步进 `V1__tables.sql`（约 200 列：台账扩展、途径列等） | PLT-DB-SYNC-01 / 附录 D.1 | P2 | 本期已修关键业务路径；全量回填工作量大 | 可排期 |
 | BACKLOG-AST-W01 | 跨模块 | 保养/计量/巡检/PM 执行表与公用设备费用表等补齐 device_id/code/name 冗余 | 附录 W.3.2 | P1 | 维修 P0 先落地；其余分批 | 可排期 |
-| BACKLOG-AST-07 | 资产 | 科室盘点申请 / 设备盘点报表完整业务（表结构、流程、报表） | AST-UI-07 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
+| BACKLOG-AST-07 | 资产 | 科室盘点申请 / 设备盘点报表完整业务（表结构、流程、报表） | 主路径已实现（G5） | P1 | 盘亏写回台账另议 | 部分完成 |
 | BACKLOG-AST-08 | 资产 | 资产动态统计完整业务（指标、图表、导出） | AST-UI-08 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
-| BACKLOG-AST-10 | 资产 | 报废审核 / 报废查询完整业务（状态流转、列表筛选） | AST-UI-10 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
+| BACKLOG-AST-10 | 资产 | 报废审核 / 报废查询完整业务（状态流转、列表筛选） | 已实现（G5） | P1 | — | 已完成 |
 | BACKLOG-AST-11 | 资产 | 铭牌识别：小程序腾讯 OCR 采集 → 结果落从表 → Web 确认回填台账 | [PLT-OCR-01](#plt-ocr-01-铭牌图像识别回填台账待开发2026-07-24) | P1 | 引擎倾向腾讯 API；密钥走后端；表结构/字段映射排期时定 | 可排期 |
 | BACKLOG-AST-14 | 资产 | 资产综合查询 `DeviceDetailTabs` 与 AST-UI-14 查看 Tab 对齐 | AST-UI-14 本轮仅资产登记 | P2 | 双轨详情，本轮不同步 | 可排期 |
 | BACKLOG-AST-18 | 资产/跨模块 | 出入库/盘点等剩余从属设备列表对齐 PLT-DEV-LIST-01 | 出入库/盘点/报修已落地（v2.185） | P2 | — | 已完成 |
@@ -2991,9 +2992,9 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | BACKLOG-AST-DISP-01 | 资产 | 处置记录聚合 Sheet | 已实现 | P1 | — | 已完成 |
 | BACKLOG-AST-UI-22 | 资产 | 台账业务 Sheet 状态中文 | 已实现 | P0 | 缺字典时回退未知(码) | 已完成 |
 | BACKLOG-AST-LOC-01 | 资产 | 位置区间 + 按钮真变更/纠错 +「位置历史」 | 主路径已实现 | P2 | 补录位置历史 Sheet 可选未做 | 部分完成 |
-| BACKLOG-AST-DISP-FIN-01 | 资产/集成 | 财务/金蝶等外部资产处置同步 | AST-DISP-01 P3 | P2 | 接口与冲突策略未定 | 可排期 |
+| BACKLOG-AST-DISP-FIN-01 | 资产/集成 | 财务/金蝶等外部资产处置同步 | 预留表+手工 API 已落地；金蝶双向另议 | P2 | 金蝶对接与冲突策略未定 | 部分完成 |
 | BACKLOG-AST-ENTRY-DID-01 | 资产 | 入库完成可靠回写 `device_entry_item.device_id` | 已随 OWN 实现 | P1 | — | 已完成 |
-| BACKLOG-AST-GAP-REVIEW-01 | 资产 | 三甲再审文档 + 非效益实施 | [复核专文](meis-requirements-tertiary-gap-review.md) | P2 | 效益排除；G5 报废盘点财务待排 | 部分完成 |
+| BACKLOG-AST-GAP-REVIEW-01 | 资产 | 三甲再审文档 + 非效益实施 | [复核专文](meis-requirements-tertiary-gap-review.md) | P2 | G1～G5 非效益已落地；效益排除 | 部分完成 |
 | BACKLOG-ANA-01 | 效益 | 效率分析完整业务（指标、图表、导出） | ANA-UI-01/02 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-ANA-02 | 效益 | 效益分析查询完整业务 | ANA-UI-02 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-ANA-03 | 效益 | 收费项目审核完整业务 | ANA-UI-02 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
@@ -7265,4 +7266,8 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 
 > **三甲再审文档**：[meis-requirements-tertiary-gap-review.md](meis-requirements-tertiary-gap-review.md)（标量 S-* / 对象 O-* / 流程 P-*；只分析不开发）。
 > **AST-GAP-REVIEW-01 后端（2026-08-01）**：已落地 G1 标量列 + 字典、O-02 证照、O-03 培训授权、O-04 档案附件、O-01 UDI 史（台账更新钩子）；**未做** O-09/O-11/P-08 效益与 G5 报废/盘点流程。部署：重启 **meis-tenant** 建表补列灌字典，再重启 meis-asset / meis-common。
-> **G5 开工（2026-08-01）**：报废审批/查询（P-05）、科室盘点（P-06）、外部财务处置预留（P-12）；**不含效益 P-08**。
+> **G5 已落地（2026-08-01，不含效益 P-08）**：
+> - **P-05**：报废审核 /warehouse/scrap-review、报废查询 /warehouse/scrap-query；处置去向/证明；审批写审批人姓名快照
+> - **P-06**：科室盘点申请（check_type=dept）+ 设备盘点报表；完成时刷新相符/不符/盘亏计数（写回台账另议）
+> - **P-12**：external_asset_disposition 预留表 + /api/asset/external-disposition；纳入处置 Sheet；**金蝶双向同步仍 BACKLOG**
+> **部署**：重启 **meis-tenant**（报废补列、外部处置表、字典）→ 再重启 meis-asset / meis-common / 前端。

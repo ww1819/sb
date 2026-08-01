@@ -247,7 +247,22 @@ public class ApprovalInstanceService {
                 if ("approved".equals(status)) markPaymentPaid(businessId);
             }
             case "device_scrap" -> {
-                jdbc.update("UPDATE device_scrap SET approval_status = ?, status = ? WHERE id = ?::uuid", status, status, businessId);
+                if (("approved".equals(status) || "rejected".equals(status)) && actorId != null) {
+                    jdbc.update("""
+                            UPDATE device_scrap SET approval_status = ?, status = ?,
+                            approver_id = COALESCE(approver_id, ?::uuid),
+                            approver_name = COALESCE(approver_name, ?),
+                            approved_at = CASE WHEN ? = 'approved' THEN COALESCE(approved_at, NOW()) ELSE approved_at END,
+                            scrap_date = CASE WHEN ? = 'approved' THEN COALESCE(scrap_date, CURRENT_DATE) ELSE scrap_date END,
+                            updated_at = NOW()
+                            WHERE id = ?::uuid
+                            """, status, status, actorId, actorName, status, status, businessId);
+                } else {
+                    jdbc.update("""
+                            UPDATE device_scrap SET approval_status = ?, status = ?, updated_at = NOW()
+                            WHERE id = ?::uuid
+                            """, status, status, businessId);
+                }
                 if ("approved".equals(status)) autoDisposeScrap(businessId);
             }
             case "asset_transfer" -> {
@@ -465,11 +480,17 @@ public class ApprovalInstanceService {
 
     private void autoDisposeScrap(UUID id) {
         var row = jdbc.queryForList("SELECT device_id FROM device_scrap WHERE id = ?::uuid", id);
-        if (!row.isEmpty() && row.get(0).get("device_id") != null) {
+        if (row.isEmpty()) return;
+        if (row.get(0).get("device_id") != null) {
             jdbc.update("UPDATE medical_device SET device_status = 'scrap', updated_at = NOW() WHERE id = ?::uuid",
                     row.get(0).get("device_id"));
-            jdbc.update("UPDATE device_scrap SET status = 'approved', updated_at = NOW() WHERE id = ?::uuid", id);
         }
+        // 审批通过：设备置报废；物理处置归档仍走 dispose 接口写去向/证明
+        jdbc.update("""
+                UPDATE device_scrap SET status = 'approved', approval_status = 'approved',
+                scrap_date = COALESCE(scrap_date, CURRENT_DATE), updated_at = NOW()
+                WHERE id = ?::uuid
+                """, id);
     }
 
     private void createPurchaseAcceptance(UUID contractId) {

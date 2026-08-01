@@ -338,8 +338,31 @@ export const pageRegistry: Record<string, PageConfig> = {
   '/purchase/trace': { title: '业务追溯', apiBase: '/purchase', table: 'purchase_plan' },
   '/asset/query': { title: '资产综合查询', apiBase: '/asset', table: 'medical_device' },
   '/asset/dynamic-stats': { title: '资产动态统计', apiBase: '/asset', table: 'medical_device' },
-  '/asset/dept-inventory-apply': { title: '科室盘点申请', apiBase: '/asset', table: 'medical_device' },
-  '/asset/dept-inventory-report': { title: '设备盘点报表', apiBase: '/asset', table: 'medical_device' },
+  '/asset/dept-inventory-apply': {
+    title: '科室盘点申请',
+    apiBase: '/asset',
+    table: 'inventory_check',
+    masterDetail: true,
+    detailTable: 'inventory_check_item',
+    foreignKey: 'check_id',
+    listPageUrl: '/asset/inventory/page',
+    saveUrl: '/asset/inventory',
+    listParams: { check_type: 'dept' },
+    listFilters: [
+      { key: 'audit_status', label: '审核状态', dictType: 'audit_status', multiple: true },
+      { key: 'dept_id', label: '科室', linkTable: 'department', multiple: true },
+      { key: 'status', label: '盘点状态', options: [
+        { value: 'planning', label: '计划中' },
+        { value: 'in_progress', label: '盘点中' },
+        { value: 'completed', label: '已完成' }
+      ], multiple: true }
+    ]
+  },
+  '/asset/dept-inventory-report': {
+    title: '设备盘点报表',
+    apiBase: '/asset',
+    table: 'inventory_check'
+  },
   '/asset/import': {
     title: '资产导入',
     apiBase: '/asset',
@@ -541,8 +564,12 @@ export const pageRegistry: Record<string, PageConfig> = {
     title: '设备报废',
     apiBase: '/asset',
     table: 'device_scrap',
+    listPageUrl: '/asset/scrap/page',
     saveUrl: '/asset/scrap',
-    listFilters: [{ key: 'status', label: '状态', dictType: 'scrap_status', multiple: true }]
+    listFilters: [
+      { key: 'status', label: '状态', dictType: 'scrap_status', multiple: true },
+      { key: 'scrap_type', label: '报废类型', dictType: 'scrap_type', multiple: true }
+    ]
   },
   '/warehouse/setting': { title: '库房维护', apiBase: '/system', table: 'warehouse',
   enableView: true
@@ -690,22 +717,41 @@ export const pageRegistry: Record<string, PageConfig> = {
     title: '报废申请',
     apiBase: '/asset',
     table: 'device_scrap',
+    listPageUrl: '/asset/scrap/page',
     saveUrl: '/asset/scrap',
-    listFilters: [{ key: 'status', label: '状态', dictType: 'scrap_status', multiple: true }]
+    listFilters: [
+      { key: 'status', label: '状态', dictType: 'scrap_status', multiple: true },
+      { key: 'scrap_type', label: '报废类型', dictType: 'scrap_type', multiple: true }
+    ]
   },
   '/warehouse/scrap-review': {
     title: '报废审核',
     apiBase: '/asset',
     table: 'device_scrap',
+    listPageUrl: '/asset/scrap/page',
     saveUrl: '/asset/scrap',
-    listFilters: [{ key: 'status', label: '状态', dictType: 'scrap_status', multiple: true }]
+    hideAdd: true,
+    enableView: true,
+    listParams: { status: 'pending' },
+    listFilters: [{ key: 'scrap_type', label: '报废类型', dictType: 'scrap_type', multiple: true }]
   },
   '/warehouse/scrap-query': {
     title: '报废查询',
     apiBase: '/asset',
     table: 'device_scrap',
+    listPageUrl: '/asset/scrap/page',
     saveUrl: '/asset/scrap',
-    listFilters: [{ key: 'status', label: '状态', dictType: 'scrap_status', multiple: true }]
+    hideAdd: true,
+    enableView: true,
+    listFilters: [
+      { key: 'status', label: '状态', dictType: 'scrap_status', multiple: true },
+      { key: 'scrap_type', label: '报废类型', dictType: 'scrap_type', multiple: true }
+    ],
+    moreSearchFields: [
+      { key: 'scrap_no', label: '报废单号' },
+      { key: 'device_code', label: '设备编码' },
+      { key: 'device_name', label: '设备名称' }
+    ]
   },
   '/asset/inspection': { title: '设备巡检', apiBase: '/asset', table: 'inspection_plan' },
   '/repair/apply': {

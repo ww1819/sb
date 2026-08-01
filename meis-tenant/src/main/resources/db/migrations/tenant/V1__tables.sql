@@ -1392,12 +1392,17 @@ CREATE TABLE device_scrap (
     approved_at TIMESTAMP WITH TIME ZONE,
     scrap_date DATE,
     disposal_method VARCHAR(50),
+    disposal_destination VARCHAR(200),
+    disposal_proof_url VARCHAR(500),
     disposal_date DATE,
     status VARCHAR(20) DEFAULT 'pending',
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    approval_status VARCHAR(20)
+    approval_status VARCHAR(20),
+    applicant_name VARCHAR(100),
+    evaluator_name VARCHAR(100),
+    approver_name VARCHAR(100)
 );
 COMMENT ON TABLE device_scrap IS '设备报废表';
 COMMENT ON COLUMN device_scrap.id IS '主键';
@@ -1416,12 +1421,17 @@ COMMENT ON COLUMN device_scrap.approver_id IS '关联审批人';
 COMMENT ON COLUMN device_scrap.approved_at IS '审核时间';
 COMMENT ON COLUMN device_scrap.scrap_date IS 'scrap日期';
 COMMENT ON COLUMN device_scrap.disposal_method IS 'disposal method';
+COMMENT ON COLUMN device_scrap.disposal_destination IS '处置去向（单位/渠道说明）';
+COMMENT ON COLUMN device_scrap.disposal_proof_url IS '处置证明附件URL';
 COMMENT ON COLUMN device_scrap.disposal_date IS 'disposal日期';
 COMMENT ON COLUMN device_scrap.status IS '状态';
 COMMENT ON COLUMN device_scrap.remark IS '备注';
 COMMENT ON COLUMN device_scrap.created_at IS '创建时间';
 COMMENT ON COLUMN device_scrap.updated_at IS '更新时间';
 COMMENT ON COLUMN device_scrap.approval_status IS '审批状态';
+COMMENT ON COLUMN device_scrap.applicant_name IS '申请人姓名快照（W.5）';
+COMMENT ON COLUMN device_scrap.evaluator_name IS '评估人姓名快照（W.5）';
+COMMENT ON COLUMN device_scrap.approver_name IS '审批人姓名快照（W.5）';
 
 -- 4.x 资产标签打印记录（附录 P）
 CREATE TABLE device_label_print_log (
@@ -3136,6 +3146,39 @@ COMMENT ON COLUMN device_udi_history.is_deleted IS '软删标志';
 COMMENT ON COLUMN device_udi_history.deleted_at IS '删除时间';
 COMMENT ON COLUMN device_udi_history.deleted_by IS '删除人';
 COMMENT ON COLUMN device_udi_history.deleted_by_name IS '删除人姓名快照';
+
+-- AST-GAP-REVIEW G5 / P-12：外部财务/金蝶等资产处置预留（不替代 device_scrap）
+CREATE TABLE external_asset_disposition (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    device_id UUID NOT NULL REFERENCES medical_device(id),
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
+    source_system VARCHAR(40) NOT NULL DEFAULT 'manual',
+    external_ref VARCHAR(100),
+    disposition_type VARCHAR(40) NOT NULL DEFAULT 'scrap',
+    disposition_type_label VARCHAR(80),
+    amount DECIMAL(15,2),
+    occurred_at TIMESTAMPTZ,
+    sync_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    sync_message TEXT,
+    payload JSONB,
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100)
+);
+COMMENT ON TABLE external_asset_disposition IS '外部财务资产处置预留（AST-DISP-FIN / P-12；本期手工录入，金蝶对接另议）';
+COMMENT ON COLUMN external_asset_disposition.source_system IS '来源系统：manual/kingdee/other';
+COMMENT ON COLUMN external_asset_disposition.external_ref IS '外部单号/凭证号';
+COMMENT ON COLUMN external_asset_disposition.sync_status IS '同步状态 pending/synced/failed/ignored';
+COMMENT ON COLUMN external_asset_disposition.payload IS '原始报文或扩展字段';
 
 -- 8.1 维保合同表
 CREATE TABLE maintenance_contract (

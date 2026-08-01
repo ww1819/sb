@@ -4,10 +4,13 @@
       ref="crudRef"
       :config="mergedConfig"
       detail-mode
+      :hide-add="hideAdd || !!config.hideAdd"
       :can-edit="canEdit"
       :can-delete="canDelete"
       :hide-operation-column="hideOperationColumn"
+      :enable-view="forceViewMode || !!config.enableView"
       @detail="openDetail"
+      @view="openView"
       @add="openCreate"
     >
       <template #toolbar-extra>
@@ -53,7 +56,7 @@
         </el-form>
         <slot name="drawer-extra" :form="form" :reload="reloadForm" :editor-mode="editorMode" />
         <ApprovalPanel
-          v-if="businessType && form.id && !headerReadonly"
+          v-if="businessType && form.id && (!headerReadonly || showApprovalWhenReadonly)"
           :business-type="businessType"
           :business-id="String(form.id)"
           @changed="reloadForm"
@@ -91,6 +94,10 @@ const props = defineProps<{
   canEdit?: (row: Record<string, unknown>) => boolean
   canDelete?: (row: Record<string, unknown>) => boolean
   hideOperationColumn?: boolean
+  /** 隐藏新增（审核/查询页） */
+  hideAdd?: boolean
+  /** 点行默认只读打开（审核/查询） */
+  forceViewMode?: boolean
 }>()
 
 const auth = useAuthStore()
@@ -110,8 +117,16 @@ const headerReadonly = computed(
   () =>
     editorMode.value === 'view' ||
     editorMode.value === 'items' ||
-    form.value?.approval_status === 'approved'
+    form.value?.approval_status === 'approved' ||
+    form.value?.approval_status === 'pending' ||
+    form.value?.status === 'disposed'
 )
+
+/** 审核页只读时仍展示审批操作区 */
+const showApprovalWhenReadonly = computed(() => {
+  const st = form.value?.approval_status ?? form.value?.status
+  return st === 'pending' || props.forceViewMode === true
+})
 
 const showSave = computed(() => {
   if (!mergedConfig.value.saveUrl) return false
@@ -173,7 +188,7 @@ async function loadRow(row: Record<string, unknown>) {
 }
 
 async function openDetail(row: Record<string, unknown>) {
-  editorMode.value = 'full'
+  editorMode.value = props.forceViewMode ? 'view' : 'full'
   await loadRow(row)
 }
 
