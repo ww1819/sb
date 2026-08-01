@@ -68,20 +68,25 @@ function Test-PortListen {
 function Get-JarProcessIds {
     param([string]$Name)
     $jar = "$Name-1.0.0-SNAPSHOT.jar"
-    $ids = New-Object System.Collections.ArrayList
+    # Emit each PID on the pipeline. Do NOT `return ,@()` — an empty nested array makes
+    # foreach iterate once with $procId=@(), and Stop-Process -Id @() throws
+    # (parameter binding error is not suppressed by -ErrorAction SilentlyContinue).
     Get-CimInstance Win32_Process -Filter "Name='java.exe'" -ErrorAction SilentlyContinue | ForEach-Object {
         if ($_.CommandLine -and $_.CommandLine -like "*$jar*") {
-            [void]$ids.Add([int]$_.ProcessId)
+            [int]$_.ProcessId
         }
     }
-    return ,$ids.ToArray()
 }
 
 function Stop-OneService {
     param([string]$Name)
     $n = 0
     foreach ($procId in @(Get-JarProcessIds -Name $Name)) {
-        Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
+        if ($null -eq $procId) { continue }
+        $id = 0
+        try { $id = [int]$procId } catch { continue }
+        if ($id -le 0) { continue }
+        Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
         $n++
     }
     return $n
