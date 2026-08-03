@@ -4,7 +4,7 @@
 > **来源**：`docs/meis-requirements.md` 附录 Q / C / D / E / F / G / H / I / R / S / T 等。  
 > **用法**：新系统可整份复制后，按「落地映射」改路径与模块名；MEIS 专属细节见文末附录。
 
-**版本**：1.49（2026-08-01）
+**版本**：1.50（2026-08-03）
 
 ---
 
@@ -536,6 +536,19 @@ USB 外设（如文档高拍仪）**勿**由浏览器直连硬件；经厂商本
 
 落地映射：MEIS [AST-UI-25](meis-requirements.md#ast-ui-25-查看态侧栏内容滚动定稿2026-08-01)；`FormTabNav`、`DeviceLedgerForm`、`global.css`（`:has(.device-ledger-form)`）。
 
+### 5.20 列表接口禁止行级 N+1（强烈建议）
+
+分页列表（含移动端同构 page）在返回前若需充实关联数据：
+
+| 项 | 要求 |
+|----|------|
+| **禁止** | 对当前页每一行再执行独立 SQL / 远程调用（典型「enrich 循环」） |
+| **做法** | 收集本页 id → **一次 `IN` / JOIN / 批量接口** → 内存归并；缺表/异常时降级为主表行，勿拖垮整页 |
+| **超时** | Web 默认约 30s；行级 N+1 在 pageSize≥20、关联表稍大时极易超时 → 前端表现为「暂无数据」 |
+| **详情另论** | 打开单条详情允许适度关联查询；明细行很多时同样优先批量 |
+
+落地映射：MEIS [REP-PERF-01](meis-requirements.md#rep-perf-01-报修列表充实性能定稿2026-08-03)；余量见第 7 章 `BACKLOG-*-PERF-*`。
+
 ---
 
 ## 6. 单据草稿 / 提交 / 撤回（业务模式）
@@ -647,6 +660,7 @@ USB 外设（如文档高拍仪）**勿**由浏览器直连硬件；经厂商本
 - [ ] 有勾选列则具备跨页缓存；导出/批量变更先选作用域（§5.4）；勿再挂「已选/全选当页」提示条  
 - [ ] 若属 Web/移动端**已共有**能力的字段或业务分支扩展：App/小程序已同批跟上，或已入 BACKLOG 点名（§5.18）  
 - [ ] 若为侧栏导航 + 内容区表单：顶栏样式未误套侧栏，滚动条未被内容覆盖（§5.19）
+- [ ] 分页列表充实关联数据：无行级 N+1；本页批量 IN/JOIN（§5.20）
 
 ### 7.3 库表改完
 
@@ -738,6 +752,7 @@ USB 外设（如文档高拍仪）**勿**由浏览器直连硬件；经厂商本
 | 外键中文 / 强业务拼编码 | 附录 H、**PLT-REF-CODE-01**、§5.2.1 | `refSelectConfig.showCode`、`formatRefRowLabel`、`useRefLabelMap`、`linkHideCode` |
 | 多端功能演进同批 | **MOB-SYNC-01**、约定包 **§5.18** | 交付自检；`meis-web` / `meis-mobile` / `meis-mp` |
 | 侧栏表单导航与内容滚动 | **AST-UI-25**、约定包 **§5.19** | `FormTabNav`、`DeviceLedgerForm`、`global.css` |
+| 列表充实禁止行级 N+1 | **REP-PERF-01**、约定包 **§5.20** | `RepairWorkorderProcessService.enrichWorkorders`；余量见第 7 章 PERF BACKLOG |
 | 字典中文 / I18N 预留 / 新状态种子 | 附录 R、PLT-STATUS-CN-01、**PLT-DICT-SEED-01**、PLT-I18N-01、§5.1 / **§5.13** | `R__data_dict.sql`；`meis-web/src/i18n/`、`useDict`、`StatusTag`；App/MP `status_labels`；新枚举同批三端 catalog |
 | 报修草稿/撤回 / 故障图片 | 附录 S（含 S.6）、约定包 §6.4 / §6.5 | `RepairWorkorderController`、`fault_photos` |
 | 移动端扫码报修 | 附录 MOB | `meis-mobile` 扫码报修 |

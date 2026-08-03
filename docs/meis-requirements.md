@@ -1285,6 +1285,7 @@
 - [x] MT-UI-01 运维管理下二级「保养管理」，其下挂保养参数/计划/执行/记录查询
 - [x] INS-UI-01 / MET-UI-01 运维下「巡检管理」「计量管理」；INS-UI-01b：巡检曾挂保养下；INS-UI-01c：巡检改回运维二级，设备过滤页入组
 - [x] REP-UI-01 运维下二级「维修管理」置顶，收纳报修/处理/配件/验收/故障库/进程类型/工程师
+- [x] REP-PERF-01 报修列表 enrich 批量查询（消除 N+1 超时）
 - [x] PWR-UI-01 电流监测迁入运维二级（计量管理之后）
 
 **AST-UI-05 定稿（2026-07-20）**
@@ -2643,6 +2644,8 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+| 2.216 | 2026-08-03 10:45:00 | — | REP-PERF-01 澄清：验收等同路径；扫描余量入 BACKLOG-*-PERF；约定包 §5.20 |
+| 2.215 | 2026-08-03 10:40:00 | — | REP-PERF-01：报修列表 enrichWorkorders 改批量查询，修复前端 30s 超时空表 |
 | 2.214 | 2026-08-01 15:25:00 | — | AST-UI-25：查看态侧栏导航与内容区滚动修复（顶栏样式勿套侧栏；约定包 §5.19） |
 | 2.213 | 2026-08-01 15:10:00 | — | MOB-SYNC-01：多端已有功能字段/业务分支扩展须 Web 与移动端同批（约定包 §5.18） |
 | 2.212 | 2026-08-01 15:00:00 | — | PLT-REF-CODE-01：强业务外键显示「编码 名称」；采购计划院区/科室继续只显名称 |
@@ -2996,6 +2999,11 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | BACKLOG-REP-07 | 维修 | 报修申请列表展示全部未删工单；维修处理列表范围与进程可编规则 | 附录 U.8 | P1 | — | 已完成 |
 | BACKLOG-REP-F-02 | 维修 | 配件库存扣减与费用汇总 | 附录 U.7 / REP-F-02 | P2 | 待真实用户、降低交付难度 | **长期搁置** |
 | BACKLOG-REP-F-03 | 维修 | 外协维修独立单据 | 附录 U.7 / REP-F-03 | P2 | 待真实用户、降低交付难度 | **长期搁置** |
+| BACKLOG-REP-PERF-02 | 维修 | 工单进程段 `listSegments` 批量装载 parts/users（详情 N+1） | REP-PERF-01 扫描 | P2 | 非 Crud 列表；段多时详情慢 | 可排期 |
+| BACKLOG-SYS-PERF-01 | 系统 | 用户列表 `enrichRoleName` 改本页角色 IN 批量 | REP-PERF-01 扫描 | P2 | 约 1 次/行，难打满 30s | 可排期 |
+| BACKLOG-OPS-PERF-01 | 运维 | 保养/巡检/PM/计量执行单详情 results 批量装载 | REP-PERF-01 扫描 | P2 | 非列表；明细多时详情慢 | 可排期 |
+| BACKLOG-AST-PERF-01 | 资产 | 设备台账/维保列表相关子查询与大 JOIN 性能评估优化 | REP-PERF-01 扫描 | P1 | 最像再撞 30s 的 Crud 列表 | 可排期 |
+| BACKLOG-PUR-PERF-01 | 采购 | 计划明细列表侧 `allocateMissingApproved` 移出热路径 | REP-PERF-01 扫描 | P2 | 缺号多时首次打开可能写库久等 | 可排期 |
 | BACKLOG-PLT-DB-SYNC-01 | 平台 | 将 R__ 中仍未回写 V1 的扩展列分批同步进 `V1__tables.sql`（约 200 列：台账扩展、途径列等） | PLT-DB-SYNC-01 / 附录 D.1 | P2 | 本期已修关键业务路径；全量回填工作量大 | 可排期 |
 | BACKLOG-AST-W01 | 跨模块 | 保养/计量/巡检/PM 执行表与公用设备费用表等补齐 device_id/code/name 冗余 | 附录 W.3.2 | P1 | 维修 P0 先落地；其余分批 | 可排期 |
 | BACKLOG-AST-07 | 资产 | 科室盘点申请 / 设备盘点报表完整业务（表结构、流程、报表） | 主路径已实现（G5） | P1 | 盘亏写回台账另议 | 部分完成 |
@@ -4114,6 +4122,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 多端操作途径补齐 | [MOB-CHANNEL-01](#mob-channel-01-多端操作途径补齐定稿2026-07-29) / [**MOB-CHANNEL-03**](#mob-channel-03-扫描缺列必补--标签打印途径定稿2026-08-01) / [**MOB-CHANNEL-04**](#mob-channel-04-变更日志途径齐套定稿2026-08-01) |
 | 多端功能演进同批 | [MOB-SYNC-01](#mob-sync-01-多端功能演进同批定稿2026-08-01)、约定包 §5.18 |
 | 侧栏表单导航与内容滚动 | [AST-UI-25](#ast-ui-25-查看态侧栏内容滚动定稿2026-08-01)、约定包 §5.19 |
+| 列表充实禁止行级 N+1 | [REP-PERF-01](#rep-perf-01-报修列表充实性能定稿2026-08-03)、约定包 §5.20 |
 | 历史途径回填 / 追加多端约定 | [MOB-CHANNEL-02](#mob-channel-02-历史途径回填--展示齐套--约定-5106定稿2026-07-29)、约定包 §5.10.6 |
 | 现场包前端生产构建 | [PKG-WEB-01](#pkg-web-01-现场包加入前端生产构建定稿2026-07-30) |
 | 开发面板生产构建 | [PKG-WEB-02](#pkg-web-02-开发面板生产构建--现场打包定稿2026-07-30) |
@@ -4307,6 +4316,23 @@ powershell -File scripts/ensure-tenant-tables.ps1
 |------|------|------|
 | 报修申请列表「暂无数据」，但已成功保存草稿 | 列表接口 `/repair/workorder/page` 在 `enrichWorkorders` 查询 `repair_workorder_process` 时 500；老租户 schema 缺该表（及 `repair_workorder_event`） | 重启 **meis-tenant** 触发 `SchemaTableEnsuring` 幂等建表；或执行 `db/source/patches/repair_workorder_flow_tables.sql` |
 | 同上 | 代码已加防御：流程表不存在时列表跳过 enrich，不再整页失败 | 需重新打包 **meis-repair** |
+| 列表 Axios `timeout of 30000ms exceeded` / 暂无数据 | `enrichWorkorders` 对每行打约 8 次进程 SQL（N+1），数据稍多即超前端 30s | **REP-PERF-01**：改为本页一次 `IN` 查询后内存归并 |
+
+### REP-PERF-01 报修列表充实性能（定稿·2026-08-03）
+
+> 来源：报修申请查询不到数据；控制台 `CrudPage` Axios 30s 超时；衍生：验收是否同类、其它模块扫描。
+
+| 项 | 定稿 |
+|----|------|
+| **根因** | 列表 `enrichWorkorders` 逐行多次查 `repair_workorder_process` |
+| **覆盖页** | **报修申请 / 维修处理 / 维修验收** 及工程师队列、我的报修——均走同一 `GET /repair/workorder/page`（或同类）+ `enrichWorkorders`；验收空表/超时与申请为**同一问题**，随本项一并修复 |
+| **规则** | 对本页工单 id **一次 IN 查询**进程行，内存归并；单条详情可复用同一批量入口 |
+| **兜底** | enrich 异常不拖垮 page（仍返回主表行） |
+| **扫描余量** | 见第 7 章 `BACKLOG-*-PERF-*`（用户角色 enrich、台账 SQL、执行单详情、采购补号等）；**本批不顺带大修** |
+| **约定** | 双写约定包 **§5.20**（列表禁止行级 N+1） |
+| **部署** | 重启/热加载 **meis-repair** |
+
+**状态**：已完成。
 
 ---
 
@@ -7471,3 +7497,6 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 > - **范围**：资产登记查看态（`DeviceLedgerForm` 侧栏）；编辑态顶栏不变
 > - **双写**：约定包 §5.19
 > **部署**：刷新前端即可
+
+> **REP-PERF-01（2026-08-03）**：报修列表「查不到/超时」——enrichWorkorders 改本页一次 IN 查询，消除 N+1；**报修申请/处理/验收同一路径**；重启 meis-repair。
+> **扫描余量（入第 7 章）**：用户角色 enrich、台账/维保 SQL、执行单详情、采购补号副作用 → BACKLOG-*-PERF-*；约定包 §5.20。

@@ -226,6 +226,13 @@ public class RepairWorkorderController {
                 pageArgs.toArray());
         for (Map<String, Object> row : rows) {
             normalizeFaultPhotosField(row);
+        }
+        try {
+            processService.enrichWorkorders(rows);
+        } catch (Exception ignored) {
+            // 列表充实失败不拖垮整页（REP-PERF-01）
+        }
+        for (Map<String, Object> row : rows) {
             String st = str(row.get("status"));
             boolean unassigned = isUnassigned(row);
             boolean mine = uid != null && uid.equalsIgnoreCase(str(row.get("assigned_user_id")));
@@ -237,7 +244,6 @@ public class RepairWorkorderController {
                             "repairing", "verify_rejected", "suspended").contains(st))
                             || (unassigned && Set.of("reported", "dispatching").contains(st)));
         }
-        processService.enrichWorkorders(rows);
         return Result.ok(PageResult.of(rows, total != null ? total : 0, query.getPage(), query.getSize()));
     }
 
@@ -287,7 +293,11 @@ public class RepairWorkorderController {
         for (Map<String, Object> row : rows) {
             normalizeFaultPhotosField(row);
         }
-        processService.enrichWorkorders(rows);
+        try {
+            processService.enrichWorkorders(rows);
+        } catch (Exception ignored) {
+            // 列表充实失败不拖垮整页（REP-PERF-01）
+        }
         return Result.ok(PageResult.of(rows, total != null ? total : 0, query.getPage(), query.getSize()));
     }
 
@@ -363,7 +373,11 @@ public class RepairWorkorderController {
         for (Map<String, Object> row : rows) {
             normalizeFaultPhotosField(row);
         }
-        processService.enrichWorkorders(rows);
+        try {
+            processService.enrichWorkorders(rows);
+        } catch (Exception ignored) {
+            // 列表充实失败不拖垮整页（REP-PERF-01）
+        }
         return Result.ok(PageResult.of(rows, total != null ? total : 0, query.getPage(), query.getSize()));
     }
 
