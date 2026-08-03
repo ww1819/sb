@@ -52,7 +52,7 @@ class HomePage extends ConsumerWidget {
               const MeisSectionLabel('常用功能'),
               MeisNavTile(
                 icon: Icons.search,
-                title: '扫码查台账',
+                title: '台账查询',
                 subtitle: 'UDI / 责任人 / 证照授权只读',
                 onTap: () => _push(context, const DeviceLookupPage()),
               ),
