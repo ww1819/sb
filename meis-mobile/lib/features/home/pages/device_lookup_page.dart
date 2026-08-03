@@ -118,7 +118,7 @@ class _DeviceLookupPageState extends ConsumerState<DeviceLookupPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('扫码查台账')),
+      appBar: AppBar(title: const Text('台账查询')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(AppSpacing.pageH, AppSpacing.md, AppSpacing.pageH, AppSpacing.xxl),
         children: [
