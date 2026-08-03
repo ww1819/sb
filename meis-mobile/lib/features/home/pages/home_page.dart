@@ -21,7 +21,7 @@ import 'power_tag_hub_page.dart';
 import 'repair_page.dart';
 import 'shared_hub_page.dart';
 
-/// 「功能」页：原首页业务入口（MOB-UI-02）
+/// 「工作台」页：业务入口（MOB-UI-02）
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 

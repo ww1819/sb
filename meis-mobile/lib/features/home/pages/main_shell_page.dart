@@ -6,7 +6,7 @@ import 'home_page.dart';
 import 'message_page.dart';
 import 'mine_page.dart';
 
-/// 登录后主壳：底部「消息 / 功能 / 我的」（MOB-UI-02）
+/// 登录后主壳：底部「消息 / 工作台 / 我的」（MOB-UI-02）
 class MainShellPage extends ConsumerStatefulWidget {
   const MainShellPage({super.key});
 
@@ -15,7 +15,7 @@ class MainShellPage extends ConsumerStatefulWidget {
 }
 
 class _MainShellPageState extends ConsumerState<MainShellPage> {
-  /// 默认落在「功能」
+  /// 默认落在「工作台」
   int _index = 1;
 
   @override
@@ -45,7 +45,7 @@ class _MainShellPageState extends ConsumerState<MainShellPage> {
           NavigationDestination(
             icon: Icon(Icons.grid_view_outlined),
             selectedIcon: Icon(Icons.grid_view, color: AppColors.primary),
-            label: '功能',
+            label: '工作台',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
