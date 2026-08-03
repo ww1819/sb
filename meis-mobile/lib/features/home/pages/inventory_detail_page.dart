@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -5,10 +7,10 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/local_sync_service.dart';
+import '../../../shared/utils/barcode_scan.dart';
 import '../../../shared/utils/status_labels.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_status_chip.dart';
-import 'repair_scan_page.dart';
 
 class InventoryDetailPage extends ConsumerStatefulWidget {
   const InventoryDetailPage({
@@ -94,6 +96,14 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
       });
       return;
     }
+    Map<String, dynamic> fromPayload = {};
+    final payload = check['payload_json']?.toString();
+    if (payload != null && payload.isNotEmpty) {
+      try {
+        final m = jsonDecode(payload);
+        if (m is Map) fromPayload = Map<String, dynamic>.from(m);
+      } catch (_) {}
+    }
     setState(() {
       master = {
         'id': check['id'],
@@ -101,6 +111,8 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
         'check_name': check['check_name'],
         'status': check['status'],
         'audit_status': check['audit_status'],
+        'check_type': fromPayload['check_type'] ?? check['check_type'],
+        'dept_name': fromPayload['dept_name'] ?? check['dept_name'],
       };
       items = localItems
           .map((e) => {
@@ -168,11 +180,8 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
   }
 
   Future<void> scanAndMark() async {
-    final code = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(builder: (_) => const RepairScanPage()),
-    );
-    if (code == null || code.isEmpty) return;
+    final code = await openBarcodeScanner(context);
+    if (code == null) return;
     if (localMode) {
       final match = items.where((e) => e['device_code']?.toString() == code.trim()).toList();
       if (match.isEmpty) {
@@ -281,6 +290,9 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
     final status = master?['status']?.toString() ?? '';
     final audit = master?['audit_status']?.toString() ?? '';
     final statusText = '${resolveStatusLabel('check_status', status)} / ${resolveStatusLabel('audit_status', audit)}';
+    final typeLabel = resolveStatusLabel('check_type', master?['check_type']);
+    final deptLabel = _text(master, 'dept_name');
+    final typeLine = deptLabel == '—' ? '类型：$typeLabel' : '类型：$typeLabel · $deptLabel';
     return Scaffold(
       appBar: AppBar(
         title: Text(localMode ? '$title（离线）' : title),
@@ -315,17 +327,24 @@ class _InventoryDetailPageState extends ConsumerState<InventoryDetailPage>
                   ),
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        MeisStatusChip(statusText),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            '单号：${_text(master, 'check_no')}',
-                            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                        Row(
+                          children: [
+                            MeisStatusChip(statusText),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '单号：${_text(master, 'check_no')}',
+                                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
+                        const SizedBox(height: 6),
+                        Text(typeLine, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
                       ],
                     ),
                   ),

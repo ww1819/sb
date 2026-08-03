@@ -1,5 +1,6 @@
 package com.meis.saas.asset.controller;
 
+import com.meis.saas.asset.service.DeviceOwnershipPeriodService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
@@ -18,6 +19,7 @@ import java.util.*;
 public class AssetTransferController {
     private final JdbcTemplate jdbc;
     private final ApprovalInstanceService approvalService;
+    private final DeviceOwnershipPeriodService ownershipService;
 
     @GetMapping("/{id}")
     public Result<Map<String, Object>> get(@PathVariable UUID id) {
@@ -78,13 +80,24 @@ public class AssetTransferController {
                         + SoftDeleteSupport.notDeletedClause(jdbc, "asset_transfer", null), id);
         if (row.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> t = row.get(0);
-        if (t.get("to_dept_id") != null && t.get("device_id") != null) {
-            jdbc.update("UPDATE medical_device SET dept_id = ?::uuid, updated_at = NOW() WHERE id = ?::uuid",
-                    t.get("to_dept_id"), t.get("device_id"));
+        UUID deviceId = t.get("device_id") != null ? UUID.fromString(t.get("device_id").toString()) : null;
+        if (t.get("to_dept_id") != null && deviceId != null) {
+            jdbc.update("UPDATE medical_device SET dept_id = ?::uuid, warehouse_id = NULL, updated_at = NOW() WHERE id = ?::uuid",
+                    t.get("to_dept_id"), deviceId);
         }
-        if (t.get("to_warehouse_id") != null && t.get("device_id") != null) {
+        if (t.get("to_warehouse_id") != null && deviceId != null) {
             jdbc.update("UPDATE medical_device SET warehouse_id = ?::uuid, updated_at = NOW() WHERE id = ?::uuid",
-                    t.get("to_warehouse_id"), t.get("device_id"));
+                    t.get("to_warehouse_id"), deviceId);
+        }
+        if (t.get("to_campus_id") != null && deviceId != null) {
+            jdbc.update("UPDATE medical_device SET campus_id = ?::uuid, updated_at = NOW() WHERE id = ?::uuid",
+                    t.get("to_campus_id"), deviceId);
+        }
+        if (deviceId != null && (t.get("to_dept_id") != null || t.get("to_warehouse_id") != null
+                || t.get("to_campus_id") != null)) {
+            String transferNo = t.get("transfer_no") != null ? String.valueOf(t.get("transfer_no")) : null;
+            ownershipService.openPeriodFromLedger(
+                    deviceId, "biz_doc", "biz_doc", "asset_transfer", id, transferNo);
         }
         jdbc.update("UPDATE asset_transfer SET status = 'completed', updated_at = NOW() WHERE id = ?::uuid", id);
         return get(id);

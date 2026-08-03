@@ -54,6 +54,7 @@ import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { http } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
+import { scanBarcode } from '@/utils/scanCode'
 
 interface DeviceInfo {
   id: string
@@ -101,20 +102,11 @@ function onSeverityChange(e: { detail: { value: string } }) {
   severityIndex.value = Number(e.detail.value) || 0
 }
 
-function scan() {
-  uni.scanCode({
-    onlyFromCamera: false,
-    success: (res) => {
-      const code = (res.result || '').trim()
-      if (!code) {
-        uni.showToast({ title: '未识别到编码', icon: 'none' })
-        return
-      }
-      deviceCode.value = code
-      lookupByCode(code)
-    },
-    fail: () => uni.showToast({ title: '扫码取消或失败', icon: 'none' })
-  })
+async function scan() {
+  const code = await scanBarcode()
+  if (!code) return
+  deviceCode.value = code
+  lookupByCode(code)
 }
 
 function lookupManual() {

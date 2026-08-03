@@ -602,9 +602,11 @@ CREATE TABLE IF NOT EXISTS medical_device (
     calibration_period_days INTEGER,
     last_calibration_date DATE,
     next_calibration_date DATE,
-    service_expiry_date DATE
+    service_expiry_date DATE,
+    service_expiry_basis VARCHAR(30)
 );
 COMMENT ON TABLE medical_device IS '设备档案主表';
+COMMENT ON COLUMN medical_device.service_expiry_basis IS 'AST-EXP-01：使用到期推算锚点 enable/production/acceptance/purchase/created';
 COMMENT ON COLUMN medical_device.id IS '主键';
 COMMENT ON COLUMN medical_device.device_code IS '设备编码';
 COMMENT ON COLUMN medical_device.device_name IS '设备名称';

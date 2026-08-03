@@ -1,23 +1,31 @@
 <template>
   <AppModal v-model="visible" title="选择设备" size="xl" @close="onClose">
     <el-form :inline="true" class="filter-form" @submit.prevent="load">
-      <el-form-item label="科室">
-        <el-input v-model="filters.deptName" clearable placeholder="科室名称" @keyup.enter="load" />
+      <el-form-item label="资产编码">
+        <el-input v-model="filters.deviceCode" clearable placeholder="资产编码" @keyup.enter="load" />
       </el-form-item>
       <el-form-item label="名称">
-        <el-input v-model="filters.deviceName" clearable placeholder="资产名称" @keyup.enter="load" />
+        <el-input v-model="filters.deviceName" clearable placeholder="名称/拼音简码" @keyup.enter="load" />
       </el-form-item>
       <el-form-item label="规格">
         <el-input v-model="filters.specification" clearable placeholder="规格" @keyup.enter="load" />
       </el-form-item>
-      <el-form-item label="资产编码">
-        <el-input v-model="filters.deviceCode" clearable placeholder="资产编码" @keyup.enter="load" />
-      </el-form-item>
-      <el-form-item label="流水号">
-        <el-input v-model="filters.financialCode" clearable placeholder="流水号" @keyup.enter="load" />
+      <el-form-item label="型号">
+        <el-input v-model="filters.model" clearable placeholder="型号" @keyup.enter="load" />
       </el-form-item>
       <el-form-item label="序列号">
         <el-input v-model="filters.serialNumber" clearable placeholder="序列号" @keyup.enter="load" />
+      </el-form-item>
+      <el-form-item label="电流标签">
+        <el-input v-model="filters.powerTagCode" clearable placeholder="电流监测编码" @keyup.enter="load" />
+      </el-form-item>
+      <el-form-item label="科室">
+        <el-input v-model="filters.deptName" clearable placeholder="科室名称" @keyup.enter="load" />
+      </el-form-item>
+      <el-form-item label="设备状态">
+        <el-select v-model="filters.deviceStatus" clearable placeholder="状态" style="width: 120px">
+          <el-option v-for="o in statusOptions" :key="o.value" :label="o.label" :value="o.value" />
+        </el-select>
       </el-form-item>
       <el-form-item>
         <el-button type="primary" @click="load">查询</el-button>
@@ -34,22 +42,12 @@
       @row-click="onRowClick"
       @row-dblclick="confirmRow"
     >
-      <el-table-column width="48">
+      <el-table-column width="48" fixed="left">
         <template #default="{ row }">
           <el-radio :model-value="selectedId" :value="String(row.id)" @change="selectRow(row)" />
         </template>
       </el-table-column>
-      <el-table-column prop="dept_name" label="科室" min-width="120" show-overflow-tooltip />
-      <el-table-column prop="device_name" label="名称" min-width="140" show-overflow-tooltip />
-      <el-table-column prop="specification" label="规格" min-width="100" show-overflow-tooltip />
-      <el-table-column prop="device_code" label="资产编码" min-width="120" />
-      <el-table-column prop="financial_code" label="流水号" min-width="110" />
-      <el-table-column prop="serial_number" label="序列号" min-width="110" />
-      <el-table-column prop="device_status" label="状态" width="90">
-        <template #default="{ row }">
-          <TableCellValue :field="{ prop: 'device_status', dictType: 'device_status' }" :value="row.device_status" />
-        </template>
-      </el-table-column>
+      <DeviceLedgerTableColumns code-fixed="left" />
     </el-table>
 
     <template #footer>
@@ -60,11 +58,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/api/http'
 import AppModal from '@/components/AppModal.vue'
-import TableCellValue from '@/components/table/TableCellValue.vue'
+import DeviceLedgerTableColumns from '@/components/table/DeviceLedgerTableColumns.vue'
+import { useDict } from '@/composables/useDict'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{
@@ -81,35 +80,37 @@ const loading = ref(false)
 const rows = ref<Record<string, unknown>[]>([])
 const selected = ref<Record<string, unknown> | null>(null)
 const selectedId = computed(() => (selected.value?.id ? String(selected.value.id) : ''))
+const statusOptions = ref<{ label: string; value: string }[]>([])
+const { loadDict } = useDict()
 
 const filters = reactive({
-  deptName: '',
+  deviceCode: '',
   deviceName: '',
   specification: '',
-  deviceCode: '',
-  financialCode: '',
-  serialNumber: ''
+  model: '',
+  serialNumber: '',
+  powerTagCode: '',
+  deptName: '',
+  deviceStatus: ''
 })
-
-function buildKeyword() {
-  const parts = [
-    filters.deviceName,
-    filters.deviceCode,
-    filters.specification,
-    filters.financialCode,
-    filters.serialNumber,
-    filters.deptName
-  ].filter((v) => v?.trim())
-  return parts.join(' ').trim()
-}
 
 async function load() {
   loading.value = true
   try {
-    const keyword = buildKeyword()
-    const params: Record<string, string | number> = { page: 1, size: 100 }
-    if (keyword) params.keyword = keyword
-    const { data } = await http.get('/asset/medical_device/query/page', { params })
+    const params: Record<string, string | number | boolean> = {
+      page: 1,
+      size: 100,
+      hide_returned: true
+    }
+    if (filters.deviceCode.trim()) params.device_code = filters.deviceCode.trim()
+    if (filters.deviceName.trim()) params.device_name = filters.deviceName.trim()
+    if (filters.specification.trim()) params.specification = filters.specification.trim()
+    if (filters.model.trim()) params.model = filters.model.trim()
+    if (filters.serialNumber.trim()) params.serial_number = filters.serialNumber.trim()
+    if (filters.powerTagCode.trim()) params.power_tag_code = filters.powerTagCode.trim()
+    if (filters.deptName.trim()) params.dept_name = filters.deptName.trim()
+    if (filters.deviceStatus) params.device_status = filters.deviceStatus
+    const { data } = await http.get('/asset/device/page', { params })
     if (data.code !== 0 && data.code !== 200) {
       ElMessage.error(data.message || '加载设备列表失败')
       rows.value = []
@@ -122,12 +123,14 @@ async function load() {
 }
 
 function onReset() {
-  filters.deptName = ''
+  filters.deviceCode = ''
   filters.deviceName = ''
   filters.specification = ''
-  filters.deviceCode = ''
-  filters.financialCode = ''
+  filters.model = ''
   filters.serialNumber = ''
+  filters.powerTagCode = ''
+  filters.deptName = ''
+  filters.deviceStatus = ''
   load()
 }
 
@@ -156,6 +159,14 @@ watch(
     load()
   }
 )
+
+onMounted(async () => {
+  const opts = await loadDict('device_status')
+  statusOptions.value = opts.map((o: { label: string; value: string }) => ({
+    label: o.label,
+    value: o.value
+  }))
+})
 </script>
 
 <style scoped>

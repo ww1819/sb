@@ -147,6 +147,7 @@ import DeviceLedgerPicker from '@/components/asset/DeviceLedgerPicker.vue'
 import { getPageConfig } from '@/config/pageRegistry'
 import { getDetailFields, getSchema } from '@/config/pageSchemas'
 import { printInventoryReprintLabels } from '@/utils/printAssetLabel'
+import { deviceLedgerSnapshot } from '@/utils/deviceLedgerSnapshot'
 
 const route = useRoute()
 const path = computed(() => '/' + String(route.params.module) + '/' + String(route.params.page))
@@ -196,8 +197,9 @@ function canModify(row: Record<string, unknown>) {
 }
 
 function createNew() {
+  const defaultType = config.value.listParams?.check_type
   master.value = {
-    check_type: 'annual',
+    check_type: defaultType != null && defaultType !== '' ? String(defaultType) : 'annual',
     status: 'planning',
     audit_status: 'pending',
     check_year: new Date().getFullYear()
@@ -228,9 +230,7 @@ function onDevicesPicked(devices: Record<string, unknown>[]) {
     if (!id || existing.has(id)) continue
     existing.add(id)
     items.value.push({
-      device_id: id,
-      device_code: device.device_code,
-      device_name: device.device_name,
+      ...deviceLedgerSnapshot(device),
       expected_location: device.location_detail ?? '',
       actual_location: '',
       is_found: false,

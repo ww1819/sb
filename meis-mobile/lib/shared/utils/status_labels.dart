@@ -11,6 +11,8 @@ const Map<String, Map<String, String>> _zhCatalog = {
     'scrap': '已报废',
     'pending_verify': '已维修待验收',
     'returned': '已退货',
+    'idle': '闲置',
+    'borrowed': '借出中',
   },
   'wo_status': {
     'draft': '未提交',
@@ -49,6 +51,64 @@ const Map<String, Map<String, String>> _zhCatalog = {
   'audit_status': {
     'pending': '待审核',
     'approved': '已审核',
+    'rejected': '已驳回',
+  },
+  'check_type': {
+    'annual': '年度盘点',
+    'spot': '抽盘',
+    'dept': '科室盘点',
+  },
+  'scrap_status': {
+    'draft': '草稿',
+    'pending': '审批中',
+    'approved': '已批准',
+    'disposed': '已处置',
+    'rejected': '已驳回',
+  },
+  'eq_class': {
+    'class_1': 'Ⅰ类',
+    'class_2': 'Ⅱ类',
+    'class_3': 'Ⅲ类',
+  },
+  'device_criticality': {
+    'high': '高',
+    'medium': '中',
+    'low': '低',
+  },
+  'acquisition_mode': {
+    'purchase': '购入',
+    'donation': '捐赠',
+    'transfer_in': '划拨',
+    'finance_lease': '融资租赁',
+    'other': '其他',
+  },
+  'depreciation_method': {
+    'straight_line': '平均年限法',
+    'units_of_production': '工作量法',
+    'other': '其他',
+  },
+  'device_license_type': {
+    'registration': '注册证',
+    'metrology': '计量证书',
+    'special': '特种许可',
+    'inspection': '强检证书',
+    'other': '其他',
+  },
+  'auth_scope': {
+    'operate': '操作授权',
+    'maintain': '维保授权',
+  },
+  'udi_change_reason': {
+    'update': '更新',
+    'correct': '纠错',
+    'import': '导入',
+  },
+  'service_expiry_basis': {
+    'enable': '启用日期+年限',
+    'production': '生产日期+年限',
+    'acceptance': '验收日期+年限',
+    'purchase': '购置日期+年限',
+    'created': '录入日期+年限',
   },
   'maintain_exec_status': {
     'draft': '草稿',

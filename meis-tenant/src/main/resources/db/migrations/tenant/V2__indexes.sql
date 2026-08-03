@@ -208,3 +208,67 @@ CREATE INDEX IF NOT EXISTS idx_insp_exec_result_exec_no ON inspection_execution_
 CREATE INDEX IF NOT EXISTS idx_metro_exec_result_exec_no ON metrology_execution_result(execution_no);
 CREATE INDEX IF NOT EXISTS idx_wo_segment_user_wo_no ON repair_workorder_segment_user(wo_no);
 CREATE INDEX IF NOT EXISTS idx_insp_record_device_code ON inspection_record(device_code);
+
+-- ---------- AST-WRN-02：设备维保信息主从 ----------
+CREATE INDEX IF NOT EXISTS idx_device_warranty_dates ON device_warranty(start_date, end_date);
+COMMENT ON INDEX idx_device_warranty_dates IS '索引：维保信息.起止日期';
+CREATE INDEX IF NOT EXISTS idx_device_warranty_supplier ON device_warranty(supplier_id);
+COMMENT ON INDEX idx_device_warranty_supplier IS '索引：维保信息.维保公司';
+CREATE INDEX IF NOT EXISTS idx_device_warranty_device_warranty ON device_warranty_device(warranty_id);
+COMMENT ON INDEX idx_device_warranty_device_warranty IS '索引：维保覆盖设备.维保头';
+CREATE INDEX IF NOT EXISTS idx_device_warranty_device_device ON device_warranty_device(device_id);
+COMMENT ON INDEX idx_device_warranty_device_device IS '索引：维保覆盖设备.设备';
+CREATE UNIQUE INDEX IF NOT EXISTS uk_device_warranty_device_active
+    ON device_warranty_device(warranty_id, device_id) WHERE is_deleted = 0;
+COMMENT ON INDEX uk_device_warranty_device_active IS '唯一：同一维保包内设备不重复（未软删）';
+
+-- ---------- AST-OWN-01 / AST-PART-01 / AST-LOC-01 ----------
+CREATE INDEX IF NOT EXISTS idx_own_period_device ON device_ownership_period(device_id);
+COMMENT ON INDEX idx_own_period_device IS '索引：归属区间.设备';
+CREATE INDEX IF NOT EXISTS idx_own_period_from ON device_ownership_period(effective_from);
+COMMENT ON INDEX idx_own_period_from IS '索引：归属区间.生效起';
+CREATE INDEX IF NOT EXISTS idx_own_period_confirm ON device_ownership_period(confirm_status);
+COMMENT ON INDEX idx_own_period_confirm IS '索引：归属区间.确认状态';
+
+CREATE INDEX IF NOT EXISTS idx_part_repl_device ON device_part_replacement(device_id);
+COMMENT ON INDEX idx_part_repl_device IS '索引：非维修换件.设备';
+CREATE INDEX IF NOT EXISTS idx_part_repl_replaced_at ON device_part_replacement(replaced_at);
+COMMENT ON INDEX idx_part_repl_replaced_at IS '索引：非维修换件.更换时间';
+CREATE INDEX IF NOT EXISTS idx_part_repl_confirm ON device_part_replacement(confirm_status);
+COMMENT ON INDEX idx_part_repl_confirm IS '索引：非维修换件.确认状态';
+
+CREATE INDEX IF NOT EXISTS idx_loc_period_device ON device_location_period(device_id);
+COMMENT ON INDEX idx_loc_period_device IS '索引：位置区间.设备';
+CREATE INDEX IF NOT EXISTS idx_loc_period_from ON device_location_period(effective_from);
+COMMENT ON INDEX idx_loc_period_from IS '索引：位置区间.生效起';
+CREATE INDEX IF NOT EXISTS idx_loc_period_confirm ON device_location_period(confirm_status);
+COMMENT ON INDEX idx_loc_period_confirm IS '索引：位置区间.确认状态';
+
+-- ---------- AST-GAP-REVIEW-01：证照/培训/档案/UDI 史 ----------
+CREATE INDEX IF NOT EXISTS idx_device_license_device ON device_license(device_id);
+COMMENT ON INDEX idx_device_license_device IS '索引：设备证照.设备';
+CREATE INDEX IF NOT EXISTS idx_device_license_type ON device_license(license_type);
+COMMENT ON INDEX idx_device_license_type IS '索引：设备证照.类型';
+CREATE INDEX IF NOT EXISTS idx_device_license_expiry ON device_license(expiry_date);
+COMMENT ON INDEX idx_device_license_expiry IS '索引：设备证照.有效期';
+
+CREATE INDEX IF NOT EXISTS idx_device_training_device ON device_training_auth(device_id);
+COMMENT ON INDEX idx_device_training_device IS '索引：培训授权.设备';
+CREATE INDEX IF NOT EXISTS idx_device_training_user ON device_training_auth(user_id);
+COMMENT ON INDEX idx_device_training_user IS '索引：培训授权.人员';
+CREATE INDEX IF NOT EXISTS idx_device_training_expiry ON device_training_auth(expiry_date);
+COMMENT ON INDEX idx_device_training_expiry IS '索引：培训授权.有效期';
+
+CREATE INDEX IF NOT EXISTS idx_device_archive_device ON device_archive_file(device_id);
+COMMENT ON INDEX idx_device_archive_device IS '索引：设备档案.设备';
+CREATE INDEX IF NOT EXISTS idx_device_archive_type ON device_archive_file(archive_type);
+COMMENT ON INDEX idx_device_archive_type IS '索引：设备档案.类型';
+
+CREATE INDEX IF NOT EXISTS idx_device_udi_hist_device ON device_udi_history(device_id);
+COMMENT ON INDEX idx_device_udi_hist_device IS '索引：UDI 历史.设备';
+CREATE INDEX IF NOT EXISTS idx_device_udi_hist_from ON device_udi_history(effective_from);
+COMMENT ON INDEX idx_device_udi_hist_from IS '索引：UDI 历史.生效起';
+CREATE INDEX IF NOT EXISTS idx_ext_asset_disp_device ON external_asset_disposition(device_id);
+COMMENT ON INDEX idx_ext_asset_disp_device IS '索引：外部处置.设备';
+CREATE INDEX IF NOT EXISTS idx_ext_asset_disp_sync ON external_asset_disposition(sync_status);
+COMMENT ON INDEX idx_ext_asset_disp_sync IS '索引：外部处置.同步状态';

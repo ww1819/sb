@@ -234,7 +234,10 @@ async function openLabelPreview(rows: Record<string, unknown>[]) {
 async function recordDevicePrintLog(deviceId: unknown) {
   if (!deviceId) return
   try {
-    await http.post(`/asset/device/${deviceId}/label/print`, { template_code: 'asset_sticker' })
+    await http.post(`/asset/device/${deviceId}/label/print`, {
+      template_code: 'asset_sticker',
+      client: 'web'
+    })
   } catch {
     // 打印预览已打开，记录失败不阻断
   }
@@ -276,7 +279,8 @@ export async function printInventoryReprintLabels(
   try {
     await http.post(`/asset/inventory/${checkId}/label/print`, {
       item_ids: itemIds,
-      template_code: 'asset_sticker'
+      template_code: 'asset_sticker',
+      client: 'web'
     })
   } catch {
     // 预览已打开，记录失败不阻断

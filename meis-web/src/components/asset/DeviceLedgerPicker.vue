@@ -1,6 +1,35 @@
 <template>
   <AppModal v-model="visible" title="选择盘点设备" size="xl" @close="onClose">
-    <PageFilterBar v-model:keyword="keyword" placeholder="资产编码/名称" @search="load" @reset="onReset" />
+    <el-form :inline="true" class="filter-form" @submit.prevent="load">
+      <el-form-item label="资产编码">
+        <el-input v-model="filters.deviceCode" clearable placeholder="资产编码" @keyup.enter="load" />
+      </el-form-item>
+      <el-form-item label="名称">
+        <el-input v-model="filters.deviceName" clearable placeholder="名称/拼音简码" @keyup.enter="load" />
+      </el-form-item>
+      <el-form-item label="规格">
+        <el-input v-model="filters.specification" clearable placeholder="规格" @keyup.enter="load" />
+      </el-form-item>
+      <el-form-item label="型号">
+        <el-input v-model="filters.model" clearable placeholder="型号" @keyup.enter="load" />
+      </el-form-item>
+      <el-form-item label="序列号">
+        <el-input v-model="filters.serialNumber" clearable placeholder="序列号" @keyup.enter="load" />
+      </el-form-item>
+      <el-form-item label="电流标签">
+        <el-input v-model="filters.powerTagCode" clearable placeholder="电流监测编码" @keyup.enter="load" />
+      </el-form-item>
+      <el-form-item label="设备状态">
+        <el-select v-model="filters.deviceStatus" clearable placeholder="状态" style="width: 120px">
+          <el-option v-for="o in statusOptions" :key="o.value" :label="o.label" :value="o.value" />
+        </el-select>
+      </el-form-item>
+      <el-form-item>
+        <el-button type="primary" @click="load">查询</el-button>
+        <el-button @click="onReset">重置</el-button>
+      </el-form-item>
+    </el-form>
+
     <el-table
       ref="tableRef"
       v-loading="loading"
@@ -9,14 +38,8 @@
       max-height="420"
       @selection-change="onSelectionChange"
     >
-      <el-table-column type="selection" width="48" reserve-selection />
-      <el-table-column prop="device_code" label="资产编码" min-width="120" />
-      <el-table-column prop="device_name" label="资产名称" min-width="140" show-overflow-tooltip />
-      <el-table-column prop="brand" label="品牌" min-width="100" />
-      <el-table-column prop="specification" label="规格" min-width="100" />
-      <el-table-column prop="model" label="型号" min-width="100" />
-      <el-table-column prop="location_detail" label="位置" min-width="120" show-overflow-tooltip />
-      <el-table-column prop="device_status" label="状态" min-width="90" />
+      <el-table-column type="selection" width="48" reserve-selection fixed="left" />
+      <DeviceLedgerTableColumns code-fixed="left" />
     </el-table>
     <template #footer>
       <el-button @click="visible = false">取消</el-button>
@@ -28,12 +51,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/api/http'
 import AppModal from '@/components/AppModal.vue'
-import PageFilterBar from '@/components/system/PageFilterBar.vue'
+import DeviceLedgerTableColumns from '@/components/table/DeviceLedgerTableColumns.vue'
 import { useCrossPageSelection } from '@/composables/useCrossPageSelection'
+import { useDict } from '@/composables/useDict'
 
 const props = defineProps<{
   modelValue: boolean
@@ -54,11 +78,22 @@ const visible = computed({
 })
 
 const loading = ref(false)
-const keyword = ref('')
 const rows = ref<Record<string, unknown>[]>([])
 const selected = ref<Record<string, unknown>[]>([])
 const tableRef = ref()
+const statusOptions = ref<{ label: string; value: string }[]>([])
 const { syncFromTable, clearAll } = useCrossPageSelection()
+const { loadDict } = useDict()
+
+const filters = reactive({
+  deviceCode: '',
+  deviceName: '',
+  specification: '',
+  model: '',
+  serialNumber: '',
+  powerTagCode: '',
+  deviceStatus: ''
+})
 
 async function load() {
   if (!props.deptId) {
@@ -73,24 +108,28 @@ async function load() {
     if (props.campusId) params.campusId = props.campusId
     if (props.checkId) params.checkId = props.checkId
     if (props.excludeIds?.length) params.excludeIds = props.excludeIds
+    if (filters.deviceCode.trim()) params.deviceCode = filters.deviceCode.trim()
+    if (filters.deviceName.trim()) params.deviceName = filters.deviceName.trim()
+    if (filters.specification.trim()) params.specification = filters.specification.trim()
+    if (filters.model.trim()) params.model = filters.model.trim()
+    if (filters.serialNumber.trim()) params.serialNumber = filters.serialNumber.trim()
+    if (filters.powerTagCode.trim()) params.powerTagCode = filters.powerTagCode.trim()
+    if (filters.deviceStatus) params.deviceStatus = filters.deviceStatus
     const { data } = await http.get('/asset/inventory/devices/candidates', { params })
-    let list = (data.data ?? []) as Record<string, unknown>[]
-    if (keyword.value) {
-      const kw = keyword.value.toLowerCase()
-      list = list.filter((r) => {
-        const code = String(r.device_code ?? '').toLowerCase()
-        const name = String(r.device_name ?? '').toLowerCase()
-        return code.includes(kw) || name.includes(kw)
-      })
-    }
-    rows.value = list
+    rows.value = (data.data ?? []) as Record<string, unknown>[]
   } finally {
     loading.value = false
   }
 }
 
 function onReset() {
-  keyword.value = ''
+  filters.deviceCode = ''
+  filters.deviceName = ''
+  filters.specification = ''
+  filters.model = ''
+  filters.serialNumber = ''
+  filters.powerTagCode = ''
+  filters.deviceStatus = ''
   load()
 }
 
@@ -112,7 +151,17 @@ function confirm() {
 
 function onClose() {
   onClearSelection()
-  keyword.value = ''
+  onResetFiltersOnly()
+}
+
+function onResetFiltersOnly() {
+  filters.deviceCode = ''
+  filters.deviceName = ''
+  filters.specification = ''
+  filters.model = ''
+  filters.serialNumber = ''
+  filters.powerTagCode = ''
+  filters.deviceStatus = ''
 }
 
 watch(
@@ -128,4 +177,18 @@ watch(
     load()
   }
 )
+
+onMounted(async () => {
+  const opts = await loadDict('device_status')
+  statusOptions.value = opts.map((o: { label: string; value: string }) => ({
+    label: o.label,
+    value: o.value
+  }))
+})
 </script>
+
+<style scoped>
+.filter-form {
+  margin-bottom: 12px;
+}
+</style>

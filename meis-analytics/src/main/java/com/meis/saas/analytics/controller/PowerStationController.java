@@ -1,6 +1,7 @@
 package com.meis.saas.analytics.controller;
 
 import com.meis.saas.analytics.service.PowerReadingQueryService;
+import com.meis.saas.common.audit.DocChangeLogService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.ops.OpsClientChannel;
@@ -23,6 +24,7 @@ import java.util.*;
 public class PowerStationController {
     private final JdbcTemplate jdbc;
     private final PowerReadingQueryService readingQuery;
+    private final DocChangeLogService docLog;
 
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(PageQuery query,
@@ -159,6 +161,8 @@ public class PowerStationController {
             sql += " WHERE id=?::uuid";
             args.add(id);
             jdbc.update(sql, args.toArray());
+            docLog.event("power", "station", id, Objects.toString(body.get("station_code"), null),
+                    "update", channel, null);
             return get(id);
         }
 
@@ -214,6 +218,8 @@ public class PowerStationController {
         }
         jdbc.update("INSERT INTO power_base_station (" + String.join(", ", cols) + ") VALUES ("
                 + String.join(", ", ph) + ")", args.toArray());
+        docLog.event("power", "station", id, Objects.toString(body.get("station_code"), null),
+                "create", channel, null);
         return get(id);
     }
 

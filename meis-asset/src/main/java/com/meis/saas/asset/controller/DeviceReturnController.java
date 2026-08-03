@@ -1,5 +1,6 @@
 package com.meis.saas.asset.controller;
 
+import com.meis.saas.asset.service.DeviceOwnershipPeriodService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.FilterCsvSupport;
@@ -21,6 +22,7 @@ import java.util.*;
 public class DeviceReturnController {
     private final JdbcTemplate jdbc;
     private final ApprovalInstanceService approvalService;
+    private final DeviceOwnershipPeriodService ownershipService;
 
     /** 预览下一退库单号：TK-yyyyMMdd + 4 位当日流水 */
     @GetMapping("/next-no")
@@ -100,10 +102,15 @@ public class DeviceReturnController {
             """ + SoftDeleteSupport.notDeletedClause(jdbc, "device_return", "r"), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> r = rows.get(0);
-        r.put("items", jdbc.queryForList(
-                "SELECT * FROM device_return_item WHERE return_id = ?::uuid"
-                        + SoftDeleteSupport.notDeletedClause(jdbc, "device_return_item", null)
-                        + " ORDER BY created_at ASC NULLS LAST", id));
+        r.put("items", jdbc.queryForList("""
+                SELECT i.*,
+                       dept.dept_name,
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.SELECT_FIELDS + """
+                FROM device_return_item i
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.joins("i.device_id") + """
+                WHERE i.return_id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "device_return_item", "i")
+                + " ORDER BY i.created_at ASC NULLS LAST", id));
         return Result.ok(r);
     }
 
@@ -230,15 +237,22 @@ public class DeviceReturnController {
             throw new BizException(400, "退库单已完成");
         }
         Object warehouseId = row.get(0).get("warehouse_id");
+        String returnNo = row.get(0).get("return_no") != null
+                ? String.valueOf(row.get(0).get("return_no")) : null;
         var items = jdbc.queryForList(
                 "SELECT device_id FROM device_return_item WHERE return_id = ?::uuid"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "device_return_item", null), id);
         for (Map<String, Object> item : items) {
             if (item.get("device_id") != null) {
+                UUID deviceId = parseUuid(item.get("device_id"));
                 jdbc.update("""
                     UPDATE medical_device SET device_status = 'normal', warehouse_id = ?::uuid, updated_at = NOW()
                     WHERE id = ?::uuid
                     """, warehouseId, item.get("device_id"));
+                if (deviceId != null) {
+                    ownershipService.openPeriodFromLedger(
+                            deviceId, "biz_doc", "biz_doc", "device_return", id, returnNo);
+                }
             }
         }
         var ctx = com.meis.saas.common.rbac.PermissionInterceptor.CTX.get();

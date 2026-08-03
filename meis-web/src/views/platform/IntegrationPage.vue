@@ -14,7 +14,9 @@
       <el-table-column prop="system_code" label="系统" />
       <el-table-column prop="task_type" label="类型" />
       <el-table-column prop="status" label="状态" />
-      <el-table-column prop="created_at" label="时间" />
+      <el-table-column prop="created_at" label="时间">
+        <template #default="{ row }">{{ formatDisplayDateTime(row.created_at) }}</template>
+      </el-table-column>
     </el-table>
   </div>
 </template>
@@ -22,6 +24,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import http from '@/api/http'
+import { formatDisplayDateTime } from '@/utils/datetime'
 
 const adapters = ref<Record<string, string>[]>([])
 const tasks = ref<Record<string, unknown>[]>([])

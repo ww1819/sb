@@ -96,6 +96,7 @@ import { http } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 import { resolveStatusLabel } from '@/utils/statusLabels'
 import { formatDate, toDateParam } from '@/utils/datetime'
+import { scanBarcode } from '@/utils/scanCode'
 
 const auth = useAuthStore()
 
@@ -216,19 +217,10 @@ function onPick(idx: number) {
   if (row && cb) cb(row.raw)
 }
 
-function scanDevice() {
-  uni.scanCode({
-    onlyFromCamera: false,
-    success: (res) => {
-      const code = (res.result || '').trim()
-      if (!code) {
-        uni.showToast({ title: '未识别到内容', icon: 'none' })
-        return
-      }
-      void lookupDevices(code, true)
-    },
-    fail: () => uni.showToast({ title: '扫码取消或失败', icon: 'none' })
-  })
+async function scanDevice() {
+  const code = await scanBarcode()
+  if (!code) return
+  void lookupDevices(code, true)
 }
 
 function searchDevice() {

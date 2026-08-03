@@ -89,6 +89,7 @@ class _LabelReprintPageState extends ConsumerState<LabelReprintPage> {
       final data = await api.postData('/asset/inventory/$checkId/label/print', {
         'item_ids': selected.toList(),
         'remark': 'app_reprint',
+        'client': 'app',
       });
       final n = data is Map ? data['printed'] : selected.length;
       if (!mounted) return;

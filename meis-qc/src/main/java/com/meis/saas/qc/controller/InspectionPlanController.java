@@ -93,9 +93,11 @@ public class InspectionPlanController {
             result.put("template_name", result.get("join_template_name"));
         }
         result.put("items", jdbc.queryForList("""
-                SELECT i.*, COALESCE(i.dept_name, dept.dept_name) AS dept_name
+                SELECT i.*,
+                       COALESCE(i.dept_name, dept.dept_name) AS dept_name,
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.SELECT_FIELDS + """
                 FROM inspection_plan_item i
-                LEFT JOIN department dept ON dept.id = i.dept_id
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.joins("i.device_id") + """
                 WHERE i.plan_id = ?::uuid
                 """ + SoftDeleteSupport.notDeletedClause(jdbc, "inspection_plan_item", "i")
                 + " ORDER BY i.device_code NULLS LAST, i.created_at", id));

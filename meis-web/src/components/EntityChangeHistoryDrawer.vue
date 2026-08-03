@@ -52,6 +52,7 @@ import { getSchema, type FieldSchema } from '@/config/pageSchemas'
 import { useDict } from '@/composables/useDict'
 import { preloadRefLabelMaps, resolveRefLabel, labelCacheVersion } from '@/composables/useRefLabelMap'
 import { formatStatusLabel } from '@/utils/tableCell'
+import { formatDisplayDateTime } from '@/utils/datetime'
 
 type FieldChange = {
   field: string
@@ -205,7 +206,7 @@ function onClose() {
 }
 
 function fmt(v: unknown) {
-  return v ? String(v).replace('T', ' ').slice(0, 19) : ''
+  return formatDisplayDateTime(v)
 }
 
 function actionLabel(a: unknown) {

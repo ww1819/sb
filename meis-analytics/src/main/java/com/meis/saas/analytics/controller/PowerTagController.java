@@ -1,6 +1,7 @@
 package com.meis.saas.analytics.controller;
 
 import com.meis.saas.analytics.service.PowerReadingQueryService;
+import com.meis.saas.common.audit.DocChangeLogService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.ops.OpsClientChannel;
@@ -47,6 +48,7 @@ public class PowerTagController {
 
     private final JdbcTemplate jdbc;
     private final PowerReadingQueryService readingQuery;
+    private final DocChangeLogService docLog;
 
     private String tagSelect() {
         boolean hasChannel = TableColumnCache.hasColumn(jdbc, "power_tag", "create_channel");
@@ -59,12 +61,16 @@ public class PowerTagController {
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(PageQuery query,
             @RequestParam(required = false) Boolean activeOnly,
-            @RequestParam(required = false) UUID stationId) {
+            @RequestParam(required = false) UUID stationId,
+            @RequestParam(required = false) Boolean unboundOnly) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "power_tag", "t"));
         List<Object> args = new ArrayList<>();
         if (Boolean.TRUE.equals(activeOnly)) {
             where.append(" AND t.is_active = true ");
+        }
+        if (Boolean.TRUE.equals(unboundOnly)) {
+            where.append(" AND t.device_id IS NULL ");
         }
         if (stationId != null) {
             where.append(" AND t.station_id = ?::uuid ");
@@ -267,6 +273,8 @@ public class PowerTagController {
                     + String.join(", ", placeholders) + ")", args.toArray());
         }
         recordBindChange(id, oldDeviceId, newDeviceId, body);
+        docLog.event("power", "tag", id, Objects.toString(body.get("tag_code"), null),
+                exists ? "update" : "create", channel, null);
         return get(id);
     }
 

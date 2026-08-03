@@ -15,8 +15,17 @@
   >
     <template #default="{ item }">
       <div class="stock-opt">
-        <span class="stock-opt__code">{{ item.device_code }}</span>
-        <span class="stock-opt__name">{{ item.device_name }}</span>
+        <div class="stock-opt__main">
+          <span class="stock-opt__code">{{ item.device_code }}</span>
+          <span class="stock-opt__name">{{ item.device_name }}</span>
+        </div>
+        <div class="stock-opt__meta">
+          <span v-if="item.brand">{{ item.brand }}</span>
+          <span v-if="item.model">{{ item.model }}</span>
+          <span v-if="item.serial_number">SN:{{ item.serial_number }}</span>
+          <span v-if="item.dept_name">{{ item.dept_name }}</span>
+          <span v-if="item.power_tag_code">标签:{{ item.power_tag_code }}</span>
+        </div>
       </div>
     </template>
   </el-autocomplete>
@@ -133,6 +142,14 @@ function onSelect(item: StockOption) {
 <style scoped>
 .stock-opt {
   display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  line-height: 1.35;
+  padding: 2px 0;
+}
+.stock-opt__main {
+  display: flex;
   gap: 10px;
   align-items: baseline;
   min-width: 0;
@@ -147,5 +164,12 @@ function onSelect(item: StockOption) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.stock-opt__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 </style>

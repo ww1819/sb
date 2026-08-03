@@ -79,7 +79,14 @@ export function chooseAndUploadImage(count = 1): Promise<string[]> {
           reject(e)
         }
       },
-      fail: () => reject(new Error('已取消选图'))
+      fail: (err) => {
+        const msg = String(err?.errMsg || '')
+        if (/cancel|取消/i.test(msg)) {
+          reject(new Error('已取消选图'))
+          return
+        }
+        reject(new Error('选图/拍照失败，请检查相机与相册权限后重试'))
+      }
     })
   })
 }

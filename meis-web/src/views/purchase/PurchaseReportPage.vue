@@ -29,7 +29,9 @@
     <el-card shadow="never" class="section">
       <template #header>采购操作审计（最近50条）</template>
       <el-table :data="auditRows" size="small" stripe max-height="360">
-        <el-table-column prop="created_at" label="时间" width="170" />
+        <el-table-column prop="created_at" label="时间" width="170">
+          <template #default="{ row }">{{ formatDisplayDateTime(row.created_at) }}</template>
+        </el-table-column>
         <el-table-column prop="operator_name" label="操作人" width="100" />
         <el-table-column prop="operation_desc" label="操作" min-width="200" />
         <el-table-column prop="operation_type" label="类型" width="80" />
@@ -41,6 +43,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import http from '@/api/http'
+import { formatDisplayDateTime } from '@/utils/datetime'
 
 const planYear = ref(new Date().getFullYear())
 const summary = ref({ totalBudget: 0, totalContract: 0, totalPaid: 0, executionRate: 0 })

@@ -1,5 +1,6 @@
 package com.meis.saas.asset.controller;
 
+import com.meis.saas.asset.service.DeviceOwnershipPeriodService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.FilterCsvSupport;
@@ -23,6 +24,7 @@ import java.util.*;
 public class DeviceOutboundController {
     private final JdbcTemplate jdbc;
     private final ApprovalInstanceService approvalService;
+    private final DeviceOwnershipPeriodService ownershipService;
 
     /** 预览下一出库单号：CK-yyyyMMdd + 4 位当日流水 */
     @GetMapping("/next-no")
@@ -99,10 +101,15 @@ public class DeviceOutboundController {
             """ + SoftDeleteSupport.notDeletedClause(jdbc, "device_outbound", "o"), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> o = rows.get(0);
-        o.put("items", jdbc.queryForList(
-                "SELECT * FROM device_outbound_item WHERE outbound_id = ?"
-                        + SoftDeleteSupport.notDeletedClause(jdbc, "device_outbound_item", null)
-                        + " ORDER BY created_at ASC NULLS LAST", id));
+        o.put("items", jdbc.queryForList("""
+                SELECT i.*,
+                       dept.dept_name,
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.SELECT_FIELDS + """
+                FROM device_outbound_item i
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.joins("i.device_id") + """
+                WHERE i.outbound_id = ?
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "device_outbound_item", "i")
+                + " ORDER BY i.created_at ASC NULLS LAST", id));
         return Result.ok(o);
     }
 
@@ -216,21 +223,28 @@ public class DeviceOutboundController {
     @OperationLog(module = "asset", description = "出库发放")
     public Result<Map<String, Object>> issue(@PathVariable UUID id) {
         var outs = jdbc.queryForList(
-                "SELECT dept_id FROM device_outbound WHERE id = ?"
+                "SELECT dept_id, outbound_no FROM device_outbound WHERE id = ?"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "device_outbound", null), id);
         if (outs.isEmpty()) throw new BizException(404, "not found");
         UUID deptId = parseUuid(outs.get(0).get("dept_id"));
+        String outboundNo = outs.get(0).get("outbound_no") != null
+                ? String.valueOf(outs.get(0).get("outbound_no")) : null;
         var items = jdbc.queryForList(
                 "SELECT device_id FROM device_outbound_item WHERE outbound_id = ?"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "device_outbound_item", null), id);
         for (Map<String, Object> item : items) {
             if (item.get("device_id") != null) {
+                UUID deviceId = parseUuid(item.get("device_id"));
                 jdbc.update("""
                     UPDATE medical_device
                     SET device_status = 'in_use', warehouse_id = NULL, dept_id = COALESCE(?, dept_id),
                         updated_at = NOW()
                     WHERE id = ?
                     """, deptId, item.get("device_id"));
+                if (deviceId != null) {
+                    ownershipService.openPeriodFromLedger(
+                            deviceId, "biz_doc", "biz_doc", "device_outbound", id, outboundNo);
+                }
             }
         }
         var ctx = com.meis.saas.common.rbac.PermissionInterceptor.CTX.get();

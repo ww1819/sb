@@ -1,4 +1,5 @@
 import type { FieldSchema } from './pageSchemas'
+import { deviceLedgerDetailFields } from './deviceLedgerFields'
 
 /** 第一期核心业务完整字段 schema */
 export const businessSchemas: Record<string, FieldSchema[]> = {
@@ -251,8 +252,34 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'specification', label: '规格', list: true, group: 'basic' },
     { prop: 'model', label: '型号', list: true, group: 'basic' },
     { prop: 'registration_no', label: '医疗器械注册证号', list: true, group: 'basic', width: 140 },
+    { prop: 'udi_di', label: 'UDI-DI', list: true, group: 'basic', width: 140 },
+    { prop: 'udi_pi', label: 'UDI-PI', group: 'basic', width: 140 },
+    { prop: 'gs1_gtin', label: 'GTIN', group: 'basic' },
+    { prop: 'lot_no', label: '生产批号', group: 'basic' },
+    { prop: 'eq_class', label: '器械管理类别', dictType: 'eq_class', list: true, group: 'basic' },
+    { prop: 'criticality', label: '临床关键等级', dictType: 'device_criticality', list: true, group: 'basic' },
+    { prop: 'acquisition_mode', label: '购置方式', dictType: 'acquisition_mode', group: 'basic' },
     { prop: 'production_date', label: '生产日期', type: 'date', list: true, group: 'basic', width: 120 },
-    { prop: 'serial_number', label: '序列号(SN)', group: 'basic' },
+    {
+      prop: 'has_power_tag',
+      label: '是否有电流监测标签',
+      type: 'boolean',
+      list: true,
+      group: 'basic',
+      readonly: true,
+      form: false,
+      width: 150
+    },
+    {
+      prop: 'power_tag_code',
+      label: '电流监测标签编码',
+      list: true,
+      group: 'basic',
+      readonly: true,
+      form: false,
+      width: 140
+    },
+    { prop: 'serial_number', label: '序列号(SN)', list: true, group: 'basic', width: 140 },
     { prop: 'unit_id', label: '单位', linkTable: 'unit_dict', group: 'basic' },
     { prop: 'category_id', label: '设备分类(68)', linkTable: 'medical_device_category', group: 'basic' },
     { prop: 'asset_category_id', label: '资产分类', linkTable: 'asset_category', group: 'basic' },
@@ -260,12 +287,26 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'standby_current_max_ma', label: '待机电流上限(mA)', type: 'number', group: 'basic' },
     { prop: 'standby_current_min_ma', label: '待机电流下限(mA)', type: 'number', group: 'basic' },
     { prop: 'country_of_origin', label: '原产国', group: 'basic' },
-    { prop: 'use_dept_head', label: '领用科室负责人', group: 'basic' },
+    { prop: 'use_dept_head', label: '领用科室负责人(文本)', group: 'basic' },
+    {
+      prop: 'clinical_owner_user_id',
+      label: '临床责任人',
+      linkTable: 'sys_user',
+      group: 'basic'
+    },
+    { prop: 'clinical_owner_name', label: '临床责任人姓名', group: 'basic', readonly: true, form: false },
     { prop: 'dept_id', label: '科室', linkTable: 'department', group: 'basic' },
     { prop: 'dept_name', label: '科室', list: true, group: 'basic', readonly: true },
     { prop: 'warehouse_name', label: '仓库', list: true, group: 'basic', readonly: true, form: false },
     { prop: 'stock_quantity', label: '库存数量', type: 'number', list: false, readonly: true, form: false, width: 100 },
-    { prop: 'manage_dept_head', label: '管理科室负责人', group: 'basic' },
+    { prop: 'manage_dept_head', label: '管理科室负责人(文本)', group: 'basic' },
+    {
+      prop: 'asset_manager_user_id',
+      label: '资产管理员',
+      linkTable: 'sys_user',
+      group: 'basic'
+    },
+    { prop: 'asset_manager_name', label: '资产管理员姓名', group: 'basic', readonly: true, form: false },
     { prop: 'manage_dept_id', label: '管理科室', linkTable: 'department', group: 'basic' },
     { prop: 'manage_dept_name', label: '管理科室', group: 'basic', readonly: true },
     { prop: 'is_imported', label: '进口设备', type: 'boolean', group: 'basic' },
@@ -286,6 +327,12 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'estimated_useful_life_months', label: '预计使用年限(单位：月)', type: 'number', group: 'finance' },
     { prop: 'monthly_depreciation_rate', label: '月折旧率', type: 'number', group: 'finance' },
     { prop: 'depreciation_status', label: '折旧状态', dictType: 'depreciation_status', group: 'finance' },
+    {
+      prop: 'depreciation_method',
+      label: '折旧方法',
+      dictType: 'depreciation_method',
+      group: 'finance'
+    },
     { prop: 'calibration_period_days', label: '计量周期(天)', type: 'number', group: 'finance' },
     { prop: 'campus_id', label: '院区', linkTable: 'campus', group: 'location' },
     { prop: 'building_id', label: '楼宇', linkTable: 'building', group: 'location' },
@@ -293,6 +340,9 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'location_floor', label: '楼层', group: 'location' },
     { prop: 'room_number', label: '房间号', group: 'location' },
     { prop: 'location_detail', label: '位置详情', group: 'location', span: 24 },
+    { prop: 'ip_address', label: 'IP地址', group: 'location' },
+    { prop: 'mac_address', label: 'MAC地址', group: 'location' },
+    { prop: 'energy_class', label: '能效等级', dictType: 'energy_class', group: 'location' },
     { prop: 'supplier_uscc', label: '社会统一信用代码', group: 'vendor' },
     { prop: 'supplier_id', label: '供应商', linkTable: 'supplier', group: 'vendor' },
     { prop: 'supplier_contact', label: '负责人', group: 'vendor' },
@@ -308,9 +358,38 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'contract_price', label: '合同价格', type: 'number', group: 'time' },
     { prop: 'purchase_date', label: '购置日期', type: 'date', group: 'time' },
     { prop: 'enable_date', label: '启用日期', type: 'date', list: true, group: 'time' },
+    {
+      prop: 'created_at',
+      label: '录入时间',
+      type: 'datetime',
+      list: true,
+      group: 'time',
+      readonly: true,
+      form: false,
+      width: 160
+    },
+    {
+      prop: 'under_warranty',
+      label: '是否在保',
+      type: 'boolean',
+      list: true,
+      group: 'time',
+      readonly: true,
+      form: false,
+      width: 100
+    },
     { prop: 'service_life_years', label: '使用年限', type: 'number', group: 'time' },
     { prop: 'service_expiry_reached', label: '使用日期是否已到', type: 'boolean', list: true, group: 'time', readonly: true, form: false, width: 130 },
     { prop: 'service_expiry_date', label: '使用到期日期', type: 'date', list: true, group: 'time', readonly: true, width: 120 },
+    {
+      prop: 'service_expiry_basis',
+      label: '使用到期推算方式',
+      dictType: 'service_expiry_basis',
+      list: true,
+      group: 'time',
+      readonly: true,
+      width: 140
+    },
     { prop: 'service_expiry_remaining_days', label: '使用到期剩余天数', type: 'number', list: true, group: 'time', readonly: true, form: false, width: 140 },
     { prop: 'warranty_end_date', label: '保修截止', type: 'date', group: 'time' },
     { prop: 'next_calibration_date', label: '下次计量日期', type: 'date', group: 'time', readonly: true },
@@ -326,7 +405,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'material_group', label: '物料分组', group: 'accounting' },
     { prop: 'asset_class_code', label: '资产类别编码', group: 'accounting' },
     { prop: 'asset_class_name', label: '资产类别', group: 'accounting' },
-    { prop: 'acceptance_date', label: '验收日期', type: 'date', group: 'accounting' },
+    { prop: 'acceptance_date', label: '验收日期', type: 'date', list: true, group: 'accounting', width: 120 },
     { prop: 'kingdee_asset_code', label: '金蝶资产编码', group: 'accounting', readonly: true },
     { prop: 'invoice_no', label: '发票号', group: 'accounting' },
     { prop: 'invoice_date', label: '发票日期', type: 'date', group: 'accounting' },
@@ -460,6 +539,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   device_outbound_item: [
     { prop: 'device_code', label: '资产编码', list: true, detail: true, width: 140 },
     { prop: 'device_name', label: '资产名称', list: true, detail: true, width: 140 },
+    ...deviceLedgerDetailFields,
     { prop: 'specification', label: '规格型号', detail: true, readonly: true, width: 120 },
     { prop: 'unit', label: '单位', detail: true, readonly: true, width: 72 },
     { prop: 'quantity', label: '数量', type: 'number', detail: true, width: 80 },
@@ -467,8 +547,6 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'total_price', label: '金额', type: 'number', detail: true, readonly: true, width: 100 },
     { prop: 'manufacturer_id', label: '生产厂家', linkTable: 'manufacturer', detail: true, readonly: true, width: 140 },
     { prop: 'supplier_id', label: '供应商', linkTable: 'supplier', detail: true, readonly: true, width: 160 },
-    { prop: 'serial_number', label: '序列号(SN)', detail: true, readonly: true, width: 120 },
-    { prop: 'brand', label: '品牌', detail: true, readonly: true, width: 100 },
     { prop: 'category_id', label: '设备分类(68)', linkTable: 'medical_device_category', detail: true, readonly: true, width: 130 },
     { prop: 'asset_category_id', label: '资产分类', linkTable: 'asset_category', detail: true, readonly: true, width: 120 },
     { prop: 'finance_category_id', label: '财务分类', linkTable: 'finance_category', detail: true, readonly: true, width: 120 },
@@ -522,8 +600,9 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'remark', label: '备注', type: 'textarea' }
   ],
   inventory_check_item: [
-    { prop: 'device_code', label: '设备编码', list: true, detail: true, readonly: true },
-    { prop: 'device_name', label: '设备名称', list: true, detail: true, readonly: true },
+    { prop: 'device_code', label: '资产编码', list: true, detail: true, readonly: true, width: 120 },
+    { prop: 'device_name', label: '资产名称', list: true, detail: true, readonly: true, width: 140 },
+    ...deviceLedgerDetailFields,
     { prop: 'expected_location', label: '账面位置', detail: true, readonly: true },
     { prop: 'actual_location', label: '实盘位置', detail: true },
     { prop: 'is_found', label: '是否找到', type: 'boolean', detail: true },
@@ -564,6 +643,7 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   device_return_item: [
     { prop: 'device_code', label: '资产编码', list: true, detail: true, width: 140 },
     { prop: 'device_name', label: '资产名称', list: true, detail: true, width: 140 },
+    ...deviceLedgerDetailFields,
     { prop: 'specification', label: '规格型号', detail: true, readonly: true, width: 120 },
     { prop: 'unit', label: '单位', detail: true, readonly: true, width: 72 },
     { prop: 'quantity', label: '数量', type: 'number', detail: true, width: 80 },
@@ -571,8 +651,6 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'total_price', label: '金额', type: 'number', detail: true, readonly: true, width: 100 },
     { prop: 'manufacturer_id', label: '生产厂家', linkTable: 'manufacturer', detail: true, readonly: true, width: 140 },
     { prop: 'supplier_id', label: '供应商', linkTable: 'supplier', detail: true, readonly: true, width: 160 },
-    { prop: 'serial_number', label: '序列号(SN)', detail: true, readonly: true, width: 120 },
-    { prop: 'brand', label: '品牌', detail: true, readonly: true, width: 100 },
     { prop: 'category_id', label: '设备分类(68)', linkTable: 'medical_device_category', detail: true, readonly: true, width: 130 },
     { prop: 'asset_category_id', label: '资产分类', linkTable: 'asset_category', detail: true, readonly: true, width: 120 },
     { prop: 'finance_category_id', label: '财务分类', linkTable: 'finance_category', detail: true, readonly: true, width: 120 },
@@ -605,14 +683,13 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   device_goods_return_item: [
     { prop: 'device_code', label: '资产编码', list: true, detail: true, width: 140 },
     { prop: 'device_name', label: '资产名称', list: true, detail: true, width: 140 },
+    ...deviceLedgerDetailFields,
     { prop: 'specification', label: '规格型号', detail: true, readonly: true, width: 120 },
     { prop: 'unit', label: '单位', detail: true, readonly: true, width: 72 },
     { prop: 'quantity', label: '数量', type: 'number', detail: true, width: 80 },
     { prop: 'unit_price', label: '单价', type: 'number', detail: true, readonly: true, width: 100 },
     { prop: 'total_price', label: '金额', type: 'number', detail: true, readonly: true, width: 100 },
     { prop: 'manufacturer_id', label: '生产厂家', linkTable: 'manufacturer', detail: true, readonly: true, width: 140 },
-    { prop: 'serial_number', label: '序列号(SN)', detail: true, readonly: true, width: 120 },
-    { prop: 'brand', label: '品牌', detail: true, readonly: true, width: 100 },
     { prop: 'category_id', label: '设备分类(68)', linkTable: 'medical_device_category', detail: true, readonly: true, width: 130 },
     { prop: 'asset_category_id', label: '资产分类', linkTable: 'asset_category', detail: true, readonly: true, width: 120 },
     { prop: 'finance_category_id', label: '财务分类', linkTable: 'finance_category', detail: true, readonly: true, width: 120 },
@@ -663,12 +740,19 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'scrap_reason', label: '报废原因', type: 'textarea', list: true, required: true },
     { prop: 'scrap_type', label: '报废类型', dictType: 'scrap_type', list: true },
     { prop: 'application_date', label: '申请日期', type: 'date', list: true },
+    { prop: 'applicant_name', label: '申请人', list: true, readonly: true },
     { prop: 'evaluator_id', label: '评估人', linkTable: 'sys_user' },
+    { prop: 'evaluator_name', label: '评估人姓名', readonly: true },
     { prop: 'evaluation_result', label: '评估结论', type: 'textarea' },
     { prop: 'residual_value', label: '残值', type: 'number' },
     { prop: 'disposal_method', label: '处置方式', dictType: 'disposal_method' },
+    { prop: 'disposal_destination', label: '处置去向' },
+    { prop: 'disposal_proof_url', label: '处置证明URL' },
     { prop: 'disposal_date', label: '处置日期', type: 'date' },
+    { prop: 'approver_name', label: '审批人', list: true, readonly: true },
+    { prop: 'approved_at', label: '审批时间', type: 'datetime', readonly: true },
     { prop: 'status', label: '状态', dictType: 'scrap_status', list: true },
+    { prop: 'approval_status', label: '审批状态', dictType: 'approval_status', list: true, readonly: true },
     { prop: 'remark', label: '备注', type: 'textarea' }
   ],
   inspection_type: [
@@ -1151,6 +1235,33 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'emergency_protocol', label: '应急预案', type: 'textarea', group: 'compliance' },
     { prop: 'remark', label: '备注', type: 'textarea', group: 'remark' }
   ],
+  device_license: [
+    { prop: 'device_code', label: '资产编码', list: true, group: 'basic', width: 130 },
+    { prop: 'device_name', label: '资产名称', list: true, group: 'basic', width: 160 },
+    { prop: 'device_id', label: '设备', linkTable: 'medical_device', group: 'basic', required: true },
+    { prop: 'license_type', label: '证照类型', dictType: 'device_license_type', list: true, group: 'basic', required: true },
+    { prop: 'license_no', label: '证号', list: true, group: 'basic' },
+    { prop: 'issue_date', label: '发证日期', type: 'date', list: true, group: 'basic' },
+    { prop: 'expiry_date', label: '有效期至', type: 'date', list: true, group: 'basic' },
+    { prop: 'issuer_name', label: '发证机关', list: true, group: 'basic' },
+    { prop: 'file_url', label: '附件URL', group: 'basic' },
+    { prop: 'file_name', label: '附件名', group: 'basic' },
+    { prop: 'remark', label: '备注', type: 'textarea', group: 'basic' }
+  ],
+  device_training_auth: [
+    { prop: 'device_code', label: '资产编码', list: true, group: 'basic', width: 130 },
+    { prop: 'device_name', label: '资产名称', list: true, group: 'basic', width: 160 },
+    { prop: 'device_id', label: '设备', linkTable: 'medical_device', group: 'basic', required: true },
+    { prop: 'user_id', label: '人员', linkTable: 'sys_user', group: 'basic', required: true },
+    { prop: 'user_name', label: '人员姓名', list: true, group: 'basic', readonly: true },
+    { prop: 'cert_name', label: '证书名称', list: true, group: 'basic' },
+    { prop: 'cert_no', label: '证书编号', list: true, group: 'basic' },
+    { prop: 'auth_scope', label: '授权范围', list: true, group: 'basic' },
+    { prop: 'trained_at', label: '培训日期', type: 'date', list: true, group: 'basic' },
+    { prop: 'expiry_date', label: '有效期至', type: 'date', list: true, group: 'basic' },
+    { prop: 'remark', label: '备注', type: 'textarea', group: 'basic' }
+  ],
+
   special_device: [
     { prop: 'device_id', label: '关联设备', linkTable: 'medical_device', list: true, group: 'basic', required: true },
     { prop: 'device_code', label: '设备编码', list: true, group: 'basic', readonly: true },
@@ -1467,6 +1578,30 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'is_active', label: '启用', type: 'boolean', list: true },
     { prop: 'create_channel', label: '制单途径', dictType: 'execution_channel', list: true, readonly: true, form: true, width: 90 },
     { prop: 'update_channel', label: '修改途径', dictType: 'execution_channel', list: true, readonly: true, form: true, width: 90 },
+    { prop: 'remark', label: '备注', type: 'textarea' }
+  ],
+  device_warranty: [
+    { prop: 'supplier_name', label: '维保公司', list: true, readonly: true, form: false, width: 140 },
+    { prop: 'supplier_id', label: '维保公司', linkTable: 'supplier' },
+    { prop: 'start_date', label: '开始日期', type: 'date', list: true, required: true, width: 120 },
+    { prop: 'end_date', label: '结束日期', type: 'date', list: true, required: true, width: 120 },
+    { prop: 'under_warranty', label: '是否在保', type: 'boolean', list: true, readonly: true, form: false, width: 100 },
+    { prop: 'total_amount', label: '总价', type: 'number', list: true, width: 120 },
+    { prop: 'device_count', label: '覆盖台数', type: 'number', list: true, readonly: true, form: false, width: 100 },
+    { prop: 'unit_price_sum', label: '单价合计', type: 'number', list: true, readonly: true, form: false, width: 110 },
+    { prop: 'coverage_content', label: '维保内容', list: true, type: 'textarea' },
+    { prop: 'remark', label: '备注', type: 'textarea' },
+    { prop: 'created_at', label: '创建时间', type: 'datetime', list: true, readonly: true, form: false, width: 160 },
+    { prop: 'created_by_name', label: '创建人', list: true, readonly: true, form: false, width: 100 },
+    { prop: 'updated_at', label: '修改时间', type: 'datetime', list: true, readonly: true, form: false, width: 160 },
+    { prop: 'updated_by_name', label: '修改人', list: true, readonly: true, form: false, width: 100 }
+  ],
+  device_warranty_device: [
+    { prop: 'warranty_id', label: '维保信息' },
+    { prop: 'device_id', label: '设备', linkTable: 'medical_device' },
+    { prop: 'device_code', label: '资产编码' },
+    { prop: 'device_name', label: '资产名称' },
+    { prop: 'unit_price', label: '单价', type: 'number' },
     { prop: 'remark', label: '备注', type: 'textarea' }
   ],
   power_tag: [

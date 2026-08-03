@@ -106,10 +106,16 @@ public final class OpsPlanIncludeSupport {
     public static List<Map<String, Object>> listByPlan(JdbcTemplate jdbc, String module, UUID planId) {
         String mod = normalizeModule(module);
         return jdbc.queryForList("""
-                SELECT * FROM ops_plan_include_request
-                WHERE module=? AND plan_id=?::uuid AND COALESCE(is_deleted,0)=0
-                ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'rejected' THEN 1 ELSE 2 END,
-                         created_at DESC
+                SELECT r.*,
+                       COALESCE(r.device_code, d.device_code) AS device_code,
+                       COALESCE(r.device_name, d.device_name) AS device_name,
+                       dept.dept_name,
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.SELECT_FIELDS + """
+                FROM ops_plan_include_request r
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.joins("r.device_id") + """
+                WHERE r.module=? AND r.plan_id=?::uuid AND COALESCE(r.is_deleted,0)=0
+                ORDER BY CASE r.status WHEN 'pending' THEN 0 WHEN 'rejected' THEN 1 ELSE 2 END,
+                         r.created_at DESC
                 """, mod, planId);
     }
 

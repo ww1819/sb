@@ -30,7 +30,7 @@ const store = useRouteProgressStore()
 .route-progress-bar {
   height: 100%;
   background: linear-gradient(90deg, var(--el-color-primary-light-3), var(--el-color-primary));
-  box-shadow: 0 0 8px rgba(22, 119, 255, 0.45);
+  box-shadow: 0 0 8px rgba(var(--el-color-primary-rgb), 0.45);
   transition: width 0.22s ease;
 }
 </style>

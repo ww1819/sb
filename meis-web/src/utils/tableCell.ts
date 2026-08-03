@@ -2,11 +2,13 @@ import { resolveCodedLabel } from '@/i18n/resolveCodedLabel'
 
 export type StatusTagType = '' | 'success' | 'warning' | 'danger' | 'info'
 
-const STATUS_PROP_PATTERN = /status|state|urgency|priority|phase|stage/i
+/** 仅匹配独立词段，避免 station_name 被 state 误伤（PLT-STATUS-CN-01 修订） */
+const STATUS_PROP_PATTERN = /(^|_)(status|state|urgency|priority|phase|stage)(_|$)/i
+const STATUS_DICT_PATTERN = /(^|_)(status|state|urgency|priority|phase|stage)(_|$)/i
 const AMOUNT_PROP_PATTERN = /amount|budget|price|total|cost|fee|quantity|num|count|value/i
 
 export function isStatusField(prop: string, dictType?: string) {
-  if (dictType && /status|urgency|priority|state/i.test(dictType)) return true
+  if (dictType && STATUS_DICT_PATTERN.test(dictType)) return true
   if (prop === 'is_active' || prop === 'is_clinical') return true
   return STATUS_PROP_PATTERN.test(prop)
 }
@@ -74,8 +76,11 @@ export function formatStatusLabel(value: unknown, prop?: string, dictType?: stri
     if (value === true || value === 'true' || value === 1 || value === '1') return '是'
     if (value === false || value === 'false' || value === 0 || value === '0') return '否'
   }
-  // 统一走 I18N 预留解析（字典未命中 → catalog → 未知(码)）
-  return resolveCodedLabel({ value, prop, dictType })
+  // 仅状态/字典码走解析；属性类字段禁止套「未知(码)」
+  if (dictType || (prop && isStatusField(prop, dictType))) {
+    return resolveCodedLabel({ value, prop, dictType })
+  }
+  return String(value)
 }
 
 export function columnAlign(prop: string, type?: string) {

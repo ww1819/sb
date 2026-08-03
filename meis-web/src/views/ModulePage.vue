@@ -42,6 +42,7 @@ const pageMap: Record<string, ReturnType<typeof defineAsyncComponent>> = {
   '/asset/dept-inventory-report': defineAsyncComponent(() => import('@/views/asset/DeptInventoryReportPage.vue')),
   '/asset/import': defineAsyncComponent(() => import('@/views/asset/AssetImportPage.vue')),
   '/asset/device': defineAsyncComponent(() => import('@/views/asset/DeviceListPage.vue')),
+  '/asset/warranty-term': defineAsyncComponent(() => import('@/views/asset/DeviceWarrantyPage.vue')),
   '/asset/entry': defineAsyncComponent(() => import('@/views/asset/DeviceEntryPage.vue')),
   '/asset/stock': defineAsyncComponent(() => import('@/views/asset/StockQueryPage.vue')),
   '/asset/outbound': defineAsyncComponent(() => import('@/views/asset/DeviceOutboundPage.vue')),
@@ -171,6 +172,13 @@ const pageComponent = computed(() => {
   height: 100%;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.module-page > :deep(*) {
+  flex: 1;
+  min-height: 0;
 }
 
 .module-page-loading {

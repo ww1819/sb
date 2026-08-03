@@ -1,7 +1,9 @@
 package com.meis.saas.special.controller;
 
+import com.meis.saas.common.audit.DocChangeLogService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.ops.OpsClientChannel;
 import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
@@ -27,6 +29,7 @@ import java.util.*;
 public class SharedReturnController {
     private final JdbcTemplate jdbc;
     private final ApprovalInstanceService approvalService;
+    private final DocChangeLogService docLog;
 
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(
@@ -93,6 +96,7 @@ public class SharedReturnController {
                 "pending", "pending");
         SoftDeleteSupport.applyChannels(jdbc, "shared_device_return", id, body,
                 "create_channel", "submit_channel", "update_channel");
+        logReturn(id, "create", body, null);
         return get(id);
     }
 
@@ -107,6 +111,7 @@ public class SharedReturnController {
                 "submit_channel", "update_channel");
         approvalService.submit("shared_device_return", id, ret.get("return_no").toString(),
                 "公用设备归还 " + ret.get("return_no"), applicantId, 0);
+        logReturn(id, "submit", body, null);
         return get(id);
     }
 
@@ -127,6 +132,7 @@ public class SharedReturnController {
         SoftDeleteSupport.applyChannels(jdbc, "shared_device_return", id, body,
                 "confirm_channel", "update_channel");
         completeReturn(ret, billingEnd);
+        logReturn(id, "approve", body, null);
         return get(id);
     }
 
@@ -138,8 +144,16 @@ public class SharedReturnController {
             UPDATE shared_device_return SET status='rejected', approval_status='rejected', updated_at=NOW()
             WHERE id=?::uuid
             """, id);
-        SoftDeleteSupport.applyChannels(jdbc, "shared_device_return", id, body, "update_channel");
+        SoftDeleteSupport.applyChannels(jdbc, "shared_device_return", id, body,
+                "confirm_channel", "update_channel");
+        logReturn(id, "reject", body, null);
         return get(id);
+    }
+
+    private void logReturn(UUID id, String event, Map<String, Object> body, String remark) {
+        Map<String, Object> ret = loadReturn(id);
+        docLog.event("shared", "return", id, Objects.toString(ret.get("return_no"), null),
+                event, OpsClientChannel.of(body), remark);
     }
 
     private void completeReturn(Map<String, Object> ret, Instant billingEnd) {

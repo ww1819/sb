@@ -73,15 +73,21 @@ public class RepairWorkorderController {
             @RequestParam(required = false) String deptName,
             @RequestParam(required = false) String deviceName,
             @RequestParam(required = false) String specification,
+            @RequestParam(required = false) String model,
             @RequestParam(required = false) String deviceCode,
             @RequestParam(required = false) String financialCode,
-            @RequestParam(required = false) String serialNumber) {
+            @RequestParam(required = false) String serialNumber,
+            @RequestParam(required = false) String powerTagCode,
+            @RequestParam(required = false) String deviceStatus) {
         StringBuilder sql = new StringBuilder("""
-                SELECT d.id, d.device_code, d.device_name, d.specification, d.serial_number,
-                       d.financial_code, d.dept_id, d.device_status, dept.dept_name
+                SELECT d.id, d.device_code, d.device_name, d.financial_code, d.dept_id,
+                       dept.dept_name,
+                """);
+        sql.append(com.meis.saas.common.asset.DeviceLedgerSelectSupport.SELECT_FIELDS);
+        sql.append("""
                 FROM medical_device d
-                LEFT JOIN department dept ON dept.id = d.dept_id""");
-        sql.append(SoftDeleteSupport.notDeletedClause(jdbc, "department", "dept"));
+                """);
+        sql.append(com.meis.saas.common.asset.DeviceLedgerSelectSupport.relatedJoins("d"));
         sql.append("""
                 WHERE d.is_active = true
                   AND COALESCE(d.device_status, '') NOT IN ('maintenance', 'pending_verify', 'scrap')
@@ -95,11 +101,22 @@ public class RepairWorkorderController {
         sql.append(SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d"));
         List<Object> args = new ArrayList<>();
         appendIlike(sql, args, "dept.dept_name", deptName);
-        appendIlike(sql, args, "d.device_name", deviceName);
+        if (deviceName != null && !deviceName.isBlank()) {
+            String like = "%" + deviceName.trim() + "%";
+            sql.append(" AND (d.device_name ILIKE ? OR COALESCE(d.pinyin_code, '') ILIKE ?) ");
+            args.add(like);
+            args.add(like);
+        }
         appendIlike(sql, args, "d.specification", specification);
+        appendIlike(sql, args, "d.model", model);
         appendIlike(sql, args, "d.device_code", deviceCode);
         appendIlike(sql, args, "d.financial_code", financialCode);
         appendIlike(sql, args, "d.serial_number", serialNumber);
+        appendIlike(sql, args, "pt.tag_code", powerTagCode);
+        if (deviceStatus != null && !deviceStatus.isBlank()) {
+            sql.append(" AND d.device_status = ? ");
+            args.add(deviceStatus.trim());
+        }
         sql.append(" ORDER BY d.device_code LIMIT 500");
         return Result.ok(jdbc.queryForList(sql.toString(), args.toArray()));
     }
@@ -209,6 +226,13 @@ public class RepairWorkorderController {
                 pageArgs.toArray());
         for (Map<String, Object> row : rows) {
             normalizeFaultPhotosField(row);
+        }
+        try {
+            processService.enrichWorkorders(rows);
+        } catch (Exception ignored) {
+            // 列表充实失败不拖垮整页（REP-PERF-01）
+        }
+        for (Map<String, Object> row : rows) {
             String st = str(row.get("status"));
             boolean unassigned = isUnassigned(row);
             boolean mine = uid != null && uid.equalsIgnoreCase(str(row.get("assigned_user_id")));
@@ -220,7 +244,6 @@ public class RepairWorkorderController {
                             "repairing", "verify_rejected", "suspended").contains(st))
                             || (unassigned && Set.of("reported", "dispatching").contains(st)));
         }
-        processService.enrichWorkorders(rows);
         return Result.ok(PageResult.of(rows, total != null ? total : 0, query.getPage(), query.getSize()));
     }
 
@@ -270,7 +293,11 @@ public class RepairWorkorderController {
         for (Map<String, Object> row : rows) {
             normalizeFaultPhotosField(row);
         }
-        processService.enrichWorkorders(rows);
+        try {
+            processService.enrichWorkorders(rows);
+        } catch (Exception ignored) {
+            // 列表充实失败不拖垮整页（REP-PERF-01）
+        }
         return Result.ok(PageResult.of(rows, total != null ? total : 0, query.getPage(), query.getSize()));
     }
 
@@ -346,7 +373,11 @@ public class RepairWorkorderController {
         for (Map<String, Object> row : rows) {
             normalizeFaultPhotosField(row);
         }
-        processService.enrichWorkorders(rows);
+        try {
+            processService.enrichWorkorders(rows);
+        } catch (Exception ignored) {
+            // 列表充实失败不拖垮整页（REP-PERF-01）
+        }
         return Result.ok(PageResult.of(rows, total != null ? total : 0, query.getPage(), query.getSize()));
     }
 
@@ -398,7 +429,11 @@ public class RepairWorkorderController {
         }
         Map<String, Object> seg = segmentService.addEngineerSegment(
                 id, wo, typeId, str(body.get("remark")), parts, engineers, startedAt, endedAt);
-        addEvent(id, "add_segment", str(wo.get("status")), str(loadWorkorder(id).get("status")),
+        SoftDeleteSupport.applyChannels(jdbc, "repair_workorder", id, body, "update_channel");
+        Map<String, Object> afterSeg = loadWorkorder(id);
+        changeLog.recordAction("repair_workorder", id, "add_segment", wo, afterSeg,
+                "添加进程段: " + seg.get("type_name"), OpsClientChannel.of(body));
+        addEvent(id, "add_segment", str(wo.get("status")), str(afterSeg.get("status")),
                 null, null, seg.get("user_id"), null, null,
                 "添加进程段: " + seg.get("type_name"), null);
         return Result.ok(seg);
@@ -417,6 +452,10 @@ public class RepairWorkorderController {
         assertRepairEngineer();
         List<Map<String, Object>> engineers = resolveEngineers(body);
         Map<String, Object> seg = segmentService.updateSegment(id, segmentId, body, engineers);
+        SoftDeleteSupport.applyChannels(jdbc, "repair_workorder", id, body, "update_channel");
+        Map<String, Object> afterSeg = loadWorkorder(id);
+        changeLog.recordAction("repair_workorder", id, "update_segment", wo, afterSeg,
+                "编辑进程段: " + seg.get("type_name"), OpsClientChannel.of(body));
         addEvent(id, "update_segment", str(wo.get("status")), str(wo.get("status")),
                 null, null, seg.get("user_id"), null, null,
                 "编辑进程段: " + seg.get("type_name"), null);
@@ -666,10 +705,11 @@ public class RepairWorkorderController {
             WHERE id = ?::uuid
             """, id);
         syncDeviceStatus(before.get("device_id"), "normal");
-        Map<String, Object> after = requireWo(id);
+        SoftDeleteSupport.applyChannels(jdbc, "repair_workorder", id, body, "update_channel");
         String remark = body != null ? str(body.get("remark")) : "撤回报修";
         if (remark.isBlank()) remark = "撤回报修";
         addEvent(id, "withdraw", "reported", "draft", null, null, null, null, null, remark, null);
+        Map<String, Object> after = requireWo(id);
         changeLog.recordAction("repair_workorder", id, "withdraw", before, after, remark, OpsClientChannel.of(body));
         return Result.ok(after);
     }
@@ -808,7 +848,11 @@ public class RepairWorkorderController {
             processService.syncWorkorderState(id, "accepted", null, null);
             addEvent(id, "accept", current, "accepted", null, null, userId, null, null, "接单", null);
         }
-        return Result.ok(loadWorkorder(id));
+        SoftDeleteSupport.applyChannels(jdbc, "repair_workorder", id, body, "update_channel");
+        Map<String, Object> afterAccept = loadWorkorder(id);
+        changeLog.recordAction("repair_workorder", id, "accept", wo, afterAccept,
+                startNow ? "接单并开始维修" : "接单", OpsClientChannel.of(body));
+        return Result.ok(afterAccept);
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/grab")
@@ -857,7 +901,10 @@ public class RepairWorkorderController {
         addEvent(id, "start_repair", current, "repairing", null, "internal", userId, null, null, "抢单并开始维修", null);
         syncDeviceStatus(wo.get("device_id"), "maintenance");
         segmentService.openSegmentByCode(id, "internal", userId, remark);
-        return Result.ok(loadWorkorder(id));
+        SoftDeleteSupport.applyChannels(jdbc, "repair_workorder", id, body, "update_channel");
+        Map<String, Object> afterGrab = loadWorkorder(id);
+        changeLog.recordAction("repair_workorder", id, "grab", wo, afterGrab, remark, OpsClientChannel.of(body));
+        return Result.ok(afterGrab);
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/transfer")
@@ -986,7 +1033,11 @@ public class RepairWorkorderController {
             syncDeviceStatus(wo.get("device_id"), "pending_verify");
             segmentService.openSystemSegment(id, "pending_verify", wo.get("assigned_user_id"), "完工提交验收", null);
         }
-        return Result.ok(loadWorkorder(id));
+        SoftDeleteSupport.applyChannels(jdbc, "repair_workorder", id, body, "update_channel");
+        Map<String, Object> afterComplete = loadWorkorder(id);
+        changeLog.recordAction("repair_workorder", id, "complete", wo, afterComplete,
+                skipVerify ? "完工直接结案" : "完工提交验收", OpsClientChannel.of(body));
+        return Result.ok(afterComplete);
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/verify")
@@ -1051,7 +1102,10 @@ public class RepairWorkorderController {
             jdbc.update("UPDATE repair_workorder SET confirm_channel = ?, updated_at = NOW() WHERE id = ?::uuid",
                     OpsClientChannel.of(body), id);
         }
-        return Result.ok(loadWorkorder(id));
+        Map<String, Object> afterVerify = loadWorkorder(id);
+        changeLog.recordAction("repair_workorder", id, "verify", wo, afterVerify,
+                "验收", OpsClientChannel.of(body));
+        return Result.ok(afterVerify);
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/suspend")

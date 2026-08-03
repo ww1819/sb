@@ -7,9 +7,9 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/repair_draft_store.dart';
-import '../../../shared/utils/camera_permission.dart';
+import '../../../shared/utils/barcode_scan.dart';
+import '../../../shared/utils/image_pick.dart';
 import '../../../shared/widgets/meis_list_card.dart';
-import 'repair_scan_page.dart';
 
 class RepairFormPage extends ConsumerStatefulWidget {
   const RepairFormPage({super.key, this.workorderId, this.localDraftId});
@@ -270,21 +270,10 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
 
   Future<void> openScan() async {
     if (!mounted) return;
-    final code = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(builder: (_) => const RepairScanPage()),
-    );
+    final code = await openBarcodeScanner(context);
     if (code == null) return; // 用户取消
-    if (code.trim().isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请扫描正确的设备条码或二维码')),
-        );
-      }
-      return;
-    }
-    codeCtrl.text = code.trim();
-    await lookupCode(code.trim());
+    codeCtrl.text = code;
+    await lookupCode(code);
   }
 
   Future<void> pickPhoto(ImageSource source) async {
@@ -292,12 +281,11 @@ class _RepairFormPageState extends ConsumerState<RepairFormPage> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('故障图片最多 3 张')));
       return;
     }
-    if (source == ImageSource.camera) {
-      final ok = await ensureCameraPermission(context, usage: '拍照上传故障图片');
-      if (!ok || !mounted) return;
-    }
-    final picker = ImagePicker();
-    final file = await picker.pickImage(source: source, imageQuality: 85);
+    final file = await pickImageWithPermission(
+      context,
+      source: source,
+      usage: '拍照上传故障图片',
+    );
     if (file == null) return;
     try {
       final url = await api.uploadFile(file.path, filename: file.name);

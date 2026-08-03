@@ -19,18 +19,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import http from '@/api/http'
-import { refSelectConfig, type RefSelectMeta } from '@/config/refSelectConfig'
-
-function refRowLabel(row: Record<string, unknown>, meta: RefSelectMeta, hideCode = false): string {
-  const vk = meta.valueKey ?? 'id'
-  const name = row[meta.labelKey]
-  const code = meta.codeKey ? row[meta.codeKey] : null
-  const withCode = !hideCode && meta.showCode !== false
-  if (withCode && code != null && code !== '' && name != null && name !== '') return `${code} ${name}`
-  if (name != null && name !== '') return String(name)
-  if (code != null && code !== '') return String(code)
-  return String(row[vk] ?? '')
-}
+import { refSelectConfig } from '@/config/refSelectConfig'
+import { formatRefRowLabel } from '@/utils/refLabel'
 
 const props = withDefaults(
   defineProps<{
@@ -91,7 +81,7 @@ async function load() {
     allOptions.value = rows
       .filter((r: Record<string, unknown>) => r && r[vk] != null && String(r[vk]) !== '')
       .map((r: Record<string, unknown>) => ({
-        label: refRowLabel(r, meta, hideCode),
+        label: formatRefRowLabel(r, meta, hideCode),
         value: String(r[vk])
       }))
     loaded.value = true

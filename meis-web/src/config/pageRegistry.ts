@@ -95,6 +95,11 @@ export interface PageConfig {
   loadFormDetail?: boolean
   /** 隐藏新增按钮（过滤列表等） */
   hideAdd?: boolean
+  /**
+   * 列表底栏金额小计/总计（AST-UI-18）：
+   * 小计=当前页字段求和；总计取接口 aggregates.sum_{prop}
+   */
+  listValueSummary?: { prop: string; label: string }[]
 }
 
 export const pageRegistry: Record<string, PageConfig> = {
@@ -333,8 +338,31 @@ export const pageRegistry: Record<string, PageConfig> = {
   '/purchase/trace': { title: '业务追溯', apiBase: '/purchase', table: 'purchase_plan' },
   '/asset/query': { title: '资产综合查询', apiBase: '/asset', table: 'medical_device' },
   '/asset/dynamic-stats': { title: '资产动态统计', apiBase: '/asset', table: 'medical_device' },
-  '/asset/dept-inventory-apply': { title: '科室盘点申请', apiBase: '/asset', table: 'medical_device' },
-  '/asset/dept-inventory-report': { title: '设备盘点报表', apiBase: '/asset', table: 'medical_device' },
+  '/asset/dept-inventory-apply': {
+    title: '科室盘点申请',
+    apiBase: '/asset',
+    table: 'inventory_check',
+    masterDetail: true,
+    detailTable: 'inventory_check_item',
+    foreignKey: 'check_id',
+    listPageUrl: '/asset/inventory/page',
+    saveUrl: '/asset/inventory',
+    listParams: { check_type: 'dept' },
+    listFilters: [
+      { key: 'audit_status', label: '审核状态', dictType: 'audit_status', multiple: true },
+      { key: 'dept_id', label: '科室', linkTable: 'department', multiple: true },
+      { key: 'status', label: '盘点状态', options: [
+        { value: 'planning', label: '计划中' },
+        { value: 'in_progress', label: '盘点中' },
+        { value: 'completed', label: '已完成' }
+      ], multiple: true }
+    ]
+  },
+  '/asset/dept-inventory-report': {
+    title: '设备盘点报表',
+    apiBase: '/asset',
+    table: 'inventory_check'
+  },
   '/asset/import': {
     title: '资产导入',
     apiBase: '/asset',
@@ -356,8 +384,24 @@ export const pageRegistry: Record<string, PageConfig> = {
     sortableColumns: ['device_code', 'device_name', 'specification', 'dept_name'],
     listParams: { hide_returned: true },
     listFilters: [
-      { key: 'enable_dateFrom', label: '起', type: 'date', actionBar: true },
-      { key: 'enable_dateTo', label: '止', type: 'date', actionBar: true },
+      { key: 'enable_dateFrom', label: '启用日期起', type: 'date', actionBar: true },
+      { key: 'enable_dateTo', label: '启用日期止', type: 'date', actionBar: true },
+      { key: 'created_atFrom', label: '录入时间起', type: 'date', actionBar: true },
+      { key: 'created_atTo', label: '录入时间止', type: 'date', actionBar: true },
+      { key: 'production_dateFrom', label: '生产日期起', type: 'date', actionBar: true },
+      { key: 'production_dateTo', label: '生产日期止', type: 'date', actionBar: true },
+      { key: 'acceptance_dateFrom', label: '验收日期起', type: 'date', actionBar: true },
+      { key: 'acceptance_dateTo', label: '验收日期止', type: 'date', actionBar: true },
+      {
+        key: 'has_power_tag',
+        label: '是否有电流监测标签',
+        type: 'select',
+        actionBar: true,
+        options: [
+          { value: 'true', label: '是' },
+          { value: 'false', label: '否' }
+        ]
+      },
       {
         key: 'device_status',
         label: '设备状态',
@@ -369,6 +413,7 @@ export const pageRegistry: Record<string, PageConfig> = {
     ],
     moreSearchFields: [
       { key: 'device_code', label: '资产编码', placeholder: '资产编码模糊' },
+      { key: 'power_tag_code', label: '电流监测标签编码', placeholder: '标签编码模糊' },
       { key: 'supplier_id', label: '供应商', placeholder: '供应商名称/编码', linkTable: 'supplier' },
       { key: 'manufacturer_id', label: '生产厂家', placeholder: '生产厂家名称/编码', linkTable: 'manufacturer' },
       { key: 'device_name', label: '资产名称', placeholder: '资产名称/简码' },
@@ -384,7 +429,11 @@ export const pageRegistry: Record<string, PageConfig> = {
       { key: 'finance_category_kw', label: '财务分类模糊', placeholder: '编码/名称' },
       { key: 'serial_number', label: '序列号(SN)', placeholder: '序列号模糊' }
     ],
-    enableView: true
+    enableView: true,
+    listValueSummary: [
+      { prop: 'original_value', label: '原值' },
+      { prop: 'net_value', label: '净值' }
+    ]
   },
   '/asset/entry': {
     title: '设备入库',
@@ -515,8 +564,12 @@ export const pageRegistry: Record<string, PageConfig> = {
     title: '设备报废',
     apiBase: '/asset',
     table: 'device_scrap',
+    listPageUrl: '/asset/scrap/page',
     saveUrl: '/asset/scrap',
-    listFilters: [{ key: 'status', label: '状态', dictType: 'scrap_status', multiple: true }]
+    listFilters: [
+      { key: 'status', label: '状态', dictType: 'scrap_status', multiple: true },
+      { key: 'scrap_type', label: '报废类型', dictType: 'scrap_type', multiple: true }
+    ]
   },
   '/warehouse/setting': { title: '库房维护', apiBase: '/system', table: 'warehouse',
   enableView: true
@@ -664,22 +717,41 @@ export const pageRegistry: Record<string, PageConfig> = {
     title: '报废申请',
     apiBase: '/asset',
     table: 'device_scrap',
+    listPageUrl: '/asset/scrap/page',
     saveUrl: '/asset/scrap',
-    listFilters: [{ key: 'status', label: '状态', dictType: 'scrap_status', multiple: true }]
+    listFilters: [
+      { key: 'status', label: '状态', dictType: 'scrap_status', multiple: true },
+      { key: 'scrap_type', label: '报废类型', dictType: 'scrap_type', multiple: true }
+    ]
   },
   '/warehouse/scrap-review': {
     title: '报废审核',
     apiBase: '/asset',
     table: 'device_scrap',
+    listPageUrl: '/asset/scrap/page',
     saveUrl: '/asset/scrap',
-    listFilters: [{ key: 'status', label: '状态', dictType: 'scrap_status', multiple: true }]
+    hideAdd: true,
+    enableView: true,
+    listParams: { status: 'pending' },
+    listFilters: [{ key: 'scrap_type', label: '报废类型', dictType: 'scrap_type', multiple: true }]
   },
   '/warehouse/scrap-query': {
     title: '报废查询',
     apiBase: '/asset',
     table: 'device_scrap',
+    listPageUrl: '/asset/scrap/page',
     saveUrl: '/asset/scrap',
-    listFilters: [{ key: 'status', label: '状态', dictType: 'scrap_status', multiple: true }]
+    hideAdd: true,
+    enableView: true,
+    listFilters: [
+      { key: 'status', label: '状态', dictType: 'scrap_status', multiple: true },
+      { key: 'scrap_type', label: '报废类型', dictType: 'scrap_type', multiple: true }
+    ],
+    moreSearchFields: [
+      { key: 'scrap_no', label: '报废单号' },
+      { key: 'device_code', label: '设备编码' },
+      { key: 'device_name', label: '设备名称' }
+    ]
   },
   '/asset/inspection': { title: '设备巡检', apiBase: '/asset', table: 'inspection_plan' },
   '/repair/apply': {
@@ -892,6 +964,46 @@ export const pageRegistry: Record<string, PageConfig> = {
   },
   '/qc/metrology': { title: '计量管理', apiBase: '/qc', table: 'metrology_record' },
   '/qc/performance': { title: '性能检测', apiBase: '/qc', table: 'performance_test' },
+  '/asset/warranty-term': {
+    title: '设备维保信息',
+    apiBase: '/asset',
+    table: 'device_warranty',
+    listPageUrl: '/asset/warranty/page',
+    saveUrl: '/asset/warranty',
+    loadFormDetail: true,
+    enableView: true,
+    showRowIndex: true,
+    listFilters: [
+      { key: 'under_warranty', label: '是否在保', type: 'select', actionBar: true, options: [
+        { value: 'true', label: '在保' },
+        { value: 'false', label: '不在保' }
+      ] },
+      { key: 'end_dateFrom', label: '结束日期起', type: 'date', actionBar: true },
+      { key: 'end_dateTo', label: '结束日期止', type: 'date', actionBar: true },
+      { key: 'supplier_id', label: '维保公司', linkTable: 'supplier', actionBar: true }
+    ]
+  },
+  '/asset/device-license': {
+    title: '设备证照',
+    apiBase: '/asset',
+    table: 'device_license',
+    listPageUrl: '/asset/device-license/page',
+    saveUrl: '/asset/device-license',
+    enableView: true,
+    showRowIndex: true,
+    listFilters: [
+      { key: 'license_type', label: '证照类型', dictType: 'device_license_type', actionBar: true }
+    ]
+  },
+  '/asset/device-training-auth': {
+    title: '培训授权',
+    apiBase: '/asset',
+    table: 'device_training_auth',
+    listPageUrl: '/asset/device-training-auth/page',
+    saveUrl: '/asset/device-training-auth',
+    enableView: true,
+    showRowIndex: true
+  },
   '/maintenance-contract/list': { title: '维保合同', apiBase: '/maintenance-contract', table: 'maintenance_contract' },
   '/maintenance-contract/fulfillment': { title: '履约记录', apiBase: '/maintenance-contract', table: 'maintenance_contract_fulfillment' },
   '/special/life': {

@@ -563,7 +563,7 @@ function onSummaryExport() {
   margin-bottom: 8px;
   margin-top: 0;
   background: #fff;
-  border: 1px solid #b7d4ea;
+  border: 1px solid var(--meis-report-border);
   border-radius: 2px;
   overflow: hidden;
   flex-shrink: 0;
@@ -580,12 +580,12 @@ function onSummaryExport() {
   line-height: 1.5;
   color: var(--el-text-color-primary, #303133);
   background: transparent;
-  border-bottom: 1px solid #d0d7de;
+  border-bottom: 1px solid var(--meis-report-line);
 }
 
 .query-box > .section-bar {
-  background: #d6ebf8;
-  border-bottom: 1px solid #b7d4ea;
+  background: var(--meis-report-header-bg);
+  border-bottom: 1px solid var(--meis-report-border);
 }
 
 .filter-form {
@@ -606,7 +606,7 @@ function onSummaryExport() {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--meis-report-line);
   border-radius: 2px;
   overflow: hidden;
   background: #fff;
@@ -663,10 +663,10 @@ function onSummaryExport() {
 
 .table-wrap :deep(.el-table) {
   border: none;
-  --el-table-border-color: #d0d7de;
-  --el-table-header-bg-color: #d6ebf8;
+  --el-table-border-color: var(--meis-report-line);
+  --el-table-header-bg-color: var(--meis-report-header-bg);
   --el-table-tr-bg-color: #ffffff;
-  --el-table-row-hover-bg-color: #e6f7ff;
+  --el-table-row-hover-bg-color: var(--meis-report-hover);
 }
 
 .table-wrap :deep(.el-table::before),
@@ -679,7 +679,7 @@ function onSummaryExport() {
 }
 
 .table-wrap :deep(.el-table th.el-table__cell) {
-  background-color: #d6ebf8 !important;
+  background-color: var(--meis-report-header-bg) !important;
   color: #303133 !important;
   font-weight: 400;
 }
@@ -705,25 +705,25 @@ function onSummaryExport() {
 }
 
 .table-wrap :deep(.el-table__row--striped td.el-table__cell) {
-  background-color: #fef5e7;
+  background-color: var(--meis-report-stripe);
 }
 
 .table-wrap :deep(.el-table__body tr:hover > td.el-table__cell) {
-  background-color: #e6f7ff !important;
+  background-color: var(--meis-report-hover) !important;
 }
 
 .table-wrap :deep(.el-table--border .el-table__cell) {
-  border-right-color: #d0d7de;
+  border-right-color: var(--meis-report-line);
 }
 
 .table-wrap :deep(.el-table td.el-table__cell),
 .table-wrap :deep(.el-table th.el-table__cell.is-leaf) {
-  border-bottom-color: #d0d7de;
+  border-bottom-color: var(--meis-report-line);
 }
 
 .table-wrap :deep(.el-table--border::before),
 .table-wrap :deep(.el-table__border-left-patch) {
-  background-color: #d0d7de;
+  background-color: var(--meis-report-line);
 }
 
 .table-footer {
@@ -734,8 +734,8 @@ function onSummaryExport() {
   justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
-  background: #d6ebf8;
-  border-top: 1px solid #d0d7de;
+  background: var(--meis-report-header-bg);
+  border-top: 1px solid var(--meis-report-line);
 }
 
 .table-footer-summary {

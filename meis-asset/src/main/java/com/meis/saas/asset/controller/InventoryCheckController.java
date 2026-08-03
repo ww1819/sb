@@ -1,5 +1,6 @@
 package com.meis.saas.asset.controller;
 
+import com.meis.saas.common.audit.DocChangeLogService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.FilterCsvSupport;
@@ -25,13 +26,14 @@ public class InventoryCheckController {
             "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
 
     private final JdbcTemplate jdbc;
+    private final DocChangeLogService docLog;
 
     /** AST-UI-14：按设备查盘点参与记录 */
     @GetMapping("/by-device/{deviceId}")
     public Result<List<Map<String, Object>>> byDevice(@PathVariable UUID deviceId) {
         return Result.ok(jdbc.queryForList("""
-                SELECT c.check_no, c.check_name, c.check_type, c.status, c.audit_status,
-                       c.dept_id, dept.dept_name, i.check_date, i.is_found, i.is_matched,
+                SELECT c.id, c.check_no, c.check_name, c.check_type, c.status, c.audit_status,
+                       c.dept_id, dept.dept_name, i.id AS item_id, i.check_date, i.is_found, i.is_matched,
                        i.actual_location, i.condition_status
                 FROM inventory_check_item i
                 INNER JOIN inventory_check c ON c.id = i.check_id
@@ -45,7 +47,9 @@ public class InventoryCheckController {
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(PageQuery query,
             @RequestParam(required = false) String audit_status,
-            @RequestParam(required = false) String dept_id) {
+            @RequestParam(required = false) String dept_id,
+            @RequestParam(required = false) String check_type,
+            @RequestParam(required = false) String status) {
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         List<Object> args = new ArrayList<>();
         if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
@@ -55,6 +59,8 @@ public class InventoryCheckController {
             args.add(kw);
         }
         FilterCsvSupport.appendStrIn(where, args, "audit_status", audit_status);
+        FilterCsvSupport.appendStrIn(where, args, "check_type", check_type);
+        FilterCsvSupport.appendStrIn(where, args, "status", status);
         FilterCsvSupport.appendUuidIn(where, args, "dept_id", dept_id);
         where.append(SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check", null));
         Long total = jdbc.queryForObject("SELECT COUNT(*) FROM inventory_check" + where, Long.class, args.toArray());
@@ -67,31 +73,81 @@ public class InventoryCheckController {
         return Result.ok(PageResult.of(rows, total != null ? total : 0, query.getPage(), query.getSize()));
     }
 
+    /** AST-UI-07 / BACKLOG-AST-07：科室盘点报表汇总 */
+    @GetMapping("/report")
+    public Result<List<Map<String, Object>>> report(
+            @RequestParam(required = false) Integer checkYear,
+            @RequestParam(required = false) String deptId,
+            @RequestParam(required = false) String checkType,
+            @RequestParam(required = false) String status) {
+        StringBuilder sql = new StringBuilder("""
+                SELECT c.id, c.check_no, c.check_name, c.check_year, c.check_type, c.dept_id,
+                       dept.dept_name, c.status, c.audit_status,
+                       c.total_count, c.checked_count, c.matched_count, c.mismatch_count, c.missing_count,
+                       c.start_date, c.end_date, c.actual_end_at, c.created_at
+                FROM inventory_check c
+                LEFT JOIN department dept ON dept.id = c.dept_id
+                WHERE 1=1
+                """);
+        sql.append(SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check", "c"));
+        List<Object> args = new ArrayList<>();
+        if (checkYear != null) {
+            sql.append(" AND c.check_year = ? ");
+            args.add(checkYear);
+        }
+        if (deptId != null && !deptId.isBlank()) {
+            sql.append(" AND c.dept_id = ?::uuid ");
+            args.add(deptId);
+        }
+        if (checkType != null && !checkType.isBlank()) {
+            sql.append(" AND c.check_type = ? ");
+            args.add(checkType.trim());
+        }
+        if (status != null && !status.isBlank()) {
+            FilterCsvSupport.appendStrIn(sql, args, "c.status", status);
+        }
+        sql.append(" ORDER BY c.check_year DESC NULLS LAST, c.created_at DESC NULLS LAST LIMIT 500");
+        return Result.ok(jdbc.queryForList(sql.toString(), args.toArray()));
+    }
+
     @GetMapping("/devices/candidates")
     public Result<List<Map<String, Object>>> candidateDevices(
             @RequestParam(required = false) String deptId,
             @RequestParam(required = false) String campusId,
             @RequestParam(required = false) String checkId,
-            @RequestParam(required = false) List<String> excludeIds) {
+            @RequestParam(required = false) List<String> excludeIds,
+            @RequestParam(required = false) String deviceCode,
+            @RequestParam(required = false) String deviceName,
+            @RequestParam(required = false) String specification,
+            @RequestParam(required = false) String model,
+            @RequestParam(required = false) String serialNumber,
+            @RequestParam(required = false) String powerTagCode,
+            @RequestParam(required = false) String deviceStatus) {
         StringBuilder sql = new StringBuilder("""
-                SELECT id, device_code, device_name, brand, model, specification,
-                       dept_id, campus_id, location_detail, device_status
-                FROM medical_device
-                WHERE is_active = true
+                SELECT d.id, d.device_code, d.device_name, d.dept_id, d.campus_id, d.location_detail,
+                       dept.dept_name,
                 """);
-        sql.append(SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", null));
+        sql.append(com.meis.saas.common.asset.DeviceLedgerSelectSupport.SELECT_FIELDS);
+        sql.append("""
+                FROM medical_device d
+                """);
+        sql.append(com.meis.saas.common.asset.DeviceLedgerSelectSupport.relatedJoins("d"));
+        sql.append("""
+                WHERE d.is_active = true
+                """);
+        sql.append(SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d"));
         List<Object> args = new ArrayList<>();
-        if (deptId != null && !deptId.toString().isBlank()) {
-            sql.append(" AND dept_id = ?::uuid ");
+        if (deptId != null && !deptId.isBlank()) {
+            sql.append(" AND d.dept_id = ?::uuid ");
             args.add(deptId);
         }
-        if (campusId != null && !campusId.toString().isBlank()) {
-            sql.append(" AND campus_id = ?::uuid ");
+        if (campusId != null && !campusId.isBlank()) {
+            sql.append(" AND d.campus_id = ?::uuid ");
             args.add(campusId);
         }
-        if (checkId != null && !checkId.toString().isBlank()) {
+        if (checkId != null && !checkId.isBlank()) {
             sql.append("""
-                     AND id NOT IN (
+                     AND d.id NOT IN (
                          SELECT device_id FROM inventory_check_item
                          WHERE check_id = ?::uuid AND device_id IS NOT NULL
                     """);
@@ -102,13 +158,34 @@ public class InventoryCheckController {
         List<String> excludes = excludeIds == null ? List.of()
                 : excludeIds.stream().filter(id -> id != null && !id.isBlank()).distinct().toList();
         if (!excludes.isEmpty()) {
-            sql.append(" AND id NOT IN (");
+            sql.append(" AND d.id NOT IN (");
             sql.append(String.join(",", Collections.nCopies(excludes.size(), "?::uuid")));
             sql.append(") ");
             args.addAll(excludes);
         }
-        sql.append(" ORDER BY device_code LIMIT 500");
+        appendIlike(sql, args, "d.device_code", deviceCode);
+        if (deviceName != null && !deviceName.isBlank()) {
+            String like = "%" + deviceName.trim() + "%";
+            sql.append(" AND (d.device_name ILIKE ? OR COALESCE(d.pinyin_code, '') ILIKE ?) ");
+            args.add(like);
+            args.add(like);
+        }
+        appendIlike(sql, args, "d.specification", specification);
+        appendIlike(sql, args, "d.model", model);
+        appendIlike(sql, args, "d.serial_number", serialNumber);
+        appendIlike(sql, args, "pt.tag_code", powerTagCode);
+        if (deviceStatus != null && !deviceStatus.isBlank()) {
+            sql.append(" AND d.device_status = ? ");
+            args.add(deviceStatus.trim());
+        }
+        sql.append(" ORDER BY d.device_code LIMIT 500");
         return Result.ok(jdbc.queryForList(sql.toString(), args.toArray()));
+    }
+
+    private static void appendIlike(StringBuilder sql, List<Object> args, String column, String value) {
+        if (value == null || value.isBlank()) return;
+        sql.append(" AND ").append(column).append(" ILIKE ? ");
+        args.add("%" + value.trim() + "%");
     }
 
     @GetMapping("/{id:" + UUID_PATH + "}")
@@ -118,10 +195,15 @@ public class InventoryCheckController {
                         + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check", null), id);
         if (rows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> t = rows.get(0);
-        t.put("items", jdbc.queryForList(
-                "SELECT * FROM inventory_check_item WHERE check_id = ?::uuid"
-                        + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check_item", null)
-                        + " ORDER BY device_code", id));
+        t.put("items", jdbc.queryForList("""
+                SELECT i.*,
+                       dept.dept_name,
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.SELECT_FIELDS + """
+                FROM inventory_check_item i
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.joins("i.device_id") + """
+                WHERE i.check_id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check_item", "i")
+                + " ORDER BY i.device_code", id));
         return Result.ok(t);
     }
 
@@ -183,24 +265,35 @@ public class InventoryCheckController {
                 }).orElse(null);
         upsertItems(id, checkNo, items);
         refreshCheckedCount(id);
+        if (exists) {
+            SoftDeleteSupport.applyChannels(jdbc, "inventory_check", id, body, "update_channel");
+        } else {
+            SoftDeleteSupport.applyChannels(jdbc, "inventory_check", id, body, "create_channel", "update_channel");
+        }
+        logInventory(id, exists ? "update" : "create", body, null);
         return get(id);
     }
 
     @DeleteMapping("/{id:" + UUID_PATH + "}")
     @Transactional
     @OperationLog(module = "asset", description = "删除盘点任务")
-    public Result<Void> delete(@PathVariable UUID id) {
+    public Result<Void> delete(@PathVariable UUID id,
+                               @RequestParam(required = false) String client) {
         assertMutable(id);
+        String checkNo = resolveCheckNo(id);
         jdbc.update("DELETE FROM inventory_check_item WHERE check_id = ?::uuid", id);
-        int n = SoftDeleteSupport.softDelete(jdbc, "inventory_check", id.toString());
+        int n = SoftDeleteSupport.softDelete(jdbc, "inventory_check", id.toString(), client);
         if (n == 0) throw new BizException(404, "not found");
+        docLog.event("asset", "inventory", id, checkNo, "delete",
+                OpsClientChannel.normalize(client), null);
         return Result.ok();
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/approve")
     @Transactional
     @OperationLog(module = "asset", description = "审核盘点任务")
-    public Result<Map<String, Object>> approve(@PathVariable UUID id) {
+    public Result<Map<String, Object>> approve(@PathVariable UUID id,
+                                               @RequestBody(required = false) Map<String, Object> body) {
         var rows = jdbc.queryForList(
                 "SELECT audit_status FROM inventory_check WHERE id = ?::uuid"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check", null), id);
@@ -217,13 +310,18 @@ public class InventoryCheckController {
                     approved_at = NOW(), updated_at = NOW()
                 WHERE id = ?::uuid
                 """, approver, approverName, id);
+        SoftDeleteSupport.applyChannels(jdbc, "inventory_check", id, body, "audit_channel", "update_channel");
+        logInventory(id, "approve", body, null);
         return get(id);
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/start")
     @OperationLog(module = "asset", description = "开始盘点")
-    public Result<Map<String, Object>> start(@PathVariable UUID id) {
+    public Result<Map<String, Object>> start(@PathVariable UUID id,
+                                             @RequestBody(required = false) Map<String, Object> body) {
         jdbc.update("UPDATE inventory_check SET status = 'in_progress', actual_start_at = NOW(), updated_at = NOW() WHERE id = ?::uuid", id);
+        SoftDeleteSupport.applyChannels(jdbc, "inventory_check", id, body, "update_channel");
+        logInventory(id, "start", body, null);
         return get(id);
     }
 
@@ -317,6 +415,11 @@ public class InventoryCheckController {
         }
         if (sets.isEmpty()) throw new BizException(400, "无更新字段");
         SoftDeleteSupport.appendUpdateChannelFromBody(jdbc, "inventory_check_item", sets, args, body);
+        if (body.containsKey("is_found") && asBool(body.get("is_found"))
+                && TableColumnCache.hasColumn(jdbc, "inventory_check_item", "confirm_channel")) {
+            sets.add("confirm_channel = COALESCE(confirm_channel, ?)");
+            args.add(OpsClientChannel.of(body));
+        }
         sets.add("row_version = COALESCE(row_version,1) + 1");
         sets.add("updated_at = NOW()");
         args.add(itemId);
@@ -330,6 +433,7 @@ public class InventoryCheckController {
                     OpsClientChannel.of(body), id);
         }
         refreshCheckedCount(id);
+        logInventory(id, "patch_item", body, itemId.toString());
         return get(id);
     }
 
@@ -353,7 +457,10 @@ public class InventoryCheckController {
                 if (item.containsKey("need_reprint_label")) patch.put("need_reprint_label", item.get("need_reprint_label"));
                 if (item.containsKey("actual_location")) patch.put("actual_location", item.get("actual_location"));
                 if (item.containsKey("row_version")) patch.put("row_version", item.get("row_version"));
-                if (patch.isEmpty()) continue;
+                boolean hasBiz = patch.containsKey("is_found") || patch.containsKey("need_reprint_label")
+                        || patch.containsKey("actual_location");
+                if (!hasBiz) continue;
+                patch.put("client", body.get("client") != null ? body.get("client") : "app");
                 patchItem(id, itemId, patch);
                 ok++;
             } catch (BizException ex) {
@@ -363,6 +470,7 @@ public class InventoryCheckController {
         Map<String, Object> result = new LinkedHashMap<>(Objects.requireNonNull(get(id).getData()));
         result.put("synced", ok);
         result.put("conflicts", conflicts);
+        logInventory(id, "offline_sync", body, "synced=" + ok);
         return Result.ok(result);
     }
 
@@ -417,13 +525,24 @@ public class InventoryCheckController {
             if (code.isBlank()) throw new BizException(400, "设备编码为空，无法生成标签二维码");
 
             UUID logId = UUID.randomUUID();
-            jdbc.update("""
-                    INSERT INTO device_label_print_log
-                    (id, device_id, device_code, device_name, printed_by, printed_by_name, template_code,
-                     biz_type, biz_id, biz_no, biz_item_id, remark)
-                    VALUES (?::uuid, ?::uuid, ?, ?, ?::uuid, ?, ?, 'inventory_check', ?::uuid, ?, ?::uuid, ?)
-                    """, logId, deviceId, code, item.get("device_name"), userId, printedByName, template,
-                    id, checkNo, item.get("id"), remark);
+            String channel = OpsClientChannel.of(body);
+            if (TableColumnCache.hasColumn(jdbc, "device_label_print_log", "create_channel")) {
+                jdbc.update("""
+                        INSERT INTO device_label_print_log
+                        (id, device_id, device_code, device_name, printed_by, printed_by_name, template_code,
+                         biz_type, biz_id, biz_no, biz_item_id, remark, create_channel)
+                        VALUES (?::uuid, ?::uuid, ?, ?, ?::uuid, ?, ?, 'inventory_check', ?::uuid, ?, ?::uuid, ?, ?)
+                        """, logId, deviceId, code, item.get("device_name"), userId, printedByName, template,
+                        id, checkNo, item.get("id"), remark, channel);
+            } else {
+                jdbc.update("""
+                        INSERT INTO device_label_print_log
+                        (id, device_id, device_code, device_name, printed_by, printed_by_name, template_code,
+                         biz_type, biz_id, biz_no, biz_item_id, remark)
+                        VALUES (?::uuid, ?::uuid, ?, ?, ?::uuid, ?, ?, 'inventory_check', ?::uuid, ?, ?::uuid, ?)
+                        """, logId, deviceId, code, item.get("device_name"), userId, printedByName, template,
+                        id, checkNo, item.get("id"), remark);
+            }
             jdbc.update("""
                     UPDATE medical_device SET label_printed = TRUE, qr_code_url = ?, updated_at = NOW()
                     WHERE id = ?::uuid
@@ -436,18 +555,54 @@ public class InventoryCheckController {
                     """, item.get("id"));
             printed++;
         }
+        logInventory(id, "label_print", body, "printed=" + printed);
         return Result.ok(Map.of("printed", printed, "check_id", id.toString(), "check_no", checkNo));
     }
 
     @PostMapping("/{id:" + UUID_PATH + "}/complete")
+    @Transactional
     @OperationLog(module = "asset", description = "完成盘点")
-    public Result<Map<String, Object>> complete(@PathVariable UUID id) {
+    public Result<Map<String, Object>> complete(@PathVariable UUID id,
+                                                @RequestBody(required = false) Map<String, Object> body) {
+        assertExists(id);
+        refreshDiffCounts(id);
         jdbc.update("""
                 UPDATE inventory_check
                 SET status = 'completed', actual_end_at = NOW(), updated_at = NOW()
                 WHERE id = ?::uuid
                 """, id);
+        SoftDeleteSupport.applyChannels(jdbc, "inventory_check", id, body, "update_channel");
+        logInventory(id, "complete", body, null);
         return get(id);
+    }
+
+    /** 刷新盘实相符/不符/盘亏计数（差异展示；写回台账另议） */
+    private void refreshDiffCounts(UUID id) {
+        jdbc.update("""
+            UPDATE inventory_check SET
+              checked_count = (
+                SELECT COUNT(*) FROM inventory_check_item
+                WHERE check_id = ?::uuid AND is_found = true
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check_item", null) + """
+              ),
+              matched_count = (
+                SELECT COUNT(*) FROM inventory_check_item
+                WHERE check_id = ?::uuid AND is_found = true AND COALESCE(is_matched, true) = true
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check_item", null) + """
+              ),
+              mismatch_count = (
+                SELECT COUNT(*) FROM inventory_check_item
+                WHERE check_id = ?::uuid AND is_found = true AND is_matched = false
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check_item", null) + """
+              ),
+              missing_count = (
+                SELECT COUNT(*) FROM inventory_check_item
+                WHERE check_id = ?::uuid AND (is_found = false OR is_found IS NULL)
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check_item", null) + """
+              ),
+              updated_at = NOW()
+            WHERE id = ?::uuid
+            """, id, id, id, id, id);
     }
 
     private void upsertItems(UUID checkId, String checkNo, List<Map<String, Object>> items) {
@@ -528,6 +683,17 @@ public class InventoryCheckController {
         if (!rows.isEmpty() && "approved".equals(String.valueOf(rows.get(0).get("audit_status")))) {
             throw new BizException(400, "已审核的盘点单不可修改或删除");
         }
+    }
+
+    private void logInventory(UUID id, String event, Map<String, Object> body, String remark) {
+        docLog.event("asset", "inventory", id, resolveCheckNo(id), event, OpsClientChannel.of(body), remark);
+    }
+
+    private String resolveCheckNo(UUID id) {
+        var rows = jdbc.queryForList("SELECT check_no FROM inventory_check WHERE id = ?::uuid", id);
+        if (rows.isEmpty() || rows.get(0).get("check_no") == null) return null;
+        String s = String.valueOf(rows.get(0).get("check_no")).trim();
+        return s.isEmpty() ? null : s;
     }
 
     private String resolveUserName(String userId) {

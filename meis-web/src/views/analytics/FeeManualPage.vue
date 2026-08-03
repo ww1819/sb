@@ -444,14 +444,14 @@ function onFeeImported(rows: FeeImportRow[]) {
 .query-box,
 .panel {
   background: #fff;
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--meis-report-line);
   border-radius: 2px;
   overflow: hidden;
 }
 
 .query-box {
   flex-shrink: 0;
-  border-color: #b7d4ea;
+  border-color: var(--meis-report-border);
 }
 
 .section-bar {
@@ -460,12 +460,12 @@ function onFeeImported(rows: FeeImportRow[]) {
   font-weight: 600;
   line-height: 1.5;
   color: #303133;
-  border-bottom: 1px solid #d0d7de;
-  background: #d6ebf8;
+  border-bottom: 1px solid var(--meis-report-line);
+  background: var(--meis-report-header-bg);
 }
 
 .query-box > .section-bar {
-  border-bottom-color: #b7d4ea;
+  border-bottom-color: var(--meis-report-border);
 }
 
 .query-body {
@@ -547,10 +547,10 @@ function onFeeImported(rows: FeeImportRow[]) {
 }
 
 .panel--left :deep(.el-table) {
-  --el-table-header-bg-color: #d6ebf8;
-  --el-table-row-hover-bg-color: #e6f7ff;
-  --el-table-current-row-bg-color: #e6f7ff;
-  --el-table-border-color: #d0d7de;
+  --el-table-header-bg-color: var(--meis-report-header-bg);
+  --el-table-row-hover-bg-color: var(--meis-report-hover);
+  --el-table-current-row-bg-color: var(--meis-report-hover);
+  --el-table-border-color: var(--meis-report-line);
 }
 
 .panel--left :deep(.el-table th.el-table__cell) {
@@ -559,7 +559,7 @@ function onFeeImported(rows: FeeImportRow[]) {
 }
 
 .panel--left :deep(.el-table__row--striped td.el-table__cell) {
-  background: #fef5e7;
+  background: var(--meis-report-stripe);
 }
 
 .mode-checks {
@@ -578,7 +578,7 @@ function onFeeImported(rows: FeeImportRow[]) {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0 12px;
   padding: 8px 8px 0;
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--meis-report-line);
   border-radius: 2px;
   background: #fafcfe;
 }

@@ -1,7 +1,9 @@
 package com.meis.saas.qc.controller;
 
+import com.meis.saas.common.audit.DocChangeLogService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.ops.OpsClientChannel;
 import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
@@ -20,6 +22,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class MetrologyExecutionController {
     private final JdbcTemplate jdbc;
+    private final DocChangeLogService docLog;
 
     @GetMapping("/page")
     public Result<PageResult<Map<String, Object>>> page(PageQuery query, @RequestParam(required = false) String status) {
@@ -61,9 +64,11 @@ public class MetrologyExecutionController {
         if (rows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> result = new LinkedHashMap<>(rows.get(0));
         var items = jdbc.queryForList("""
-                SELECT ei.*, COALESCE(ei.dept_name, d.dept_name) AS dept_name
+                SELECT ei.*,
+                       COALESCE(ei.dept_name, dept.dept_name) AS dept_name,
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.SELECT_FIELDS + """
                 FROM metrology_execution_item ei
-                LEFT JOIN department d ON d.id = ei.dept_id
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.joins("ei.device_id") + """
                 WHERE ei.execution_id = ?::uuid
                 """ + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_execution_item", "ei")
                 + " ORDER BY ei.created_at", id);
@@ -90,6 +95,7 @@ public class MetrologyExecutionController {
                 """, executorId, id);
         jdbc.update("UPDATE metrology_execution_item SET status='in_progress', updated_at=NOW() WHERE execution_id=?::uuid AND status='pending'", id);
         SoftDeleteSupport.applyChannels(jdbc, "metrology_execution", id, body, "update_channel");
+        logMetrology(id, "start", body, null);
         return get(id);
     }
 
@@ -129,9 +135,18 @@ public class MetrologyExecutionController {
                 updatePlansAfterComplete(execId);
                 syncLegacyRecord(itemId);
             }
+            logMetrology(execId, "complete_item", body, itemId.toString());
             return get(execId);
         }
         throw new BizException(404, "execution item not found");
+    }
+
+    private void logMetrology(UUID id, String event, Map<String, Object> body, String remark) {
+        var rows = jdbc.queryForList(
+                "SELECT execution_no FROM metrology_execution WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "metrology_execution", null), id);
+        String no = rows.isEmpty() ? null : Objects.toString(rows.get(0).get("execution_no"), null);
+        docLog.event("metrology", "execution", id, no, event, OpsClientChannel.of(body), remark);
     }
 
     private void updatePlansAfterComplete(UUID execId) {

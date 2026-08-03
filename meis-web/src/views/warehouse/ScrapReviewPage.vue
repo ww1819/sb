@@ -1,12 +1,19 @@
 <template>
-  <FeaturePlaceholderPage
-    title="报废审核"
-    subtitle="资产管理 / 报废管理"
-    description="报废审核功能开发中"
-    hint="菜单已开通（AST-UI-10）；完整审核流程见待开发池 BACKLOG-AST-10"
+  <WorkflowCrudPage
+    :config="config"
+    save-url="/asset/scrap"
+    business-type="device_scrap"
+    hide-add
+    force-view-mode
+    :can-edit="() => false"
+    :can-delete="() => false"
   />
 </template>
 
 <script setup lang="ts">
-import FeaturePlaceholderPage from '@/components/FeaturePlaceholderPage.vue'
+import { computed } from 'vue'
+import WorkflowCrudPage from '@/components/WorkflowCrudPage.vue'
+import { getPageConfig } from '@/config/pageRegistry'
+
+const config = computed(() => getPageConfig('/warehouse/scrap-review')!)
 </script>

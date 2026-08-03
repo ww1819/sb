@@ -46,7 +46,9 @@
     <el-tab-pane label="质控记录" name="qc">
       <el-table :data="(device.qc as unknown[]) ?? []" border>
         <el-table-column prop="type" label="类型" />
-        <el-table-column prop="created_at" label="时间" />
+        <el-table-column prop="created_at" label="时间">
+          <template #default="{ row }">{{ formatDisplayDateTime(row.created_at) }}</template>
+        </el-table-column>
       </el-table>
     </el-tab-pane>
     <el-tab-pane label="效益分析" name="benefit">
@@ -59,7 +61,9 @@
     <el-tab-pane label="操作日志" name="log">
       <el-table :data="(device.logs as unknown[]) ?? []" border>
         <el-table-column prop="operation_desc" label="操作" />
-        <el-table-column prop="created_at" label="时间" />
+        <el-table-column prop="created_at" label="时间">
+          <template #default="{ row }">{{ formatDisplayDateTime(row.created_at) }}</template>
+        </el-table-column>
       </el-table>
     </el-tab-pane>
     <el-tab-pane label="二维码" name="qrcode">
@@ -77,6 +81,7 @@ import { collectLinkTables, fieldSchemaByProp, getSchema } from '@/config/pageSc
 import { preloadRefLabelMaps } from '@/composables/useRefLabelMap'
 import { useDict } from '@/composables/useDict'
 import TableCellValue from '@/components/table/TableCellValue.vue'
+import { formatDisplayDateTime } from '@/utils/datetime'
 
 const props = defineProps<{ device: Record<string, unknown> }>()
 const active = ref('basic')

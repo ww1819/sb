@@ -6,8 +6,8 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_section_label.dart';
+import '../../../shared/utils/barcode_scan.dart';
 import '../../auth/providers/auth_provider.dart';
-import 'repair_scan_page.dart';
 
 /// MOB-PWR-01：查看 / 修改标签绑定设备
 class PowerTagBindPage extends ConsumerStatefulWidget {
@@ -71,13 +71,10 @@ class _PowerTagBindPageState extends ConsumerState<PowerTagBindPage> {
 
   Future<void> _scanDevice() async {
     if (!mounted) return;
-    final code = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(builder: (_) => const RepairScanPage()),
-    );
-    if (code == null || code.trim().isEmpty) return;
-    keywordCtrl.text = code.trim();
-    await _lookupDevices(code.trim(), preferExact: true);
+    final code = await openBarcodeScanner(context);
+    if (code == null) return;
+    keywordCtrl.text = code;
+    await _lookupDevices(code, preferExact: true);
   }
 
   Future<void> _lookupDevices(String q, {bool preferExact = false}) async {

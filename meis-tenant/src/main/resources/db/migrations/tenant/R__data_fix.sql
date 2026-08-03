@@ -1004,6 +1004,10 @@ BEGIN
   END LOOP;
 END $$;
 
+-- ========== MOB-CHANNEL-04：变更/单据日志 client NULL → web ==========
+UPDATE sys_entity_change_log SET client = 'web' WHERE client IS NULL;
+UPDATE sys_doc_change_log SET client = 'web' WHERE client IS NULL;
+
 -- ========== PLT-STATUS-CN-01：补齐运维执行/招标/健康检查等状态字典 ==========
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
 ('maintain_exec_status', 'draft', '草稿', 'draft', 1),
@@ -1051,3 +1055,242 @@ SET dict_label = EXCLUDED.dict_label,
     dict_value = EXCLUDED.dict_value,
     sort_order = EXCLUDED.sort_order;
 
+-- AST-WRN-02：废止扁平行维保时段（测试数据可清；头/明细由 V1 SchemaTableEnsuring 建表）
+DROP TABLE IF EXISTS device_warranty_term CASCADE;
+
+-- ========== AST-OWN / AST-BF / AST-PART / AST-SRC / AST-DISP：归属/换件/处置字典 ==========
+DELETE FROM sys_dict WHERE dict_type = 'confirm_status';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('confirm_status', 'draft', '待确认', 'draft', 1),
+('confirm_status', 'confirmed', '已确认', 'confirmed', 2);
+
+DELETE FROM sys_dict WHERE dict_type = 'source_mode';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('source_mode', 'biz_doc', '业务单据', 'biz_doc', 1),
+('source_mode', 'biz_op', '业务操作写回', 'biz_op', 2),
+('source_mode', 'manual_backfill', '手工补录', 'manual_backfill', 3),
+('source_mode', 'system', '系统生成', 'system', 4),
+('source_mode', 'manual_transfer', '手工真变更', 'manual_transfer', 5);
+
+DELETE FROM sys_dict WHERE dict_type = 'owner_type';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('owner_type', 'warehouse', '仓库', 'warehouse', 1),
+('owner_type', 'dept', '科室', 'dept', 2);
+
+DELETE FROM sys_dict WHERE dict_type = 'ownership_change_reason';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('ownership_change_reason', 'biz_doc', '业务单据', 'biz_doc', 1),
+('ownership_change_reason', 'manual_transfer', '手工真变更', 'manual_transfer', 2),
+('ownership_change_reason', 'manual_correct', '手工纠错', 'manual_correct', 3),
+('ownership_change_reason', 'manual_backfill', '手工补录', 'manual_backfill', 4),
+('ownership_change_reason', 'import', '导入', 'import', 5);
+
+DELETE FROM sys_dict WHERE dict_type = 'disposition_type';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('disposition_type', 'entry', '入库', 'entry', 1),
+('disposition_type', 'outbound', '出库', 'outbound', 2),
+('disposition_type', 'return', '退库', 'return', 3),
+('disposition_type', 'transfer', '调拨/转仓', 'transfer', 4),
+('disposition_type', 'goods_return', '退货', 'goods_return', 5),
+('disposition_type', 'scrap', '报废', 'scrap', 6),
+('disposition_type', 'inventory_loss', '盘亏', 'inventory_loss', 7),
+('disposition_type', 'ownership_transfer', '手工归属变更', 'ownership_transfer', 8);
+
+-- ========== AST-GAP-REVIEW-01：三甲标量/证照/档案字典 ==========
+DELETE FROM sys_dict WHERE dict_type = 'eq_class';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('eq_class', 'class_1', 'Ⅰ类', 'class_1', 1),
+('eq_class', 'class_2', 'Ⅱ类', 'class_2', 2),
+('eq_class', 'class_3', 'Ⅲ类', 'class_3', 3);
+
+DELETE FROM sys_dict WHERE dict_type = 'device_criticality';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('device_criticality', 'high', '高', 'high', 1),
+('device_criticality', 'medium', '中', 'medium', 2),
+('device_criticality', 'low', '低', 'low', 3);
+
+DELETE FROM sys_dict WHERE dict_type = 'depreciation_method';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('depreciation_method', 'straight_line', '平均年限法', 'straight_line', 1),
+('depreciation_method', 'units_of_production', '工作量法', 'units_of_production', 2),
+('depreciation_method', 'other', '其他', 'other', 9);
+
+DELETE FROM sys_dict WHERE dict_type = 'acquisition_mode';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('acquisition_mode', 'purchase', '购入', 'purchase', 1),
+('acquisition_mode', 'donation', '捐赠', 'donation', 2),
+('acquisition_mode', 'transfer_in', '划拨', 'transfer_in', 3),
+('acquisition_mode', 'finance_lease', '融资租赁', 'finance_lease', 4),
+('acquisition_mode', 'other', '其他', 'other', 9);
+
+DELETE FROM sys_dict WHERE dict_type = 'energy_class';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('energy_class', 'A', 'A', 'A', 1),
+('energy_class', 'B', 'B', 'B', 2),
+('energy_class', 'C', 'C', 'C', 3);
+
+DELETE FROM sys_dict WHERE dict_type = 'device_license_type';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('device_license_type', 'registration', '注册证', 'registration', 1),
+('device_license_type', 'metrology', '计量证书', 'metrology', 2),
+('device_license_type', 'special', '特种许可', 'special', 3),
+('device_license_type', 'inspection', '强检证书', 'inspection', 4),
+('device_license_type', 'other', '其他', 'other', 9);
+
+DELETE FROM sys_dict WHERE dict_type = 'device_archive_type';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('device_archive_type', 'archive', '档案', 'archive', 1),
+('device_archive_type', 'image', '图片', 'image', 2),
+('device_archive_type', 'manual', '说明书', 'manual', 3),
+('device_archive_type', 'other', '其他', 'other', 9);
+
+-- AST-GAP-REVIEW G5：报废状态/处置方式补字典
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('scrap_status', 'rejected', '已驳回', 'rejected', 5),
+('disposal_method', 'donate', '捐赠', 'donate', 4),
+('disposal_method', 'return_supplier', '退供应商', 'return_supplier', 5)
+ON CONFLICT (dict_type, dict_code) DO NOTHING;
+
+-- AST-SHEET-DRILL-01 / AST-UI-22：台账 Sheet 状态字典补齐
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('metrology_result', 'qualified', '合格', 'qualified', 1),
+('metrology_result', 'unqualified', '不合格', 'unqualified', 2),
+('metrology_result', 'pass', '合格', 'pass', 3),
+('metrology_result', 'fail', '不合格', 'fail', 4),
+('metrology_result', 'pending', '待判定', 'pending', 5),
+('ops_result_status', 'pending', '待填', 'pending', 1),
+('ops_result_status', 'pass', '合格', 'pass', 2),
+('ops_result_status', 'fail', '不合格', 'fail', 3),
+('ops_result_status', 'na', '不适用', 'na', 4),
+('pm_exec_status', 'draft', '草稿', 'draft', 1),
+('pm_exec_status', 'pending', '待执行', 'pending', 2),
+('pm_exec_status', 'in_progress', '执行中', 'in_progress', 3),
+('pm_exec_status', 'submitted', '已提交', 'submitted', 4),
+('pm_exec_status', 'audited', '已审核', 'audited', 5),
+('pm_exec_status', 'completed', '已完成', 'completed', 6),
+('pm_exec_item_status', 'pending', '待执行', 'pending', 10),
+('pm_exec_item_status', 'in_progress', '执行中', 'in_progress', 20),
+('pm_exec_item_status', 'completed', '已完成', 'completed', 30),
+('pm_exec_item_status', 'confirmed', '已确认', 'confirmed', 40),
+('maintain_result', 'qualified', '合格', 'qualified', 3),
+('maintain_result', 'unqualified', '不合格', 'unqualified', 4),
+('adverse_event_type', 'device_failure', '设备故障', 'device_failure', 6),
+('plan_status', 'draft', '草稿', 'draft', 0),
+('plan_status', 'active', '进行中', 'active', 1),
+('plan_status', 'completed', '已完成', 'completed', 2),
+('plan_status', 'cancelled', '已取消', 'cancelled', 3)
+ON CONFLICT (dict_type, dict_code) DO NOTHING;
+
+-- AST-STATUS-CN-GAP-01：补齐前端/台账所用字典类型与码值，避免未知(码)
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('maintain_approval_status', 'draft', '未提交', 'draft', 1),
+('maintain_approval_status', 'pending', '审批中', 'pending', 2),
+('maintain_approval_status', 'approved', '已通过', 'approved', 3),
+('maintain_approval_status', 'rejected', '已驳回', 'rejected', 4),
+('maintain_approval_status', 'withdrawn', '已撤回', 'withdrawn', 5),
+('inspect_approval_status', 'draft', '未提交', 'draft', 1),
+('inspect_approval_status', 'pending', '审批中', 'pending', 2),
+('inspect_approval_status', 'approved', '已通过', 'approved', 3),
+('inspect_approval_status', 'rejected', '已驳回', 'rejected', 4),
+('inspect_approval_status', 'withdrawn', '已撤回', 'withdrawn', 5),
+('metrology_approval_status', 'draft', '未提交', 'draft', 1),
+('metrology_approval_status', 'pending', '审批中', 'pending', 2),
+('metrology_approval_status', 'approved', '已通过', 'approved', 3),
+('metrology_approval_status', 'rejected', '已驳回', 'rejected', 4),
+('metrology_approval_status', 'withdrawn', '已撤回', 'withdrawn', 5),
+('inspect_result', 'pass', '合格', 'pass', 1),
+('inspect_result', 'fail', '不合格', 'fail', 2),
+('inspect_result', 'qualified', '合格', 'qualified', 3),
+('inspect_result', 'unqualified', '不合格', 'unqualified', 4),
+('inspect_result', 'pending', '待判定', 'pending', 5),
+('approval_status', 'withdrawn', '已撤回', 'withdrawn', 5),
+('audit_status', 'rejected', '已驳回', 'rejected', 3),
+('condition_status', 'normal', '正常', 'normal', 4),
+('plan_status', 'paused', '已暂停', 'paused', 4),
+('plan_status', 'pending', '待开始', 'pending', 5),
+('source_mode', 'external', '外部/财务', 'external', 6),
+('device_status', 'idle', '闲置', 'idle', 10),
+('device_status', 'borrowed', '借出中', 'borrowed', 11),
+('scrap_status', 'rejected', '已驳回', 'rejected', 5),
+('outbound_status', 'approved', '已审批', 'approved', 3),
+('outbound_status', 'pending', '待审批', 'pending', 4),
+('goods_return_status', 'rejected', '已驳回', 'rejected', 5),
+('transfer_status', 'rejected', '已驳回', 'rejected', 4),
+('transfer_status', 'draft', '草稿', 'draft', 0),
+('entry_status', 'approved', '已审批', 'approved', 4),
+('disposition_biz_status', 'draft', '草稿', 'draft', 1),
+('disposition_biz_status', 'pending', '待处理', 'pending', 2),
+('disposition_biz_status', 'approved', '已批准', 'approved', 3),
+('disposition_biz_status', 'issued', '已发放', 'issued', 4),
+('disposition_biz_status', 'returned', '已退回', 'returned', 5),
+('disposition_biz_status', 'completed', '已完成', 'completed', 6),
+('disposition_biz_status', 'disposed', '已处置', 'disposed', 7),
+('disposition_biz_status', 'confirmed', '已确认', 'confirmed', 8),
+('disposition_biz_status', 'planning', '计划中', 'planning', 9),
+('disposition_biz_status', 'in_progress', '进行中', 'in_progress', 10),
+('disposition_biz_status', 'rejected', '已驳回', 'rejected', 11),
+('disposition_biz_status', 'synced', '已同步', 'synced', 12),
+('disposition_biz_status', 'failed', '同步失败', 'failed', 13),
+('disposition_biz_status', 'ignored', '已忽略', 'ignored', 14),
+('sync_status', 'pending', '待同步', 'pending', 1),
+('sync_status', 'synced', '已同步', 'synced', 2),
+('sync_status', 'failed', '同步失败', 'failed', 3),
+('sync_status', 'ignored', '已忽略', 'ignored', 4),
+('auth_scope', 'operate', '操作授权', 'operate', 1),
+('auth_scope', 'maintain', '维保授权', 'maintain', 2),
+('udi_change_reason', 'update', '更新', 'update', 1),
+('udi_change_reason', 'correct', '纠错', 'correct', 2),
+('udi_change_reason', 'import', '导入', 'import', 3),
+('pm_exec_status', 'draft', '草稿', 'draft', 1),
+('pm_exec_status', 'pending', '待执行', 'pending', 2),
+('pm_exec_status', 'in_progress', '执行中', 'in_progress', 3),
+('pm_exec_status', 'submitted', '已提交', 'submitted', 4),
+('pm_exec_status', 'audited', '已审核', 'audited', 5),
+('pm_exec_status', 'completed', '已完成', 'completed', 6),
+('pm_exec_item_status', 'pending', '待执行', 'pending', 10),
+('pm_exec_item_status', 'in_progress', '执行中', 'in_progress', 20),
+('pm_exec_item_status', 'completed', '已完成', 'completed', 30),
+('pm_exec_item_status', 'confirmed', '已确认', 'confirmed', 40),
+('metrology_result', 'qualified', '合格', 'qualified', 1),
+('metrology_result', 'unqualified', '不合格', 'unqualified', 2),
+('metrology_result', 'pass', '合格', 'pass', 3),
+('metrology_result', 'fail', '不合格', 'fail', 4),
+('metrology_result', 'pending', '待判定', 'pending', 5),
+('ops_result_status', 'pending', '待填', 'pending', 1),
+('ops_result_status', 'pass', '合格', 'pass', 2),
+('ops_result_status', 'fail', '不合格', 'fail', 3),
+('ops_result_status', 'na', '不适用', 'na', 4),
+('maintain_result', 'qualified', '合格', 'qualified', 3),
+('maintain_result', 'unqualified', '不合格', 'unqualified', 4),
+('inspection_status', 'pending', '待巡检', 'pending', 1),
+('inspection_status', 'completed', '已完成', 'completed', 2),
+('inspection_status', 'in_progress', '巡检中', 'in_progress', 3),
+('wo_status', 'in_progress', '进行中', 'in_progress', 20),
+('wo_status', 'completed', '已完成', 'completed', 21),
+-- AST-EXP-01：使用到期推算方式
+('service_expiry_basis', 'enable', '启用日期+年限', 'enable', 1),
+('service_expiry_basis', 'production', '生产日期+年限', 'production', 2),
+('service_expiry_basis', 'acceptance', '验收日期+年限', 'acceptance', 3),
+('service_expiry_basis', 'purchase', '购置日期+年限', 'purchase', 4),
+('service_expiry_basis', 'created', '录入日期+年限', 'created', 5)
+ON CONFLICT (dict_type, dict_code) DO NOTHING;
+
+-- AST-EXP-01：存量台账按默认优先级回填使用到期（有年限且到期为空时）
+UPDATE medical_device d
+SET service_expiry_date = (
+        COALESCE(d.enable_date, d.production_date, d.acceptance_date, d.purchase_date, d.created_at::date)
+        + (d.service_life_years * INTERVAL '1 year')
+      )::date,
+    service_expiry_basis = CASE
+        WHEN d.enable_date IS NOT NULL THEN 'enable'
+        WHEN d.production_date IS NOT NULL THEN 'production'
+        WHEN d.acceptance_date IS NOT NULL THEN 'acceptance'
+        WHEN d.purchase_date IS NOT NULL THEN 'purchase'
+        ELSE 'created'
+      END,
+    updated_at = COALESCE(d.updated_at, NOW())
+WHERE COALESCE(d.is_deleted, 0) = 0
+  AND d.service_life_years IS NOT NULL
+  AND d.service_life_years > 0
+  AND d.service_expiry_date IS NULL
+  AND COALESCE(d.enable_date, d.production_date, d.acceptance_date, d.purchase_date, d.created_at::date) IS NOT NULL;

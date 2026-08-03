@@ -8,6 +8,11 @@
     :total="total"
     @page-change="load"
   >
+    <template v-if="valueSummaryItems.length" #footerSummary>
+      <span v-for="item in valueSummaryItems" :key="item.prop" class="value-summary-item">
+        小计{{ item.label }} {{ item.pageText }}；总计{{ item.label }} {{ item.totalText }}
+      </span>
+    </template>
     <template #filterBar>
       <PageFilterBar
         v-model:keyword="keyword"
@@ -62,7 +67,7 @@
               :options="filterOptions[f.key] ?? []"
               @change="onSearch"
             />
-            <el-button v-if="!hideAdd" v-permission="'add'" type="primary" @click="onAdd">新增</el-button>
+            <el-button v-if="!addHidden" v-permission="'add'" type="primary" @click="onAdd">新增</el-button>
             <slot name="toolbar-after-add" />
             <el-button @click="exportCsv">导出</el-button>
             <el-button v-if="showImport" @click="importVisible = true">导入</el-button>
@@ -81,7 +86,7 @@
             />
             <el-button type="primary" :icon="Search" @click="onSearch">查询</el-button>
             <el-button :icon="RefreshLeft" @click="onReset">重置</el-button>
-            <el-button v-if="!hideAdd" v-permission="'add'" type="primary" @click="onAdd">新增</el-button>
+            <el-button v-if="!addHidden" v-permission="'add'" type="primary" @click="onAdd">新增</el-button>
             <slot name="toolbar-after-add" />
             <el-button @click="exportCsv">导出</el-button>
             <slot name="actions-after" />
@@ -317,6 +322,7 @@ provide('crudBeforeSave', {
 const loading = ref(false)
 const rows = ref<Record<string, unknown>[]>([])
 const total = ref(0)
+const aggregates = ref<Record<string, unknown>>({})
 const page = ref(1)
 const size = ref(20)
 const keyword = ref('')
@@ -356,6 +362,7 @@ watch(tableHeight, () => {
 })
 
 const viewEnabled = computed(() => props.enableView === true || props.config.enableView === true)
+const addHidden = computed(() => props.hideAdd === true || props.config.hideAdd === true)
 const hideOperationColumn = computed(() => props.hideOperationColumn === true)
 const operationWidth = computed(() => {
   if (props.operationColumnWidth) return props.operationColumnWidth
@@ -377,6 +384,27 @@ const prependFilters = computed(() => props.config.listFilters?.filter((f) => f.
 const actionBarFilters = computed(() => props.config.listFilters?.filter((f) => f.actionBar) ?? [])
 const normalFilters = computed(() => props.config.listFilters?.filter((f) => !f.prepend && !f.actionBar) ?? [])
 const moreSearchFields = computed(() => props.config.moreSearchFields ?? [])
+
+const valueSummaryItems = computed(() => {
+  const defs = props.config.listValueSummary ?? []
+  if (!defs.length) return [] as { prop: string; label: string; pageText: string; totalText: string }[]
+  const fmt = (n: number) =>
+    n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return defs.map((d) => {
+    const pageSum = rows.value.reduce((acc, row) => {
+      const v = Number(row[d.prop])
+      return acc + (Number.isFinite(v) ? v : 0)
+    }, 0)
+    const totalRaw = aggregates.value[`sum_${d.prop}`]
+    const totalSum = totalRaw != null && totalRaw !== '' ? Number(totalRaw) : NaN
+    return {
+      prop: d.prop,
+      label: d.label,
+      pageText: fmt(pageSum),
+      totalText: Number.isFinite(totalSum) ? fmt(totalSum) : '—'
+    }
+  })
+})
 
 function initMoreSearchValues() {
   for (const f of moreSearchFields.value) {
@@ -534,6 +562,10 @@ async function load() {
     const { data } = await http.get(url, { params })
     rows.value = data.data?.records ?? []
     total.value = data.data?.total ?? 0
+    aggregates.value =
+      data.data?.aggregates && typeof data.data.aggregates === 'object'
+        ? (data.data.aggregates as Record<string, unknown>)
+        : {}
     await nextTick()
     applyingSelection.value = true
     applyToCurrentPage(tableRef.value, rows.value)
@@ -873,5 +905,8 @@ defineExpose({
 }
 :deep(.el-table .row-status-returned:hover > td.el-table__cell) {
   background-color: #fee2e2 !important;
+}
+.value-summary-item {
+  white-space: nowrap;
 }
 </style>

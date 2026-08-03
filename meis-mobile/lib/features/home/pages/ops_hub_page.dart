@@ -4,11 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/utils/barcode_scan.dart';
 import '../../../shared/utils/datetime_format.dart';
 import '../../../shared/widgets/meis_list_card.dart';
 import '../../../shared/widgets/meis_section_label.dart';
 import 'ops_exec_detail_page.dart';
-import 'repair_scan_page.dart';
 
 /// 保养 / 巡检 / PM 共用配置（MOB-F-03）
 class OpsModuleConfig {
@@ -131,11 +131,8 @@ class _OpsHubPageState extends ConsumerState<OpsHubPage> {
   }
 
   Future<void> scanAndExecute() async {
-    final code = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(builder: (_) => const RepairScanPage()),
-    );
-    if (code == null || code.isEmpty || !mounted) return;
+    final code = await openBarcodeScanner(context);
+    if (code == null || !mounted) return;
     await openByQuery(code);
   }
 

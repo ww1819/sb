@@ -143,6 +143,8 @@ public final class PageableJdbc {
             case "campus" -> new String[]{"campus_code", "campus_name"};
             case "maintenance_plan", "pm_plan", "inspection_plan" ->
                     new String[]{"plan_no", "plan_code", "plan_name", "template_name", "assigned_user_name", "created_by_name"};
+            case "device_scrap" -> new String[]{"scrap_no", "device_code", "device_name", "scrap_reason"};
+            case "inventory_check" -> new String[]{"check_no", "check_name"};
             default -> null;
         };
     }

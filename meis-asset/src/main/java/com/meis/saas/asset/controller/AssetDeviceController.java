@@ -1,10 +1,12 @@
 package com.meis.saas.asset.controller;
 
+import com.meis.saas.asset.service.DeviceDispositionQueryService;
 import com.meis.saas.common.asset.MedicalDeviceDeleteGuard;
 import com.meis.saas.common.audit.EntityChangeLogService;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.code.DeviceCodeGenerator;
 import com.meis.saas.common.exception.BizException;
+import com.meis.saas.common.ops.OpsClientChannel;
 import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
@@ -38,6 +40,7 @@ public class AssetDeviceController {
     private final JdbcTemplate jdbc;
     private final DeviceCodeGenerator codeGenerator;
     private final EntityChangeLogService changeLog;
+    private final DeviceDispositionQueryService dispositionQueryService;
 
     /** App 台账增量同步（MOB.8）：按 updated_at 水位 + 数据权限过滤。 */
     @GetMapping("/sync")
@@ -95,6 +98,14 @@ public class AssetDeviceController {
             PageQuery query,
             @RequestParam(value = "enable_dateFrom", required = false) String enable_dateFrom,
             @RequestParam(value = "enable_dateTo", required = false) String enable_dateTo,
+            @RequestParam(value = "created_atFrom", required = false) String created_atFrom,
+            @RequestParam(value = "created_atTo", required = false) String created_atTo,
+            @RequestParam(value = "production_dateFrom", required = false) String production_dateFrom,
+            @RequestParam(value = "production_dateTo", required = false) String production_dateTo,
+            @RequestParam(value = "acceptance_dateFrom", required = false) String acceptance_dateFrom,
+            @RequestParam(value = "acceptance_dateTo", required = false) String acceptance_dateTo,
+            @RequestParam(value = "has_power_tag", required = false) String has_power_tag,
+            @RequestParam(value = "power_tag_code", required = false) String power_tag_code,
             @RequestParam(value = "supplier_id", required = false) String supplier_id,
             @RequestParam(value = "manufacturer_id", required = false) String manufacturer_id,
             @RequestParam(value = "supplier_name", required = false) String supplier_name,
@@ -118,78 +129,18 @@ public class AssetDeviceController {
             @RequestParam(value = "finance_category_kw", required = false) String finance_category_kw,
             @RequestParam(value = "stock_scope", required = false) String stock_scope,
             @RequestParam(value = "hide_returned", required = false) Boolean hide_returned) {
-        StringBuilder where = new StringBuilder(" WHERE 1=1 ");
-        where.append(SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", "d"));
-        List<Object> args = new ArrayList<>();
-        // 库房库存：仅仓库在库（WH-UI-19）；科室在用：不在库（WH-UI-24 退库选资产）
-        if ("warehouse".equalsIgnoreCase(stock_scope)) {
-            where.append(" AND d.warehouse_id IS NOT NULL ");
-        } else if ("dept".equalsIgnoreCase(stock_scope)) {
-            where.append(" AND d.warehouse_id IS NULL ");
-        }
-        // 资产登记：已退货不展示（AST-UI-12）；库存/综合查询等不传此参
-        if (Boolean.TRUE.equals(hide_returned)) {
-            where.append(" AND COALESCE(d.device_status, '') <> 'returned' ");
-        }
-        if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
-            String kw = "%" + query.getKeyword().trim() + "%";
-            where.append("""
-                     AND (d.device_code ILIKE ? OR d.device_name ILIKE ? OR d.specification ILIKE ?
-                          OR d.financial_code ILIKE ? OR d.serial_number ILIKE ?)
-                    """);
-            args.add(kw);
-            args.add(kw);
-            args.add(kw);
-            args.add(kw);
-            args.add(kw);
-        }
-        appendUuidEq(where, args, "d.supplier_id", supplier_id);
-        appendUuidEq(where, args, "d.manufacturer_id", manufacturer_id);
-        FilterCsvSupport.appendUuidIn(where, args, "d.dept_id", dept_id);
-        FilterCsvSupport.appendUuidIn(where, args, "d.manage_dept_id", manage_dept_id);
-        appendUuidEq(where, args, "d.warehouse_id", warehouse_id);
-        FilterCsvSupport.appendUuidIn(where, args, "d.category_id", category_id);
-        FilterCsvSupport.appendUuidIn(where, args, "d.asset_category_id", asset_category_id);
-        FilterCsvSupport.appendUuidIn(where, args, "d.finance_category_id", finance_category_id);
-        boolean needSupplier = true;
-        boolean needManufacturer = true;
-        // 列表须带出科室/仓库/分类名称
-        boolean needUseDept = true;
-        boolean needManageDept = true;
-        boolean needWarehouse = true;
-        boolean needCategory = true;
-        if (hasText(supplier_name)) {
-            appendSupplierSearch(where, args, supplier_name);
-        }
-        if (!hasText(manufacturer_id)) {
-            appendNameOrPinyin(where, args, "mfr.manufacturer_name", "mfr.pinyin_code", manufacturer_name);
-        }
-        appendNameOrPinyin(where, args, "d.device_name", "d.pinyin_code", device_name);
-        appendLike(where, args, "d.specification", specification);
-        appendLike(where, args, "d.model", model);
-        if (!hasText(dept_id)) {
-            appendNameOrPinyin(where, args, "use_dept.dept_name", "use_dept.pinyin_code", dept_name);
-        }
-        if (!hasText(manage_dept_id)) {
-            appendNameOrPinyin(where, args, "mgr_dept.dept_name", "mgr_dept.pinyin_code", manage_dept_name);
-        }
-        appendLike(where, args, "d.serial_number", serial_number);
-        appendLike(where, args, "d.device_code", device_code);
-        FilterCsvSupport.appendStrIn(where, args, "d.device_status", device_status);
-        FilterCsvSupport.appendCodeNamePinyin(where, args, "mdc.category_code", "mdc.category_name", null, category_kw);
-        FilterCsvSupport.appendCodeNamePinyin(where, args, "ac.category_code", "ac.category_name", null, asset_category_kw);
-        FilterCsvSupport.appendCodeNamePinyin(where, args, "fc.finance_code", "fc.finance_name", null, finance_category_kw);
-        if (enable_dateFrom != null && !enable_dateFrom.isBlank()) {
-            where.append(" AND d.enable_date >= ?::date ");
-            args.add(enable_dateFrom.trim());
-        }
-        if (enable_dateTo != null && !enable_dateTo.isBlank()) {
-            where.append(" AND d.enable_date <= ?::date ");
-            args.add(enable_dateTo.trim());
-        }
-        String from = buildFrom(needSupplier, needManufacturer, needUseDept, needManageDept, needWarehouse, needCategory);
+        FilterBuild fb = buildListFilter(query, enable_dateFrom, enable_dateTo,
+                created_atFrom, created_atTo, production_dateFrom, production_dateTo,
+                acceptance_dateFrom, acceptance_dateTo,
+                has_power_tag, power_tag_code,
+                supplier_id, manufacturer_id, supplier_name, manufacturer_name,
+                device_name, specification, model, dept_id, manage_dept_id,
+                dept_name, manage_dept_name, serial_number, device_code, device_status,
+                warehouse_id, category_id, asset_category_id, finance_category_id,
+                category_kw, asset_category_kw, finance_category_kw, stock_scope, hide_returned);
         long total = Optional.ofNullable(jdbc.queryForObject(
-                "SELECT COUNT(*) " + from + where, Long.class, args.toArray())).orElse(0L);
+                "SELECT COUNT(*) " + fb.from + fb.where, Long.class, fb.args.toArray())).orElse(0L);
+        List<Object> args = new ArrayList<>(fb.args);
         int offset = (query.getPage() - 1) * query.getSize();
         args.add(query.getSize());
         args.add(offset);
@@ -211,10 +162,35 @@ public class AssetDeviceController {
                             WHEN d.service_expiry_date <= CURRENT_DATE THEN TRUE
                             ELSE FALSE END AS service_expiry_reached,
                        CASE WHEN d.service_expiry_date IS NULL THEN NULL
-                            ELSE GREATEST(0, (d.service_expiry_date - CURRENT_DATE)) END AS service_expiry_remaining_days
-                """ + from + where + buildOrderBy(query) + " LIMIT ? OFFSET ?", args.toArray());
+                            ELSE GREATEST(0, (d.service_expiry_date - CURRENT_DATE)) END AS service_expiry_remaining_days,
+                       CASE WHEN pt.tag_code IS NOT NULL THEN TRUE ELSE FALSE END AS has_power_tag,
+                       pt.tag_code AS power_tag_code,
+                       d.use_dept_head AS responsible_person_name,
+                       NULLIF(TRIM(CONCAT_WS(' ',
+                         (SELECT NULLIF(TRIM(b.building_name), '') FROM building b
+                          WHERE b.id = d.building_id AND COALESCE(b.is_deleted, 0) = 0 LIMIT 1),
+                         NULLIF(TRIM(d.location_floor), ''),
+                         NULLIF(TRIM(d.room_number), '')
+                       )), '') AS install_location,
+                       EXISTS (
+                         SELECT 1 FROM device_warranty_device wd
+                         JOIN device_warranty w ON w.id = wd.warranty_id
+                         WHERE wd.device_id = d.id
+                           AND w.start_date <= CURRENT_DATE AND w.end_date >= CURRENT_DATE
+                           AND wd.is_deleted = 0 AND w.is_deleted = 0
+                       ) AS under_warranty
+                """ + fb.from + powerTagLateralJoin() + fb.where + buildOrderBy(query)
+                + " LIMIT ? OFFSET ?", args.toArray());
         MedicalDeviceDeleteGuard.enrichCanDelete(jdbc, rows);
-        return Result.ok(new PageResult<>(rows, total, query.getPage(), query.getSize()));
+        Map<String, Object> sum = jdbc.queryForMap(
+                "SELECT COALESCE(SUM(d.original_value), 0) AS sum_original_value, "
+                        + "COALESCE(SUM(d.net_value), 0) AS sum_net_value "
+                        + fb.from + fb.where,
+                fb.args.toArray());
+        Map<String, Object> aggregates = new LinkedHashMap<>();
+        aggregates.put("sum_original_value", sum.get("sum_original_value"));
+        aggregates.put("sum_net_value", sum.get("sum_net_value"));
+        return Result.ok(new PageResult<>(rows, total, query.getPage(), query.getSize()).withAggregates(aggregates));
     }
 
     /** AST-UI-15：当前筛选条件下全部设备 id（全选查询结果） */
@@ -223,6 +199,14 @@ public class AssetDeviceController {
             PageQuery query,
             @RequestParam(value = "enable_dateFrom", required = false) String enable_dateFrom,
             @RequestParam(value = "enable_dateTo", required = false) String enable_dateTo,
+            @RequestParam(value = "created_atFrom", required = false) String created_atFrom,
+            @RequestParam(value = "created_atTo", required = false) String created_atTo,
+            @RequestParam(value = "production_dateFrom", required = false) String production_dateFrom,
+            @RequestParam(value = "production_dateTo", required = false) String production_dateTo,
+            @RequestParam(value = "acceptance_dateFrom", required = false) String acceptance_dateFrom,
+            @RequestParam(value = "acceptance_dateTo", required = false) String acceptance_dateTo,
+            @RequestParam(value = "has_power_tag", required = false) String has_power_tag,
+            @RequestParam(value = "power_tag_code", required = false) String power_tag_code,
             @RequestParam(value = "supplier_id", required = false) String supplier_id,
             @RequestParam(value = "manufacturer_id", required = false) String manufacturer_id,
             @RequestParam(value = "supplier_name", required = false) String supplier_name,
@@ -246,8 +230,12 @@ public class AssetDeviceController {
             @RequestParam(value = "finance_category_kw", required = false) String finance_category_kw,
             @RequestParam(value = "stock_scope", required = false) String stock_scope,
             @RequestParam(value = "hide_returned", required = false) Boolean hide_returned) {
-        FilterBuild fb = buildListFilter(query, enable_dateFrom, enable_dateTo, supplier_id, manufacturer_id,
-                supplier_name, manufacturer_name, device_name, specification, model, dept_id, manage_dept_id,
+        FilterBuild fb = buildListFilter(query, enable_dateFrom, enable_dateTo,
+                created_atFrom, created_atTo, production_dateFrom, production_dateTo,
+                acceptance_dateFrom, acceptance_dateTo,
+                has_power_tag, power_tag_code,
+                supplier_id, manufacturer_id, supplier_name, manufacturer_name,
+                device_name, specification, model, dept_id, manage_dept_id,
                 dept_name, manage_dept_name, serial_number, device_code, device_status, warehouse_id,
                 category_id, asset_category_id, finance_category_id, category_kw, asset_category_kw,
                 finance_category_kw, stock_scope, hide_returned);
@@ -320,7 +308,8 @@ public class AssetDeviceController {
             jdbc.update("UPDATE medical_device SET " + String.join(", ", sets)
                     + " WHERE id = ?::uuid"
                     + SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", null), args.toArray());
-            changeLog.recordUpdate("medical_device", idStr, before, changeLog.loadRow("medical_device", idStr));
+            changeLog.recordUpdate("medical_device", idStr, before, changeLog.loadRow("medical_device", idStr),
+                    OpsClientChannel.of(body));
             updated++;
         }
         return Result.ok(Map.of("updated", updated));
@@ -329,6 +318,10 @@ public class AssetDeviceController {
     private FilterBuild buildListFilter(
             PageQuery query,
             String enable_dateFrom, String enable_dateTo,
+            String created_atFrom, String created_atTo,
+            String production_dateFrom, String production_dateTo,
+            String acceptance_dateFrom, String acceptance_dateTo,
+            String has_power_tag, String power_tag_code,
             String supplier_id, String manufacturer_id,
             String supplier_name, String manufacturer_name,
             String device_name, String specification, String model,
@@ -390,14 +383,21 @@ public class AssetDeviceController {
         FilterCsvSupport.appendCodeNamePinyin(where, args, "mdc.category_code", "mdc.category_name", null, category_kw);
         FilterCsvSupport.appendCodeNamePinyin(where, args, "ac.category_code", "ac.category_name", null, asset_category_kw);
         FilterCsvSupport.appendCodeNamePinyin(where, args, "fc.finance_code", "fc.finance_name", null, finance_category_kw);
-        if (enable_dateFrom != null && !enable_dateFrom.isBlank()) {
-            where.append(" AND d.enable_date >= ?::date ");
-            args.add(enable_dateFrom.trim());
+        appendDateGe(where, args, "d.enable_date", enable_dateFrom);
+        appendDateLe(where, args, "d.enable_date", enable_dateTo);
+        appendDateGe(where, args, "d.production_date", production_dateFrom);
+        appendDateLe(where, args, "d.production_date", production_dateTo);
+        appendDateGe(where, args, "d.acceptance_date", acceptance_dateFrom);
+        appendDateLe(where, args, "d.acceptance_date", acceptance_dateTo);
+        if (hasText(created_atFrom)) {
+            where.append(" AND d.created_at >= ?::date ");
+            args.add(created_atFrom.trim());
         }
-        if (enable_dateTo != null && !enable_dateTo.isBlank()) {
-            where.append(" AND d.enable_date <= ?::date ");
-            args.add(enable_dateTo.trim());
+        if (hasText(created_atTo)) {
+            where.append(" AND d.created_at < (?::date + INTERVAL '1 day') ");
+            args.add(created_atTo.trim());
         }
+        appendPowerTagFilters(where, args, has_power_tag, power_tag_code);
         String from = buildFrom(true, true, true, true, true, true);
         return new FilterBuild(from, where.toString(), args);
     }
@@ -409,6 +409,10 @@ public class AssetDeviceController {
         FilterBuild fb = buildListFilter(
                 query,
                 str(body.get("enable_dateFrom")), str(body.get("enable_dateTo")),
+                str(body.get("created_atFrom")), str(body.get("created_atTo")),
+                str(body.get("production_dateFrom")), str(body.get("production_dateTo")),
+                str(body.get("acceptance_dateFrom")), str(body.get("acceptance_dateTo")),
+                str(body.get("has_power_tag")), str(body.get("power_tag_code")),
                 str(body.get("supplier_id")), str(body.get("manufacturer_id")),
                 str(body.get("supplier_name")), str(body.get("manufacturer_name")),
                 str(body.get("device_name")), str(body.get("specification")), str(body.get("model")),
@@ -461,6 +465,56 @@ public class AssetDeviceController {
         if (!hasText(value)) return;
         where.append(" AND ").append(column).append(" ILIKE ? ");
         args.add("%" + value.trim() + "%");
+    }
+
+    private static void appendDateGe(StringBuilder where, List<Object> args, String column, String value) {
+        if (!hasText(value)) return;
+        where.append(" AND ").append(column).append(" >= ?::date ");
+        args.add(value.trim());
+    }
+
+    private static void appendDateLe(StringBuilder where, List<Object> args, String column, String value) {
+        if (!hasText(value)) return;
+        where.append(" AND ").append(column).append(" <= ?::date ");
+        args.add(value.trim());
+    }
+
+    /** AST-UI-16：电流监测标签筛选（未软删绑定） */
+    private void appendPowerTagFilters(StringBuilder where, List<Object> args,
+                                       String has_power_tag, String power_tag_code) {
+        String notDel = SoftDeleteSupport.notDeletedClause(jdbc, "power_tag", "pt");
+        if (hasText(has_power_tag)) {
+            String v = has_power_tag.trim().toLowerCase(Locale.ROOT);
+            boolean wantYes = "true".equals(v) || "1".equals(v) || "yes".equals(v) || "是".equals(has_power_tag.trim());
+            boolean wantNo = "false".equals(v) || "0".equals(v) || "no".equals(v) || "否".equals(has_power_tag.trim());
+            if (wantYes) {
+                where.append(" AND EXISTS (SELECT 1 FROM power_tag pt WHERE pt.device_id = d.id ")
+                        .append(notDel).append(") ");
+            } else if (wantNo) {
+                where.append(" AND NOT EXISTS (SELECT 1 FROM power_tag pt WHERE pt.device_id = d.id ")
+                        .append(notDel).append(") ");
+            }
+        }
+        if (hasText(power_tag_code)) {
+            where.append(" AND EXISTS (SELECT 1 FROM power_tag pt WHERE pt.device_id = d.id ")
+                    .append(notDel).append(" AND pt.tag_code ILIKE ?) ");
+            args.add("%" + power_tag_code.trim() + "%");
+        }
+    }
+
+    /** AST-UI-16：列表带出一条有效标签编码 */
+    private String powerTagLateralJoin() {
+        String notDel = SoftDeleteSupport.notDeletedClause(jdbc, "power_tag", "pt");
+        return """
+                 LEFT JOIN LATERAL (
+                   SELECT pt.tag_code
+                   FROM power_tag pt
+                   WHERE pt.device_id = d.id
+                """ + notDel + """
+                   ORDER BY pt.updated_at DESC NULLS LAST, pt.created_at DESC NULLS LAST
+                   LIMIT 1
+                 ) pt ON TRUE
+                """;
     }
 
     /** @deprecated 使用 {@link FilterCsvSupport#appendStrIn} */
@@ -661,6 +715,86 @@ public class AssetDeviceController {
         return Result.ok(Map.of("deviceCode", code));
     }
 
+    /**
+     * AST-UI-21 / AST-PART-01：配件更换记录（维修进程 + 已确认非维修补录 UNION）。
+     */
+    @GetMapping("/{id}/spare-replacements")
+    public Result<List<Map<String, Object>>> spareReplacements(@PathVariable UUID id) {
+        var device = jdbc.queryForList(
+                "SELECT 1 FROM medical_device WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", null), id);
+        if (device.isEmpty()) throw new BizException(404, "not found");
+        return Result.ok(jdbc.queryForList("""
+                SELECT * FROM (
+                  SELECT p.id,
+                         p.created_at AS replaced_at,
+                         p.quantity,
+                         p.unit_price,
+                         p.total_price,
+                         p.remark,
+                         p.wo_no,
+                         sp.part_code,
+                         sp.part_name,
+                         sp.specification AS part_specification,
+                         sp.model AS part_model,
+                         sup.supplier_name,
+                         w.id AS workorder_id,
+                         w.wo_no AS workorder_no,
+                         w.status AS workorder_status,
+                         t.type_name AS process_type_name,
+                         'biz_doc' AS source_mode,
+                         '业务单据' AS source_mode_label
+                  FROM repair_workorder_segment_part p
+                  LEFT JOIN spare_part sp ON sp.id = p.spare_part_id
+                  LEFT JOIN supplier sup ON sup.id = p.supplier_id AND COALESCE(sup.is_deleted, 0) = 0
+                  LEFT JOIN repair_workorder_segment s ON s.id = p.segment_id AND COALESCE(s.is_deleted, 0) = 0
+                  LEFT JOIN repair_process_type t ON t.id = s.process_type_id AND COALESCE(t.is_deleted, 0) = 0
+                  LEFT JOIN repair_workorder w ON w.id = s.workorder_id
+                  WHERE p.device_id = ?::uuid
+                  """ + SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_segment_part", "p") + """
+
+                  UNION ALL
+                  SELECT r.id,
+                         r.replaced_at,
+                         r.quantity,
+                         r.unit_price,
+                         r.total_price,
+                         r.remark,
+                         NULL AS wo_no,
+                         r.part_code,
+                         r.part_name,
+                         r.part_specification,
+                         r.part_model,
+                         r.supplier_name,
+                         NULL AS workorder_id,
+                         NULL AS workorder_no,
+                         NULL AS workorder_status,
+                         NULL AS process_type_name,
+                         COALESCE(r.source_mode, 'manual_backfill') AS source_mode,
+                         CASE COALESCE(r.source_mode, 'manual_backfill')
+                           WHEN 'biz_doc' THEN '业务单据'
+                           WHEN 'biz_op' THEN '业务操作写回'
+                           WHEN 'manual_backfill' THEN '手工补录'
+                           WHEN 'system' THEN '系统生成'
+                           WHEN 'manual_transfer' THEN '手工真变更'
+                           ELSE COALESCE(r.source_mode, '手工补录')
+                         END AS source_mode_label
+                  FROM device_part_replacement r
+                  WHERE r.device_id = ?::uuid
+                    AND r.confirm_status = 'confirmed'
+                  """ + SoftDeleteSupport.notDeletedClause(jdbc, "device_part_replacement", "r") + """
+                ) u
+                ORDER BY replaced_at DESC NULLS LAST
+                LIMIT 200
+                """, id, id));
+    }
+
+    /** AST-DISP-01：处置记录聚合。 */
+    @GetMapping("/{id}/dispositions")
+    public Result<List<Map<String, Object>>> dispositions(@PathVariable UUID id) {
+        return Result.ok(dispositionQueryService.listByDevice(id));
+    }
+
     @GetMapping("/{id}/label")
     public Result<Map<String, Object>> labelInfo(@PathVariable UUID id) {
         var rows = jdbc.queryForList(
@@ -672,7 +806,7 @@ public class AssetDeviceController {
         String code = Objects.toString(d.get("device_code"), "");
         d.put("qr_payload", code);
         d.put("prints", jdbc.queryForList("""
-                SELECT id, device_code, device_name, printed_by, printed_at, template_code, remark
+                SELECT id, device_code, device_name, printed_by, printed_by_name, printed_at, template_code, remark
                 FROM device_label_print_log WHERE device_id = ?::uuid
                 """ + SoftDeleteSupport.notDeletedClause(jdbc, "device_label_print_log", null) + """
                  ORDER BY printed_at DESC LIMIT 50
@@ -682,7 +816,7 @@ public class AssetDeviceController {
 
     @PostMapping("/{id}/label/print")
     @Transactional
-    @OperationLog(module = "asset", description = "打印资产标签")
+    @OperationLog(module = "asset", description = "打印资产标签或卡片")
     public Result<Map<String, Object>> printLabel(@PathVariable UUID id, @RequestBody(required = false) Map<String, Object> body) {
         var rows = jdbc.queryForList(
                 "SELECT id, device_code, device_name FROM medical_device WHERE id = ?::uuid"
@@ -706,14 +840,27 @@ public class AssetDeviceController {
                 printedByName = nameRows.get(0).get("name").toString();
             }
         }
-        jdbc.update("""
-                INSERT INTO device_label_print_log
-                (id, device_id, device_code, device_name, printed_by, printed_by_name, template_code, biz_type, biz_id, remark)
-                VALUES (?::uuid, ?::uuid, ?, ?, ?::uuid, ?, ?, 'device', ?::uuid, ?)
-                """, logId, id, code, device.get("device_name"), printedBy, printedByName, template, id, remark);
-        jdbc.update("""
-                UPDATE medical_device SET label_printed = TRUE, qr_code_url = ?, updated_at = NOW() WHERE id = ?::uuid
-                """, code, id);
+        String channel = OpsClientChannel.of(body);
+        if (TableColumnCache.hasColumn(jdbc, "device_label_print_log", "create_channel")) {
+            jdbc.update("""
+                    INSERT INTO device_label_print_log
+                    (id, device_id, device_code, device_name, printed_by, printed_by_name, template_code,
+                     biz_type, biz_id, remark, create_channel)
+                    VALUES (?::uuid, ?::uuid, ?, ?, ?::uuid, ?, ?, 'device', ?::uuid, ?, ?)
+                    """, logId, id, code, device.get("device_name"), printedBy, printedByName, template, id, remark, channel);
+        } else {
+            jdbc.update("""
+                    INSERT INTO device_label_print_log
+                    (id, device_id, device_code, device_name, printed_by, printed_by_name, template_code, biz_type, biz_id, remark)
+                    VALUES (?::uuid, ?::uuid, ?, ?, ?::uuid, ?, ?, 'device', ?::uuid, ?)
+                    """, logId, id, code, device.get("device_name"), printedBy, printedByName, template, id, remark);
+        }
+        // AST-UI-19：资产卡片打印只写流水，不回写贴纸「已打印」标志
+        if (!"asset_card".equalsIgnoreCase(template)) {
+            jdbc.update("""
+                    UPDATE medical_device SET label_printed = TRUE, qr_code_url = ?, updated_at = NOW() WHERE id = ?::uuid
+                    """, code, id);
+        }
         return Result.ok(jdbc.queryForList(
                 "SELECT * FROM device_label_print_log WHERE id = ?::uuid"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "device_label_print_log", null), logId).get(0));

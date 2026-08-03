@@ -4,6 +4,7 @@
     :title="title"
     :size="size"
     :placement="placement"
+    :variant="variant"
     @update:model-value="$emit('update:modelValue', $event)"
   >
     <template #header-actions>
@@ -31,8 +32,9 @@ withDefaults(
     size?: 'sm' | 'md' | 'lg' | 'xl'
     placement?: 'center' | 'right'
     showSave?: boolean
+    variant?: 'default' | 'report'
   }>(),
-  { size: 'md', placement: 'center', showSave: true }
+  { size: 'md', placement: 'center', showSave: true, variant: 'report' }
 )
 
 defineEmits<{ 'update:modelValue': [v: boolean]; save: [] }>()
@@ -41,9 +43,9 @@ defineEmits<{ 'update:modelValue': [v: boolean]; save: [] }>()
 <style scoped>
 .form-drawer-footer {
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   width: 100%;
 }
 </style>

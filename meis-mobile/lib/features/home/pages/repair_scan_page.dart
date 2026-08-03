@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 /// 扫码页：识别成功返回纯文本编码；失败由调用方提示。
-/// 进入页内自行申请相机权限后再启动预览（避免黑屏感叹号）。
+///
+/// 安卓：先申请相机权限 → 首帧后再 `start()`，避免 CameraX NPE
+/// （`getClass()` on null）与黑屏感叹号。见 MOB-SCAN-01 / MOB-SCAN-03。
 class RepairScanPage extends StatefulWidget {
   const RepairScanPage({super.key});
 
@@ -17,6 +21,7 @@ class _RepairScanPageState extends State<RepairScanPage> with WidgetsBindingObse
   var preparing = true;
   String? blockMessage;
   var permanentlyDenied = false;
+  var starting = false;
 
   @override
   void initState() {
@@ -28,29 +33,53 @@ class _RepairScanPageState extends State<RepairScanPage> with WidgetsBindingObse
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    controller?.dispose();
+    final c = controller;
+    controller = null;
+    unawaited(c?.dispose() ?? Future<void>.value());
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // 从系统设置返回后自动重试
-    if (state == AppLifecycleState.resumed && blockMessage != null) {
-      prepareCamera();
+    final c = controller;
+    if (c == null) {
+      if (state == AppLifecycleState.resumed && blockMessage != null) {
+        prepareCamera();
+      }
+      return;
+    }
+    switch (state) {
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+        return;
+      case AppLifecycleState.resumed:
+        // 从后台/设置返回后重启
+        if (c.value.isInitialized) {
+          unawaited(_safeStart(c));
+        } else if (blockMessage != null) {
+          prepareCamera();
+        }
+      case AppLifecycleState.inactive:
+        if (c.value.isRunning) {
+          unawaited(c.stop());
+        }
     }
   }
 
   Future<void> prepareCamera() async {
+    if (!mounted) return;
     setState(() {
       preparing = true;
       blockMessage = null;
       permanentlyDenied = false;
     });
+
+    await _tearDownController();
+
     final status = await Permission.camera.request();
     if (!mounted) return;
     if (!status.isGranted) {
-      controller?.dispose();
-      controller = null;
       setState(() {
         preparing = false;
         permanentlyDenied = status.isPermanentlyDenied;
@@ -60,18 +89,73 @@ class _RepairScanPageState extends State<RepairScanPage> with WidgetsBindingObse
       });
       return;
     }
-    // 权限就绪后再创建控制器，避免未授权时启动预览 → 黑屏+感叹号
-    controller?.dispose();
-    final c = MobileScannerController(detectionSpeed: DetectionSpeed.noDuplicates);
+
+    // autoStart=false：等 MobileScanner 挂载后再手动 start，降低 CameraX NPE
+    final c = MobileScannerController(
+      detectionSpeed: DetectionSpeed.noDuplicates,
+      autoStart: false,
+      facing: CameraFacing.back,
+    );
     setState(() {
       controller = c;
       preparing = false;
       blockMessage = null;
     });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_safeStart(c));
+    });
+  }
+
+  Future<void> _tearDownController() async {
+    final old = controller;
+    controller = null;
+    if (old == null) return;
+    try {
+      if (old.value.isRunning) await old.stop();
+    } catch (_) {}
+    await old.dispose();
+  }
+
+  Future<void> _safeStart(MobileScannerController c) async {
+    if (!mounted || starting || !identical(controller, c)) return;
+    if (c.value.isRunning) return;
+    starting = true;
+    try {
+      // 短延迟：部分机型 Surface/CameraX 未就绪时 start 会 NPE（getClass on null）
+      await Future<void>.delayed(const Duration(milliseconds: 160));
+      if (!mounted || !identical(controller, c) || c.value.isRunning) return;
+      await c.start();
+      if (mounted) setState(() => blockMessage = null);
+    } on MobileScannerException catch (e) {
+      if (!mounted) return;
+      setState(() => blockMessage = _friendlyError(e));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        blockMessage = '相机打开失败，请重试或检查是否被其它应用占用';
+      });
+    } finally {
+      starting = false;
+    }
+  }
+
+  String _friendlyError(MobileScannerException error) {
+    final raw = error.errorDetails?.message ?? error.errorCode.name;
+    if (raw.contains('getClass()') ||
+        raw.contains('null object reference') ||
+        raw.contains('NullPointerException')) {
+      return '相机初始化失败。请点「重新打开相机」；'
+          '若仍失败，请关闭占用相机的其它应用后重试，或重启手机。';
+    }
+    if (error.errorCode == MobileScannerErrorCode.permissionDenied) {
+      return '需要相机权限才能扫码';
+    }
+    return raw;
   }
 
   void onDetect(BarcodeCapture capture) {
-    if (handled) return;
+    if (handled || !mounted) return;
     final raw = capture.barcodes
         .map((b) => b.rawValue?.trim() ?? '')
         .firstWhere((s) => s.isNotEmpty, orElse: () => '');
@@ -100,17 +184,19 @@ class _RepairScanPageState extends State<RepairScanPage> with WidgetsBindingObse
               style: const TextStyle(color: Colors.white, fontSize: 16),
             ),
             const SizedBox(height: 20),
+            FilledButton(onPressed: prepareCamera, child: const Text('重新打开相机')),
+            const SizedBox(height: 8),
             if (permanentlyDenied)
               FilledButton.icon(
                 onPressed: () => openAppSettings(),
                 icon: const Icon(Icons.settings),
                 label: const Text('打开系统设置'),
+              )
+            else
+              TextButton(
+                onPressed: () => openAppSettings(),
+                child: const Text('打开系统设置', style: TextStyle(color: Colors.white70)),
               ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: prepareCamera,
-              child: const Text('重试', style: TextStyle(color: Colors.white)),
-            ),
           ],
         ),
       ),
@@ -127,7 +213,7 @@ class _RepairScanPageState extends State<RepairScanPage> with WidgetsBindingObse
             const Icon(Icons.error_outline, size: 48, color: Colors.white70),
             const SizedBox(height: 16),
             Text(
-              error.errorDetails?.message ?? error.errorCode.name,
+              _friendlyError(error),
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.white, fontSize: 15),
             ),

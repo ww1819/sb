@@ -115,6 +115,8 @@ ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS calibration_period_days INTE
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS last_calibration_date DATE;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS next_calibration_date DATE;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS service_expiry_date DATE;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS service_expiry_basis VARCHAR(30);
+COMMENT ON COLUMN medical_device.service_expiry_basis IS 'AST-EXP-01：使用到期推算锚点 enable/production/acceptance/purchase/created';
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS extension_data JSONB DEFAULT '{}'::jsonb;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS warehouse_id UUID;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_metrology BOOLEAN DEFAULT FALSE;
@@ -230,6 +232,8 @@ ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS biz_type VARCHAR(50)
 ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS biz_id UUID;
 ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS biz_no VARCHAR(50);
 ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS biz_item_id UUID;
+ALTER TABLE device_label_print_log ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+COMMENT ON COLUMN device_label_print_log.create_channel IS '打印途径：web/app/mp（MOB-CHANNEL-03）';
 -- ---------- ??????????? N? ----------
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS is_shared_device BOOLEAN DEFAULT FALSE;
 ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS metrology_type_code VARCHAR(50);
@@ -970,6 +974,16 @@ COMMENT ON COLUMN shared_device_fee.device_id IS '设备ID冗余（W.6 / AST-W01
 COMMENT ON COLUMN shared_device_fee.device_code IS '设备编码快照';
 COMMENT ON COLUMN shared_device_fee.device_name IS '设备名称快照';
 
+-- ---------- 附录 W.5：维修流程子表姓名快照（PLT-DB-SYNC-01 / 2026-08-01） ----------
+ALTER TABLE repair_workorder_process ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
+ALTER TABLE repair_workorder_process ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(100);
+ALTER TABLE repair_workorder_segment_user ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
+ALTER TABLE repair_workorder_segment_user ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(100);
+COMMENT ON COLUMN repair_workorder_process.created_by_name IS '创建人姓名快照（W.5）';
+COMMENT ON COLUMN repair_workorder_process.updated_by_name IS '更新人姓名快照（W.5）';
+COMMENT ON COLUMN repair_workorder_segment_user.created_by_name IS '创建人姓名快照（W.5）';
+COMMENT ON COLUMN repair_workorder_segment_user.updated_by_name IS '更新人姓名快照（W.5）';
+
 ALTER TABLE maintenance_plan_item ADD COLUMN IF NOT EXISTS dept_name VARCHAR(100);
 ALTER TABLE maintenance_execution_item ADD COLUMN IF NOT EXISTS dept_name VARCHAR(100);
 ALTER TABLE inspection_plan_item ADD COLUMN IF NOT EXISTS dept_name VARCHAR(100);
@@ -1310,3 +1324,76 @@ COMMENT ON COLUMN shared_device_return.create_channel IS '制单途径 web/app/m
 COMMENT ON COLUMN shared_device_return.update_channel IS '修改途径 web/app/mp';
 COMMENT ON COLUMN shared_device_return.submit_channel IS '提交途径 web/app/mp';
 COMMENT ON COLUMN shared_device_return.confirm_channel IS '审核途径 web/app/mp';
+
+-- AST-GAP-REVIEW-01 / G1：台账标量补列（老租户）
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS udi_di VARCHAR(100);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS udi_pi VARCHAR(100);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS asset_manager_user_id UUID;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS asset_manager_name VARCHAR(100);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS clinical_owner_user_id UUID;
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS clinical_owner_name VARCHAR(100);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS eq_class VARCHAR(20);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS criticality VARCHAR(20);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS depreciation_method VARCHAR(40);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS acquisition_mode VARCHAR(40);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS ip_address VARCHAR(64);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS mac_address VARCHAR(64);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS gs1_gtin VARCHAR(32);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS lot_no VARCHAR(64);
+ALTER TABLE medical_device ADD COLUMN IF NOT EXISTS energy_class VARCHAR(20);
+COMMENT ON COLUMN medical_device.udi_di IS 'UDI 产品标识 DI';
+COMMENT ON COLUMN medical_device.udi_pi IS 'UDI 生产标识 PI';
+COMMENT ON COLUMN medical_device.asset_manager_user_id IS '资产管理员（设备科责任人）';
+COMMENT ON COLUMN medical_device.asset_manager_name IS '资产管理员姓名快照';
+COMMENT ON COLUMN medical_device.clinical_owner_user_id IS '临床责任人';
+COMMENT ON COLUMN medical_device.clinical_owner_name IS '临床责任人姓名快照';
+COMMENT ON COLUMN medical_device.eq_class IS '医疗器械管理类别 class_1/2/3';
+COMMENT ON COLUMN medical_device.criticality IS '临床关键等级 high/medium/low';
+COMMENT ON COLUMN medical_device.depreciation_method IS '折旧方法';
+COMMENT ON COLUMN medical_device.acquisition_mode IS '购置方式';
+COMMENT ON COLUMN medical_device.ip_address IS '设备 IP 地址';
+COMMENT ON COLUMN medical_device.mac_address IS '设备 MAC 地址';
+COMMENT ON COLUMN medical_device.gs1_gtin IS 'GS1 GTIN';
+COMMENT ON COLUMN medical_device.lot_no IS '生产批号';
+COMMENT ON COLUMN medical_device.energy_class IS '能效等级';
+
+-- AST-GAP-REVIEW G5 / P-05：报废处置去向与姓名快照（老租户）
+ALTER TABLE device_scrap ADD COLUMN IF NOT EXISTS disposal_destination VARCHAR(200);
+ALTER TABLE device_scrap ADD COLUMN IF NOT EXISTS disposal_proof_url VARCHAR(500);
+ALTER TABLE device_scrap ADD COLUMN IF NOT EXISTS applicant_name VARCHAR(100);
+ALTER TABLE device_scrap ADD COLUMN IF NOT EXISTS evaluator_name VARCHAR(100);
+ALTER TABLE device_scrap ADD COLUMN IF NOT EXISTS approver_name VARCHAR(100);
+COMMENT ON COLUMN device_scrap.disposal_destination IS '处置去向（单位/渠道说明）';
+COMMENT ON COLUMN device_scrap.disposal_proof_url IS '处置证明附件URL';
+COMMENT ON COLUMN device_scrap.applicant_name IS '申请人姓名快照（W.5）';
+COMMENT ON COLUMN device_scrap.evaluator_name IS '评估人姓名快照（W.5）';
+COMMENT ON COLUMN device_scrap.approver_name IS '审批人姓名快照（W.5）';
+
+-- AST-GAP-REVIEW G5 / P-12：外部财务处置预留（老租户）
+CREATE TABLE IF NOT EXISTS external_asset_disposition (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    device_id UUID NOT NULL REFERENCES medical_device(id),
+    device_code VARCHAR(50),
+    device_name VARCHAR(200),
+    source_system VARCHAR(40) NOT NULL DEFAULT 'manual',
+    external_ref VARCHAR(100),
+    disposition_type VARCHAR(40) NOT NULL DEFAULT 'scrap',
+    disposition_type_label VARCHAR(80),
+    amount DECIMAL(15,2),
+    occurred_at TIMESTAMPTZ,
+    sync_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    sync_message TEXT,
+    payload JSONB,
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100)
+);
+COMMENT ON TABLE external_asset_disposition IS '外部财务资产处置预留（AST-DISP-FIN / P-12）';

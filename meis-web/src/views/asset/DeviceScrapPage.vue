@@ -1,8 +1,15 @@
 <template>
   <WorkflowCrudPage :config="config" save-url="/asset/scrap" business-type="device_scrap">
     <template #toolbar-extra="{ form, reload }">
-      <el-button v-if="form?.id" @click="evaluate(form, reload)">评估</el-button>
-      <el-button v-if="form?.id" @click="dispose(form, reload)">处置归档</el-button>
+      <el-button
+        v-if="form?.id && (form.status === 'draft' || form.status === 'rejected')"
+        @click="evaluate(form, reload)"
+      >
+        评估
+      </el-button>
+      <el-button v-if="form?.id && form.status === 'approved'" type="warning" @click="dispose(form, reload)">
+        处置归档
+      </el-button>
     </template>
   </WorkflowCrudPage>
 </template>
@@ -26,6 +33,8 @@ async function evaluate(form: Record<string, unknown>, reload?: () => void) {
 async function dispose(form: Record<string, unknown>, reload?: () => void) {
   await http.post(`/asset/scrap/${form.id}/dispose`, {
     disposal_method: form.disposal_method,
+    disposal_destination: form.disposal_destination,
+    disposal_proof_url: form.disposal_proof_url,
     disposal_date: form.disposal_date
   })
   reload?.()

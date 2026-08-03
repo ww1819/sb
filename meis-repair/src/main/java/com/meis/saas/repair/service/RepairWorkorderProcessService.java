@@ -317,45 +317,117 @@ public class RepairWorkorderProcessService {
     }
 
     public void enrichWorkorder(Map<String, Object> wo) {
-        if (!processTableReady() || wo == null || wo.get("id") == null) return;
-        UUID id = UUID.fromString(String.valueOf(wo.get("id")));
+        if (wo == null) return;
+        enrichWorkorders(List.of(wo));
+    }
 
-        latestByAction(id, "complete").ifPresent(p -> {
-            putIfPresent(wo, "solution_description", p.get("solution_description"));
-            // U.17：主单费用以进程汇总列为准，不覆盖已落库的汇总结果
-            if (wo.get("labor_cost") == null) putIfPresent(wo, "labor_cost", p.get("labor_cost"));
-            if (wo.get("parts_cost") == null) putIfPresent(wo, "parts_cost", p.get("parts_cost"));
-            if (wo.get("total_cost") == null) putIfPresent(wo, "total_cost", p.get("total_cost"));
-            putIfPresent(wo, "repair_end_time", p.get("created_at"));
-        });
+    /**
+     * 列表批量充实：一次查出本页工单全部进程行，在内存归并。
+     * 禁止对每行再打多条 SQL（否则 pageSize=20 约 160 次查询，易触发前端 30s 超时）。
+     */
+    public void enrichWorkorders(List<Map<String, Object>> rows) {
+        if (!processTableReady() || rows == null || rows.isEmpty()) return;
+        List<UUID> ids = new ArrayList<>();
+        Map<String, Map<String, Object>> byId = new LinkedHashMap<>();
+        for (Map<String, Object> row : rows) {
+            if (row == null || row.get("id") == null) continue;
+            try {
+                UUID id = UUID.fromString(String.valueOf(row.get("id")));
+                String key = id.toString();
+                if (byId.containsKey(key)) continue;
+                ids.add(id);
+                byId.put(key, row);
+            } catch (IllegalArgumentException ignored) {
+                // skip bad id
+            }
+        }
+        if (ids.isEmpty()) return;
 
-        latestByAction(id, "verify_pass", "verify_fail").ifPresent(p -> {
-            putIfPresent(wo, "verify_result", p.get("verify_result"));
-            putIfPresent(wo, "verify_comment", p.get("verify_comment"));
-            putIfPresent(wo, "satisfaction_rating", p.get("satisfaction_rating"));
-            putIfPresent(wo, "satisfaction_comment", p.get("satisfaction_comment"));
-            putIfPresent(wo, "verify_time", p.get("created_at"));
-            putIfPresent(wo, "verifier_id", p.get("operator_id"));
-        });
+        String clause = SoftDeleteSupport.notDeletedClause(jdbc, "repair_workorder_process", null);
+        String placeholders = String.join(",", Collections.nCopies(ids.size(), "?::uuid"));
+        List<Map<String, Object>> processes;
+        try {
+            processes = jdbc.queryForList(
+                    "SELECT * FROM repair_workorder_process WHERE workorder_id IN (" + placeholders + ")"
+                            + clause + " ORDER BY created_at ASC, id ASC",
+                    ids.toArray());
+        } catch (Exception e) {
+            // 缺列/缺表时不拖垮列表
+            return;
+        }
 
-        firstActionAt(id, "dispatch", "grab").ifPresent(at -> putIfPresent(wo, "dispatch_started_at", at));
-        firstActionAt(id, "dispatch", "grab").ifPresent(at -> putIfPresent(wo, "assigned_at", at));
-        firstActionAt(id, "accept").ifPresent(at -> putIfPresent(wo, "accepted_at", at));
-        firstActionAt(id, "start_repair").ifPresent(at -> {
-            putIfPresent(wo, "repair_start_time", at);
-            putIfPresent(wo, "response_time", at);
-        });
-        latestByAction(id, "close", "cancel").ifPresent(p -> {
-            if (wo.get("closed_at") == null) putIfPresent(wo, "closed_at", p.get("created_at"));
-        });
-        if (wo.get("arrival_time") == null) {
-            firstOnSiteArrival(id).ifPresent(at -> putIfPresent(wo, "arrival_time", at));
+        Map<String, List<Map<String, Object>>> grouped = new HashMap<>();
+        for (Map<String, Object> p : processes) {
+            if (p.get("workorder_id") == null) continue;
+            String wid = UUID.fromString(String.valueOf(p.get("workorder_id"))).toString();
+            grouped.computeIfAbsent(wid, k -> new ArrayList<>()).add(p);
+        }
+        for (Map.Entry<String, Map<String, Object>> e : byId.entrySet()) {
+            enrichFromProcessRows(e.getValue(), grouped.getOrDefault(e.getKey(), List.of()));
         }
     }
 
-    public void enrichWorkorders(List<Map<String, Object>> rows) {
-        for (Map<String, Object> row : rows) {
-            enrichWorkorder(row);
+    private void enrichFromProcessRows(Map<String, Object> wo, List<Map<String, Object>> processes) {
+        Map<String, Object> latestComplete = null;
+        Map<String, Object> latestVerify = null;
+        Map<String, Object> latestClose = null;
+        Object firstDispatchGrab = null;
+        Object firstAccept = null;
+        Object firstStart = null;
+        Object firstOnSite = null;
+
+        for (Map<String, Object> p : processes) {
+            String action = p.get("action_type") == null ? "" : String.valueOf(p.get("action_type"));
+            Object at = p.get("created_at");
+            switch (action) {
+                case "complete" -> latestComplete = p;
+                case "verify_pass", "verify_fail" -> latestVerify = p;
+                case "close", "cancel" -> latestClose = p;
+                case "dispatch", "grab" -> {
+                    if (firstDispatchGrab == null) firstDispatchGrab = at;
+                }
+                case "accept" -> {
+                    if (firstAccept == null) firstAccept = at;
+                }
+                case "start_repair" -> {
+                    if (firstStart == null) firstStart = at;
+                }
+                case "sub_status" -> {
+                    if (firstOnSite == null && "on_site".equals(String.valueOf(p.get("to_sub_status")))) {
+                        firstOnSite = at;
+                    }
+                }
+                default -> { }
+            }
+        }
+
+        if (latestComplete != null) {
+            putIfPresent(wo, "solution_description", latestComplete.get("solution_description"));
+            if (wo.get("labor_cost") == null) putIfPresent(wo, "labor_cost", latestComplete.get("labor_cost"));
+            if (wo.get("parts_cost") == null) putIfPresent(wo, "parts_cost", latestComplete.get("parts_cost"));
+            if (wo.get("total_cost") == null) putIfPresent(wo, "total_cost", latestComplete.get("total_cost"));
+            putIfPresent(wo, "repair_end_time", latestComplete.get("created_at"));
+        }
+        if (latestVerify != null) {
+            putIfPresent(wo, "verify_result", latestVerify.get("verify_result"));
+            putIfPresent(wo, "verify_comment", latestVerify.get("verify_comment"));
+            putIfPresent(wo, "satisfaction_rating", latestVerify.get("satisfaction_rating"));
+            putIfPresent(wo, "satisfaction_comment", latestVerify.get("satisfaction_comment"));
+            putIfPresent(wo, "verify_time", latestVerify.get("created_at"));
+            putIfPresent(wo, "verifier_id", latestVerify.get("operator_id"));
+        }
+        putIfPresent(wo, "dispatch_started_at", firstDispatchGrab);
+        putIfPresent(wo, "assigned_at", firstDispatchGrab);
+        putIfPresent(wo, "accepted_at", firstAccept);
+        if (firstStart != null) {
+            putIfPresent(wo, "repair_start_time", firstStart);
+            putIfPresent(wo, "response_time", firstStart);
+        }
+        if (latestClose != null && wo.get("closed_at") == null) {
+            putIfPresent(wo, "closed_at", latestClose.get("created_at"));
+        }
+        if (wo.get("arrival_time") == null) {
+            putIfPresent(wo, "arrival_time", firstOnSite);
         }
     }
 

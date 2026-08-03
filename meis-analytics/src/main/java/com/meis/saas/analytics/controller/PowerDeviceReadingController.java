@@ -3,6 +3,7 @@ package com.meis.saas.analytics.controller;
 import com.meis.saas.analytics.service.PowerReadingQueryService;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -57,5 +58,25 @@ public class PowerDeviceReadingController {
                 WHERE l.device_id = ?::uuid
                 ORDER BY l.bound_at DESC
                 """, deviceId));
+    }
+
+    /** AST-UI-17：当前设备绑定的未软删电流监测标签（无则 data=null） */
+    @GetMapping("/{deviceId}/tag")
+    public Result<Map<String, Object>> currentTag(@PathVariable UUID deviceId) {
+        String sql = """
+                SELECT t.id, t.tag_code, t.tag_name, t.device_id, t.station_id,
+                       t.rated_power, t.install_date, t.is_active, t.remark,
+                       COALESCE(t.device_code, d.device_code) AS device_code,
+                       COALESCE(t.device_name, d.device_name) AS device_name,
+                       d.standby_current_max_ma, d.standby_current_min_ma
+                FROM power_tag t
+                LEFT JOIN medical_device d ON d.id = t.device_id
+                WHERE t.device_id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "power_tag", "t") + """
+                ORDER BY t.updated_at DESC NULLS LAST, t.created_at DESC NULLS LAST
+                LIMIT 1
+                """;
+        var rows = jdbc.queryForList(sql, deviceId);
+        return Result.ok(rows.isEmpty() ? null : rows.get(0));
     }
 }

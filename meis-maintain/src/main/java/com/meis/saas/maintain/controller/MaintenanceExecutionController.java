@@ -106,9 +106,11 @@ public class MaintenanceExecutionController {
         if (rows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> result = new LinkedHashMap<>(rows.get(0));
         var items = jdbc.queryForList("""
-                SELECT ei.*, COALESCE(ei.dept_name, d.dept_name) AS dept_name
+                SELECT ei.*,
+                       COALESCE(ei.dept_name, dept.dept_name) AS dept_name,
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.SELECT_FIELDS + """
                 FROM maintenance_execution_item ei
-                LEFT JOIN department d ON d.id = ei.dept_id
+                """ + com.meis.saas.common.asset.DeviceLedgerSelectSupport.joins("ei.device_id") + """
                 WHERE ei.execution_id = ?::uuid
                 """ + SoftDeleteSupport.notDeletedClause(jdbc, "maintenance_execution_item", "ei")
                 + " ORDER BY ei.created_at", id);
@@ -202,6 +204,7 @@ public class MaintenanceExecutionController {
                 start_time=COALESCE(start_time, NOW()), updated_at=NOW()
                 WHERE execution_id=?::uuid AND status='pending'
                 """, userId, name, id);
+        SoftDeleteSupport.applyChannels(jdbc, "maintenance_execution", id, body, "update_channel");
         docLog.event("maintain", "execution", id, execNo(id), "start", clientOf(body), null);
         return get(id);
     }
@@ -374,6 +377,8 @@ public class MaintenanceExecutionController {
                     """, body.getOrDefault("overall_result", "pass"), body.get("remark"), channel, userId, name, itemId);
         }
 
+        SoftDeleteSupport.applyChannels(jdbc, "maintenance_execution_item", itemId, body, "update_channel");
+        SoftDeleteSupport.applyChannels(jdbc, "maintenance_execution", execId, body, "update_channel");
         docLog.event("maintain", "execution", execId, execNo(execId), "complete_item", clientOf(body), itemId.toString());
         maybeAutoRepair("maintain", execId, itemId, item.get("device_id"));
         return get(execId);
