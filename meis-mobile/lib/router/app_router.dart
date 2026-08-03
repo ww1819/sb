@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../core/storage/app_prefs.dart';
 import '../features/auth/pages/login_page.dart';
 import '../features/auth/providers/auth_provider.dart';
-import '../features/home/pages/home_page.dart';
+import '../features/home/pages/main_shell_page.dart';
 import '../features/setup/pages/ethernet_setup_page.dart';
 import '../features/setup/pages/lan_setup_page.dart';
 import '../features/setup/pages/mode_select_page.dart';
@@ -59,7 +59,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/home',
-        builder: (_, __) => const HomePage(),
+        builder: (_, __) => const MainShellPage(),
       ),
     ],
   );

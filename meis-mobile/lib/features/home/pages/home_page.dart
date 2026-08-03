@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -13,7 +12,6 @@ import 'inspection_page.dart';
 import 'inventory_page.dart';
 import 'label_reprint_page.dart';
 import 'maintain_page.dart';
-import 'message_page.dart';
 import 'metrology_hub_page.dart';
 import 'my_repairs_page.dart';
 import 'pm_page.dart';
@@ -22,15 +20,13 @@ import 'power_tag_hub_page.dart';
 import 'repair_page.dart';
 import 'shared_hub_page.dart';
 
+/// 「功能」页：原首页业务入口（MOB-UI-02）
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider).user;
-    final name = user?.realName?.trim().isNotEmpty == true
-        ? user!.realName!
-        : (user?.username ?? '用户');
 
     return Scaffold(
       body: Container(
@@ -43,6 +39,7 @@ class HomePage extends ConsumerWidget {
           ),
         ),
         child: SafeArea(
+          bottom: false,
           child: ListView(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.pageH,
@@ -51,71 +48,6 @@ class HomePage extends ConsumerWidget {
               AppSpacing.xxl,
             ),
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'MEIS',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 1.2,
-                              ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '医疗设备助手',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () async {
-                      final ok = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('确认退出'),
-                          content: const Text('退出后需要重新登录'),
-                          actions: [
-                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-                            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('退出')),
-                          ],
-                        ),
-                      );
-                      if (ok != true) return;
-                      await ref.read(authProvider.notifier).logout();
-                      if (context.mounted) context.go('/login');
-                    },
-                    child: const Text('退出'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              Text(
-                '你好，$name',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                      fontSize: 22,
-                    ),
-              ),
-              if (user != null) ...[
-                const SizedBox(height: 6),
-                Text(
-                  '${user.tenantCode} · 扫码报修 / 运维 / 盘点',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                ),
-              ],
-              const SizedBox(height: AppSpacing.xl),
               const MeisSectionLabel('常用功能'),
               MeisNavTile(
                 icon: Icons.qr_code_scanner,
@@ -200,14 +132,6 @@ class HomePage extends ConsumerWidget {
                 title: '移动计量',
                 subtitle: '扫码执行计量任务',
                 onTap: () => _push(context, const MetrologyHubPage()),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              const MeisSectionLabel('其他'),
-              MeisNavTile(
-                icon: Icons.notifications_none,
-                title: '消息中心',
-                subtitle: '到期提醒 / 工单 / 系统通知',
-                onTap: () => _push(context, const MessagePage()),
               ),
               const SizedBox(height: AppSpacing.lg),
               Text(

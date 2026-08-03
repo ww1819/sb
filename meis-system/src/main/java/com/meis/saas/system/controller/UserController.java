@@ -282,6 +282,40 @@ public class UserController {
         return Result.ok();
     }
 
+    /** 当前登录用户修改密码（MOB-UI-02：我的 → 修改密码） */
+    @PostMapping("/me/change-password")
+    @OperationLog(module = "system", description = "修改本人密码")
+    public Result<Void> changeMyPassword(@RequestBody Map<String, String> body) {
+        UUID userId = requireCurrentUserId();
+        String oldPassword = body == null ? null : body.get("oldPassword");
+        String newPassword = body == null ? null : body.get("newPassword");
+        if (oldPassword == null || oldPassword.isBlank()) {
+            throw new BizException(400, "请输入原密码");
+        }
+        if (newPassword == null || newPassword.isBlank()) {
+            throw new BizException(400, "请输入新密码");
+        }
+        if (newPassword.length() < 6) {
+            throw new BizException(400, "新密码至少 6 位");
+        }
+        if (oldPassword.equals(newPassword)) {
+            throw new BizException(400, "新密码不能与原密码相同");
+        }
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT password_hash FROM sys_user WHERE id = ?::uuid "
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", null),
+                userId);
+        if (rows.isEmpty()) throw new BizException(404, "user not found");
+        String hash = String.valueOf(rows.get(0).get("password_hash"));
+        if (!encoder.matches(oldPassword, hash)) {
+            throw new BizException(400, "原密码不正确");
+        }
+        jdbc.update(
+                "UPDATE sys_user SET password_hash = ?, updated_at = NOW() WHERE id = ?::uuid",
+                encoder.encode(newPassword), userId);
+        return Result.ok();
+    }
+
     /** DASH-UI-06：当前登录用户 UI 偏好 */
     @GetMapping("/me/preferences")
     public Result<Map<String, Object>> myPreferences() {
