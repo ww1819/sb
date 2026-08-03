@@ -134,16 +134,19 @@ class MinePage extends ConsumerWidget {
               const SizedBox(height: AppSpacing.xl),
               _MineActionButton(
                 label: '修改密码',
+                transparent: true,
                 onPressed: () => _push(context, const ChangePasswordPage()),
               ),
               const SizedBox(height: 12),
               _MineActionButton(
                 label: '设置IP',
+                transparent: true,
                 onPressed: () => _push(context, const ServerIpPage()),
               ),
               const SizedBox(height: 12),
               _MineActionButton(
                 label: '关于',
+                transparent: true,
                 onPressed: () => _push(context, const AboutPage()),
               ),
               const SizedBox(height: 12),
@@ -179,13 +182,30 @@ class MinePage extends ConsumerWidget {
 }
 
 class _MineActionButton extends StatelessWidget {
-  const _MineActionButton({required this.label, required this.onPressed});
+  const _MineActionButton({
+    required this.label,
+    required this.onPressed,
+    this.transparent = false,
+  });
 
   final String label;
   final VoidCallback onPressed;
+  final bool transparent;
 
   @override
   Widget build(BuildContext context) {
+    if (transparent) {
+      return OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.textPrimary,
+          backgroundColor: Colors.transparent,
+          side: const BorderSide(color: AppColors.borderLight),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+        ),
+        child: Text(label),
+      );
+    }
     return FilledButton.tonal(
       onPressed: onPressed,
       style: FilledButton.styleFrom(
