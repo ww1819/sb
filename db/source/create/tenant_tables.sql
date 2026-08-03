@@ -110,6 +110,9 @@ CREATE TABLE IF NOT EXISTS sys_user (
     dept_id UUID REFERENCES department(id),
     role_ids UUID[],
     avatar_url VARCHAR(500),
+    gender VARCHAR(10),
+    region VARCHAR(100),
+    wechat_id VARCHAR(64),
     last_login_at TIMESTAMP WITH TIME ZONE,
     last_login_ip VARCHAR(45),
     is_locked BOOLEAN DEFAULT FALSE,
@@ -131,6 +134,9 @@ COMMENT ON COLUMN sys_user.email IS '电子邮箱';
 COMMENT ON COLUMN sys_user.dept_id IS '所属科室';
 COMMENT ON COLUMN sys_user.role_ids IS '角色ID列表';
 COMMENT ON COLUMN sys_user.avatar_url IS '头像地址';
+COMMENT ON COLUMN sys_user.gender IS '性别：male/female/unknown';
+COMMENT ON COLUMN sys_user.region IS '地区（展示用）';
+COMMENT ON COLUMN sys_user.wechat_id IS '微信号（展示用）';
 COMMENT ON COLUMN sys_user.last_login_at IS '最后登录时间';
 COMMENT ON COLUMN sys_user.last_login_ip IS '最后登录IP';
 COMMENT ON COLUMN sys_user.is_locked IS '是否锁定';
