@@ -316,6 +316,40 @@ public class UserController {
         return Result.ok();
     }
 
+    /** 当前登录用户个人资料（MOB-UI-02：我的 → 个人资料） */
+    @GetMapping("/me/profile")
+    public Result<Map<String, Object>> myProfile(
+            @RequestHeader(value = "X-Tenant-Id", required = false) String tenantIdHeader) {
+        UUID userId = requireCurrentUserId();
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                """
+                SELECT id, username, real_name, phone, email, avatar_url,
+                       gender, region, wechat_id, employee_no, dept_id
+                  FROM sys_user
+                 WHERE id = ?::uuid
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", null),
+                userId);
+        if (rows.isEmpty()) throw new BizException(404, "user not found");
+        Map<String, Object> row = rows.get(0);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", row.get("id") != null ? row.get("id").toString() : null);
+        out.put("username", row.get("username"));
+        out.put("real_name", row.get("real_name"));
+        out.put("phone", row.get("phone"));
+        out.put("email", row.get("email"));
+        out.put("avatar_url", row.get("avatar_url"));
+        out.put("gender", row.get("gender"));
+        out.put("region", row.get("region"));
+        out.put("wechat_id", row.get("wechat_id"));
+        out.put("employee_no", row.get("employee_no"));
+        out.put("dept_id", row.get("dept_id") != null ? row.get("dept_id").toString() : null);
+        String tenantId = tenantIdHeader != null && !tenantIdHeader.isBlank()
+                ? tenantIdHeader
+                : TenantContext.getTenantId();
+        out.put("tenant_id", tenantId);
+        return Result.ok(out);
+    }
+
     /** DASH-UI-06：当前登录用户 UI 偏好 */
     @GetMapping("/me/preferences")
     public Result<Map<String, Object>> myPreferences() {

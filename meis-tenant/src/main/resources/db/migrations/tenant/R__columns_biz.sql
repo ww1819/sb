@@ -924,6 +924,14 @@ ALTER TABLE inspection_execution_result ADD COLUMN IF NOT EXISTS is_required BOO
 ALTER TABLE inspection_execution_result ADD COLUMN IF NOT EXISTS photos JSONB;
 ALTER TABLE inspection_execution_result ADD COLUMN IF NOT EXISTS row_version INTEGER DEFAULT 1;
 
+-- ---------- MOB-UI-02：个人资料扩展字段（App 个人资料页） ----------
+ALTER TABLE sys_user ADD COLUMN IF NOT EXISTS gender VARCHAR(10);
+ALTER TABLE sys_user ADD COLUMN IF NOT EXISTS region VARCHAR(100);
+ALTER TABLE sys_user ADD COLUMN IF NOT EXISTS wechat_id VARCHAR(64);
+COMMENT ON COLUMN sys_user.gender IS '性别：male/female/unknown';
+COMMENT ON COLUMN sys_user.region IS '地区（展示用）';
+COMMENT ON COLUMN sys_user.wechat_id IS '微信号（展示用）';
+
 -- ---------- MP.3: WeChat mini-program openid (subscribe message) ----------
 ALTER TABLE sys_user ADD COLUMN IF NOT EXISTS wx_openid VARCHAR(64);
 COMMENT ON COLUMN sys_user.wx_openid IS 'WeChat mini-program openid for subscribe message';

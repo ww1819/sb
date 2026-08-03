@@ -19,7 +19,7 @@ Future<bool> ensureCameraPermission(
         permanent ? '相机权限已被拒绝，请在系统设置中开启' : '需要相机权限才能$usage',
       ),
       action: permanent
-          ? SnackBarAction(label: '去设置', onPressed: openAppSettings)
+          ? const SnackBarAction(label: '去设置', onPressed: openAppSettings)
           : null,
     ),
   );

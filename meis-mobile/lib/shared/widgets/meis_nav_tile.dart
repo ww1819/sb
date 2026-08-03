@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 
-/// 首页/功能入口瓦片（简洁列表行）
+/// 首页/功能入口瓦片。
+/// - 默认：横向列表行
+/// - [grid]=true：四列紧凑宫格（上图标下标题，对齐微信生活服务）
 class MeisNavTile extends StatelessWidget {
   const MeisNavTile({
     super.key,
@@ -11,6 +13,7 @@ class MeisNavTile extends StatelessWidget {
     this.subtitle,
     this.icon,
     this.primary = false,
+    this.grid = false,
     required this.onTap,
   });
 
@@ -18,10 +21,46 @@ class MeisNavTile extends StatelessWidget {
   final String? subtitle;
   final IconData? icon;
   final bool primary;
+  final bool grid;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    if (grid) return _buildGrid();
+    return _buildRow();
+  }
+
+  Widget _buildGrid() {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (icon != null)
+              Icon(icon, color: AppColors.primary, size: 28),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
+                height: 1.2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRow() {
     final fg = primary ? Colors.white : AppColors.textPrimary;
     final subFg = primary ? Colors.white.withValues(alpha: 0.82) : AppColors.textSecondary;
     final bg = primary ? AppColors.primary : Colors.white;

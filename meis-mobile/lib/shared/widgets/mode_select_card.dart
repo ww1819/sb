@@ -31,7 +31,7 @@ class ModeSelectCard extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
+                  color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: AppColors.primary, size: 28),
@@ -57,7 +57,7 @@ class ModeSelectCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: AppColors.textSecondary.withOpacity(0.6)),
+              Icon(Icons.chevron_right, color: AppColors.textSecondary.withValues(alpha: 0.6)),
             ],
           ),
         ),

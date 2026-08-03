@@ -15,17 +15,22 @@ class ServerIpPage extends ConsumerStatefulWidget {
 }
 
 class _ServerIpPageState extends ConsumerState<ServerIpPage> {
-  late final TextEditingController _hostCtrl;
-  late final TextEditingController _portCtrl;
+  final _hostCtrl = TextEditingController();
+  final _portCtrl = TextEditingController();
+  var _hydrating = true;
 
   @override
   void initState() {
     super.initState();
-    final config = ref.read(setupProvider).config;
-    _hostCtrl = TextEditingController(text: config.host);
-    _portCtrl = TextEditingController(
-      text: config.port.isEmpty ? AppConstants.defaultPort : config.port,
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _hydrate());
+  }
+
+  Future<void> _hydrate() async {
+    final config = await ref.read(setupProvider.notifier).reloadFromPrefs();
+    if (!mounted) return;
+    _hostCtrl.text = config.host;
+    _portCtrl.text = config.port.isEmpty ? AppConstants.defaultPort : config.port;
+    setState(() => _hydrating = false);
   }
 
   @override
@@ -73,70 +78,72 @@ class _ServerIpPageState extends ConsumerState<ServerIpPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('设置 IP')),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.pageH),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                '配置服务器地址',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '请填写服务器 IP 与 Nginx 端口（默认 ${AppConstants.defaultPort}）。修改后若无法访问，请重新测试连接。',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
-              ),
-              const SizedBox(height: 24),
-              TextField(
-                controller: _hostCtrl,
-                keyboardType: TextInputType.url,
-                decoration: const InputDecoration(
-                  labelText: '服务器 IP',
-                  hintText: '例如 192.168.1.100',
-                  prefixIcon: Icon(Icons.computer),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                controller: _portCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: '端口',
-                  hintText: AppConstants.defaultPort,
-                  prefixIcon: Icon(Icons.numbers),
-                ),
-              ),
-              if (setup.testPassed) ...[
-                const SizedBox(height: AppSpacing.md),
-                const Row(
+        child: _hydrating
+            ? const Center(child: CircularProgressIndicator())
+            : Padding(
+                padding: const EdgeInsets.all(AppSpacing.pageH),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(Icons.check_circle, color: Colors.green, size: 20),
-                    SizedBox(width: 8),
-                    Text('连接测试已通过', style: TextStyle(color: Colors.green)),
+                    Text(
+                      '配置服务器地址',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '以下为当前维护的服务器地址。修改后请先测试连接再保存（默认端口 ${AppConstants.defaultPort}）。',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+                    ),
+                    const SizedBox(height: 24),
+                    TextField(
+                      controller: _hostCtrl,
+                      keyboardType: TextInputType.url,
+                      decoration: const InputDecoration(
+                        labelText: '服务器 IP',
+                        hintText: '例如 192.168.1.100',
+                        prefixIcon: Icon(Icons.computer),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    TextField(
+                      controller: _portCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: '端口',
+                        hintText: AppConstants.defaultPort,
+                        prefixIcon: Icon(Icons.numbers),
+                      ),
+                    ),
+                    if (setup.testPassed) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      const Row(
+                        children: [
+                          Icon(Icons.check_circle, color: Colors.green, size: 20),
+                          SizedBox(width: 8),
+                          Text('连接测试已通过', style: TextStyle(color: Colors.green)),
+                        ],
+                      ),
+                    ],
+                    const Spacer(),
+                    OutlinedButton(
+                      onPressed: setup.testing ? null : _testConnection,
+                      child: setup.testing
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('测试连接'),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton(
+                      onPressed: setup.testPassed ? _save : null,
+                      style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                      child: const Text('保存'),
+                    ),
                   ],
                 ),
-              ],
-              const Spacer(),
-              OutlinedButton(
-                onPressed: setup.testing ? null : _testConnection,
-                child: setup.testing
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('测试连接'),
               ),
-              const SizedBox(height: 12),
-              FilledButton(
-                onPressed: setup.testPassed ? _save : null,
-                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-                child: const Text('保存'),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

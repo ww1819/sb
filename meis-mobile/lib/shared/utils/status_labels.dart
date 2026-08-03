@@ -1,5 +1,5 @@
-/// 业务状态码 → 中文（与 sys_dict / Web i18n catalog 对齐）。
-/// I18N 预留：后续可按 locale 切换文案包。PLT-STATUS-CN-01 / §5.13。
+// 业务状态码 → 中文（与 sys_dict / Web i18n catalog 对齐）。
+// I18N 预留：后续可按 locale 切换文案包。PLT-STATUS-CN-01 / §5.13。
 
 const String defaultLocale = 'zh-CN';
 

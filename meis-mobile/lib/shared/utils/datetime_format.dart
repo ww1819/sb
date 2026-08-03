@@ -1,5 +1,5 @@
-/// 移动端日期/时间统一格式（PLT-DT-01 / 约定包 §5.12）
-/// 日期：yyyy-MM-dd；时间：yyyy-MM-dd HH:mm:ss（24h）
+// 移动端日期/时间统一格式（PLT-DT-01 / 约定包 §5.12）
+// 日期：yyyy-MM-dd；时间：yyyy-MM-dd HH:mm:ss（24h）
 
 String _pad2(int n) => n.toString().padLeft(2, '0');
 

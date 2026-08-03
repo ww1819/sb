@@ -46,6 +46,13 @@ class SetupNotifier extends StateNotifier<SetupState> {
     state = state.copyWith(config: config, testPassed: config.completed);
   }
 
+  /// 从本地偏好重新加载当前维护的服务器地址
+  Future<ServerConfig> reloadFromPrefs() async {
+    final config = await _prefs.loadServerConfig();
+    state = state.copyWith(config: config, testPassed: false, clearError: true);
+    return config;
+  }
+
   void setMode(SetupMode mode) {
     state = state.copyWith(
       config: state.config.copyWith(mode: mode),
