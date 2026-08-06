@@ -226,6 +226,7 @@ public class RepairWorkorderController {
                 pageArgs.toArray());
         for (Map<String, Object> row : rows) {
             normalizeFaultPhotosField(row);
+            normalizeVerifiedClosedDisplay(row);
         }
         try {
             processService.enrichWorkorders(rows);
@@ -292,6 +293,7 @@ public class RepairWorkorderController {
                 pageArgs.toArray());
         for (Map<String, Object> row : rows) {
             normalizeFaultPhotosField(row);
+            normalizeVerifiedClosedDisplay(row);
         }
         try {
             processService.enrichWorkorders(rows);
@@ -372,6 +374,7 @@ public class RepairWorkorderController {
                 pageArgs.toArray());
         for (Map<String, Object> row : rows) {
             normalizeFaultPhotosField(row);
+            normalizeVerifiedClosedDisplay(row);
         }
         try {
             processService.enrichWorkorders(rows);
@@ -1187,12 +1190,14 @@ public class RepairWorkorderController {
         if (rows.isEmpty()) throw new BizException(404, "workorder not found");
         Map<String, Object> row = rows.get(0);
         normalizeFaultPhotosField(row);
+        normalizeVerifiedClosedDisplay(row);
         return row;
     }
 
     private Map<String, Object> loadWorkorder(UUID id) {
         Map<String, Object> wo = requireWo(id);
         processService.enrichWorkorder(wo);
+        normalizeVerifiedClosedDisplay(wo);
         return wo;
     }
 
@@ -1778,9 +1783,23 @@ public class RepairWorkorderController {
             where.append(" AND 1=0 ");
             return;
         }
-        where.append(" AND status IN (");
+        // 验收通过后主状态立即结案为 closed、子状态 verified；筛「已验收」(verified) 须含此类结案单（U.6 / REP-STAT-01）
+        boolean verifiedSemantics = effective.contains("verified");
+        where.append(" AND (status IN (");
         where.append(String.join(",", Collections.nCopies(effective.size(), "?")));
-        where.append(") ");
+        where.append(")");
         args.addAll(effective);
+        if (verifiedSemantics) {
+            where.append(" OR (status = 'closed' AND (repair_sub_status = 'verified' OR verify_time IS NOT NULL))");
+        }
+        where.append(") ");
+    }
+
+    /** 列表/详情展示：验收通过已结案仍显示「已验收」，与筛选项语义一致（REP-STAT-01） */
+    private void normalizeVerifiedClosedDisplay(Map<String, Object> row) {
+        if (row == null || !"closed".equals(str(row.get("status")))) return;
+        if ("verified".equals(str(row.get("repair_sub_status"))) || row.get("verify_time") != null) {
+            row.put("status", "verified");
+        }
     }
 }
