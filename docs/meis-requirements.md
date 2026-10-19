@@ -17,6 +17,7 @@
 - [Windows 生产部署](windows-production-deploy.md)
 - [Linux 生产部署](production-deploy.md)
 - [生产服务状态监测](production-monitoring.md)
+- [**信创小改平替（JDK/PG/Redis/Nginx/MinIO）**](xinchuang-compat-minimal.md)
 - [**可复用工程约定包**](reusable-engineering-conventions.md)（跨项目沉淀，其他系统可直接复用）
 
 ---
@@ -2647,6 +2648,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
 
+| 2.218 | 2026-09-03 12:10:00 | — | 新增信创小改平替文档 `docs/xinchuang-compat-minimal.md`（JDK/PG/Redis/Nginx/MinIO ↔ 国产选型） |
 | 2.217 | 2026-08-06 11:30:00 | — | REP-STAT-01：筛「已验收」含验收后结案单；列表/详情展示对齐为已验收 |
 | 2.216 | 2026-08-03 10:45:00 | — | REP-PERF-01 澄清：验收等同路径；扫描余量入 BACKLOG-*-PERF；约定包 §5.20 |
 | 2.215 | 2026-08-03 10:40:00 | — | REP-PERF-01：报修列表 enrichWorkorders 改批量查询，修复前端 30s 超时空表 |
