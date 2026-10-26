@@ -317,6 +317,209 @@
       .hero-foot, .compare, .points, .feat-grid { grid-template-columns: 1fr; }
       .lang-switch { top: 10px; right: 10px; }
     }
+
+    .policy, .tertiary, .arch, .rel, .flows {
+      background: var(--paper);
+    }
+    .policy {
+      background:
+        radial-gradient(700px 360px at 0% 0%, rgba(22,119,255,0.12), transparent 55%),
+        linear-gradient(180deg, #f7fafc, #eef3f8);
+    }
+    .tertiary {
+      background: linear-gradient(180deg, #eaf1f8 0%, #f3f7fb 100%);
+    }
+    .arch, .rel, .flows {
+      background:
+        radial-gradient(900px 420px at 100% 10%, rgba(22,119,255,0.08), transparent 50%),
+        var(--paper);
+    }
+    .policy h2, .tertiary h2, .arch h2, .rel h2, .flows h2 {
+      margin-top: 18px;
+      font-family: "Noto Serif SC", "Instrument Serif", serif;
+      font-size: clamp(28px, 4.2vw, 42px);
+      font-weight: 600; line-height: 1.25; max-width: 20em;
+    }
+    .pill-row {
+      margin-top: 28px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .pill {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px 16px;
+    }
+    .pill strong {
+      display: block;
+      font-size: 15px;
+      margin-bottom: 8px;
+      color: var(--brand-deep);
+    }
+    .pill p { font-size: 13px; color: var(--muted); }
+    .check-grid {
+      margin-top: 28px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .check {
+      display: flex; gap: 12px; align-items: flex-start;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .check i {
+      flex: 0 0 auto;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: rgba(22,119,255,0.12);
+      color: var(--brand);
+      font-style: normal; font-weight: 700; font-size: 12px;
+      display: grid; place-items: center;
+      margin-top: 2px;
+    }
+    .check b { display: block; font-size: 14px; margin-bottom: 4px; }
+    .check span { font-size: 13px; color: var(--muted); }
+    .disclaimer {
+      margin-top: 18px;
+      font-size: 12px;
+      color: var(--muted);
+      padding: 12px 14px;
+      border-left: 3px solid var(--brand);
+      background: rgba(22,119,255,0.06);
+      border-radius: 0 6px 6px 0;
+    }
+    .diagram {
+      margin-top: 28px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 18px 12px 12px;
+      overflow-x: auto;
+      box-shadow: 0 12px 32px rgba(15,28,46,0.05);
+    }
+    .diagram figcaption {
+      font-size: 12px; color: var(--muted);
+      text-align: center; margin-top: 8px; padding-bottom: 4px;
+    }
+    .diagram svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+    .flow-grid {
+      margin-top: 28px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .flow-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px 14px 12px;
+    }
+    .flow-card h3 {
+      font-size: 15px; font-weight: 700;
+      margin-bottom: 10px;
+      color: var(--brand-deep);
+    }
+    .flow-steps {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    }
+    .flow-steps span {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-height: 34px; padding: 6px 10px;
+      border-radius: 6px;
+      background: #eef5ff;
+      border: 1px solid rgba(22,119,255,0.22);
+      font-size: 12px; font-weight: 600; color: var(--ink);
+    }
+    .flow-steps em {
+      font-style: normal; color: var(--brand); font-weight: 700; padding: 0 2px;
+    }
+    .flow-card p {
+      margin-top: 10px; font-size: 12px; color: var(--muted);
+    }
+    @media (max-width: 900px) {
+      .pill-row, .check-grid, .flow-grid { grid-template-columns: 1fr; }
+    }
+
+
+    .feat .feat-points {
+      margin: 10px 0 0;
+      padding-left: 1.1em;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .feat .feat-points li { margin-bottom: 4px; }
+    .digital {
+      background:
+        radial-gradient(700px 360px at 100% 0%, rgba(22,119,255,0.1), transparent 55%),
+        #e8eef6;
+    }
+    .digital h2 {
+      margin-top: 18px;
+      font-family: "Noto Serif SC", "Instrument Serif", serif;
+      font-size: clamp(28px, 4.2vw, 42px);
+      font-weight: 600; line-height: 1.25; max-width: 20em;
+    }
+    .vs-grid {
+      margin-top: 28px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .vs-card {
+      border-radius: 10px;
+      padding: 20px 18px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+    }
+    .vs-card.bad {
+      background: #f7f8fa;
+    }
+    .vs-card.good {
+      background: linear-gradient(165deg, rgba(22,119,255,0.1), #fff 55%);
+      border-color: rgba(22,119,255,0.35);
+    }
+    .vs-card h3 {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    .vs-card ul {
+      margin: 0;
+      padding-left: 1.15em;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .vs-card li { margin-bottom: 8px; }
+    .vs-card li strong { color: var(--ink); font-weight: 600; }
+    .benefit-row {
+      margin-top: 20px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .benefit {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .benefit strong {
+      display: block;
+      font-size: 14px;
+      color: var(--brand-deep);
+      margin-bottom: 6px;
+    }
+    .benefit span { font-size: 12px; color: var(--muted); }
+    @media (max-width: 900px) {
+      .vs-grid, .benefit-row { grid-template-columns: 1fr; }
+    }
+
     @media print {
       .lang-switch, .toc { display: none; }
       .screen { min-height: auto; page-break-after: always; padding: 24px; }
@@ -334,7 +537,13 @@
   <nav class="toc" aria-label="章节">
     <a href="#s1" title="品牌"></a>
     <a href="#s2" title="差异"></a>
+    <a href="#s-policy" title="政策"></a>
+    <a href="#s-tertiary" title="三甲"></a>
+    <a href="#s-arch" title="架构"></a>
+    <a href="#s-rel" title="关联"></a>
+    <a href="#s-flow" title="流程"></a>
     <a href="#s3" title="功能"></a>
+    <a href="#s-digital" title="数字化"></a>
     <a href="#s4" title="比对"></a>
     <a href="#s5" title="收束"></a>
   </nav>
@@ -349,8 +558,9 @@
       </p>
       <div class="hero-cta">
         <a class="btn btn-primary" href="#s2">看清差异</a>
+        <a class="btn btn-ghost" href="#s-policy">政策与三甲</a>
+        <a class="btn btn-ghost" href="#s-arch">架构与流程</a>
         <a class="btn btn-ghost" href="#s3">功能介绍</a>
-        <a class="btn btn-ghost" href="#s4">同类比对</a>
       </div>
     </div>
     <div class="hero-foot">
@@ -390,12 +600,219 @@
     </ul>
   </section>
 
+
+  <section class="screen tall policy" id="s-policy">
+    <p class="eyebrow">Policy context</p>
+    <h2>国家政策与监管背景</h2>
+    <p class="sec-lead">
+      医院医学装备管理正在从「登记造册」走向「全程可追溯、责任可落地」。MEIS 的设计对齐下列常见监管与行业治理方向
+      （宣传口径为管理支撑，不等同于某次检查的逐条对标承诺）。
+    </p>
+    <div class="pill-row">
+      <article class="pill">
+        <strong>医疗器械全生命周期监管</strong>
+        <p>依据《医疗器械监督管理条例》等，医疗机构须对在用器械采购、验收、使用、维护、报废等环节留痕备查；系统侧强调主从单据齐套与变更可审计。</p>
+      </article>
+      <article class="pill">
+        <strong>UDI 与唯一标识追溯</strong>
+        <p>国家推进医疗器械唯一标识（UDI）应用，要求关键标识与使用环节可关联。MEIS 台账支持 UDI 相关字段与变更历史，便于追溯查询。</p>
+      </article>
+      <article class="pill">
+        <strong>医学装备管理制度化</strong>
+        <p>卫生健康行业对医学装备论证、采购、档案、计量、不良事件监测等有制度要求。MEIS 以「一台设备一张完整主数据卡 + 业务 Sheet」支撑日常管理与迎检材料组织。</p>
+      </article>
+      <article class="pill">
+        <strong>不良事件监测与上报</strong>
+        <p>在用器械不良事件需及时发现、记录与上报。系统提供关联设备的不良事件填报与查询入口，便于质控闭环。</p>
+      </article>
+      <article class="pill">
+        <strong>计量与强检管理</strong>
+        <p>计量器具需按周期检定/校准。MEIS 将计量计划、执行与结果挂在设备时间线上，到期可提醒，结果中文可读。</p>
+      </article>
+      <article class="pill">
+        <strong>信息化与多端现场作业</strong>
+        <p>政策与评审均强调过程留痕。Web / App / 小程序同批能力与途径记录，减少「纸质补录、事后对不上」。</p>
+      </article>
+    </div>
+    <p class="disclaimer">说明：上表为行业常见治理方向综述，便于院领导与设备科理解建设必要性；具体条款以当时有效的法规、评审细则及本院制度为准。</p>
+  </section>
+
+  <section class="screen tall tertiary" id="s-tertiary">
+    <p class="eyebrow">Tertiary hospital review</p>
+    <h2>助力三级甲等医院评审备查</h2>
+    <p class="sec-lead">
+      三甲评审中医学装备相关条款，常聚焦：台账是否齐全、责任是否到科到人、维护保养与计量是否按计划执行、
+      不良事件与培训上岗是否可查、报废与处置是否合规。MEIS 用「可追溯的数据底座」降低迎检材料拼凑成本。
+    </p>
+    <div class="check-grid">
+      <div class="check"><i>01</i><div><b>装备台账与档案齐套</b><span>主数据字段齐全；证照、培训授权、档案附件、图片同机可查，减少「找材料」时间。</span></div></div>
+      <div class="check"><i>02</i><div><b>归属与位置可回溯</b><span>科室/安装位置按时间区间留痕；真变更与纠错分流，避免迎检时说不清「当时谁管」。</span></div></div>
+      <div class="check"><i>03</i><div><b>维护保养与计量闭环</b><span>保养 / 巡检 / 计量 / PM：参数→计划→执行→记录；结果与状态中文展示，便于抽查。</span></div></div>
+      <div class="check"><i>04</i><div><b>维修与配件可审计</b><span>报修—处理—验收完整进程；维修换件与非维修换件来源可辨，费用与责任可核对。</span></div></div>
+      <div class="check"><i>05</i><div><b>质控与不良事件</b><span>不良事件可关联设备上报与查询，支撑质控条款备查。</span></div></div>
+      <div class="check"><i>06</i><div><b>出入库、盘点与报废</b><span>库房单据主从齐套；盘点可多端协同；报废与处置历史可在台账侧聚合查看。</span></div></div>
+      <div class="check"><i>07</i><div><b>特殊与高风险设备</b><span>生命支持、辐射/特种、应急库等专项入口，便于重点设备清单管理。</span></div></div>
+      <div class="check"><i>08</i><div><b>变更与途径留痕</b><span>主数据变更明文；关键动作记录 Web / App / 小程序途径，过程证据更完整。</span></div></div>
+    </div>
+    <p class="disclaimer">MEIS 助力的是「管理过程可查、材料可导出组织」；评审结论仍取决于医院制度落实与现场核查，系统不替代人工迎检责任。</p>
+  </section>
+
+  <section class="screen tall arch" id="s-arch">
+    <p class="eyebrow">Architecture</p>
+    <h2>系统架构一览</h2>
+    <p class="sec-lead">多端统一接入、业务域微服务分工、租户数据隔离——同一套台账与运维数据，服务设备科后台与临床/工程师现场。</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 920 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="MEIS 系统架构图">
+  <defs>
+    <marker id="arrA" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#1677ff"/></marker>
+    <style>
+      .bx{fill:#fff;stroke:#c9d6e5;stroke-width:1.2}
+      .bxh{fill:#1677ff;stroke:#0b3d8c}
+      .t{font-family:Manrope,Noto Sans SC,sans-serif;font-size:13px;fill:#0f1c2e;text-anchor:middle}
+      .tw{fill:#fff}
+      .tm{font-size:11px;fill:#5a6b7d;text-anchor:middle}
+      .ln{stroke:#1677ff;stroke-width:1.6;fill:none;marker-end:url(#arrA)}
+      .lg{stroke:#8eb6ff;stroke-width:1.2;fill:none;stroke-dasharray:4 3}
+    </style>
+  </defs>
+  <text x="460" y="26" class="t" style="font-size:15px;font-weight:700">应用层</text>
+  <rect class="bx" x="40" y="40" width="180" height="56" rx="8"/><text x="130" y="66" class="t" style="font-weight:700">Web</text><text x="130" y="84" class="tm">设备科 / 库房 / 采购</text>
+  <rect class="bx" x="260" y="40" width="180" height="56" rx="8"/><text x="350" y="66" class="t" style="font-weight:700">Flutter App</text><text x="350" y="84" class="tm">工程师 / 盘点 / 运维</text>
+  <rect class="bx" x="480" y="40" width="180" height="56" rx="8"/><text x="570" y="66" class="t" style="font-weight:700">微信小程序</text><text x="570" y="84" class="tm">报修 / 查询 / 执行</text>
+  <rect class="bx" x="700" y="40" width="180" height="56" rx="8"/><text x="790" y="66" class="t" style="font-weight:700">电流监测边缘</text><text x="790" y="84" class="tm">标签 · 基站 · 读数</text>
+  <line class="ln" x1="130" y1="96" x2="130" y2="138"/>
+  <line class="ln" x1="350" y1="96" x2="350" y2="138"/>
+  <line class="ln" x1="570" y1="96" x2="570" y2="138"/>
+  <line class="ln" x1="790" y1="96" x2="790" y2="138"/>
+  <rect class="bxh" x="40" y="140" width="840" height="46" rx="8"/><text x="460" y="168" class="t tw" style="font-weight:700">统一 API 网关 · 鉴权 · 多租户上下文</text>
+  <line class="ln" x1="460" y1="186" x2="460" y2="218"/>
+  <text x="460" y="236" class="t" style="font-size:15px;font-weight:700">业务服务层</text>
+  <rect class="bx" x="40" y="248" width="120" height="44" rx="6"/><text x="100" y="275" class="t">资产台账</text>
+  <rect class="bx" x="178" y="248" width="120" height="44" rx="6"/><text x="238" y="275" class="t">库房盘点</text>
+  <rect class="bx" x="316" y="248" width="120" height="44" rx="6"/><text x="376" y="275" class="t">维修工单</text>
+  <rect class="bx" x="454" y="248" width="120" height="44" rx="6"/><text x="514" y="275" class="t">运维计划</text>
+  <rect class="bx" x="592" y="248" width="120" height="44" rx="6"/><text x="652" y="275" class="t">质控采购</text>
+  <rect class="bx" x="730" y="248" width="150" height="44" rx="6"/><text x="805" y="275" class="t">通知权限</text>
+  <line class="lg" x1="100" y1="292" x2="100" y2="318"/>
+  <line class="lg" x1="238" y1="292" x2="238" y2="318"/>
+  <line class="lg" x1="376" y1="292" x2="376" y2="318"/>
+  <line class="lg" x1="100" y1="318" x2="376" y2="318"/>
+  <line class="ln" x1="238" y1="318" x2="238" y2="348"/>
+  <line class="lg" x1="514" y1="292" x2="514" y2="318"/>
+  <line class="lg" x1="652" y1="292" x2="652" y2="318"/>
+  <line class="lg" x1="805" y1="292" x2="805" y2="318"/>
+  <line class="lg" x1="514" y1="318" x2="805" y2="318"/>
+  <line class="ln" x1="660" y1="318" x2="660" y2="348"/>
+  <rect class="bxh" x="120" y="350" width="240" height="42" rx="8"/><text x="240" y="376" class="t tw" style="font-weight:700">PostgreSQL 租户库</text>
+  <rect class="bxh" x="540" y="350" width="240" height="42" rx="8"/><text x="660" y="376" class="t tw" style="font-weight:700">文件 / 档案存储</text>
+  <text x="460" y="416" class="tm">同一设备主键贯穿：台账 · 归属区间 · 维修 · 保养/巡检/计量/PM · 借调 · 不良 · 电流</text>
+</svg>
+      <figcaption>图：MEIS 逻辑架构（多端 → 网关 → 业务域服务 → 租户库与文件）</figcaption>
+    </figure>
+  </section>
+
+  <section class="screen tall rel" id="s-rel">
+    <p class="eyebrow">Data model</p>
+    <h2>台账与运维数据的关联关系</h2>
+    <p class="sec-lead">
+      医疗设备台账是主枢纽：出入库改变资产状态，维修与计划性运维挂接执行历史，
+      归属/位置区间决定「某时段成本与责任归谁」，质控与监测事件同样回指同一设备。
+    </p>
+    <figure class="diagram">
+      <svg viewBox="0 0 920 500" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="台账与运维关联关系图">
+  <defs>
+    <marker id="arrR" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L5,3 L0,6 Z" fill="#5a6b7d"/></marker>
+    <style>
+      .hub{fill:#1677ff;stroke:#0b3d8c;stroke-width:1.5}
+      .n{fill:#fff;stroke:#c9d6e5;stroke-width:1.2}
+      .bus{fill:#eef4fb;stroke:#b7c9de;stroke-width:1.2}
+      .tt{font-family:Manrope,Noto Sans SC,sans-serif;font-size:12px;fill:#0f1c2e;text-anchor:middle}
+      .tw{fill:#fff;font-weight:700}
+      .tm{font-size:10px;fill:#5a6b7d;text-anchor:middle}
+      .e{stroke:#7a90a8;stroke-width:1.4;fill:none;marker-end:url(#arrR)}
+      .s{stroke:#a8b9cb;stroke-width:1.2;fill:none}
+    </style>
+  </defs>
+
+  <!-- top nodes -->
+  <rect class="n" x="40" y="24" width="140" height="50" rx="8"/><text x="110" y="45" class="tt" style="font-weight:700">归属区间</text><text x="110" y="61" class="tm">科室 · 何时</text>
+  <rect class="n" x="210" y="24" width="140" height="50" rx="8"/><text x="280" y="45" class="tt" style="font-weight:700">位置区间</text><text x="280" y="61" class="tm">楼层房间 · 何时</text>
+  <rect class="n" x="380" y="24" width="160" height="50" rx="8"/><text x="460" y="45" class="tt" style="font-weight:700">借调 / 不良 / 电流</text><text x="460" y="61" class="tm">事件回指设备</text>
+  <rect class="n" x="570" y="24" width="140" height="50" rx="8"/><text x="640" y="45" class="tt" style="font-weight:700">证照 / 培训</text><text x="640" y="61" class="tm">合规对象</text>
+  <rect class="n" x="740" y="24" width="140" height="50" rx="8"/><text x="810" y="45" class="tt" style="font-weight:700">档案 / 图片</text><text x="810" y="61" class="tm">资料挂机</text>
+
+  <!-- stubs down to top bus (no elbows, no cross) -->
+  <line class="s" x1="110" y1="74" x2="110" y2="100"/>
+  <line class="s" x1="280" y1="74" x2="280" y2="100"/>
+  <line class="s" x1="460" y1="74" x2="460" y2="100"/>
+  <line class="s" x1="640" y1="74" x2="640" y2="100"/>
+  <line class="s" x1="810" y1="74" x2="810" y2="100"/>
+  <rect class="bus" x="90" y="100" width="740" height="28" rx="6"/>
+  <text x="460" y="119" class="tm" style="fill:#3d5670;font-size:11px">上联业务汇入</text>
+  <line class="e" x1="460" y1="128" x2="460" y2="188"/>
+
+  <!-- hub（加高，与左右三块水平对齐，箭头纯水平） -->
+  <rect class="hub" x="350" y="196" width="220" height="128" rx="12"/>
+  <text x="460" y="248" class="tt tw" style="font-size:17px">设备台账</text>
+  <text x="460" y="272" class="tm" style="fill:#dbeaff">medical_device</text>
+
+  <!-- left: 纯水平接入 -->
+  <rect class="n" x="40" y="196" width="150" height="40" rx="8"/><text x="115" y="214" class="tt" style="font-weight:700">出入库 / 调拨</text><text x="115" y="228" class="tm">状态写回台账</text>
+  <rect class="n" x="40" y="246" width="150" height="40" rx="8"/><text x="115" y="264" class="tt" style="font-weight:700">盘点</text><text x="115" y="278" class="tm">实物核对</text>
+  <rect class="n" x="40" y="296" width="150" height="40" rx="8"/><text x="115" y="314" class="tt" style="font-weight:700">报废 / 处置</text><text x="115" y="328" class="tm">终态与证明</text>
+  <line class="e" x1="190" y1="216" x2="350" y2="216"/>
+  <line class="e" x1="190" y1="266" x2="350" y2="266"/>
+  <line class="e" x1="190" y1="316" x2="350" y2="316"/>
+
+  <!-- right: 纯水平接入 -->
+  <rect class="n" x="730" y="196" width="150" height="40" rx="8"/><text x="805" y="214" class="tt" style="font-weight:700">维修工单</text><text x="805" y="228" class="tm">报修处理验收</text>
+  <rect class="n" x="730" y="246" width="150" height="40" rx="8"/><text x="805" y="264" class="tt" style="font-weight:700">配件更换</text><text x="805" y="278" class="tm">维修 / 非维修</text>
+  <rect class="n" x="730" y="296" width="150" height="40" rx="8"/><text x="805" y="314" class="tt" style="font-weight:700">维保合同</text><text x="805" y="328" class="tm">覆盖设备</text>
+  <line class="e" x1="730" y1="216" x2="570" y2="216"/>
+  <line class="e" x1="730" y1="266" x2="570" y2="266"/>
+  <line class="e" x1="730" y1="316" x2="570" y2="316"/>
+
+  <!-- hub down to bottom bus -->
+  <line class="e" x1="460" y1="324" x2="460" y2="358"/>
+  <rect class="bus" x="160" y="358" width="600" height="28" rx="6"/>
+  <text x="460" y="377" class="tm" style="fill:#3d5670;font-size:11px">计划性运维汇入</text>
+
+  <!-- bottom stubs: bus → nodes（无箭头悬空，节点上方短竖线） -->
+  <line class="s" x1="220" y1="386" x2="220" y2="412"/>
+  <line class="s" x1="380" y1="386" x2="380" y2="412"/>
+  <line class="s" x1="540" y1="386" x2="540" y2="412"/>
+  <line class="s" x1="700" y1="386" x2="700" y2="412"/>
+  <rect class="n" x="155" y="412" width="130" height="50" rx="8"/><text x="220" y="433" class="tt" style="font-weight:700">保养</text><text x="220" y="449" class="tm">计划 + 执行</text>
+  <rect class="n" x="315" y="412" width="130" height="50" rx="8"/><text x="380" y="433" class="tt" style="font-weight:700">巡检</text><text x="380" y="449" class="tm">计划 + 执行</text>
+  <rect class="n" x="475" y="412" width="130" height="50" rx="8"/><text x="540" y="433" class="tt" style="font-weight:700">计量</text><text x="540" y="449" class="tm">计划 + 执行</text>
+  <rect class="n" x="635" y="412" width="130" height="50" rx="8"/><text x="700" y="433" class="tt" style="font-weight:700">PM</text><text x="700" y="449" class="tm">计划 + 执行</text>
+
+  <text x="460" y="486" class="tm">各业务以设备主键关联台账；上下联经汇流条汇入，左右水平直连</text>
+</svg>
+      <figcaption>图：台账枢纽 + 上下汇流条 + 左右直连（无交叉悬空折线）</figcaption>
+    </figure>
+  </section>
+
+  <section class="screen tall flows" id="s-flow">
+    <p class="eyebrow">Process flows</p>
+    <h2>分域业务流程图</h2>
+    <p class="sec-lead">按日常高频链路概括关键步骤（细则以实现与医院制度为准）。每条链路均可在 Web 或移动端协同完成部分环节。</p>
+    <div class="flow-grid">
+      <article class="flow-card"><h3>采购 → 验收 → 入库上台账</h3><div class="flow-steps"><span>采购申请</span><em>→</em><span>审批</span><em>→</em><span>计划/招标</span><em>→</em><span>合同</span><em>→</em><span>验收</span><em>→</em><span>入库</span><em>→</em><span>生成/关联台账</span></div><p>合同与付款计划可挂接；入库明细与设备主键对齐，避免「货已入、账无主」。</p></article>
+      <article class="flow-card"><h3>报修 → 维修 → 验收</h3><div class="flow-steps"><span>扫码/选设备报修</span><em>→</em><span>派工/接单</span><em>→</em><span>进程与配件</span><em>→</em><span>完工</span><em>→</em><span>科室验收</span></div><p>双层状态与进程段留痕；Web / App / 小程序可同批参与，途径可查。</p></article>
+      <article class="flow-card"><h3>计划性运维（保养 / 巡检 / 计量 / PM）</h3><div class="flow-steps"><span>参数模板</span><em>→</em><span>生成计划</span><em>→</em><span>到期提醒</span><em>→</em><span>现场执行</span><em>→</em><span>结果记录</span></div><p>计划与执行主从分离；漏设备可直开执行或纳入计划申请。</p></article>
+      <article class="flow-card"><h3>归属 / 位置变更（真变更）</h3><div class="flow-steps"><span>打开台账</span><em>→</em><span>变更按钮</span><em>→</em><span>选目标科室/位置</span><em>→</em><span>确认真变更</span><em>→</em><span>闭合旧区间+新开</span></div><p>纠错仅修正当前值不改写历史；补录走草稿→确认生效，默认不覆盖当前开放段。</p></article>
+      <article class="flow-card"><h3>库存盘点</h3><div class="flow-steps"><span>创建盘点单</span><em>→</em><span>下发任务</span><em>→</em><span>扫码实盘</span><em>→</em><span>差异确认</span><em>→</em><span>完成归档</span></div><p>Web 与 App / 小程序协同；差异留痕，写回台账策略可按院方制度配置。</p></article>
+      <article class="flow-card"><h3>公用设备借还</h3><div class="flow-steps"><span>借调申请</span><em>→</em><span>审批</span><em>→</em><span>借出</span><em>→</em><span>归还申请</span><em>→</em><span>确认归还</span></div><p>状态可视；费用结算可挂接，台账侧可查借调记录。</p></article>
+    </div>
+  </section>
+
   <section class="screen tall features" id="s3">
     <p class="eyebrow">Capabilities</p>
     <h2>常规功能介绍</h2>
     <p class="sec-lead">
       覆盖采购 → 入库 → 台账 → 使用维护 → 质控合规 → 报废处置 → 效益分析的一体化链路。
-      以下按业务域列出日常可宣传的核心能力（不含未交付路线图能力）。
+      以下按业务域展开已落地能力：做什么、留下什么、对管理有何帮助（不含未交付路线图）。
     </p>
 
     <div class="domain">
@@ -407,32 +824,56 @@
         <article class="feat">
           <div class="tag">Ledger</div>
           <h4>设备台账</h4>
-          <p>证照、分类、财务与业务字段齐套；列表/详情中文可读，外键「编码 名称」。</p>
+          <p>全院设备「一物一档」：分类、财务、位置、状态与业务标志齐套，列表/详情中文可读。</p>
+          <ul class="feat-points">
+            <li>强业务外键以「编码 名称」展示，减少误选与对账歧义</li>
+            <li>查看态侧栏按现场习惯聚合证照、运维、流转、监测等 Sheet</li>
+            <li>支持按编码/名称/序列号等多条件检索与导出</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">Archive</div>
           <h4>设备档案与图片</h4>
-          <p>合同、说明书等资料挂机管理；支持高拍仪现场成片入库与预览。</p>
+          <p>合同、说明书、验收资料与现场照片挂在同一设备，迎检与纠纷时可快速调阅。</p>
+          <ul class="feat-points">
+            <li>高拍仪现场成片、命名与入库一体，减少「拍了找不到」</li>
+            <li>档案复制、排序、预览工程化，多机资料可规范复用</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">History</div>
           <h4>归属 / 位置历史</h4>
-          <p>按时间段记录所属科室与安装位置，支撑运维与成本区间排查。</p>
+          <p>所属科室与安装位置按<strong>时间区间</strong>留痕，运维与成本可按「当时谁管」回溯。</p>
+          <ul class="feat-points">
+            <li>真变更闭合旧段并新开；纠错只改当前值、不污染历史</li>
+            <li>支持补录草稿 → 确认生效，生效后不可随意改删</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">Print</div>
           <h4>资产卡片与标签</h4>
-          <p>三甲式资产卡片打印；贴纸/标签流水可追溯，支撑盘点与扫码。</p>
+          <p>三甲式资产卡片与贴纸/标签打印流水可追溯，支撑日常盘点与扫码作业。</p>
+          <ul class="feat-points">
+            <li>标签内容与设备编码一致，扫码直达台账</li>
+            <li>打印途径可记录，便于核对「谁在何时补打」</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">Audit</div>
           <h4>主数据变更记录</h4>
-          <p>关键字段改前改后明文可查，混合来源可辨「生成方式」。</p>
+          <p>关键字段改前改后明文可查，混合来源可辨「生成方式」，审计与纠纷有据。</p>
+          <ul class="feat-points">
+            <li>实体/单据变更与多端途径一并留痕</li>
+            <li>证照、培训、档案等对象也可查看变更历史</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">Special</div>
           <h4>特殊设备登记</h4>
-          <p>生命支持、辐射/特种、应急库、租赁等专项台账入口。</p>
+          <p>生命支持、辐射/特种、应急库、租赁等专项入口，重点设备清单更清晰。</p>
+          <ul class="feat-points">
+            <li>与主台账同源，避免「专项台账各写一套」</li>
+          </ul>
         </article>
       </div>
     </div>
@@ -446,17 +887,28 @@
         <article class="feat">
           <div class="tag">Warehouse</div>
           <h4>入库 / 出库 / 退库 / 退货</h4>
-          <p>单据头明细强制齐套，状态回写台账，避免只存主表丢明细。</p>
+          <p>单据头与明细强制齐套，完成时状态写回台账，杜绝「只存主表、丢明细」。</p>
+          <ul class="feat-points">
+            <li>入库与设备主键对齐，货账一致可核对</li>
+            <li>调拨/转仓等流转在处置视图可聚合查看</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">Inventory</div>
           <h4>库存盘点</h4>
-          <p>Web 盘点与 App / 小程序扫码盘点协同，差异可留痕。</p>
+          <p>Web 建单与 App / 小程序扫码实盘协同，差异可留痕、可复查。</p>
+          <ul class="feat-points">
+            <li>支持科室盘点等类型标识，任务边界清楚</li>
+            <li>弱网场景可配合离线回传（App），减少现场漏盘</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">Dispose</div>
           <h4>报废与处置</h4>
-          <p>报废申请到归档可查，处置历史可在台账侧聚合查看。</p>
+          <p>报废申请到审核归档可查；处置证明与去向可留存，台账侧可看处置历史。</p>
+          <ul class="feat-points">
+            <li>终态变化可追溯，减少口头说明与纸质散落</li>
+          </ul>
         </article>
       </div>
     </div>
@@ -470,22 +922,37 @@
         <article class="feat">
           <div class="tag">Repair</div>
           <h4>维修全流程</h4>
-          <p>报修 → 处理 → 验收；双层状态、进程段与配件更换完整留痕。</p>
+          <p>报修 → 派工/接单 → 进程与配件 → 完工 → 验收，双层状态与进程段完整留痕。</p>
+          <ul class="feat-points">
+            <li>临床可小程序/扫码报修；工程师 App 处理；途径可区分</li>
+            <li>验收闭环可查，减少「修完无人确认」</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">Parts</div>
           <h4>配件更换</h4>
-          <p>维修换件与非维修换件来源可辨；历史补录可确认后生效。</p>
+          <p>维修换件与非维修换件来源可辨；历史补录需确认生效，避免随意改写。</p>
+          <ul class="feat-points">
+            <li>费用与责任核对有据，支持审计抽查</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">PM</div>
           <h4>保养 · 巡检 · 计量 · PM</h4>
-          <p>参数 → 计划 → 执行 → 记录主从分离，边界清晰、结果中文展示。</p>
+          <p>参数模板 → 计划 → 到期提醒 → 现场执行 → 结果记录，主从边界清晰。</p>
+          <ul class="feat-points">
+            <li>到期可提醒，降低漏保、漏检、漏计量风险</li>
+            <li>结果与状态中文展示，便于抽查与报表</li>
+            <li>漏设备可直开执行或申请纳入计划</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">Contract</div>
           <h4>维保信息与合同</h4>
-          <p>保修/维保覆盖设备可维护，合同履约与台账档案可对照。</p>
+          <p>保修/维保覆盖设备可维护，合同履约与台账档案对照，到期节点可纳入提醒体系。</p>
+          <ul class="feat-points">
+            <li>覆盖关系清晰，减少「保内当保外修」争议</li>
+          </ul>
         </article>
       </div>
     </div>
@@ -499,17 +966,26 @@
         <article class="feat">
           <div class="tag">QC</div>
           <h4>不良事件与风险评估</h4>
-          <p>质控合规上报与查询入口齐套，事件可关联设备。</p>
+          <p>不良事件可关联设备上报与查询，支撑质控条款备查与内部复盘。</p>
+          <ul class="feat-points">
+            <li>移动端可简易填报，缩短发现到登记的时滞</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">Loan</div>
           <h4>调配中心（借还）</h4>
-          <p>公用设备借调申请 / 审批 / 归还 / 收费，状态可视。</p>
+          <p>公用设备借调申请 / 审批 / 借出 / 归还 / 收费，状态全程可视。</p>
+          <ul class="feat-points">
+            <li>台账侧可查借调记录，设备去向清楚</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">Purchase</div>
           <h4>采购与合同</h4>
-          <p>申请 → 审批 → 计划 → 招标 → 合同 → 验收；合同可带付款计划。</p>
+          <p>申请 → 审批 → 计划 → 招标 → 合同 → 验收；合同可挂付款计划，链路可追溯。</p>
+          <ul class="feat-points">
+            <li>与入库上台账衔接，减少「合同、验收、台账三张皮」</li>
+          </ul>
         </article>
       </div>
     </div>
@@ -523,30 +999,83 @@
         <article class="feat">
           <div class="tag">Power</div>
           <h4>电流监测</h4>
-          <p>标签 / 基站 / 读数与台账打通，关键设备运行状态可纳入日常视图。</p>
+          <p>标签 / 基站 / 读数与台账打通，关键设备运行状态进入日常管理视图。</p>
+          <ul class="feat-points">
+            <li>异常可纳入监测与提醒，辅助早发现早处理</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">Channels</div>
           <h4>Web · App · 小程序</h4>
-          <p>报修、盘点、运维执行、借还等能力同批演进；动作记录发生端。</p>
+          <p>报修、盘点、运维执行、借还等能力同批演进；动作记录发生端，责任可定位。</p>
+          <ul class="feat-points">
+            <li>现场扫码作业，减少回办公室补录</li>
+            <li>消息中心承载到期与工单类提醒</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">Camera</div>
           <h4>高拍仪采集</h4>
-          <p>Web 对接良田高拍仪，档案现场拍照、命名与入库一体化。</p>
+          <p>Web 对接良田高拍仪，档案现场拍照、命名与入库一体化，资料更完整。</p>
         </article>
         <article class="feat">
           <div class="tag">IAM</div>
           <h4>组织与权限</h4>
-          <p>多租户隔离；院区 / 科室 / 用户 / 角色 / 菜单授权可管。</p>
+          <p>多租户隔离；院区 / 科室 / 用户 / 角色 / 菜单授权可管，数据边界清晰。</p>
+        </article>
+        <article class="feat">
+          <div class="tag">Alert</div>
+          <h4>到期与消息提醒</h4>
+          <p>计量、维保、计划任务等到期可提醒；消息中心集中查看，降低漏办风险。</p>
+          <ul class="feat-points">
+            <li>相对纸质台账「靠人记」，提醒更及时、可复查是否已读处理</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">Analytics</div>
           <h4>效益与资产报表</h4>
-          <p>单机效益、折旧与资产结构等决策报表入口，服务设备科管理。</p>
+          <p>单机效益、折旧与资产结构等决策报表入口，服务设备科管理与院领导阅览。</p>
         </article>
       </div>
     </div>
+  </section>
+  <section class="screen tall digital" id="s-digital">
+    <p class="eyebrow">Paper vs digital</p>
+    <h2>手工登记 vs 系统数字化</h2>
+    <p class="sec-lead">
+      许多医院仍部分依赖 Excel、纸质卡片与口头交接。MEIS 不是「把表格搬上网」，而是把台账、运维、提醒与审计做成同一套可查询的数据底座。
+    </p>
+    <div class="vs-grid">
+      <article class="vs-card bad">
+        <h3>手工 / 分散登记常见痛点</h3>
+        <ul>
+          <li><strong>分散难汇总</strong>：Excel 多版本、科室各记一本，全院对账耗时长</li>
+          <li><strong>改写无痕迹</strong>：科室/位置一改就覆盖，说不清历史责任</li>
+          <li><strong>单据易丢明细</strong>：纸质出入库、维修单散落，附件难找</li>
+          <li><strong>提醒靠人记</strong>：计量/保养到期常漏，发现时已超期</li>
+          <li><strong>现场与后台脱节</strong>：工程师回办公室补录，延迟且易错</li>
+          <li><strong>迎检临时拼材料</strong>：现翻现找，口径不一</li>
+        </ul>
+      </article>
+      <article class="vs-card good">
+        <h3>MEIS 数字化对应优势</h3>
+        <ul>
+          <li><strong>一物一档、全院同源</strong>：检索、导出、同机看运维与档案，汇总更快</li>
+          <li><strong>区间历史 + 变更明文</strong>：归属/位置可回溯；改前改后可审计</li>
+          <li><strong>主从齐套强制</strong>：出入库、计划执行等禁止只存空壳主表</li>
+          <li><strong>到期与消息提醒</strong>：计量/维保/任务到期可推送，处理可留痕</li>
+          <li><strong>多端现场作业</strong>：扫码报修、盘点、运维执行，途径可区分</li>
+          <li><strong>备查材料常在线</strong>：评审与抽查时按设备/时间段直接调阅</li>
+        </ul>
+      </article>
+    </div>
+    <div class="benefit-row">
+      <div class="benefit"><strong>便捷</strong><span>扫码即达台账与报修；少跑腿、少重复填表</span></div>
+      <div class="benefit"><strong>完整</strong><span>字段、明细、附件、进程同链路沉淀，少缺页少断档</span></div>
+      <div class="benefit"><strong>及时</strong><span>到期提醒与消息中心降低漏保漏检漏计量</span></div>
+      <div class="benefit"><strong>可信</strong><span>时间区间、变更日志与多端途径，经得起查</span></div>
+    </div>
+    <p class="disclaimer">数字化优势取决于制度落地与数据质量；系统提供能力与约束，不替代岗位责任制。</p>
   </section>
 
   <section class="screen tall compare-sec" id="s4">
@@ -626,7 +1155,7 @@
     <p class="eyebrow">Built to be audited</p>
     <h2>让设备管理经得起查</h2>
     <p class="sec-lead">
-      字段齐全 · 记录完整 · 历史归属清晰——MEIS 为医院设备科与临床共建可信的资产与运维底座。
+      字段齐全 · 记录完整 · 历史归属清晰——对齐监管与三甲备查诉求，为医院设备科与临床共建可信的资产与运维底座。
     </p>
     <div class="close-actions">
       <a class="btn btn-primary" href="#s3">再看功能介绍</a>

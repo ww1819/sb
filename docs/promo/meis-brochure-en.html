@@ -306,6 +306,209 @@
     @media (max-width: 900px) {
       .hero-foot, .compare, .points, .feat-grid { grid-template-columns: 1fr; }
     }
+
+    .policy, .tertiary, .arch, .rel, .flows {
+      background: var(--paper);
+    }
+    .policy {
+      background:
+        radial-gradient(700px 360px at 0% 0%, rgba(22,119,255,0.12), transparent 55%),
+        linear-gradient(180deg, #f7fafc, #eef3f8);
+    }
+    .tertiary {
+      background: linear-gradient(180deg, #eaf1f8 0%, #f3f7fb 100%);
+    }
+    .arch, .rel, .flows {
+      background:
+        radial-gradient(900px 420px at 100% 10%, rgba(22,119,255,0.08), transparent 50%),
+        var(--paper);
+    }
+    .policy h2, .tertiary h2, .arch h2, .rel h2, .flows h2 {
+      margin-top: 18px;
+      font-family: "Noto Serif SC", "Instrument Serif", serif;
+      font-size: clamp(28px, 4.2vw, 42px);
+      font-weight: 600; line-height: 1.25; max-width: 20em;
+    }
+    .pill-row {
+      margin-top: 28px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .pill {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px 16px;
+    }
+    .pill strong {
+      display: block;
+      font-size: 15px;
+      margin-bottom: 8px;
+      color: var(--brand-deep);
+    }
+    .pill p { font-size: 13px; color: var(--muted); }
+    .check-grid {
+      margin-top: 28px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .check {
+      display: flex; gap: 12px; align-items: flex-start;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .check i {
+      flex: 0 0 auto;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: rgba(22,119,255,0.12);
+      color: var(--brand);
+      font-style: normal; font-weight: 700; font-size: 12px;
+      display: grid; place-items: center;
+      margin-top: 2px;
+    }
+    .check b { display: block; font-size: 14px; margin-bottom: 4px; }
+    .check span { font-size: 13px; color: var(--muted); }
+    .disclaimer {
+      margin-top: 18px;
+      font-size: 12px;
+      color: var(--muted);
+      padding: 12px 14px;
+      border-left: 3px solid var(--brand);
+      background: rgba(22,119,255,0.06);
+      border-radius: 0 6px 6px 0;
+    }
+    .diagram {
+      margin-top: 28px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 18px 12px 12px;
+      overflow-x: auto;
+      box-shadow: 0 12px 32px rgba(15,28,46,0.05);
+    }
+    .diagram figcaption {
+      font-size: 12px; color: var(--muted);
+      text-align: center; margin-top: 8px; padding-bottom: 4px;
+    }
+    .diagram svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+    .flow-grid {
+      margin-top: 28px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .flow-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px 14px 12px;
+    }
+    .flow-card h3 {
+      font-size: 15px; font-weight: 700;
+      margin-bottom: 10px;
+      color: var(--brand-deep);
+    }
+    .flow-steps {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    }
+    .flow-steps span {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-height: 34px; padding: 6px 10px;
+      border-radius: 6px;
+      background: #eef5ff;
+      border: 1px solid rgba(22,119,255,0.22);
+      font-size: 12px; font-weight: 600; color: var(--ink);
+    }
+    .flow-steps em {
+      font-style: normal; color: var(--brand); font-weight: 700; padding: 0 2px;
+    }
+    .flow-card p {
+      margin-top: 10px; font-size: 12px; color: var(--muted);
+    }
+    @media (max-width: 900px) {
+      .pill-row, .check-grid, .flow-grid { grid-template-columns: 1fr; }
+    }
+
+
+    .feat .feat-points {
+      margin: 10px 0 0;
+      padding-left: 1.1em;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .feat .feat-points li { margin-bottom: 4px; }
+    .digital {
+      background:
+        radial-gradient(700px 360px at 100% 0%, rgba(22,119,255,0.1), transparent 55%),
+        #e8eef6;
+    }
+    .digital h2 {
+      margin-top: 18px;
+      font-family: "Noto Serif SC", "Instrument Serif", serif;
+      font-size: clamp(28px, 4.2vw, 42px);
+      font-weight: 600; line-height: 1.25; max-width: 20em;
+    }
+    .vs-grid {
+      margin-top: 28px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .vs-card {
+      border-radius: 10px;
+      padding: 20px 18px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+    }
+    .vs-card.bad {
+      background: #f7f8fa;
+    }
+    .vs-card.good {
+      background: linear-gradient(165deg, rgba(22,119,255,0.1), #fff 55%);
+      border-color: rgba(22,119,255,0.35);
+    }
+    .vs-card h3 {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    .vs-card ul {
+      margin: 0;
+      padding-left: 1.15em;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .vs-card li { margin-bottom: 8px; }
+    .vs-card li strong { color: var(--ink); font-weight: 600; }
+    .benefit-row {
+      margin-top: 20px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .benefit {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .benefit strong {
+      display: block;
+      font-size: 14px;
+      color: var(--brand-deep);
+      margin-bottom: 6px;
+    }
+    .benefit span { font-size: 12px; color: var(--muted); }
+    @media (max-width: 900px) {
+      .vs-grid, .benefit-row { grid-template-columns: 1fr; }
+    }
+
     @media print {
       .lang-switch, .toc { display: none; }
       .screen { min-height: auto; page-break-after: always; padding: 24px; }
@@ -322,7 +525,13 @@
   <nav class="toc" aria-label="Sections">
     <a href="#s1" title="Brand"></a>
     <a href="#s2" title="Difference"></a>
+    <a href="#s-policy" title="Policy"></a>
+    <a href="#s-tertiary" title="Tertiary"></a>
+    <a href="#s-arch" title="Architecture"></a>
+    <a href="#s-rel" title="Relations"></a>
+    <a href="#s-flow" title="Flows"></a>
     <a href="#s3" title="Features"></a>
+    <a href="#s-digital" title="Digital"></a>
     <a href="#s4" title="Compare"></a>
     <a href="#s5" title="Close"></a>
   </nav>
@@ -339,8 +548,9 @@
       </p>
       <div class="hero-cta">
         <a class="btn btn-primary" href="#s2">See the difference</a>
+        <a class="btn btn-ghost" href="#s-policy">Policy &amp; review</a>
+        <a class="btn btn-ghost" href="#s-arch">Architecture &amp; flows</a>
         <a class="btn btn-ghost" href="#s3">Features</a>
-        <a class="btn btn-ghost" href="#s4">Comparison</a>
       </div>
     </div>
     <div class="hero-foot">
@@ -382,49 +592,277 @@
     </ul>
   </section>
 
+
+  <section class="screen tall policy" id="s-policy">
+    <p class="eyebrow">Policy context</p>
+    <h2>National policy &amp; regulatory backdrop</h2>
+    <p class="sec-lead">
+      Hospital medical-equipment management is moving from “registers only” to full-lifecycle traceability and clear accountability.
+      MEIS aligns with the following common governance directions (supporting management—not a clause-by-clause certification promise).
+    </p>
+    <div class="pill-row">
+      <article class="pill">
+        <strong>Full lifecycle device regulation</strong>
+        <p>Under regulations such as the Regulation on the Supervision and Administration of Medical Devices, providers must keep auditable records across purchase, acceptance, use, maintenance, and disposal. MEIS emphasizes complete master–detail documents and auditable changes.</p>
+      </article>
+      <article class="pill">
+        <strong>UDI unique device identification</strong>
+        <p>National UDI programs require linking identifiers with use. MEIS supports UDI-related ledger fields and change history for traceability.</p>
+      </article>
+      <article class="pill">
+        <strong>Institutionalized equipment management</strong>
+        <p>Health authorities expect processes for procurement justification, archives, metrology, and adverse-event monitoring. MEIS provides one rich device card plus business sheets for day-to-day work and review packs.</p>
+      </article>
+      <article class="pill">
+        <strong>Adverse event monitoring</strong>
+        <p>In-use device events must be recorded and reported. MEIS offers device-linked adverse-event entry and query for QC closure.</p>
+      </article>
+      <article class="pill">
+        <strong>Metrology &amp; mandatory calibration</strong>
+        <p>Measuring instruments need periodic verification. Plans, execution, and results sit on the device timeline with readable statuses.</p>
+      </article>
+      <article class="pill">
+        <strong>Digitized multi-channel fieldwork</strong>
+        <p>Reviews emphasize process evidence. Shared Web / App / Mini Program capabilities and channel logging reduce paper backfill gaps.</p>
+      </article>
+    </div>
+    <p class="disclaimer">Summary of common industry directions for leadership briefing; binding rules are the statutes and hospital policies in force at review time.</p>
+  </section>
+
+  <section class="screen tall tertiary" id="s-tertiary">
+    <p class="eyebrow">Tertiary hospital review</p>
+    <h2>Supporting Grade-A tertiary hospital accreditation prep</h2>
+    <p class="sec-lead">
+      Equipment-related review items usually ask: complete ledgers, accountability by department/person, planned maintenance and metrology,
+      adverse events and training records, and compliant scrap/disposal. MEIS supplies a traceable data base to cut last-minute pack assembly.
+    </p>
+    <div class="check-grid">
+      <div class="check"><i>01</i><div><b>Complete ledger &amp; archives</b><span>Rich master data; licenses, training, files, and images on the same device.</span></div></div>
+      <div class="check"><i>02</i><div><b>Ownership &amp; location history</b><span>Time-interval departments/locations; real transfer vs correction—no silent timeline edits.</span></div></div>
+      <div class="check"><i>03</i><div><b>Maintenance &amp; metrology loops</b><span>Maintain / inspect / metrology / PM: parameters → plans → execution → records.</span></div></div>
+      <div class="check"><i>04</i><div><b>Repair &amp; parts audit trail</b><span>Request → work → acceptance; repair vs non-repair parts distinguishable.</span></div></div>
+      <div class="check"><i>05</i><div><b>QC &amp; adverse events</b><span>Device-linked reporting and query for QC clauses.</span></div></div>
+      <div class="check"><i>06</i><div><b>Warehouse, inventory, scrap</b><span>Master–detail warehouse docs; multi-channel inventory; disposition history on the ledger.</span></div></div>
+      <div class="check"><i>07</i><div><b>Special / high-risk devices</b><span>Life-support, radiation/special, emergency pool entries for priority lists.</span></div></div>
+      <div class="check"><i>08</i><div><b>Change &amp; channel evidence</b><span>Plain-language change logs; Web / App / Mini Program channel on key actions.</span></div></div>
+    </div>
+    <p class="disclaimer">MEIS helps make processes queryable and materials organizable; accreditation outcomes still depend on hospital practice and on-site review.</p>
+  </section>
+
+  <section class="screen tall arch" id="s-arch">
+    <p class="eyebrow">Architecture</p>
+    <h2>System architecture</h2>
+    <p class="sec-lead">Unified multi-channel access, domain services, tenant isolation—one ledger and ops dataset for back-office and field teams.</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 920 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="MEIS architecture">
+  <defs>
+    <marker id="arrA" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#1677ff"/></marker>
+    <style>
+      .bx{fill:#fff;stroke:#c9d6e5;stroke-width:1.2}
+      .bxh{fill:#1677ff;stroke:#0b3d8c}
+      .t{font-family:Manrope,Noto Sans SC,sans-serif;font-size:13px;fill:#0f1c2e;text-anchor:middle}
+      .tw{fill:#fff}
+      .tm{font-size:11px;fill:#5a6b7d;text-anchor:middle}
+      .ln{stroke:#1677ff;stroke-width:1.6;fill:none;marker-end:url(#arrA)}
+      .lg{stroke:#8eb6ff;stroke-width:1.2;fill:none;stroke-dasharray:4 3}
+    </style>
+  </defs>
+  <text x="460" y="26" class="t" style="font-size:15px;font-weight:700">Clients</text>
+  <rect class="bx" x="40" y="40" width="180" height="56" rx="8"/><text x="130" y="66" class="t" style="font-weight:700">Web</text><text x="130" y="84" class="tm">Admin / warehouse</text>
+  <rect class="bx" x="260" y="40" width="180" height="56" rx="8"/><text x="350" y="66" class="t" style="font-weight:700">Flutter App</text><text x="350" y="84" class="tm">Engineer / inventory</text>
+  <rect class="bx" x="480" y="40" width="180" height="56" rx="8"/><text x="570" y="66" class="t" style="font-weight:700">Mini Program</text><text x="570" y="84" class="tm">Repair / query / ops</text>
+  <rect class="bx" x="700" y="40" width="180" height="56" rx="8"/><text x="790" y="66" class="t" style="font-weight:700">Power edge</text><text x="790" y="84" class="tm">Tags · stations · readings</text>
+  <line class="ln" x1="130" y1="96" x2="130" y2="138"/>
+  <line class="ln" x1="350" y1="96" x2="350" y2="138"/>
+  <line class="ln" x1="570" y1="96" x2="570" y2="138"/>
+  <line class="ln" x1="790" y1="96" x2="790" y2="138"/>
+  <rect class="bxh" x="40" y="140" width="840" height="46" rx="8"/><text x="460" y="168" class="t tw" style="font-weight:700">API Gateway · Auth · Tenant context</text>
+  <line class="ln" x1="460" y1="186" x2="460" y2="218"/>
+  <text x="460" y="236" class="t" style="font-size:15px;font-weight:700">Services</text>
+  <rect class="bx" x="40" y="248" width="120" height="44" rx="6"/><text x="100" y="275" class="t">Asset</text>
+  <rect class="bx" x="178" y="248" width="120" height="44" rx="6"/><text x="238" y="275" class="t">Warehouse</text>
+  <rect class="bx" x="316" y="248" width="120" height="44" rx="6"/><text x="376" y="275" class="t">Repair</text>
+  <rect class="bx" x="454" y="248" width="120" height="44" rx="6"/><text x="514" y="275" class="t">Ops plans</text>
+  <rect class="bx" x="592" y="248" width="120" height="44" rx="6"/><text x="652" y="275" class="t">QC / Purchase</text>
+  <rect class="bx" x="730" y="248" width="150" height="44" rx="6"/><text x="805" y="275" class="t">Notify / IAM</text>
+  <line class="lg" x1="100" y1="292" x2="100" y2="318"/>
+  <line class="lg" x1="238" y1="292" x2="238" y2="318"/>
+  <line class="lg" x1="376" y1="292" x2="376" y2="318"/>
+  <line class="lg" x1="100" y1="318" x2="376" y2="318"/>
+  <line class="ln" x1="238" y1="318" x2="238" y2="348"/>
+  <line class="lg" x1="514" y1="292" x2="514" y2="318"/>
+  <line class="lg" x1="652" y1="292" x2="652" y2="318"/>
+  <line class="lg" x1="805" y1="292" x2="805" y2="318"/>
+  <line class="lg" x1="514" y1="318" x2="805" y2="318"/>
+  <line class="ln" x1="660" y1="318" x2="660" y2="348"/>
+  <rect class="bxh" x="120" y="350" width="240" height="42" rx="8"/><text x="240" y="376" class="t tw" style="font-weight:700">PostgreSQL tenants</text>
+  <rect class="bxh" x="540" y="350" width="240" height="42" rx="8"/><text x="660" y="376" class="t tw" style="font-weight:700">Files / archives</text>
+  <text x="460" y="416" class="tm">One device key across ledger · ownership · repair · maintain/inspect/metrology/PM · loan · adverse · power</text>
+</svg>
+      <figcaption>Figure: MEIS logical architecture (clients → gateway → domain services → tenant DB &amp; files)</figcaption>
+    </figure>
+  </section>
+
+  <section class="screen tall rel" id="s-rel">
+    <p class="eyebrow">Data model</p>
+    <h2>How the ledger relates to ops data</h2>
+    <p class="sec-lead">
+      The device ledger is the hub: warehouse docs change asset state; repair and planned ops hang execution history;
+      ownership/location intervals decide who owned cost in a period; QC and monitoring events point back to the same device.
+    </p>
+    <figure class="diagram">
+      <svg viewBox="0 0 920 500" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Ledger relations">
+  <defs>
+    <marker id="arrR" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L5,3 L0,6 Z" fill="#5a6b7d"/></marker>
+    <style>
+      .hub{fill:#1677ff;stroke:#0b3d8c;stroke-width:1.5}
+      .n{fill:#fff;stroke:#c9d6e5;stroke-width:1.2}
+      .bus{fill:#eef4fb;stroke:#b7c9de;stroke-width:1.2}
+      .tt{font-family:Manrope,Noto Sans SC,sans-serif;font-size:12px;fill:#0f1c2e;text-anchor:middle}
+      .tw{fill:#fff;font-weight:700}
+      .tm{font-size:10px;fill:#5a6b7d;text-anchor:middle}
+      .e{stroke:#7a90a8;stroke-width:1.4;fill:none;marker-end:url(#arrR)}
+      .s{stroke:#a8b9cb;stroke-width:1.2;fill:none}
+    </style>
+  </defs>
+
+  <!-- top nodes -->
+  <rect class="n" x="40" y="24" width="140" height="50" rx="8"/><text x="110" y="45" class="tt" style="font-weight:700">Ownership</text><text x="110" y="61" class="tm">Dept · when</text>
+  <rect class="n" x="210" y="24" width="140" height="50" rx="8"/><text x="280" y="45" class="tt" style="font-weight:700">Location</text><text x="280" y="61" class="tm">Floor/room · when</text>
+  <rect class="n" x="380" y="24" width="160" height="50" rx="8"/><text x="460" y="45" class="tt" style="font-weight:700">Loan / AE / Power</text><text x="460" y="61" class="tm">Events to device</text>
+  <rect class="n" x="570" y="24" width="140" height="50" rx="8"/><text x="640" y="45" class="tt" style="font-weight:700">License / training</text><text x="640" y="61" class="tm">Compliance</text>
+  <rect class="n" x="740" y="24" width="140" height="50" rx="8"/><text x="810" y="45" class="tt" style="font-weight:700">Archive / images</text><text x="810" y="61" class="tm">On-device docs</text>
+
+  <!-- stubs down to top bus (no elbows, no cross) -->
+  <line class="s" x1="110" y1="74" x2="110" y2="100"/>
+  <line class="s" x1="280" y1="74" x2="280" y2="100"/>
+  <line class="s" x1="460" y1="74" x2="460" y2="100"/>
+  <line class="s" x1="640" y1="74" x2="640" y2="100"/>
+  <line class="s" x1="810" y1="74" x2="810" y2="100"/>
+  <rect class="bus" x="90" y="100" width="740" height="28" rx="6"/>
+  <text x="460" y="119" class="tm" style="fill:#3d5670;font-size:11px">Upstream links</text>
+  <line class="e" x1="460" y1="128" x2="460" y2="188"/>
+
+  <!-- hub（加高，与左右三块水平对齐，箭头纯水平） -->
+  <rect class="hub" x="350" y="196" width="220" height="128" rx="12"/>
+  <text x="460" y="248" class="tt tw" style="font-size:17px">Device ledger</text>
+  <text x="460" y="272" class="tm" style="fill:#dbeaff">medical_device</text>
+
+  <!-- left: 纯水平接入 -->
+  <rect class="n" x="40" y="196" width="150" height="40" rx="8"/><text x="115" y="214" class="tt" style="font-weight:700">In/out stock</text><text x="115" y="228" class="tm">Status write-back</text>
+  <rect class="n" x="40" y="246" width="150" height="40" rx="8"/><text x="115" y="264" class="tt" style="font-weight:700">Inventory</text><text x="115" y="278" class="tm">Physical check</text>
+  <rect class="n" x="40" y="296" width="150" height="40" rx="8"/><text x="115" y="314" class="tt" style="font-weight:700">Scrap / dispose</text><text x="115" y="328" class="tm">Terminal state</text>
+  <line class="e" x1="190" y1="216" x2="350" y2="216"/>
+  <line class="e" x1="190" y1="266" x2="350" y2="266"/>
+  <line class="e" x1="190" y1="316" x2="350" y2="316"/>
+
+  <!-- right: 纯水平接入 -->
+  <rect class="n" x="730" y="196" width="150" height="40" rx="8"/><text x="805" y="214" class="tt" style="font-weight:700">Repair WO</text><text x="805" y="228" class="tm">Request to accept</text>
+  <rect class="n" x="730" y="246" width="150" height="40" rx="8"/><text x="805" y="264" class="tt" style="font-weight:700">Parts</text><text x="805" y="278" class="tm">Repair / non-repair</text>
+  <rect class="n" x="730" y="296" width="150" height="40" rx="8"/><text x="805" y="314" class="tt" style="font-weight:700">Warranty</text><text x="805" y="328" class="tm">Coverage</text>
+  <line class="e" x1="730" y1="216" x2="570" y2="216"/>
+  <line class="e" x1="730" y1="266" x2="570" y2="266"/>
+  <line class="e" x1="730" y1="316" x2="570" y2="316"/>
+
+  <!-- hub down to bottom bus -->
+  <line class="e" x1="460" y1="324" x2="460" y2="358"/>
+  <rect class="bus" x="160" y="358" width="600" height="28" rx="6"/>
+  <text x="460" y="377" class="tm" style="fill:#3d5670;font-size:11px">Planned ops links</text>
+
+  <!-- bottom stubs: bus → nodes（无箭头悬空，节点上方短竖线） -->
+  <line class="s" x1="220" y1="386" x2="220" y2="412"/>
+  <line class="s" x1="380" y1="386" x2="380" y2="412"/>
+  <line class="s" x1="540" y1="386" x2="540" y2="412"/>
+  <line class="s" x1="700" y1="386" x2="700" y2="412"/>
+  <rect class="n" x="155" y="412" width="130" height="50" rx="8"/><text x="220" y="433" class="tt" style="font-weight:700">Maintain</text><text x="220" y="449" class="tm">Plan + exec</text>
+  <rect class="n" x="315" y="412" width="130" height="50" rx="8"/><text x="380" y="433" class="tt" style="font-weight:700">Inspect</text><text x="380" y="449" class="tm">Plan + exec</text>
+  <rect class="n" x="475" y="412" width="130" height="50" rx="8"/><text x="540" y="433" class="tt" style="font-weight:700">Metrology</text><text x="540" y="449" class="tm">Plan + exec</text>
+  <rect class="n" x="635" y="412" width="130" height="50" rx="8"/><text x="700" y="433" class="tt" style="font-weight:700">PM</text><text x="700" y="449" class="tm">Plan + exec</text>
+
+  <text x="460" y="486" class="tm">各业务以设备主键关联台账；上下联经汇流条汇入，左右水平直连</text>
+</svg>
+      <figcaption>Figure: ledger hub with top/bottom buses and direct left/right links (no crossing elbows)</figcaption>
+    </figure>
+  </section>
+
+  <section class="screen tall flows" id="s-flow">
+    <p class="eyebrow">Process flows</p>
+    <h2>Domain process flows</h2>
+    <p class="sec-lead">High-frequency paths summarized (details follow implementation and hospital SOPs). Steps may span Web and mobile.</p>
+    <div class="flow-grid">
+      <article class="flow-card"><h3>Purchase → acceptance → stock-in → ledger</h3><div class="flow-steps"><span>Request</span><em>→</em><span>Approve</span><em>→</em><span>Plan/tender</span><em>→</em><span>Contract</span><em>→</em><span>Accept</span><em>→</em><span>Stock-in</span><em>→</em><span>Create/link device</span></div><p>Contracts and payment plans attach; stock-in lines align to device IDs.</p></article>
+      <article class="flow-card"><h3>Repair request → work → acceptance</h3><div class="flow-steps"><span>Scan/select device</span><em>→</em><span>Dispatch/accept</span><em>→</em><span>Progress &amp; parts</span><em>→</em><span>Complete</span><em>→</em><span>Dept acceptance</span></div><p>Dual status + segment history; multi-channel with channel logging.</p></article>
+      <article class="flow-card"><h3>Planned ops (maintain / inspect / metrology / PM)</h3><div class="flow-steps"><span>Templates</span><em>→</em><span>Plans</span><em>→</em><span>Due reminders</span><em>→</em><span>Field execution</span><em>→</em><span>Results</span></div><p>Plan vs execution separated; missing devices can start ad-hoc or request plan inclusion.</p></article>
+      <article class="flow-card"><h3>Ownership / location real transfer</h3><div class="flow-steps"><span>Open ledger</span><em>→</em><span>Change action</span><em>→</em><span>Pick target</span><em>→</em><span>Confirm transfer</span><em>→</em><span>Close old + open new</span></div><p>Correction edits current values only; backfill is draft → confirm and does not overwrite the open period by default.</p></article>
+      <article class="flow-card"><h3>Inventory count</h3><div class="flow-steps"><span>Create count</span><em>→</em><span>Assign</span><em>→</em><span>Scan count</span><em>→</em><span>Confirm variance</span><em>→</em><span>Close</span></div><p>Web + App / Mini Program; variances retained; write-back policy per hospital rules.</p></article>
+      <article class="flow-card"><h3>Shared-device loan / return</h3><div class="flow-steps"><span>Loan request</span><em>→</em><span>Approve</span><em>→</em><span>Issue</span><em>→</em><span>Return request</span><em>→</em><span>Confirm return</span></div><p>Visible status; fees optional; loan history on the ledger.</p></article>
+    </div>
+  </section>
+
   <section class="screen tall features" id="s3">
     <p class="eyebrow">Capabilities</p>
     <h2>Feature overview</h2>
     <p class="sec-lead">
-      One platform from purchasing → inbound → ledger → use &amp; maintenance → quality compliance → disposal → benefit analysis.
-      Below are shippable capabilities by domain (roadmap items are not marketed as delivered).
+      End-to-end from purchase and stock-in through the ledger, operations, QC, disposal, and analytics.
+      Below: what each domain does, what is retained, and how it helps (delivered capabilities only).
     </p>
 
     <div class="domain">
       <div class="domain-head">
         <h3>Assets &amp; archives</h3>
-        <span>One complete master card per device, with documents and history attached</span>
+        <span>One rich device card; documents and history on the same asset</span>
       </div>
       <div class="feat-grid">
         <article class="feat">
           <div class="tag">Ledger</div>
-          <h4>Asset ledger</h4>
-          <p>Licenses, classification, finance and ops fields; readable labels and coded references.</p>
+          <h4>Device ledger</h4>
+          <p>Hospital-wide one-device-one-record: classification, finance, location, status, and flags with readable lists/details.</p>
+          <ul class="feat-points">
+            <li>Strong FKs shown as “code name”</li>
+            <li>View-mode side nav aggregates licenses, ops, flow, and monitoring sheets</li>
+            <li>Multi-field search and export</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">Archive</div>
           <h4>Archives &amp; images</h4>
-          <p>Contracts and manuals on the device; document camera capture and preview in the browser.</p>
+          <p>Contracts, manuals, acceptance packs and photos hang on the device for reviews and disputes.</p>
+          <ul class="feat-points">
+            <li>Document-camera capture with naming and ingest</li>
+            <li>Copy / sort / preview engineered for multi-device reuse</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">History</div>
           <h4>Ownership / location history</h4>
-          <p>Time-bounded department and install location for ops and cost attribution.</p>
+          <p>Department and install location as <strong>time intervals</strong> so ops and cost can be attributed correctly.</p>
+          <ul class="feat-points">
+            <li>Real transfer closes/opens periods; correction edits current values only</li>
+            <li>Backfill draft → confirm; locked after confirm</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">Print</div>
           <h4>Asset cards &amp; labels</h4>
-          <p>Printable asset cards; label runs support inventory and scan workflows.</p>
+          <p>Printable cards and label logs for inventory and scan workflows.</p>
+          <ul class="feat-points">
+            <li>Label content matches device code</li>
+            <li>Reprint channel can be recorded</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">Audit</div>
           <h4>Master-data change log</h4>
-          <p>Before/after values in plain language; mixed sources show generation method.</p>
+          <p>Before/after in plain language; generation method for mixed sources.</p>
+          <ul class="feat-points">
+            <li>Entity/doc changes with multi-channel client</li>
+            <li>Licenses, training, archives also trackable</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">Special</div>
-          <h4>Special equipment</h4>
-          <p>Life-support, radiation / special, emergency stock, leasing, and more.</p>
+          <h4>Special device registers</h4>
+          <p>Life-support, radiation/special, emergency pool, lease entries on the same ledger lineage.</p>
         </article>
       </div>
     </div>
@@ -432,23 +870,31 @@
     <div class="domain">
       <div class="domain-head">
         <h3>Warehouse &amp; inventory</h3>
-        <span>Master–detail warehouse docs; mobile scan collaboration</span>
+        <span>Master–detail stock docs; mobile scan collaboration</span>
       </div>
       <div class="feat-grid">
         <article class="feat">
           <div class="tag">Warehouse</div>
-          <h4>In / out / return / vendor return</h4>
-          <p>Header and lines required together; status writes back to the ledger.</p>
+          <h4>In / out / return / RMA</h4>
+          <p>Header and lines required together; completion writes status back to the ledger.</p>
+          <ul class="feat-points">
+            <li>Stock-in aligned to device IDs</li>
+            <li>Transfers visible in disposition views</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">Inventory</div>
-          <h4>Stocktaking</h4>
-          <p>Web counts with App / mini-program scan counts; variances are recorded.</p>
+          <h4>Inventory counts</h4>
+          <p>Web tasks with App / Mini Program scan counting; variances retained.</p>
+          <ul class="feat-points">
+            <li>Dept-count typing supported</li>
+            <li>Offline sync on App for weak networks</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">Dispose</div>
-          <h4>Disposal</h4>
-          <p>Request through archival; disposal history aggregates on the asset.</p>
+          <h4>Scrap &amp; disposition</h4>
+          <p>Request through review/archive; proofs retained; history on the ledger.</p>
         </article>
       </div>
     </div>
@@ -462,46 +908,55 @@
         <article class="feat">
           <div class="tag">Repair</div>
           <h4>Repair workflow</h4>
-          <p>Request → work → acceptance; dual status, process stages, and part replacements.</p>
+          <p>Request → dispatch/accept → progress &amp; parts → complete → acceptance with dual status and segments.</p>
+          <ul class="feat-points">
+            <li>Clinical Mini Program / scan; engineer App; channel logged</li>
+            <li>Acceptance closes the loop</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">Parts</div>
-          <h4>Part replacement</h4>
-          <p>Repair and non-repair replacements with clear source; confirmable backfill.</p>
+          <h4>Part replacements</h4>
+          <p>Repair vs non-repair sources distinguishable; backfill requires confirm.</p>
         </article>
         <article class="feat">
           <div class="tag">PM</div>
-          <h4>Maintenance · inspection · metrology · PM</h4>
-          <p>Parameter → plan → execute → record, with clear boundaries and readable results.</p>
+          <h4>Maintain · inspect · metrology · PM</h4>
+          <p>Templates → plans → due reminders → field execution → results.</p>
+          <ul class="feat-points">
+            <li>Due alerts reduce missed cycles</li>
+            <li>Readable statuses for sampling and reports</li>
+            <li>Ad-hoc execution or plan-inclusion requests</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">Contract</div>
-          <h4>Warranty &amp; service contracts</h4>
-          <p>Coverage maintained against devices; contracts align with ledger archives.</p>
+          <h4>Warranty &amp; contracts</h4>
+          <p>Coverage maintainable; contracts align with archives; renewals enter reminder flows.</p>
         </article>
       </div>
     </div>
 
     <div class="domain">
       <div class="domain-head">
-        <h3>QC · pooling · purchasing</h3>
-        <span>Compliance reporting, shared-device pooling, and purchasable document trails</span>
+        <h3>QC · sharing · purchase</h3>
+        <span>Compliance, shared-device flow, purchasable audit trail</span>
       </div>
       <div class="feat-grid">
         <article class="feat">
           <div class="tag">QC</div>
-          <h4>Adverse events &amp; risk</h4>
-          <p>Quality reporting and query entries, linkable to devices.</p>
+          <h4>Adverse events</h4>
+          <p>Device-linked reporting and query for QC clauses and internal review.</p>
         </article>
         <article class="feat">
           <div class="tag">Loan</div>
-          <h4>Pooling (loan / return)</h4>
-          <p>Request / approve / return / charge for shared equipment with visible status.</p>
+          <h4>Loan / return hub</h4>
+          <p>Request / approve / issue / return / fees with visible status and ledger history.</p>
         </article>
         <article class="feat">
           <div class="tag">Purchase</div>
-          <h4>Purchasing &amp; contracts</h4>
-          <p>Request → approve → plan → bid → contract → acceptance; payment schedules supported.</p>
+          <h4>Purchase &amp; contracts</h4>
+          <p>Request → approve → plan → tender → contract → acceptance; payment plans optional.</p>
         </article>
       </div>
     </div>
@@ -509,36 +964,83 @@
     <div class="domain">
       <div class="domain-head">
         <h3>Sensing · channels · platform</h3>
-        <span>Field work and back-office governance on one data set</span>
+        <span>Field work and back-office share one dataset</span>
       </div>
       <div class="feat-grid">
         <article class="feat">
           <div class="tag">Power</div>
           <h4>Power monitoring</h4>
-          <p>Tags / gateways / readings linked to the ledger for critical device visibility.</p>
+          <p>Tags / stations / readings linked to the ledger for day-to-day views.</p>
         </article>
         <article class="feat">
           <div class="tag">Channels</div>
           <h4>Web · App · Mini Program</h4>
-          <p>Shared capabilities evolve together; actions record the originating channel.</p>
+          <p>Shared features evolve together; actions record client channel.</p>
+          <ul class="feat-points">
+            <li>Scan-first fieldwork</li>
+            <li>Message center for due and work-order alerts</li>
+          </ul>
         </article>
         <article class="feat">
           <div class="tag">Camera</div>
-          <h4>Document camera capture</h4>
-          <p>Browser-side capture into archives with naming and upload in one flow.</p>
+          <h4>Document camera</h4>
+          <p>Web capture with naming and ingest for complete archives.</p>
         </article>
         <article class="feat">
           <div class="tag">IAM</div>
           <h4>Org &amp; permissions</h4>
-          <p>Multi-tenant isolation; campuses, departments, users, roles, and menus.</p>
+          <p>Tenant isolation; campus / dept / user / role / menu control.</p>
+        </article>
+        <article class="feat">
+          <div class="tag">Alert</div>
+          <h4>Due &amp; message alerts</h4>
+          <p>Metrology, warranty, and planned-task dues can notify; message center tracks handling.</p>
         </article>
         <article class="feat">
           <div class="tag">Analytics</div>
           <h4>Benefit &amp; asset reports</h4>
-          <p>Per-device benefit, depreciation, and portfolio views for biomedical leadership.</p>
+          <p>Per-device benefit, depreciation, and structure report entries for leadership.</p>
         </article>
       </div>
     </div>
+  </section>
+  <section class="screen tall digital" id="s-digital">
+    <p class="eyebrow">Paper vs digital</p>
+    <h2>Manual registers vs MEIS digitalization</h2>
+    <p class="sec-lead">
+      Many hospitals still mix Excel, paper cards, and verbal handoffs. MEIS is not “Excel on the web”—it is one queryable base for ledger, ops, alerts, and audit.
+    </p>
+    <div class="vs-grid">
+      <article class="vs-card bad">
+        <h3>Typical manual / fragmented pain</h3>
+        <ul>
+          <li><strong>Hard to consolidate</strong>: many Excel versions; long reconciliations</li>
+          <li><strong>Silent overwrites</strong>: department/location edits erase history</li>
+          <li><strong>Missing detail lines</strong>: paper slips and attachments scatter</li>
+          <li><strong>Memory-based reminders</strong>: metrology/maintain dues are missed</li>
+          <li><strong>Field vs office lag</strong>: late backfill after rounds</li>
+          <li><strong>Last-minute review packs</strong>: inconsistent binders under deadline</li>
+        </ul>
+      </article>
+      <article class="vs-card good">
+        <h3>MEIS digital advantages</h3>
+        <ul>
+          <li><strong>One record lineage</strong>: search, export, ops and archives on-device</li>
+          <li><strong>Interval history + plain change logs</strong>: attributable ownership/location</li>
+          <li><strong>Forced master–detail</strong>: no empty header-only warehouse/ops docs</li>
+          <li><strong>Due &amp; message alerts</strong>: actionable reminders with read/handling trail</li>
+          <li><strong>Multi-channel fieldwork</strong>: scan repair/inventory/ops with client channel</li>
+          <li><strong>Always-on evidence</strong>: pull by device/period for sampling and accreditation prep</li>
+        </ul>
+      </article>
+    </div>
+    <div class="benefit-row">
+      <div class="benefit"><strong>Convenient</strong><span>Scan to ledger and repair; less walking and retyping</span></div>
+      <div class="benefit"><strong>Complete</strong><span>Fields, lines, attachments, and progress on one chain</span></div>
+      <div class="benefit"><strong>Timely</strong><span>Due alerts cut missed maintain/inspect/metrology</span></div>
+      <div class="benefit"><strong>Trustworthy</strong><span>Intervals, change logs, and channels stand up to review</span></div>
+    </div>
+    <p class="disclaimer">Outcomes still depend on hospital process and data quality; software enables and constrains—it does not replace accountability.</p>
   </section>
 
   <section class="screen tall compare-sec" id="s4">
@@ -619,7 +1121,7 @@
     <h2>Equipment management that stands up to scrutiny</h2>
     <p class="sec-lead">
       Complete fields · complete records · clear historical ownership—
-      MEIS is the trusted base for biomedical and clinical teams.
+      aligned with regulatory and tertiary-review readiness needs for biomedical and clinical teams.
     </p>
     <div class="close-actions">
       <a class="btn btn-primary" href="#s3">Back to features</a>
