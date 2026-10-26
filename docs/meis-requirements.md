@@ -17,6 +17,7 @@
 - [Windows 生产部署](windows-production-deploy.md)
 - [Linux 生产部署](production-deploy.md)
 - [生产服务状态监测](production-monitoring.md)
+- [**信创小改平替（JDK/PG/Redis/Nginx/MinIO）**](xinchuang-compat-minimal.md)
 - [**可复用工程约定包**](reusable-engineering-conventions.md)（跨项目沉淀，其他系统可直接复用）
 - [台账字段缺口分析稿](meis-requirements-asset-ledger-gap.md)（分析用；**定稿与 BACKLOG 以本文为准**）
 - [三甲缺口再审](meis-requirements-tertiary-gap-review.md)
