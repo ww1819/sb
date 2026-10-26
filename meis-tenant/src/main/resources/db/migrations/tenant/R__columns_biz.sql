@@ -1405,3 +1405,11 @@ CREATE TABLE IF NOT EXISTS external_asset_disposition (
     deleted_by_name VARCHAR(100)
 );
 COMMENT ON TABLE external_asset_disposition IS '外部财务资产处置预留（AST-DISP-FIN / P-12）';
+
+-- AST-ARCH-01：设备档案排序/旋转角/来源
+ALTER TABLE device_archive_file ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE device_archive_file ADD COLUMN IF NOT EXISTS rotate_angle INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE device_archive_file ADD COLUMN IF NOT EXISTS source VARCHAR(20);
+COMMENT ON COLUMN device_archive_file.sort_order IS '类型内自定义排序（升序）';
+COMMENT ON COLUMN device_archive_file.rotate_angle IS '预览旋转角 0/90/180/270（CSS）';
+COMMENT ON COLUMN device_archive_file.source IS '来源 upload|eloam|copy';

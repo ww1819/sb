@@ -3,8 +3,8 @@
 > **用途**：梳理、编写、评审 MEIS 全系统业务需求，并跟踪已知问题与技术债。  
 > 请在本文件中直接增删改；模块细节可拆分子文档后在此链接。
 
-**文档状态**：草稿  
-**最后更新**：2026-07-12  
+**文档状态**：进行中（主需求 SSOT）  
+**最后更新**：2026-10-15  
 **负责人**：待填写  
 **系统定位**：医院医疗设备与固定资产全生命周期管理 SaaS（Schema 多租户）
 
@@ -18,6 +18,8 @@
 - [Linux 生产部署](production-deploy.md)
 - [生产服务状态监测](production-monitoring.md)
 - [**可复用工程约定包**](reusable-engineering-conventions.md)（跨项目沉淀，其他系统可直接复用）
+- [台账字段缺口分析稿](meis-requirements-asset-ledger-gap.md)（分析用；**定稿与 BACKLOG 以本文为准**）
+- [三甲缺口再审](meis-requirements-tertiary-gap-review.md)
 
 ---
 
@@ -25,7 +27,8 @@
 
 | 场景 | 做法 |
 |------|------|
-| 写新需求 | 在对应模块章节新增条目，或复制 [附录 A 需求模板](#附录-a-需求条目模板) |
+| 写新需求 | 在对应模块章节新增条目，或复制 [附录 A 需求模板](#附录-a-需求条目模板)；**后续需求与修改一律记入本主文档** |
+| 长文分析 / 对照草稿 | 可写附属稿（如 gap / tertiary）；**定稿表、BACKLOG、版本记录必须回写本文**并链回附属稿 |
 | 记录缺陷 | 写入 [第 4 章 已知问题](#4-已知问题与技术债) |
 | 待产品决策 | 写入 [第 5 章 待确认问题](#5-待确认问题) |
 | 合理但暂缓开发 | 写入 [第 7 章 待开发功能池](#7-待开发功能池)（编号 `BACKLOG-{模块}-{序号}`） |
@@ -1073,9 +1076,9 @@
 | **文案** | 界面可见名称/备注/故障描述等**不出现**「演示」「测试」等字样，贴近院端真实业务表述 |
 | **样板机** | **`SD24080001`**（多参数监护仪）挂齐可落库 Sheet |
 | **已覆盖 Sheet** | 基本信息 / 资产卡片；维保信息；资产标签；维修记录；配件更换记录；保养/巡检/计量/PM 的计划与记录；借调记录与费用；盘点记录；不良事件；电流读数（默认今日）；电流标签绑定记录 |
-| **不可 SQL 填充** | **设备档案**、**设备图片**：当前前端内存态、无落库表（见衍生） |
+| **不可 SQL 填充** | **设备图片** Tab 仍偏占位；**设备档案**已落库（AST-ARCH-01/02），演示种子可后续扩档案行 |
 | **注意** | 执行前 `SET search_path TO <tenant_schema>`；删除范围仅限上述命名空间，勿改前缀以免误伤业务数据 |
-| **衍生（待确认）** | 若演示必须展示档案/图片：需先做附件落库，再扩种子；可记 `BACKLOG-AST-ARCHIVE-01` |
+| **衍生** | 演示数据扩档案/图片种子：可记 `BACKLOG-AST-DEMO-ARCH-01`（可选） |
 
 **AST-UI-18 定稿（2026-07-31）**
 
@@ -2648,6 +2651,10 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
 
+| 2.222 | 2026-10-15 11:20:00 | — | AST-SNJ-01 工程约束：冗余/幂等/禁假主键；档案合同聚合改 origin 元数据；约定包 §5.11.1 |
+| 2.221 | 2026-10-15 11:10:00 | — | 主文档收口：AST-SNJ-01；缺口稿降为附记；后续需求一律记主文档 |
+| 2.220 | 2026-10-15 11:00:00 | — | AST-ARCH-02 / PLT-CAM-04：档案 PDF/合同只读/批量改类/多设备复制/排序抽屉/预览缩放；高拍仪补光空格命名；神农架设备管理对照 BACKLOG |
+| 2.219 | 2026-10-15 10:30:00 | — | AST-ARCH-01 / PLT-CAM-03：设备档案复制/排序/旋转/改名改类；高拍仪成片横纵向；字典对齐 |
 | 2.218 | 2026-09-07 15:40:00 | — | PLT-RUANZHU-01：软著源代码鉴定材料约定 + 生成前/后30页 Word |
 | 2.217 | 2026-08-06 11:30:00 | — | REP-STAT-01：筛「已验收」含验收后结案单；列表/详情展示对齐为已验收 |
 | 2.216 | 2026-08-03 10:45:00 | — | REP-PERF-01 澄清：验收等同路径；扫描余量入 BACKLOG-*-PERF；约定包 §5.20 |
@@ -3027,6 +3034,15 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | BACKLOG-AST-DISP-FIN-01 | 资产/集成 | 财务/金蝶等外部资产处置同步 | 预留表+手工 API 已落地；金蝶双向另议 | P2 | 金蝶对接与冲突策略未定 | 部分完成 |
 | BACKLOG-AST-ENTRY-DID-01 | 资产 | 入库完成可靠回写 `device_entry_item.device_id` | 已随 OWN 实现 | P1 | — | 已完成 |
 | BACKLOG-AST-GAP-REVIEW-01 | 资产 | 三甲再审文档 + 非效益实施 | [复核专文](meis-requirements-tertiary-gap-review.md) | P2 | G1～G5 非效益已落地；效益排除 | 部分完成 |
+| BACKLOG-AST-ARCH-02 | 资产 | 档案列表分页、卡片视图、缩略图、上传自动命名、Word→PDF 预览 | [AST-ARCH-02](#ast-arch-02-档案预览合同批量与排序体验定稿2026-10-15) P2 | P2 | AST-ARCH-02 已落 P0/P1 | 可排期 |
+| BACKLOG-AST-DEMO-ARCH-01 | 资产 | 演示种子扩设备档案/图片样例行 | AST-DEMO-01 衍生 | P2 | 可选 | 可排期 |
+| BACKLOG-AST-YK-01 | 资产 | 盘点盈亏处理单主从+审批+是否写回台账 | [AST-SNJ-01](#ast-snj-01-神农架设备管理对照后续池定稿2026-10-15) | P0 | 完成盘点仅统计 diff，写回另议 | 可排期 |
+| BACKLOG-AST-KD-01 | 资产/集成 | 金蝶/外部资产单向抓取或回写契约 | [AST-SNJ-01](#ast-snj-01-神农架设备管理对照后续池定稿2026-10-15)；DISP-FIN | P0 | 冲突策略未定 | 可排期 |
+| BACKLOG-AST-BEN-01 | 效益 | 效益对照→审核→设备效益报表最小闭环 | [AST-SNJ-01](#ast-snj-01-神农架设备管理对照后续池定稿2026-10-15)；ANA-* | P0 | 现有多为 sync/占位 | 可排期 |
+| BACKLOG-AST-RFID-01 | 资产/电流 | RFID EPC 字段+定位大屏（与 Power 边界） | [AST-SNJ-01](#ast-snj-01-神农架设备管理对照后续池定稿2026-10-15) | P1 | 按现场是否用定位选型 | 可排期 |
+| BACKLOG-AST-SPC-RY-01 | 特种 | 特种设备持证/作业人员主从 | [AST-SNJ-01](#ast-snj-01-神农架设备管理对照后续池定稿2026-10-15) | P1 | SPC-F-01 证照未完 | 可排期 |
+| BACKLOG-AST-AE-SYNC-01 | 质控 | 不良事件监管平台对接 | [AST-SNJ-01](#ast-snj-01-神农架设备管理对照后续池定稿2026-10-15) | P1 | CRUD 已有 | 可排期 |
+| BACKLOG-AST-JYFY-01 | 公用 | 设备借用费用结算 | [AST-SNJ-01](#ast-snj-01-神农架设备管理对照后续池定稿2026-10-15) | P1 | 借还主流程已有 | 可排期 |
 | BACKLOG-ANA-01 | 效益 | 效率分析完整业务（指标、图表、导出） | ANA-UI-01/02 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-ANA-02 | 效益 | 效益分析查询完整业务 | ANA-UI-02 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-ANA-03 | 效益 | 收费项目审核完整业务 | ANA-UI-02 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
@@ -4101,7 +4117,9 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 运维模板周期 / 选模板回填 | [OPS.15](#ops15-模板周期与计划选模板回填2026-07-23)、约定包 §5.6 |
 | 全局加列 / 冗余 CRUD 通检 | [PLT-AUDIT-01](#plt-audit-01-全局加列--对象冗余--crud-通检2026-07-23) |
 | 主键类型审计（非 UUID） | [PLT-PK-01](#plt-pk-01-主键类型审计非-uuid--非字符串2026-07-23) |
-| 本机外设（高拍仪等） | [PLT-CAM-01](#plt-cam-01-新良田高拍仪对接2026-07-24) / [PLT-CAM-02](#plt-cam-02-厂家选择--调试菜单--设备档案2026-07-24)、约定包 §5.11 |
+| 本机外设（高拍仪等） | [PLT-CAM-01](#plt-cam-01-新良田高拍仪对接2026-07-24) / [PLT-CAM-02](#plt-cam-02-厂家选择--调试菜单--设备档案2026-07-24) / [PLT-CAM-03](#plt-cam-03-高拍仪成片横纵向定稿2026-10-15) / [PLT-CAM-04](#plt-cam-04-高拍仪补光空格成片命名定稿2026-10-15)、约定包 §5.11 |
+| 设备档案增强 | [AST-ARCH-01](#ast-arch-01-设备档案复制排序旋转与字典对齐定稿2026-10-15) / [AST-ARCH-02](#ast-arch-02-档案预览合同批量与排序体验定稿2026-10-15) |
+| 神农架设备管理对照（后续） | [AST-SNJ-01](#ast-snj-01-神农架设备管理对照后续池定稿2026-10-15)；第 7 章 `BACKLOG-AST-YK/KD/BEN/...`；分析附记 [GAP §8](meis-requirements-asset-ledger-gap.md) |
 | 铭牌图像识别（待开发） | [PLT-OCR-01](#plt-ocr-01-铭牌图像识别回填台账待开发2026-07-24)、第 7 章 `BACKLOG-AST-11` |
 | 计划/执行交互缺口（改记录·审核·明细） | [OPS.16](#ops16-计划执行交互缺口审计修改记录审核明细2026-07-23) |
 | App 离线盘点 / 台账缓存 | [MOB.8](#mob8-离线盘点权限缓存与台账同步2026-07-21)、修订 MOB.7 |
@@ -4510,20 +4528,23 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | `auth_scope` | `VARCHAR(100)` | 授权范围 |
 | `remark` | `TEXT` | 备注 |
 
-#### `device_archive_file`（设备档案附件，AST-GAP O-04）
+#### `device_archive_file`（设备档案附件，AST-GAP O-04 / AST-ARCH-01）
 
 | 字段名 | 类型 | 中文注释 |
 |---|---|---|
 | `device_id` | `UUID` | 设备 |
 | `device_code` | `VARCHAR(50)` | 设备编码冗余 |
 | `device_name` | `VARCHAR(200)` | 设备名称冗余 |
-| `archive_type` | `VARCHAR(40)` | 档案类型 |
+| `archive_type` | `VARCHAR(40)` | 档案类型 certificate\|manual\|tech_doc\|other\|image |
 | `title` | `VARCHAR(200)` | 标题 |
 | `file_url` | `VARCHAR(500)` | 文件地址 |
 | `file_name` | `VARCHAR(200)` | 文件名 |
 | `file_size` | `BIGINT` | 文件大小 |
 | `content_type` | `VARCHAR(100)` | MIME 类型 |
 | `version_no` | `INTEGER` | 版本号 |
+| `sort_order` | `INTEGER` | 类型内自定义排序（升序） |
+| `rotate_angle` | `INTEGER` | 预览旋转角 0/90/180/270（CSS） |
+| `source` | `VARCHAR(20)` | 来源 upload\|eloam\|copy |
 | `remark` | `TEXT` | 备注 |
 
 #### `device_udi_history`（UDI 变更历史，AST-GAP O-01）
@@ -6680,6 +6701,125 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 
 **状态**：已落地（2026-07-24）。
 
+#### PLT-CAM-03 高拍仪成片横纵向（定稿·2026-10-15）
+
+> 来源：对照神农架高拍仪；用户确认「成片旋转、降低复杂度」。
+
+| 项 | 定稿 |
+|----|------|
+| **范围** | 仅 Web `EloamCaptureDialog`；不改厂商预览流分辨率 |
+| **交互** | 工具栏「横向 / 纵向」；预览区 CSS 旋转提示；拍照后对成片 **canvas 旋转**再上传 |
+| **成片** | 纵向=相对原始帧旋转 90° 写入 JPEG；缩略图可再手动转 90° |
+| **不做** | 不改 Eloam 设备端方向 API；不把横纵向写入 `device_archive_file.rotate_angle`（成片已摆正） |
+
+**状态**：已落地（2026-10-15）。
+
+### AST-ARCH-01 设备档案复制·排序·旋转与字典对齐（定稿·2026-10-15）
+
+> 来源：对照 `cestar_shenNongJia` 台账档案/高拍仪；用户确认 1–6（物理复制、CSS 角度、类型内排序、字典对齐、成片横纵向、P0+P1 同批）。
+
+#### 背景与字典对齐说明（原 Q4）
+
+一期 UI 侧栏为「合格证/说明书/技术文档/其他资料」，但 `sys_dict.device_archive_type` 为 `archive|image|manual|other`，前端用 `remark` 塞 `fileType:中文` 做映射，字典与展示不一致。
+
+| 项 | 定稿 |
+|----|------|
+| **字典** | `certificate` 合格证、`manual` 说明书、`tech_doc` 技术文档、`image` 图片、`other` 其他资料 |
+| **迁移** | 历史 `archive`→`tech_doc`；按 `remark` 中 `fileType:` 回填类型；`source` 从 remark/`高拍仪` 回填 |
+| **禁止** | 新写入再把中文类型塞进 `remark`；来源走 `source` 列 |
+
+#### 能力（P0+P1 同批）
+
+| 能力 | 定稿 |
+|------|------|
+| **物理复制** | `POST /api/file/copy` MinIO 新 object；`POST /api/asset/device-archive/copy-to` 选目标设备批量建档，`source=copy` |
+| **旋转** | 仅存 `rotate_angle`（0/90/180/270），列表/预览 **CSS** `transform:rotate`；不改原文件 |
+| **排序** | `sort_order` 在 **同一 archive_type 内**；列表支持自定义/上传时间/名称；自定义模式上移下移→`save-sort` |
+| **改名/改类** | `PUT` 更新 `title`/`file_name`、`archive_type` |
+| **预览** | 图片预览区应用旋转角；可新窗口打开 |
+
+#### 库表 / API
+
+- 列：`sort_order`、`rotate_angle`、`source`（`R__columns_biz` + V1 双轨）；字典与回填见 `R__data_fix`
+- API：`by-device?sort=`、`/{id}/rotate`、`/save-sort`、`/copy-to`
+- 变更快照：附录 T.5 / `SNAPSHOT_FIELDS` 同步含上述三列
+
+**状态**：已落地（2026-10-15）。
+
+#### PLT-CAM-04 高拍仪补光·空格连拍·成片命名（定稿·2026-10-15）
+
+| 项 | 定稿 |
+|----|------|
+| **补光** | `SetLed` / `SetLaserLight`；开关失败静默降级 |
+| **空格** | 预览打开时空格拍照（输入框内不触发） |
+| **成片命名** | 缩略图可改文件名后再上传 |
+| **进窗** | 档案场景默认自动尝试开预览 |
+| **左右旋** | 缩略图 ↺/↻ 对成片再 canvas 旋转 |
+
+**状态**：已落地（2026-10-15）。
+
+### AST-ARCH-02 档案预览·合同只读·批量与排序体验（定稿·2026-10-15）
+
+> 来源：GAP §7.3 P0+P1；合同关联确认：`medical_device.contract_id` → `purchase_contract.contract_file_url` / `acceptance_report_url`。
+
+| 能力 | 定稿 |
+|------|------|
+| **PDF 预览** | 侧栏 iframe 内嵌 |
+| **合同只读** | 经 `medical_device.contract_id` FK 聚合；行带 `row_kind=ref` / `origin` / `origin_id` / `origin_field` / `client_key`；**禁止**伪造档案 UUID 或 `ht_` 假主键 |
+| **批量改类** | `POST .../batch-reclassify`；同类型幂等跳过；改类后排入目标类型末尾 |
+| **批量删除** | `POST .../batch-delete`；去重 id；软删已删行跳过 |
+| **多设备复制** | `AssetDevicePicker multiple` + `copy-to`；目标去重；同源设备跳过；物理复制 MinIO；写目标 `device_code/name` 冗余 |
+| **排序抽屉** | 类型内序号/上移下移/可改名后 `save-sort`；`sort_order` 未变则跳过写库 |
+| **预览增强** | 临时旋转角 + 保存；缩放/滚轮；左/右旋/还原 |
+| **规范下载** | `disposition=attachment&filename=` |
+| **排序记忆** | localStorage `meis_device_archive_sort` |
+| **P2 暂缓** | 分页/卡片/缩略图/自动命名/Word→PDF → `BACKLOG-AST-ARCH-02` |
+
+**状态**：已落地（2026-10-15；关联模型修订同日，见 AST-SNJ-01 工程约束）。
+
+### AST-SNJ-01 神农架设备管理对照后续池（定稿·2026-10-15）
+
+> 来源：对照 `cestar_shenNongJia` 资产/设备管理（`erps/zcgl`、盘点/借用/报废/定位/特种/效益等）；**不含**已收口档案/高拍仪（AST-ARCH / PLT-CAM）。  
+> 分析附记可保留在 [缺口稿 §8](meis-requirements-asset-ledger-gap.md)；**排期与状态以本表 + 第 7 章 BACKLOG 为准**。  
+> MEIS 已领先、勿重复当 gap：台账 Tab/Sheet、归属/位置、非维修配件、处置聚合、维保包、盘点扫码主路径、借调主流程、培训授权 Tab、电流标签运维。
+
+#### 工程约束（实施 BACKLOG 时强制 · 2026-10-15）
+
+对照神农架时**只借鉴业务能力，不复制其关联与数据习惯**：
+
+| 项 | 要求 | 神农架反例（规避） |
+|----|------|-------------------|
+| **关联** | 用正式 FK / 关联表；列表聚合返回 `row_kind`+`origin*` 元数据 | 磁盘绝对路径归属校验、`ht_` 假 id 混进可写主键空间 |
+| **附件** | 跨主数据复制须物理复制对象存储；禁止多主数据共用同一 URL | 复制后仍指向源设备路径 |
+| **冗余** | 写 `device_id` / 责任人 UUID 时同事务写编码·名称 / `*_by_name`（约定包 §6.2 / §6.3） | 只存 id 或事后拼路径猜设备 |
+| **幂等** | 批改/批删/排序：去重入参；状态未变则跳过写库；软删可重复调用无副作用 | 无校验重复提交、重复 INSERT |
+| **字典** | 业务码进 `sys_dict` + 三端 catalog；禁止 remark 塞中文类型 | `remark` 拼 `fileType:合格证` |
+| **状态** | 列表/详情状态中文；真变更/纠错走约定包 §5.17 | 静默改关键字段、裸码直出 |
+| **迁库** | 固定槽位 + 幂等 `ADD COLUMN IF NOT EXISTS` / 字典 DELETE+INSERT | 碎片脚本、不可重复补丁 |
+
+后续补强（盈亏/金蝶/效益/RFID 等）须遵守上表 + 约定包；评审时点名关联模型，禁止「先仿神农架再改」。
+
+| 优先级 | 模块/能力 | 神农架要点 | MEIS 现状 | BACKLOG |
+|--------|-----------|------------|-----------|---------|
+| **P0** | 台账字段与三甲对象 | 台账字段极全 | GAP/复核未全落地 | `BACKLOG-AST-GAP-01` |
+| **P0** | 盘点盈亏闭环 | `sbykcl`/`sbykbb` | 完成盘点仅统计 diff | `BACKLOG-AST-YK-01` |
+| **P0** | 金蝶/外部资产同步 | 多路 HTTP 同步 | 只读码 + DISP-FIN 预留 | `BACKLOG-AST-KD-01` |
+| **P0** | 效益分析最小闭环 | xyfx 对照/审核/报表 | sync/菜单占位多 | `BACKLOG-AST-BEN-01` |
+| **P0** | 资产动态统计 | `zcdttj` | 占位页 | `BACKLOG-AST-08` |
+| **P1** | 报废子状态粒度 | 待报废/已报废使用中等 | 设备态较粗 | 产品评估后开号 |
+| **P1** | 科室调拨 vs 库房调拨 | `ksdbgl` | 库房调拨 + 改科室真变更 | 产品定是否独立单据 |
+| **P1** | 借用费用 | `jyfyinit` | 借还有、费用无 | `BACKLOG-AST-JYFY-01` |
+| **P1** | RFID/定位监测 | `dzbqdtjc` | 电流标签有；无 EPC/定位大屏 | `BACKLOG-AST-RFID-01` |
+| **P1** | 特种设备人员 | `tzsb` 人员 | 登记有；人员主从未齐 | `BACKLOG-AST-SPC-RY-01` |
+| **P1** | 设备验收入口 | `sbys` | 采购验收链为主 | 按院方是否绕开采购定 |
+| **P1** | 不良事件监管同步 | `ws_blsj` | QC CRUD 有 | `BACKLOG-AST-AE-SYNC-01` |
+| **P1** | 铭牌 OCR | — | PLT-OCR-01 | `BACKLOG-AST-11` |
+| **P2** | 档案主数据 sbda / 增减明细 / 折旧计提 / 按钮级权限 | 老 ERP 专页 | 字典+分散出入库+菜单 RBAC | 一般不复刻；按需开号 |
+
+**推荐排期**：GAP 字段 → 盈亏闭环 → 外部同步 → 效益最小闭环 + 动态统计；RFID/特种人员/不良同步按现场选型。
+
+**状态**：分析定稿；实施项进第 7 章（2026-10-15）。
+
 
 ### PLT-MENU-01 菜单唯一维护脚本（2026-07-24）
 
@@ -7587,3 +7727,8 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 
 > **PLT-RUANZHU-01（2026-09-07）**：软著源代码鉴定材料约定已定稿；生成稿见 `docs/附件3-源代码鉴定材料.docx`（副本 `docs/ruanzhu-source-identification.docx`）；页眉全称/版本待申请表回填。重新生成：`python scripts/common/gen-ruanzhu-source-docx.py`。
 
+> **AST-ARCH-01/02 · PLT-CAM-03/04 · AST-SNJ-01（2026-10-15）**：
+> - **已落地**：设备档案物理复制/排序/旋转/字典对齐；PDF 预览、合同只读（`row_kind=ref`+FK，禁假主键）；批改/批删/排序幂等；多设备复制去重+跳过同源；高拍仪成片横纵向与补光/空格/命名
+> - **工程约束**：补强须遵守 [AST-SNJ-01 工程约束](#工程约束实施-backlog-时强制--2026-10-15)（冗余双写、幂等、正规关联）；约定包 **§5.11.1**
+> - **后续池**：第 7 章 `BACKLOG-AST-YK/KD/BEN/RFID/...`、`BACKLOG-AST-ARCH-02`
+> - **部署**：重启 meis-asset / meis-file；刷新前端

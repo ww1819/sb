@@ -94,6 +94,20 @@ const Map<String, Map<String, String>> _zhCatalog = {
     'inspection': '强检证书',
     'other': '其他',
   },
+  'device_archive_type': {
+    'certificate': '合格证',
+    'manual': '说明书',
+    'tech_doc': '技术文档',
+    'image': '图片',
+    'other': '其他资料',
+    'archive': '技术文档',
+  },
+  'device_archive_source': {
+    'upload': '上传',
+    'eloam': '高拍仪',
+    'copy': '复制',
+    'contract': '合同',
+  },
   'auth_scope': {
     'operate': '操作授权',
     'maintain': '维保授权',

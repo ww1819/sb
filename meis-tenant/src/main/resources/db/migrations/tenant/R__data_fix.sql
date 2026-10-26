@@ -1139,10 +1139,31 @@ INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) 
 
 DELETE FROM sys_dict WHERE dict_type = 'device_archive_type';
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
-('device_archive_type', 'archive', '档案', 'archive', 1),
-('device_archive_type', 'image', '图片', 'image', 2),
-('device_archive_type', 'manual', '说明书', 'manual', 3),
-('device_archive_type', 'other', '其他', 'other', 9);
+('device_archive_type', 'certificate', '合格证', 'certificate', 1),
+('device_archive_type', 'manual', '说明书', 'manual', 2),
+('device_archive_type', 'tech_doc', '技术文档', 'tech_doc', 3),
+('device_archive_type', 'image', '图片', 'image', 8),
+('device_archive_type', 'other', '其他资料', 'other', 9);
+
+-- AST-ARCH-01：历史 archive_type / remark 中文类型回填
+UPDATE device_archive_file SET archive_type = 'tech_doc' WHERE archive_type = 'archive' AND COALESCE(is_deleted,0)=0;
+UPDATE device_archive_file SET archive_type = 'certificate'
+ WHERE COALESCE(is_deleted,0)=0 AND remark LIKE '%fileType:合格证%';
+UPDATE device_archive_file SET archive_type = 'manual'
+ WHERE COALESCE(is_deleted,0)=0 AND remark LIKE '%fileType:说明书%' AND archive_type NOT IN ('certificate');
+UPDATE device_archive_file SET archive_type = 'tech_doc'
+ WHERE COALESCE(is_deleted,0)=0 AND remark LIKE '%fileType:技术文档%';
+UPDATE device_archive_file SET archive_type = 'other'
+ WHERE COALESCE(is_deleted,0)=0 AND remark LIKE '%fileType:其他资料%';
+UPDATE device_archive_file SET source = 'eloam' WHERE source IS NULL AND remark LIKE '%source:高拍仪%' AND COALESCE(is_deleted,0)=0;
+UPDATE device_archive_file SET source = 'upload' WHERE source IS NULL AND COALESCE(is_deleted,0)=0;
+
+DELETE FROM sys_dict WHERE dict_type = 'device_archive_source';
+INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES
+('device_archive_source', 'upload', '上传', 'upload', 1),
+('device_archive_source', 'eloam', '高拍仪', 'eloam', 2),
+('device_archive_source', 'copy', '复制', 'copy', 3),
+('device_archive_source', 'contract', '合同', 'contract', 4);
 
 -- AST-GAP-REVIEW G5：报废状态/处置方式补字典
 INSERT INTO sys_dict (dict_type, dict_code, dict_label, dict_value, sort_order) VALUES

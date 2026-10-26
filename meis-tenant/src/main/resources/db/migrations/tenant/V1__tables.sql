@@ -3078,6 +3078,9 @@ CREATE TABLE device_archive_file (
     file_size BIGINT,
     content_type VARCHAR(100),
     version_no INTEGER DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    rotate_angle INTEGER NOT NULL DEFAULT 0,
+    source VARCHAR(20),
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -3094,13 +3097,16 @@ COMMENT ON TABLE device_archive_file IS '设备档案附件（AST-GAP O-04）';
 COMMENT ON COLUMN device_archive_file.device_id IS '设备';
 COMMENT ON COLUMN device_archive_file.device_code IS '设备编码冗余';
 COMMENT ON COLUMN device_archive_file.device_name IS '设备名称冗余';
-COMMENT ON COLUMN device_archive_file.archive_type IS '档案类型 archive|image|manual|other';
+COMMENT ON COLUMN device_archive_file.archive_type IS '档案类型 certificate|manual|tech_doc|other|image';
 COMMENT ON COLUMN device_archive_file.title IS '标题';
 COMMENT ON COLUMN device_archive_file.file_url IS '文件地址';
 COMMENT ON COLUMN device_archive_file.file_name IS '文件名';
 COMMENT ON COLUMN device_archive_file.file_size IS '文件大小（字节）';
 COMMENT ON COLUMN device_archive_file.content_type IS 'MIME 类型';
 COMMENT ON COLUMN device_archive_file.version_no IS '版本号';
+COMMENT ON COLUMN device_archive_file.sort_order IS '类型内自定义排序（升序）';
+COMMENT ON COLUMN device_archive_file.rotate_angle IS '预览旋转角 0/90/180/270';
+COMMENT ON COLUMN device_archive_file.source IS '来源 upload|eloam|copy';
 COMMENT ON COLUMN device_archive_file.remark IS '备注';
 COMMENT ON COLUMN device_archive_file.created_at IS '创建时间';
 COMMENT ON COLUMN device_archive_file.updated_at IS '更新时间';

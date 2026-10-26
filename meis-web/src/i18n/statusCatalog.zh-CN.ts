@@ -416,6 +416,20 @@ const ZH: Record<string, Record<string, string>> = {
     inspection: '强检证书',
     other: '其他',
   },
+  device_archive_type: {
+    certificate: '合格证',
+    manual: '说明书',
+    tech_doc: '技术文档',
+    image: '图片',
+    other: '其他资料',
+    archive: '技术文档',
+  },
+  device_archive_source: {
+    upload: '上传',
+    eloam: '高拍仪',
+    copy: '复制',
+    contract: '合同',
+  },
   service_expiry_basis: {
     enable: '启用日期+年限',
     production: '生产日期+年限',

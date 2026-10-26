@@ -1,5 +1,5 @@
 <template>
-  <AppModal v-model="visible" title="选择设备" size="xl" @close="onClose">
+  <AppModal v-model="visible" :title="multiple ? '选择目标设备（可多选）' : '选择设备'" size="xl" @close="onClose">
     <el-form :inline="true" class="filter-form" @submit.prevent="load">
       <el-form-item label="资产编码">
         <el-input v-model="filters.deviceCode" clearable placeholder="资产编码" @keyup.enter="load" />
@@ -34,15 +34,18 @@
     </el-form>
 
     <el-table
+      ref="tableRef"
       v-loading="loading"
       :data="rows"
       row-key="id"
       highlight-current-row
       max-height="420"
       @row-click="onRowClick"
-      @row-dblclick="confirmRow"
+      @row-dblclick="onDblClick"
+      @selection-change="onSelectionChange"
     >
-      <el-table-column width="48" fixed="left">
+      <el-table-column v-if="multiple" type="selection" width="48" reserve-selection fixed="left" />
+      <el-table-column v-else width="48" fixed="left">
         <template #default="{ row }">
           <el-radio :model-value="selectedId" :value="String(row.id)" @change="selectRow(row)" />
         </template>
@@ -52,7 +55,15 @@
 
     <template #footer>
       <el-button @click="visible = false">取消</el-button>
-      <el-button type="primary" :disabled="!selected" @click="confirmRow(selected!)">确认</el-button>
+      <el-button
+        v-if="multiple"
+        type="primary"
+        :disabled="!selectedMany.length"
+        @click="confirmMany"
+      >
+        确认（{{ selectedMany.length }}）
+      </el-button>
+      <el-button v-else type="primary" :disabled="!selected" @click="confirmRow(selected!)">确认</el-button>
     </template>
   </AppModal>
 </template>
@@ -65,10 +76,14 @@ import AppModal from '@/components/AppModal.vue'
 import DeviceLedgerTableColumns from '@/components/table/DeviceLedgerTableColumns.vue'
 import { useDict } from '@/composables/useDict'
 
-const props = defineProps<{ modelValue: boolean }>()
+const props = withDefaults(
+  defineProps<{ modelValue: boolean; multiple?: boolean }>(),
+  { multiple: false }
+)
 const emit = defineEmits<{
   'update:modelValue': [v: boolean]
   confirm: [device: Record<string, unknown>]
+  confirmMany: [devices: Record<string, unknown>[]]
 }>()
 
 const visible = computed({
@@ -79,6 +94,8 @@ const visible = computed({
 const loading = ref(false)
 const rows = ref<Record<string, unknown>[]>([])
 const selected = ref<Record<string, unknown> | null>(null)
+const selectedMany = ref<Record<string, unknown>[]>([])
+const tableRef = ref()
 const selectedId = computed(() => (selected.value?.id ? String(selected.value.id) : ''))
 const statusOptions = ref<{ label: string; value: string }[]>([])
 const { loadDict } = useDict()
@@ -139,7 +156,17 @@ function selectRow(row: Record<string, unknown>) {
 }
 
 function onRowClick(row: Record<string, unknown>) {
+  if (props.multiple) return
   selectRow(row)
+}
+
+function onDblClick(row: Record<string, unknown>) {
+  if (props.multiple) return
+  confirmRow(row)
+}
+
+function onSelectionChange(list: Record<string, unknown>[]) {
+  selectedMany.value = list
 }
 
 function confirmRow(row: Record<string, unknown>) {
@@ -147,8 +174,17 @@ function confirmRow(row: Record<string, unknown>) {
   visible.value = false
 }
 
+function confirmMany() {
+  emit('confirmMany', selectedMany.value)
+  // 兼容只监听 confirm 的调用方：多选时也发第一条
+  if (selectedMany.value[0]) emit('confirm', selectedMany.value[0])
+  visible.value = false
+}
+
 function onClose() {
   selected.value = null
+  selectedMany.value = []
+  tableRef.value?.clearSelection?.()
 }
 
 watch(
@@ -156,6 +192,7 @@ watch(
   (open) => {
     if (!open) return
     selected.value = null
+    selectedMany.value = []
     load()
   }
 )

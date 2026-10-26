@@ -290,6 +290,22 @@ export function useEloamCamera(wsUrl?: MaybeRef<string | undefined>) {
     }
   }
 
+  const flashOn = ref(false)
+
+  /** PLT-CAM-04：补光灯；驱动不支持时静默失败 */
+  async function setFlashLight(on: boolean, silent = false) {
+    flashOn.value = on
+    if (!connected.value) return
+    try {
+      send({ function: 'SetLed', onoff: on ? 1 : 0 })
+      await waitFor('SetLed', 3000).catch(() => undefined)
+      send({ function: 'SetLaserLight', onoff: on ? 1 : 0 })
+      await waitFor('SetLaserLight', 3000).catch(() => undefined)
+    } catch (e) {
+      if (!silent) error.value = e instanceof Error ? e.message : '设置补光灯失败'
+    }
+  }
+
   async function closeCamera() {
     if (!connected.value) {
       cameraOpen.value = false
@@ -316,12 +332,14 @@ export function useEloamCamera(wsUrl?: MaybeRef<string | undefined>) {
     resolutionIndex,
     resolutions,
     deskewOn,
+    flashOn,
     lastWsUrl,
     connect,
     disconnect,
     initAndOpen,
     scanImage,
     setDeskew,
+    setFlashLight,
     closeCamera
   }
 }

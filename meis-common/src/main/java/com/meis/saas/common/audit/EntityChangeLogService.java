@@ -89,7 +89,8 @@ public class EntityChangeLogService {
                     "cert_name", "cert_no", "trained_at", "expiry_date", "auth_scope", "remark")),
             Map.entry("device_archive_file", List.of(
                     "device_id", "device_code", "device_name", "archive_type", "title",
-                    "file_url", "file_name", "file_size", "content_type", "version_no", "remark")),
+                    "file_url", "file_name", "file_size", "content_type", "version_no",
+                    "sort_order", "rotate_angle", "source", "remark")),
             Map.entry("device_udi_history", List.of(
                     "device_id", "device_code", "device_name", "udi_di", "udi_pi",
                     "effective_from", "effective_to", "change_reason", "remark"))

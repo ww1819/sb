@@ -4,7 +4,7 @@
 > **来源**：`docs/meis-requirements.md` 附录 Q / C / D / E / F / G / H / I / R / S / T 等。  
 > **用法**：新系统可整份复制后，按「落地映射」改路径与模块名；MEIS 专属细节见文末附录。
 
-**版本**：1.50（2026-08-03）
+**版本**：1.52（2026-10-15）
 
 ---
 
@@ -413,10 +413,26 @@ USB 外设（如文档高拍仪）**勿**由浏览器直连硬件；经厂商本
 |----|------|
 | **封装** | 前端薄封装（连接/预览/拍照/关闭）；勿整页拷贝厂商 demo |
 | **上传** | 外设产物（base64/文件）走系统统一文件上传 API，业务只存 URL |
+| **成片方向** | 横/纵向优先对**成片**做 canvas 旋转再上传，避免依赖厂商预览方向 API |
+| **业务预览旋转** | 若业务需事后纠正朝向：库内只存角度，列表/预览用 CSS 旋转，勿改原文件 |
+| **附件复制** | 跨主数据复制附件须**物理复制**对象存储 object，禁止多主数据共用同一 URL |
 | **降级** | 无本机服务时友好提示，并保留普通上传/手机相机入口 |
 | **范围** | 仅工作站浏览器；移动端不接本机代理 |
 
-落地映射：MEIS PLT-CAM-01（新良田 Eloam `ws://127.0.0.1:9000`）。开发机注意：Eloam 与对象存储（MinIO）**勿共占 9000**；MEIS 本地 MinIO 默认 API **9100**。
+落地映射：MEIS PLT-CAM-01/02/**03**/**04**、**AST-ARCH-01/02**、**AST-SNJ-01 工程约束**（新良田 Eloam `ws://127.0.0.1:9000`；`/api/file/copy`；合同附件只读聚合用 `row_kind=ref`+`origin*`，禁止假主键；`device_archive_file.sort_order/rotate_angle/source`）。开发机注意：Eloam 与对象存储（MinIO）**勿共占 9000**；MEIS 本地 MinIO 默认 API **9100**。
+
+### 5.11.1 跨对象附件只读聚合与写入口隔离
+
+当详情聚合「本对象附件 + 他表只读引用」时：
+
+| 项 | 要求 |
+|----|------|
+| **标识** | 引用行用 `row_kind=ref` + `origin` / `origin_id` / `origin_field`（或等价）；列表键用 `client_key`，**勿**伪造主表 UUID / 字符串假主键 |
+| **写隔离** | 变更/删除/复制 API 只接受真实主键；引用行一律拒绝 |
+| **物理复制** | 跨主数据复制附件须新 object；写目标侧冗余编码名称 |
+| **幂等** | 批处理去重；同态跳过；软删可重复 |
+
+落地映射：MEIS AST-ARCH-02 / AST-SNJ-01。
 
 ### 5.12 日期与时间格式（多端）
 
@@ -763,7 +779,9 @@ USB 外设（如文档高拍仪）**勿**由浏览器直连硬件；经厂商本
 | 业务单号系统生成 | 约定包 §6.8、OPS.14 | `DailyBizNoSupport`；计划/执行 Controller 与 Generator |
 | 维修列表功能分列 | 附录 U.14.2 | `WorkorderListPage`（handle/verify 取消操作列、功能分列） |
 | 运维计划操作分列 / 已审核明细 | OPS.16.6–16.16、约定包 §5.7 / §5.8 / **§5.9** / **§5.10** | 三计划操作分列；明细执行/确认/删除；纳入申请+Web确认；编辑/执行分离；全确认即可审核；头表流式紧凑；途径齐套展示；追加多端须加列+历史 web 回填（§5.10.6） |
-| 本机外设高拍仪 | PLT-CAM-01 / **02**、约定包 **§5.11** | `cameraVendors`；`CameraDebugPage`（系统管理）；设备档案高拍仪；通用上传入口 |
+| 本机外设高拍仪 | PLT-CAM-01～**04**、约定包 **§5.11** | `cameraVendors`；`EloamCaptureDialog`；设备档案高拍仪 |
+| 设备档案附件增强 | AST-ARCH-01/02、**§5.11.1** | `DeviceArchivePanel`；合同 `row_kind=ref`；`/api/file/copy` |
+| 旧系统对照补强 | AST-SNJ-01 工程约束 | 禁假主键/路径猜归属；批处理幂等；冗余双写 |
 | 多端日期时间格式 | PLT-DT-01、约定包 **§5.12** | `meis-web/src/utils/datetime.ts`；`meis-mobile/.../datetime_format.dart`；`meis-mp/src/utils/datetime.ts`；列表/表单/筛选 |
 | 构建产物不入库 | PKG-VCS-01、约定包 **NF-08** | `.gitignore`；`package/www|.jars|.apk` 目录内占位 ignore |
 | 开发/现场脚本分区 | 本文 **§9.1** | `scripts/{common,bs,app}`；`package/{common,bs,app}`；根目录薄转发 |

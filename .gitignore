@@ -76,3 +76,6 @@ meis-mp/src/manifest.json
 # JVM heap dumps (do not commit)
 *.hprof
 
+# 对照用旧系统（神农架）完整工程：仅本地参考，勿入库
+cestar_shenNongJia/
+
