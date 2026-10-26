@@ -88,8 +88,8 @@ public class DeviceArchiveFileController {
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 SELECT * FROM device_archive_file
                 WHERE device_id = ?::uuid
-                """ + SoftDeleteSupport.notDeletedClause(jdbc, TABLE, null) + """
-                ORDER BY """ + order, deviceId);
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, TABLE, null)
+                + " ORDER BY " + order, deviceId);
         for (Map<String, Object> row : rows) {
             row.put("row_kind", "archive");
             row.put("readonly", false);

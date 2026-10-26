@@ -29,6 +29,37 @@ function Resolve-MeisJavaHome {
     throw 'JDK 17 not found. Install to E:\workspace\jdk-17 or set MEIS_JAVA_HOME.'
 }
 
+<#
+.SYNOPSIS
+  Load package\env.txt into the current process environment so child java.exe inherit DB/middleware settings.
+  Without this, Spring falls back to application.yml defaults (remote POSTGRES_HOST) and JDBC Connection refused.
+#>
+function Import-MeisPackageEnv {
+    $envFile = Join-Path $script:MeisRoot 'package\env.txt'
+    if (-not (Test-Path -LiteralPath $envFile)) {
+        Write-Host "  Warn: missing package\env.txt — JDBC may use application.yml remote defaults" -ForegroundColor Yellow
+        return $false
+    }
+    $loaded = 0
+    Get-Content -LiteralPath $envFile -Encoding UTF8 | ForEach-Object {
+        $line = $_.Trim()
+        if (-not $line -or $line.StartsWith('#')) { return }
+        $eq = $line.IndexOf('=')
+        if ($eq -lt 1) { return }
+        $key = $line.Substring(0, $eq).Trim()
+        $val = $line.Substring($eq + 1).Trim()
+        if ($val.StartsWith('"') -and $val.EndsWith('"') -and $val.Length -ge 2) {
+            $val = $val.Substring(1, $val.Length - 2)
+        }
+        if (-not $key) { return }
+        Set-Item -Path "Env:$key" -Value $val
+        $loaded++
+    }
+    $pgHost = [Environment]::GetEnvironmentVariable('POSTGRES_HOST')
+    Write-Host "  Loaded package\env.txt ($loaded keys); POSTGRES_HOST=$pgHost" -ForegroundColor DarkGray
+    return $true
+}
+
 function Resolve-MeisMaven {
     foreach ($candidate in @(
         $env:MEIS_MAVEN_CMD,
@@ -319,6 +350,7 @@ function Start-MeisServices {
     $javaExe = Join-Path $env:JAVA_HOME 'bin\java.exe'
     $env:Path = "$env:JAVA_HOME\bin;" + $env:Path
     Write-Host "Using JAVA_HOME: $env:JAVA_HOME"
+    Import-MeisPackageEnv | Out-Null
     $root = $script:MeisRoot
     $logDir = Join-Path $root "logs"
     if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
@@ -515,6 +547,7 @@ function Start-MeisServiceByName {
 
     $env:JAVA_HOME = Resolve-MeisJavaHome
     $javaExe = Join-Path $env:JAVA_HOME 'bin\java.exe'
+    Import-MeisPackageEnv | Out-Null
     $root = $script:MeisRoot
     $jar = Join-Path $root "$ServiceName\target\$ServiceName-1.0.0-SNAPSHOT.jar"
     $jarHealth = Test-MeisServiceJarHealthy $ServiceName
