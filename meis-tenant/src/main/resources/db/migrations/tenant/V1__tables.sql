@@ -217,6 +217,34 @@ COMMENT ON COLUMN sys_operation_log.error_msg IS '错误信息';
 COMMENT ON COLUMN sys_operation_log.created_at IS '创建时间';
 
 -- 1.7 实体变更记录（附录 T）
+
+CREATE TABLE IF NOT EXISTS sys_user_wx_bind (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
+    wx_openid VARCHAR(64) NOT NULL,
+    wx_unionid VARCHAR(64),
+    mp_app_id VARCHAR(64),
+    effective_from TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    effective_to TIMESTAMPTZ,
+    bind_channel VARCHAR(20),
+    unbind_channel VARCHAR(20),
+    remark VARCHAR(500),
+    unbound_at TIMESTAMPTZ,
+    unbound_by UUID,
+    unbound_by_name VARCHAR(100),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by UUID,
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMPTZ,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100)
+);
+COMMENT ON TABLE sys_user_wx_bind IS '系统用户与微信账号区间绑定（多对多历史，WX-BIND-01）';
+
 CREATE TABLE sys_entity_change_log (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     entity_type VARCHAR(64) NOT NULL,

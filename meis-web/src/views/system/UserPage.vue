@@ -152,7 +152,7 @@
       </el-table-column>
       <el-table-column
         label="操作"
-        width="300"
+        width="360"
         fixed="right"
         header-align="center"
         align="center"
@@ -161,6 +161,7 @@
         <template #default="{ row }">
           <div class="table-actions">
             <el-button link type="primary" @click="openChangeLog(row)">变更记录</el-button>
+            <el-button link type="primary" @click="openWxBind(row)">微信账号</el-button>
             <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
             <el-button link type="primary" @click="openRole(row)">分配角色</el-button>
             <el-dropdown trigger="click" @command="(cmd: string) => onUserAction(cmd, row)">
@@ -374,6 +375,47 @@
       </template>
     </AppModal>
     <EntityChangeHistoryDrawer v-model="changeLogVisible" entity-type="sys_user" :entity-id="changeLogId" />
+
+    <el-dialog
+      v-model="wxVisible"
+      :title="wxUser ? `微信账号 · ${wxUser.real_name || wxUser.username}` : '微信账号'"
+      width="720px"
+      destroy-on-close
+    >
+      <p class="permission-hint">
+        多微信号与系统用户按<strong>时间区间</strong>关联；解除绑定=闭合当前区间（保留历史），不做启用/停用开关。
+      </p>
+      <div class="batch-field" style="margin-bottom: 12px">
+        <el-input v-model="wxForm.wx_openid" placeholder="微信 openid（手动关联）" clearable />
+        <el-input v-model="wxForm.remark" placeholder="备注（可选）" clearable style="margin-top: 8px" />
+        <el-button type="primary" :loading="wxSaving" style="margin-top: 8px" @click="saveWxBind">关联</el-button>
+      </div>
+      <el-table :data="wxRows" stripe size="small" max-height="360">
+        <el-table-column label="openid" min-width="160">
+          <template #default="{ row }">{{ maskOpenid(row.wx_openid) }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="88">
+          <template #default="{ row }">
+            <el-tag size="small" :type="row.effective_to ? 'info' : 'success'">
+              {{ row.effective_to ? '已解绑' : '有效' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="effective_from" label="生效起" min-width="150" />
+        <el-table-column prop="effective_to" label="生效止" min-width="150" />
+        <el-table-column label="操作" width="100" fixed="right">
+          <template #default="{ row }">
+            <el-button
+              v-if="!row.effective_to"
+              link
+              type="danger"
+              :loading="wxSaving"
+              @click="unbindWx(row)"
+            >解除绑定</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
   </SystemPageCard>
 </template>
 
@@ -410,6 +452,11 @@ const filterPermissionMode = ref('')
 const roleOptions = ref<any[]>([])
 const flatDepts = ref<any[]>([])
 const formVisible = ref(false)
+const wxVisible = ref(false)
+const wxUser = ref<any>(null)
+const wxRows = ref<any[]>([])
+const wxSaving = ref(false)
+const wxForm = reactive({ wx_openid: '', remark: '' })
 const batchVisible = ref(false)
 const roleVisible = ref(false)
 const permVisible = ref(false)
@@ -426,6 +473,85 @@ const batchForm = reactive({
   setRepairEngineer: false,
   is_repair_engineer: false
 })
+
+function maskOpenid(v: unknown) {
+  const s = v == null ? '' : String(v)
+  if (s.length < 6) return s || '—'
+  return `${s.slice(0, 3)}***${s.slice(-3)}`
+}
+
+async function openWxBind(row: any) {
+  wxUser.value = row
+  wxForm.wx_openid = ''
+  wxForm.remark = ''
+  wxVisible.value = true
+  await loadWxBinds()
+}
+
+async function loadWxBinds() {
+  if (!wxUser.value?.id) return
+  try {
+    const { data } = await http.get(`/system/user-wx-bind/by-user/${wxUser.value.id}`)
+    if (data.code !== 0 && data.code !== 200) {
+      ElMessage.error(data.message || '加载微信绑定失败')
+      wxRows.value = []
+      return
+    }
+    wxRows.value = Array.isArray(data.data) ? data.data : []
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.message || '加载微信绑定失败')
+    wxRows.value = []
+  }
+}
+
+async function saveWxBind() {
+  if (!wxUser.value?.id) return
+  if (!wxForm.wx_openid.trim()) {
+    ElMessage.warning('请填写 openid')
+    return
+  }
+  wxSaving.value = true
+  try {
+    const { data } = await http.post('/system/user-wx-bind', {
+      user_id: wxUser.value.id,
+      wx_openid: wxForm.wx_openid.trim(),
+      remark: wxForm.remark || null,
+      client: 'web'
+    })
+    if (data.code !== 0 && data.code !== 200) {
+      ElMessage.error(data.message || '关联失败')
+      return
+    }
+    ElMessage.success('已关联')
+    wxForm.wx_openid = ''
+    wxForm.remark = ''
+    await loadWxBinds()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.message || '关联失败')
+  } finally {
+    wxSaving.value = false
+  }
+}
+
+async function unbindWx(row: any) {
+  await ElMessageBox.confirm('解除绑定将闭合当前有效区间并保留历史，是否继续？', '解除绑定', {
+    type: 'warning'
+  })
+  wxSaving.value = true
+  try {
+    const { data } = await http.post(`/system/user-wx-bind/${row.id}/unbind`, { client: 'web' })
+    if (data.code !== 0 && data.code !== 200) {
+      ElMessage.error(data.message || '解绑失败')
+      return
+    }
+    ElMessage.success('已解除绑定')
+    await loadWxBinds()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.message || '解绑失败')
+  } finally {
+    wxSaving.value = false
+  }
+}
 
 function openChangeLog(row: any) {
   changeLogId.value = String(row.id)

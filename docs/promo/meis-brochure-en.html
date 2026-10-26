@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MEIS Medical Equipment Management · Brochure</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --brand: #1677ff;
+      --brand-deep: #0b3d8c;
+      --ink: #0f1c2e;
+      --muted: #5a6b7d;
+      --paper: #f3f7fb;
+      --panel: #ffffff;
+      --line: rgba(15, 28, 46, 0.1);
+      --glow: rgba(22, 119, 255, 0.35);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: Manrope, sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+      line-height: 1.55;
+    }
+    a { color: inherit; text-decoration: none; }
+    .lang-switch {
+      position: fixed; top: 16px; right: 16px; z-index: 30;
+      display: flex; gap: 6px; padding: 6px; border-radius: 999px;
+      background: rgba(255,255,255,0.88); backdrop-filter: blur(8px);
+      border: 1px solid var(--line); font-size: 12px; font-weight: 600;
+    }
+    .lang-switch a { padding: 6px 12px; border-radius: 999px; }
+    .lang-switch a.is-on { background: var(--brand); color: #fff; }
+    .toc {
+      position: fixed; left: 16px; top: 50%; transform: translateY(-50%);
+      z-index: 25; display: flex; flex-direction: column; gap: 8px;
+    }
+    .toc a {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: rgba(15,28,46,0.22);
+    }
+    .toc a:hover, .toc a:focus { background: var(--brand); }
+    @media (max-width: 960px) { .toc { display: none; } }
+
+    .screen {
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+      padding: clamp(28px, 5vw, 64px);
+    }
+    .screen.tall {
+      min-height: auto;
+      padding-top: clamp(48px, 6vw, 80px);
+      padding-bottom: clamp(48px, 6vw, 80px);
+    }
+    .screen + .screen { border-top: 1px solid var(--line); }
+
+    .hero {
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(22,119,255,0.28), transparent 55%),
+        radial-gradient(900px 500px at 90% 20%, rgba(11,61,140,0.18), transparent 50%),
+        linear-gradient(165deg, #e8f1ff 0%, #f7fafc 45%, #eef4f8 100%);
+      justify-content: space-between;
+    }
+    .hero::before {
+      content: "";
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(15,28,46,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15,28,46,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: linear-gradient(180deg, #000 20%, transparent 85%);
+      pointer-events: none;
+    }
+    .hero-top { position: relative; z-index: 1; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--brand-deep);
+    }
+    .eyebrow::before {
+      content: ""; width: 28px; height: 2px; background: var(--brand);
+    }
+    .brand {
+      margin-top: 28px;
+      font-family: "Instrument Serif", serif;
+      font-size: clamp(64px, 14vw, 128px);
+      line-height: 0.92;
+      letter-spacing: -0.03em;
+      animation: rise 0.9s ease both;
+    }
+    .brand span { color: var(--brand); }
+    .hero-lead {
+      margin-top: 28px;
+      max-width: 38em;
+      font-size: clamp(17px, 2.2vw, 22px);
+      color: var(--muted);
+      font-weight: 500;
+      animation: rise 0.9s ease 0.12s both;
+    }
+    .hero-cta {
+      margin-top: 36px;
+      display: flex; flex-wrap: wrap; gap: 12px;
+      animation: rise 0.9s ease 0.22s both;
+    }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 14px 22px; border-radius: 4px; font-weight: 700; font-size: 14px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary {
+      background: var(--brand); color: #fff;
+      box-shadow: 0 12px 28px var(--glow);
+    }
+    .btn-ghost {
+      background: transparent; border: 1px solid rgba(15,28,46,0.18);
+    }
+    .hero-foot {
+      position: relative; z-index: 1;
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px; margin-top: 48px;
+    }
+    .stat {
+      padding: 18px 16px; border-radius: 6px;
+      background: rgba(255,255,255,0.72);
+      border: 1px solid var(--line);
+      backdrop-filter: blur(6px);
+      animation: rise 0.8s ease both;
+    }
+    .stat:nth-child(1) { animation-delay: 0.28s; }
+    .stat:nth-child(2) { animation-delay: 0.36s; }
+    .stat:nth-child(3) { animation-delay: 0.44s; }
+    .stat strong {
+      display: block;
+      font-family: "Instrument Serif", serif;
+      font-size: 28px; line-height: 1.1;
+    }
+    .stat span { font-size: 13px; color: var(--muted); }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .diff {
+      background: linear-gradient(180deg, #0f1c2e 0%, #14305a 55%, #0f2444 100%);
+      color: #eef4ff;
+    }
+    .diff .eyebrow { color: #9ec5ff; }
+    .diff .eyebrow::before { background: #5aa2ff; }
+    .diff h2, .features h2, .compare-sec h2, .close h2 {
+      margin-top: 18px;
+      font-family: "Instrument Serif", serif;
+      font-size: clamp(30px, 4.4vw, 44px);
+      font-weight: 400; line-height: 1.2; max-width: 18em;
+    }
+    .diff-lead, .sec-lead {
+      margin-top: 16px; max-width: 48em; font-size: 16px;
+    }
+    .diff-lead { color: rgba(238,244,255,0.78); }
+    .sec-lead { color: var(--muted); }
+    .compare {
+      margin-top: 40px;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+    }
+    .card {
+      border-radius: 8px; padding: 22px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.05);
+    }
+    .card.good {
+      background: linear-gradient(160deg, rgba(22,119,255,0.28), rgba(255,255,255,0.06));
+      border-color: rgba(90,162,255,0.45);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.22);
+    }
+    .card h3 {
+      font-size: 13px; font-weight: 700; letter-spacing: 0.06em;
+      text-transform: uppercase; opacity: 0.85; margin-bottom: 10px;
+    }
+    .card p { font-size: 15px; color: rgba(238,244,255,0.86); }
+    .timeline { margin-top: 18px; display: grid; gap: 10px; }
+    .seg {
+      display: grid; grid-template-columns: 100px 1fr; gap: 10px; align-items: center;
+      font-size: 13px;
+    }
+    .seg i {
+      display: block; height: 10px; border-radius: 999px;
+      background: linear-gradient(90deg, #5aa2ff, #1677ff);
+      transform-origin: left center;
+      animation: growBar 1.1s ease 0.4s both;
+    }
+    .seg:nth-child(2) i { width: 72%; opacity: 0.75; }
+    .seg:nth-child(3) i { width: 48%; opacity: 0.55; }
+    @keyframes growBar {
+      from { transform: scaleX(0.15); opacity: 0.4; }
+      to { transform: scaleX(1); opacity: 1; }
+    }
+    .flat {
+      margin-top: 18px; padding: 14px; border-radius: 6px;
+      background: rgba(0,0,0,0.22); font-size: 13px; color: rgba(238,244,255,0.7);
+    }
+    .points {
+      margin-top: 28px;
+      display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px;
+    }
+    .points li {
+      list-style: none; padding: 14px;
+      border-radius: 6px; background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      font-size: 14px;
+    }
+    .points strong { display: block; margin-bottom: 4px; font-size: 15px; }
+
+    .features {
+      background:
+        radial-gradient(800px 400px at 100% 0%, rgba(22,119,255,0.1), transparent 50%),
+        var(--paper);
+    }
+    .domain { margin-top: 36px; }
+    .domain + .domain { margin-top: 40px; }
+    .domain-head {
+      display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px 18px;
+      padding-bottom: 12px; border-bottom: 1px solid var(--line);
+      margin-bottom: 16px;
+    }
+    .domain-head h3 {
+      font-family: "Instrument Serif", serif;
+      font-size: 24px; font-weight: 400;
+    }
+    .domain-head span { font-size: 13px; color: var(--muted); }
+    .feat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .feat {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+    .feat:hover { border-color: rgba(22,119,255,0.45); transform: translateY(-2px); }
+    .feat .tag {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+      color: var(--brand); text-transform: uppercase;
+    }
+    .feat h4 { margin-top: 6px; font-size: 16px; font-weight: 700; }
+    .feat p { margin-top: 6px; font-size: 13px; color: var(--muted); }
+
+    .compare-sec { background: #eaf1f8; }
+    .table-wrap {
+      margin-top: 28px;
+      overflow-x: auto;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      box-shadow: 0 16px 40px rgba(15,28,46,0.06);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      min-width: 760px;
+    }
+    th, td {
+      padding: 14px 16px;
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid var(--line);
+    }
+    th {
+      background: #0f1c2e;
+      color: #eef4ff;
+      font-weight: 600;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+    }
+    th:first-child { width: 20%; }
+    th.meis { background: var(--brand); }
+    td.dim { color: var(--muted); }
+    td.meis-cell { background: rgba(22,119,255,0.06); font-weight: 500; }
+    tr:last-child td { border-bottom: none; }
+    .note { margin-top: 14px; font-size: 12px; color: var(--muted); }
+
+    .close {
+      background: linear-gradient(120deg, #0f1c2e, #143868);
+      color: #fff;
+      min-height: auto;
+      padding-top: clamp(56px, 8vw, 96px);
+      padding-bottom: clamp(56px, 8vw, 96px);
+    }
+    .close .eyebrow { color: #9ec5ff; }
+    .close .eyebrow::before { background: #5aa2ff; }
+    .close .sec-lead { color: rgba(238,244,255,0.78); }
+    .close-actions { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 12px; }
+    .close .btn-ghost { border-color: rgba(255,255,255,0.35); color: #fff; }
+
+    @media (max-width: 900px) {
+      .hero-foot, .compare, .points, .feat-grid { grid-template-columns: 1fr; }
+    }
+    @media print {
+      .lang-switch, .toc { display: none; }
+      .screen { min-height: auto; page-break-after: always; padding: 24px; }
+      .screen.tall { page-break-after: auto; }
+      .btn { box-shadow: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="lang-switch" aria-label="Language">
+    <a href="./meis-brochure-zh.html">中文</a>
+    <a class="is-on" href="./meis-brochure-en.html">EN</a>
+  </nav>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1" title="Brand"></a>
+    <a href="#s2" title="Difference"></a>
+    <a href="#s3" title="Features"></a>
+    <a href="#s4" title="Compare"></a>
+    <a href="#s5" title="Close"></a>
+  </nav>
+
+  <section class="screen hero" id="s1">
+    <div class="hero-top">
+      <p class="eyebrow">Hospital Medical Equipment SaaS</p>
+      <h1 class="brand">MEIS<span>.</span></h1>
+      <p class="hero-lead">
+        Full lifecycle management for medical devices and fixed assets—
+        from purchasing and warehousing to the ledger, operations, quality compliance, and analytics.
+        Complete fields, complete records, clear historical ownership:
+        every work order and cost can return to the right department and time span.
+      </p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#s2">See the difference</a>
+        <a class="btn btn-ghost" href="#s3">Features</a>
+        <a class="btn btn-ghost" href="#s4">Comparison</a>
+      </div>
+    </div>
+    <div class="hero-foot">
+      <div class="stat"><strong>Period history</strong><span>Ownership &amp; location as time ranges</span></div>
+      <div class="stat"><strong>End-to-end</strong><span>Purchase · warehouse · ledger · ops · QC</span></div>
+      <div class="stat"><strong>Multi-channel</strong><span>Web · App · Mini Program · power monitoring</span></div>
+    </div>
+  </section>
+
+  <section class="screen diff" id="s2">
+    <p class="eyebrow">Why MEIS</p>
+    <h2>Not overwriting a field—remembering who owned the device, and when</h2>
+    <p class="diff-lead">
+      In many peer systems, department and install location are flat “current” values. Change them and history disappears;
+      past maintenance and costs become hard to attribute. MEIS stores ownership and location as
+      <strong style="color:#fff">time intervals</strong>, so repairs, maintenance, metrology, PM, and part replacements
+      can be reconciled to the department in charge at that time.
+    </p>
+    <div class="compare">
+      <article class="card">
+        <h3>Typical peer approach</h3>
+        <p>Department / location = current fields only. Updates overwrite; historical ops and cost ownership drift.</p>
+        <div class="flat">Dept A → overwritten as Dept B (who was responsible? which cost center? unclear)</div>
+      </article>
+      <article class="card good">
+        <h3>MEIS approach</h3>
+        <p>Ownership periods · location periods with start/end. Ledger-linked ops stay attributable by interval.</p>
+        <div class="timeline">
+          <div class="seg"><span>Dept A</span><i></i></div>
+          <div class="seg"><span>Dept B</span><i></i></div>
+          <div class="seg"><span>Current site</span><i></i></div>
+        </div>
+      </article>
+    </div>
+    <ul class="points">
+      <li><strong>Complete fields</strong>Rich master data and business sheets—licenses, archives, warranty, and ops on one asset.</li>
+      <li><strong>Complete records</strong>Repair workflow, part replacements, maintenance / inspection / metrology / PM on one timeline.</li>
+      <li><strong>Clear ownership</strong>True change vs correction; backfill can be confirmed—no silent edits of timeline fields.</li>
+    </ul>
+  </section>
+
+  <section class="screen tall features" id="s3">
+    <p class="eyebrow">Capabilities</p>
+    <h2>Feature overview</h2>
+    <p class="sec-lead">
+      One platform from purchasing → inbound → ledger → use &amp; maintenance → quality compliance → disposal → benefit analysis.
+      Below are shippable capabilities by domain (roadmap items are not marketed as delivered).
+    </p>
+
+    <div class="domain">
+      <div class="domain-head">
+        <h3>Assets &amp; archives</h3>
+        <span>One complete master card per device, with documents and history attached</span>
+      </div>
+      <div class="feat-grid">
+        <article class="feat">
+          <div class="tag">Ledger</div>
+          <h4>Asset ledger</h4>
+          <p>Licenses, classification, finance and ops fields; readable labels and coded references.</p>
+        </article>
+        <article class="feat">
+          <div class="tag">Archive</div>
+          <h4>Archives &amp; images</h4>
+          <p>Contracts and manuals on the device; document camera capture and preview in the browser.</p>
+        </article>
+        <article class="feat">
+          <div class="tag">History</div>
+          <h4>Ownership / location history</h4>
+          <p>Time-bounded department and install location for ops and cost attribution.</p>
+        </article>
+        <article class="feat">
+          <div class="tag">Print</div>
+          <h4>Asset cards &amp; labels</h4>
+          <p>Printable asset cards; label runs support inventory and scan workflows.</p>
+        </article>
+        <article class="feat">
+          <div class="tag">Audit</div>
+          <h4>Master-data change log</h4>
+          <p>Before/after values in plain language; mixed sources show generation method.</p>
+        </article>
+        <article class="feat">
+          <div class="tag">Special</div>
+          <h4>Special equipment</h4>
+          <p>Life-support, radiation / special, emergency stock, leasing, and more.</p>
+        </article>
+      </div>
+    </div>
+
+    <div class="domain">
+      <div class="domain-head">
+        <h3>Warehouse &amp; inventory</h3>
+        <span>Master–detail warehouse docs; mobile scan collaboration</span>
+      </div>
+      <div class="feat-grid">
+        <article class="feat">
+          <div class="tag">Warehouse</div>
+          <h4>In / out / return / vendor return</h4>
+          <p>Header and lines required together; status writes back to the ledger.</p>
+        </article>
+        <article class="feat">
+          <div class="tag">Inventory</div>
+          <h4>Stocktaking</h4>
+          <p>Web counts with App / mini-program scan counts; variances are recorded.</p>
+        </article>
+        <article class="feat">
+          <div class="tag">Dispose</div>
+          <h4>Disposal</h4>
+          <p>Request through archival; disposal history aggregates on the asset.</p>
+        </article>
+      </div>
+    </div>
+
+    <div class="domain">
+      <div class="domain-head">
+        <h3>Operations loop</h3>
+        <span>Repair and planned ops on one device timeline</span>
+      </div>
+      <div class="feat-grid">
+        <article class="feat">
+          <div class="tag">Repair</div>
+          <h4>Repair workflow</h4>
+          <p>Request → work → acceptance; dual status, process stages, and part replacements.</p>
+        </article>
+        <article class="feat">
+          <div class="tag">Parts</div>
+          <h4>Part replacement</h4>
+          <p>Repair and non-repair replacements with clear source; confirmable backfill.</p>
+        </article>
+        <article class="feat">
+          <div class="tag">PM</div>
+          <h4>Maintenance · inspection · metrology · PM</h4>
+          <p>Parameter → plan → execute → record, with clear boundaries and readable results.</p>
+        </article>
+        <article class="feat">
+          <div class="tag">Contract</div>
+          <h4>Warranty &amp; service contracts</h4>
+          <p>Coverage maintained against devices; contracts align with ledger archives.</p>
+        </article>
+      </div>
+    </div>
+
+    <div class="domain">
+      <div class="domain-head">
+        <h3>QC · pooling · purchasing</h3>
+        <span>Compliance reporting, shared-device pooling, and purchasable document trails</span>
+      </div>
+      <div class="feat-grid">
+        <article class="feat">
+          <div class="tag">QC</div>
+          <h4>Adverse events &amp; risk</h4>
+          <p>Quality reporting and query entries, linkable to devices.</p>
+        </article>
+        <article class="feat">
+          <div class="tag">Loan</div>
+          <h4>Pooling (loan / return)</h4>
+          <p>Request / approve / return / charge for shared equipment with visible status.</p>
+        </article>
+        <article class="feat">
+          <div class="tag">Purchase</div>
+          <h4>Purchasing &amp; contracts</h4>
+          <p>Request → approve → plan → bid → contract → acceptance; payment schedules supported.</p>
+        </article>
+      </div>
+    </div>
+
+    <div class="domain">
+      <div class="domain-head">
+        <h3>Sensing · channels · platform</h3>
+        <span>Field work and back-office governance on one data set</span>
+      </div>
+      <div class="feat-grid">
+        <article class="feat">
+          <div class="tag">Power</div>
+          <h4>Power monitoring</h4>
+          <p>Tags / gateways / readings linked to the ledger for critical device visibility.</p>
+        </article>
+        <article class="feat">
+          <div class="tag">Channels</div>
+          <h4>Web · App · Mini Program</h4>
+          <p>Shared capabilities evolve together; actions record the originating channel.</p>
+        </article>
+        <article class="feat">
+          <div class="tag">Camera</div>
+          <h4>Document camera capture</h4>
+          <p>Browser-side capture into archives with naming and upload in one flow.</p>
+        </article>
+        <article class="feat">
+          <div class="tag">IAM</div>
+          <h4>Org &amp; permissions</h4>
+          <p>Multi-tenant isolation; campuses, departments, users, roles, and menus.</p>
+        </article>
+        <article class="feat">
+          <div class="tag">Analytics</div>
+          <h4>Benefit &amp; asset reports</h4>
+          <p>Per-device benefit, depreciation, and portfolio views for biomedical leadership.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen tall compare-sec" id="s4">
+    <p class="eyebrow">Competitive edge</p>
+    <h2>How MEIS differs from peer products</h2>
+    <p class="sec-lead">
+      Compared with common hospital equipment-management products. “Typical peer” summarizes market patterns without naming vendors;
+      the MEIS column reflects shipped capabilities and engineering conventions.
+    </p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Dimension</th>
+            <th>Typical peer approach</th>
+            <th class="meis">MEIS advantage</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Department / location</td>
+            <td class="dim">Flat current fields; updates overwrite</td>
+            <td class="meis-cell">Time intervals; ops and cost reconcile to the right department by period</td>
+          </tr>
+          <tr>
+            <td>Editing timeline fields</td>
+            <td class="dim">Silent edits of department / room common</td>
+            <td class="meis-cell">True change (close old + open new) vs correction—no quiet timeline edits</td>
+          </tr>
+          <tr>
+            <td>Historical backfill</td>
+            <td class="dim">Hard to backfill, or still freely editable</td>
+            <td class="meis-cell">Draft → confirm; immutable after effective for clear audit boundaries</td>
+          </tr>
+          <tr>
+            <td>Ledger depth</td>
+            <td class="dim">List + few tabs; ops scattered</td>
+            <td class="meis-cell">Complete fields + business sheets: repair / PM / metrology / loans on one asset</td>
+          </tr>
+          <tr>
+            <td>Document structure</td>
+            <td class="dim">Headers without lines are common</td>
+            <td class="meis-cell">Master–detail required (plans, warehouse docs, ops executions)</td>
+          </tr>
+          <tr>
+            <td>Multi-channel</td>
+            <td class="dim">Web / App capabilities diverge</td>
+            <td class="meis-cell">Shared features evolve together; channel is written and displayable</td>
+          </tr>
+          <tr>
+            <td>Audit &amp; change</td>
+            <td class="dim">Weak logs or missing before/after</td>
+            <td class="meis-cell">Entity change log in plain language; generation method for mixed sources</td>
+          </tr>
+          <tr>
+            <td>Archive capture</td>
+            <td class="dim">Mostly local file upload</td>
+            <td class="meis-cell">Document-camera capture; copy / sort / preview engineered</td>
+          </tr>
+          <tr>
+            <td>Runtime sensing</td>
+            <td class="dim">Ledger and monitoring often split</td>
+            <td class="meis-cell">Power monitoring linked to the asset; tags and readings multi-channel</td>
+          </tr>
+          <tr>
+            <td>Readability</td>
+            <td class="dim">Raw codes and opaque FKs in lists</td>
+            <td class="meis-cell">Chinese / human labels for status; strong FKs as “code name”</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Note: RFID / real-time locating remain on the roadmap and are not marketed as delivered here.</p>
+  </section>
+
+  <section class="screen close" id="s5">
+    <p class="eyebrow">Built to be audited</p>
+    <h2>Equipment management that stands up to scrutiny</h2>
+    <p class="sec-lead">
+      Complete fields · complete records · clear historical ownership—
+      MEIS is the trusted base for biomedical and clinical teams.
+    </p>
+    <div class="close-actions">
+      <a class="btn btn-primary" href="#s3">Back to features</a>
+      <a class="btn btn-ghost" href="#s1">Back to top</a>
+    </div>
+  </section>
+</body>
+</html>

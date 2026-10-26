@@ -370,6 +370,135 @@ public class DeviceOwnershipPeriodService implements DeviceOwnershipWriteback {
     }
 
     @Transactional
+    public Map<String, Object> createLocationBackfill(Map<String, Object> body) {
+        UUID deviceId = parseUuid(body.get("device_id"));
+        if (deviceId == null) throw new BizException(400, "请指定设备");
+        Map<String, Object> device = requireDevice(deviceId);
+        Instant from = parseInstant(body.get("effective_from"));
+        Instant to = parseInstant(body.get("effective_to"));
+        if (from == null || to == null) {
+            throw new BizException(400, "补录位置历史须填写闭合起止时间");
+        }
+        if (!to.isAfter(from)) {
+            throw new BizException(400, "结束时间必须晚于开始时间");
+        }
+        assertNoConfirmedLocationOverlap(deviceId, from, to, null);
+
+        Map<String, Object> row = new LinkedHashMap<>();
+        UUID id = UUID.randomUUID();
+        row.put("id", id);
+        fillLocationFromDevice(row, device);
+        applyLocationBodyOverrides(row, body);
+        row.put("effective_from", Timestamp.from(from));
+        row.put("effective_to", Timestamp.from(to));
+        row.put("change_reason", firstNonBlank(str(body.get("change_reason")), "manual_backfill"));
+        row.put("source_mode", firstNonBlank(str(body.get("source_mode")), "manual_backfill"));
+        row.put("source_biz_type", body.get("source_biz_type"));
+        row.put("source_biz_id", parseUuid(body.get("source_biz_id")));
+        row.put("source_biz_no", body.get("source_biz_no"));
+        row.put("confirm_status", "draft");
+        row.put("confirmed_at", null);
+        row.put("confirmed_by", null);
+        row.put("confirmed_by_name", null);
+        row.put("remark", body.get("remark"));
+        SoftDeleteSupport.applyInsertAudit(jdbc, LOC_TABLE, row);
+        insertLocation(row);
+        return loadLocation(id);
+    }
+
+    @Transactional
+    public Map<String, Object> updateLocationDraft(UUID periodId, Map<String, Object> body) {
+        Map<String, Object> existing = loadLocation(periodId);
+        if (!"draft".equals(String.valueOf(existing.get("confirm_status")))) {
+            throw new BizException(400, "仅待确认草稿可修改");
+        }
+        UUID deviceId = parseUuid(existing.get("device_id"));
+        Instant from = body.containsKey("effective_from")
+                ? parseInstant(body.get("effective_from")) : parseInstant(existing.get("effective_from"));
+        Instant to = body.containsKey("effective_to")
+                ? parseInstant(body.get("effective_to")) : parseInstant(existing.get("effective_to"));
+        if (from == null || to == null) {
+            throw new BizException(400, "补录位置历史须填写闭合起止时间");
+        }
+        if (!to.isAfter(from)) {
+            throw new BizException(400, "结束时间必须晚于开始时间");
+        }
+        assertNoConfirmedLocationOverlap(deviceId, from, to, periodId);
+
+        List<String> sets = new ArrayList<>();
+        List<Object> args = new ArrayList<>();
+        if (body.containsKey("campus_id")) {
+            sets.add("campus_id = ?::uuid");
+            args.add(parseUuid(body.get("campus_id")));
+            sets.add("campus_name = ?");
+            args.add(firstNonBlank(str(body.get("campus_name")), resolveCampusName(body.get("campus_id"))));
+        }
+        if (body.containsKey("building_id")) {
+            sets.add("building_id = ?::uuid");
+            args.add(parseUuid(body.get("building_id")));
+            sets.add("building_name = ?");
+            args.add(firstNonBlank(str(body.get("building_name")), resolveBuildingName(body.get("building_id"))));
+        }
+        putSet(sets, args, "location_floor", body, existing, false);
+        putSet(sets, args, "room_number", body, existing, false);
+        putSet(sets, args, "location_detail", body, existing, false);
+        sets.add("effective_from = ?::timestamptz");
+        args.add(Timestamp.from(from));
+        sets.add("effective_to = ?::timestamptz");
+        args.add(Timestamp.from(to));
+        putSet(sets, args, "change_reason", body, existing, false);
+        putSet(sets, args, "source_mode", body, existing, false);
+        putSet(sets, args, "remark", body, existing, false);
+        SoftDeleteSupport.appendUpdateAuditSets(jdbc, TableColumnCache.columns(jdbc, LOC_TABLE), sets, args);
+        args.add(periodId);
+        jdbc.update("UPDATE device_location_period SET " + String.join(", ", sets)
+                + " WHERE id = ?::uuid"
+                + SoftDeleteSupport.notDeletedClause(jdbc, LOC_TABLE, null), args.toArray());
+        return loadLocation(periodId);
+    }
+
+    @Transactional
+    public void deleteLocationDraft(UUID periodId) {
+        Map<String, Object> existing = loadLocation(periodId);
+        if (!"draft".equals(String.valueOf(existing.get("confirm_status")))) {
+            throw new BizException(400, "仅待确认草稿可删除");
+        }
+        SoftDeleteSupport.softDelete(jdbc, LOC_TABLE, periodId.toString());
+    }
+
+    @Transactional
+    public Map<String, Object> confirmLocation(UUID periodId) {
+        Map<String, Object> existing = loadLocation(periodId);
+        if (!"draft".equals(String.valueOf(existing.get("confirm_status")))) {
+            throw new BizException(400, "仅待确认草稿可确认生效");
+        }
+        UUID deviceId = parseUuid(existing.get("device_id"));
+        Instant from = parseInstant(existing.get("effective_from"));
+        Instant to = parseInstant(existing.get("effective_to"));
+        if (from == null || to == null) {
+            throw new BizException(400, "补录区间须为闭合区间才能确认");
+        }
+        assertNoConfirmedLocationOverlap(deviceId, from, to, periodId);
+
+        List<String> sets = new ArrayList<>();
+        List<Object> args = new ArrayList<>();
+        sets.add("confirm_status = 'confirmed'");
+        sets.add("confirmed_at = NOW()");
+        UUID userId = currentUserUuid();
+        String userName = SoftDeleteSupport.resolveUserDisplayName(jdbc, userId);
+        sets.add("confirmed_by = ?::uuid");
+        args.add(userId);
+        sets.add("confirmed_by_name = ?");
+        args.add(userName);
+        SoftDeleteSupport.appendUpdateAuditSets(jdbc, TableColumnCache.columns(jdbc, LOC_TABLE), sets, args);
+        args.add(periodId);
+        jdbc.update("UPDATE device_location_period SET " + String.join(", ", sets)
+                + " WHERE id = ?::uuid"
+                + SoftDeleteSupport.notDeletedClause(jdbc, LOC_TABLE, null), args.toArray());
+        return loadLocation(periodId);
+    }
+
+    @Transactional
     public void ensureInitialPeriodIfMissing(UUID deviceId) {
         if (deviceId == null) return;
         Integer cnt = jdbc.queryForObject("""
@@ -543,6 +672,34 @@ public class DeviceOwnershipPeriodService implements DeviceOwnershipWriteback {
         }
     }
 
+    private void assertNoConfirmedLocationOverlap(UUID deviceId, Instant from, Instant to, UUID excludeId) {
+        List<Object> args = new ArrayList<>();
+        StringBuilder sql = new StringBuilder("""
+                SELECT id, effective_to FROM device_location_period
+                WHERE device_id = ?::uuid AND confirm_status = 'confirmed'
+                """);
+        args.add(deviceId);
+        sql.append(SoftDeleteSupport.notDeletedClause(jdbc, LOC_TABLE, null));
+        sql.append("""
+                 AND effective_from < ?::timestamptz
+                 AND ?::timestamptz < COALESCE(effective_to, 'infinity'::timestamptz)
+                """);
+        args.add(Timestamp.from(to));
+        args.add(Timestamp.from(from));
+        if (excludeId != null) {
+            sql.append(" AND id <> ?::uuid ");
+            args.add(excludeId);
+        }
+        sql.append(" LIMIT 1");
+        var rows = jdbc.queryForList(sql.toString(), args.toArray());
+        if (!rows.isEmpty()) {
+            if (rows.get(0).get("effective_to") == null) {
+                throw new BizException(400, "补录不可覆盖当前开放位置段，请使用「变更安装/存放位置」");
+            }
+            throw new BizException(400, "补录区间与已确认位置历史重叠，请调整起止时间");
+        }
+    }
+
     private void fillOwnershipFromDevice(Map<String, Object> body, Map<String, Object> device) {
         body.put("device_id", device.get("id"));
         body.put("device_code", device.get("device_code"));
@@ -602,6 +759,34 @@ public class DeviceOwnershipPeriodService implements DeviceOwnershipWriteback {
         body.put("building_name", resolveBuildingName(device.get("building_id")));
         body.put("campus_id", device.get("campus_id"));
         body.put("campus_name", resolveCampusName(device.get("campus_id")));
+    }
+
+    private void applyLocationBodyOverrides(Map<String, Object> row, Map<String, Object> body) {
+        if (body.containsKey("campus_id")) {
+            row.put("campus_id", parseUuid(body.get("campus_id")));
+            row.put("campus_name", firstNonBlank(str(body.get("campus_name")),
+                    resolveCampusName(body.get("campus_id"))));
+        }
+        if (body.containsKey("building_id")) {
+            row.put("building_id", parseUuid(body.get("building_id")));
+            row.put("building_name", firstNonBlank(str(body.get("building_name")),
+                    resolveBuildingName(body.get("building_id"))));
+        }
+        if (body.containsKey("location_floor")) {
+            row.put("location_floor", blankToNull(str(body.get("location_floor"))));
+        }
+        if (body.containsKey("room_number")) {
+            row.put("room_number", blankToNull(str(body.get("room_number"))));
+        }
+        if (body.containsKey("location_detail")) {
+            row.put("location_detail", blankToNull(str(body.get("location_detail"))));
+        }
+        if (body.containsKey("campus_name") && hasText(str(body.get("campus_name")))) {
+            row.put("campus_name", body.get("campus_name"));
+        }
+        if (body.containsKey("building_name") && hasText(str(body.get("building_name")))) {
+            row.put("building_name", body.get("building_name"));
+        }
     }
 
     private void insertOwnership(Map<String, Object> body) {
@@ -675,6 +860,14 @@ public class DeviceOwnershipPeriodService implements DeviceOwnershipWriteback {
                 "SELECT * FROM device_ownership_period WHERE id = ?::uuid"
                         + SoftDeleteSupport.notDeletedClause(jdbc, OWN_TABLE, null), id);
         if (rows.isEmpty()) throw new BizException(404, "归属区间不存在");
+        return rows.get(0);
+    }
+
+    private Map<String, Object> loadLocation(UUID id) {
+        var rows = jdbc.queryForList(
+                "SELECT * FROM device_location_period WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, LOC_TABLE, null), id);
+        if (rows.isEmpty()) throw new BizException(404, "位置区间不存在");
         return rows.get(0);
     }
 

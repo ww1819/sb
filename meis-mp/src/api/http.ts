@@ -1,4 +1,4 @@
-import { API_BASE, STORAGE_TOKEN, STORAGE_USER } from '@/config/env'
+import { API_BASE, STORAGE_TOKEN, STORAGE_USER, STORAGE_WX_OPENID } from '@/config/env'
 
 export interface ApiResult<T = unknown> {
   success?: boolean
@@ -64,6 +64,12 @@ export function request<T = unknown>(options: RequestOptions): Promise<T> {
           /* ignore */
         }
       }
+    }
+    try {
+      const wxOpenid = uni.getStorageSync(STORAGE_WX_OPENID)
+      if (wxOpenid) headers['X-Meis-Wx-Openid'] = String(wxOpenid)
+    } catch {
+      /* ignore */
     }
   }
   const fullUrl = `${API_BASE}${url}${buildQuery(params)}`

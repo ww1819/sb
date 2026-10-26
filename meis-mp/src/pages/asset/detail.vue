@@ -37,6 +37,51 @@
         </view>
       </view>
 
+      <view class="card">
+        <view class="section-title">设备档案（只读）</view>
+        <view v-if="archives.length === 0" class="sub-empty">暂无档案附件</view>
+        <view v-for="(row, i) in archives" :key="row.id || i" class="sub-row">
+          <text class="sub-main">{{ text(row.title || row.file_name) }}</text>
+          <text class="sub-meta">{{ resolveStatusLabel('device_archive_type', row.archive_type) }} · {{ text(row.created_at) }}</text>
+        </view>
+      </view>
+
+      <view class="card">
+        <view class="section-title">UDI 变更史（只读）</view>
+        <view v-if="udiHist.length === 0" class="sub-empty">暂无 UDI 变更</view>
+        <view v-for="(row, i) in udiHist" :key="row.id || i" class="sub-row">
+          <text class="sub-main">DI {{ text(row.udi_di) }} · PI {{ text(row.udi_pi) }}</text>
+          <text class="sub-meta">{{ fmtRange(row.effective_from, row.effective_to) }} · {{ resolveStatusLabel('udi_change_reason', row.change_reason) }}</text>
+        </view>
+      </view>
+
+      <view class="card">
+        <view class="section-title">归属历史（只读）</view>
+        <view v-if="ownerships.length === 0" class="sub-empty">暂无归属区间</view>
+        <view v-for="(row, i) in ownerships" :key="row.id || i" class="sub-row">
+          <text class="sub-main">{{ text(row.dept_name || row.warehouse_name) }}</text>
+          <text class="sub-meta">{{ fmtRange(row.effective_from, row.effective_to) }}</text>
+        </view>
+      </view>
+
+      <view class="card">
+        <view class="section-title">位置历史（只读）</view>
+        <view v-if="locations.length === 0" class="sub-empty">暂无位置区间</view>
+        <view v-for="(row, i) in locations" :key="row.id || i" class="sub-row">
+          <text class="sub-main">{{ locLabel(row) }}</text>
+          <text class="sub-meta">{{ fmtRange(row.effective_from, row.effective_to) }}</text>
+        </view>
+      </view>
+
+      <view class="card">
+        <view class="section-title">变更记录（只读）</view>
+        <view v-if="changes.length === 0" class="sub-empty">暂无变更记录</view>
+        <view v-for="(row, i) in changes" :key="row.id || i" class="sub-row">
+          <text class="sub-main">{{ text(row.action) }} · {{ text(row.operator_name) }}</text>
+          <text class="sub-meta">{{ text(row.created_at) }} · {{ channelLabel(row.client) }}</text>
+        </view>
+      </view>
+
       <button class="btn-repair" @click="goRepair">去报修</button>
     </view>
   </view>
@@ -56,6 +101,11 @@ const deviceId = ref('')
 const device = ref<Record<string, unknown> | null>(null)
 const licenses = ref<Record<string, unknown>[]>([])
 const trainings = ref<Record<string, unknown>[]>([])
+const archives = ref<Record<string, unknown>[]>([])
+const udiHist = ref<Record<string, unknown>[]>([])
+const ownerships = ref<Record<string, unknown>[]>([])
+const locations = ref<Record<string, unknown>[]>([])
+const changes = ref<Record<string, unknown>[]>([])
 const loading = ref(false)
 
 const basicFields: Field[] = [
@@ -97,17 +147,60 @@ function display(f: Field) {
   return String(v)
 }
 
+function fmtRange(from: unknown, to: unknown) {
+  const a = text(from)
+  const b = to == null || to === '' ? '至今' : text(to)
+  return `${a} ~ ${b}`
+}
+
+function locLabel(row: Record<string, unknown>) {
+  const parts = [row.building_name, row.location_floor, row.room_number, row.location_detail]
+    .map((x) => (x == null || x === '' ? '' : String(x)))
+    .filter(Boolean)
+  return parts.length ? parts.join(' / ') : '—'
+}
+
+function channelLabel(v: unknown) {
+  const s = v == null ? '' : String(v)
+  if (s === 'web') return 'Web'
+  if (s === 'app') return 'App'
+  if (s === 'mp') return '小程序'
+  return s || '—'
+}
+
 async function loadChildren(id: string) {
   try {
-    const [lic, tr] = await Promise.all([
+    const [lic, tr, arch, udi, own, loc, ch] = await Promise.all([
       http.get<Record<string, unknown>[]>(`/asset/device-license/by-device/${id}`),
-      http.get<Record<string, unknown>[]>(`/asset/device-training-auth/by-device/${id}`)
+      http.get<Record<string, unknown>[]>(`/asset/device-training-auth/by-device/${id}`),
+      http.get<Record<string, unknown>[]>(`/asset/device-archive/by-device/${id}`),
+      http.get<Record<string, unknown>[]>(`/asset/device-udi-history/by-device/${id}`),
+      http.get<Record<string, unknown>[]>(`/asset/ownership-period/by-device/${id}`),
+      http.get<Record<string, unknown>[]>(`/asset/ownership-period/location/by-device/${id}`),
+      http.get<{ records?: Record<string, unknown>[] }>('/system/entity-change-log', {
+        entityType: 'medical_device',
+        entityId: id,
+        page: 1,
+        size: 20
+      })
     ])
     licenses.value = Array.isArray(lic) ? lic : []
     trainings.value = Array.isArray(tr) ? tr : []
+    archives.value = Array.isArray(arch)
+      ? arch.filter((r) => String(r.row_kind || 'archive') !== 'ref')
+      : []
+    udiHist.value = Array.isArray(udi) ? udi : []
+    ownerships.value = Array.isArray(own) ? own : []
+    locations.value = Array.isArray(loc) ? loc : []
+    changes.value = Array.isArray(ch?.records) ? ch.records : []
   } catch {
     licenses.value = []
     trainings.value = []
+    archives.value = []
+    udiHist.value = []
+    ownerships.value = []
+    locations.value = []
+    changes.value = []
   }
 }
 

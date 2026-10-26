@@ -38,7 +38,7 @@ const loading = ref(false)
 onShow(() => {
   auth.restore()
   if (auth.isLoggedIn) {
-    uni.reLaunch({ url: '/pages/home/index' })
+    uni.switchTab({ url: '/pages/home/index' })
   }
 })
 
@@ -53,7 +53,7 @@ async function onLogin() {
     await requestSubscribe('login')
     uni.showToast({ title: '登录成功', icon: 'success' })
     setTimeout(() => {
-      uni.reLaunch({ url: '/pages/home/index' })
+      uni.switchTab({ url: '/pages/home/index' })
     }, 300)
   } catch (e: unknown) {
     uni.showToast({ title: e instanceof Error ? e.message : '登录失败', icon: 'none' })

@@ -69,14 +69,20 @@
             <el-table-column prop="fileTypeLabel" label="类型" width="100" />
             <el-table-column prop="sourceLabel" label="来源" width="90" />
             <el-table-column prop="createdAt" label="时间" width="160" />
-            <el-table-column v-if="!readonly" label="操作" width="200" fixed="right">
+            <el-table-column label="操作" :width="readonly ? 100 : 260" fixed="right">
               <template #default="{ row }">
-                <template v-if="!row.readonly">
+                <el-button
+                  v-if="row.rowKind === 'archive'"
+                  link
+                  type="primary"
+                  @click.stop="openChangeLog(row)"
+                >变更记录</el-button>
+                <template v-if="!readonly && !row.readonly">
                   <el-button link type="primary" @click.stop="renameDoc(row)">改名</el-button>
                   <el-button link type="primary" @click.stop="reclassifyDoc(row)">改类</el-button>
                   <el-button v-if="isImage(row.url)" link type="primary" @click.stop="rotateDoc(row)">旋转</el-button>
                 </template>
-                <el-tag v-else size="small" type="info">只读</el-tag>
+                <el-tag v-else-if="row.readonly" size="small" type="info">只读</el-tag>
               </template>
             </el-table-column>
           </el-table>
@@ -166,6 +172,12 @@
         <el-button type="primary" :loading="saving" @click="saveSortDrawer">保存排序</el-button>
       </template>
     </el-dialog>
+
+    <EntityChangeHistoryDrawer
+      v-model="changeLogVisible"
+      entity-type="device_archive_file"
+      :entity-id="changeLogId"
+    />
   </div>
 </template>
 
@@ -176,6 +188,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/api/http'
 import PageEmpty from '@/components/table/PageEmpty.vue'
 import EloamCaptureDialog from '@/components/form/EloamCaptureDialog.vue'
+import EntityChangeHistoryDrawer from '@/components/EntityChangeHistoryDrawer.vue'
 import AssetDevicePicker from '@/components/form/AssetDevicePicker.vue'
 import { useDict } from '@/composables/useDict'
 import { formatDisplayDateTime } from '@/utils/datetime'
@@ -214,6 +227,8 @@ const sortMode = ref<'custom' | 'time' | 'name'>(
 const activeType = ref('all')
 const docs = ref<ArchiveDoc[]>([])
 const selectedIds = ref<string[]>([])
+const changeLogVisible = ref(false)
+const changeLogId = ref('')
 const previewId = ref<string | null>(null)
 const uploading = ref(false)
 const saving = ref(false)
@@ -454,6 +469,12 @@ async function onCopyTargets(devices: Record<string, unknown>[]) {
   } else {
     ElMessage.error(data.message || '复制失败')
   }
+}
+
+function openChangeLog(row: ArchiveDoc) {
+  if (row.rowKind !== 'archive' || !row.id) return
+  changeLogId.value = row.id
+  changeLogVisible.value = true
 }
 
 async function renameDoc(row: ArchiveDoc) {

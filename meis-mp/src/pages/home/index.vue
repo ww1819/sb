@@ -6,7 +6,6 @@
           <text class="brand">MEIS</text>
           <text class="brand-sub">医疗设备助手</text>
         </view>
-        <text class="logout" @click="onLogout">退出</text>
       </view>
       <view class="greet">
         <text class="greet-hi">你好，{{ auth.displayName || '用户' }}</text>
@@ -203,16 +202,6 @@ function go(url: string) {
 function goOps(module: OpsModule) {
   uni.navigateTo({ url: `/pages/ops/hub?module=${module}` })
 }
-
-function onLogout() {
-  uni.showModal({
-    title: '确认退出',
-    content: '退出后需要重新登录',
-    success: (res) => {
-      if (res.confirm) auth.logout()
-    }
-  })
-}
 </script>
 
 <style lang="scss" scoped>
@@ -236,6 +225,7 @@ function onLogout() {
   margin-bottom: 32rpx;
 }
 
+
 .brand {
   display: block;
   font-size: 44rpx;
@@ -250,12 +240,6 @@ function onLogout() {
   margin-top: 8rpx;
   font-size: 24rpx;
   color: $meis-text-secondary;
-}
-
-.logout {
-  font-size: 26rpx;
-  color: $meis-primary;
-  padding: 8rpx 4rpx 8rpx 20rpx;
 }
 
 .greet-hi {

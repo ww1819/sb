@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { http } from '@/api/http'
-import { STORAGE_TOKEN, STORAGE_USER } from '@/config/env'
+import { STORAGE_TOKEN, STORAGE_USER, STORAGE_WX_OPENID } from '@/config/env'
 
 export interface UserInfo {
   token: string
@@ -62,7 +62,13 @@ export const useAuthStore = defineStore('auth', {
           success: async (res) => {
             try {
               if (res.code) {
-                await http.post('/notification/wx/bind', { code: res.code })
+                const data = await http.post<{ openid?: string; bound?: boolean }>(
+                  '/notification/wx/bind',
+                  { code: res.code, client: 'mp' }
+                )
+                if (data?.openid) {
+                  uni.setStorageSync(STORAGE_WX_OPENID, data.openid)
+                }
               }
             } catch {
               /* ignore */
@@ -77,6 +83,7 @@ export const useAuthStore = defineStore('auth', {
       this.user = null
       uni.removeStorageSync(STORAGE_TOKEN)
       uni.removeStorageSync(STORAGE_USER)
+      uni.removeStorageSync(STORAGE_WX_OPENID)
       uni.reLaunch({ url: '/pages/login/index' })
     }
   }

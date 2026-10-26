@@ -1413,3 +1413,46 @@ ALTER TABLE device_archive_file ADD COLUMN IF NOT EXISTS source VARCHAR(20);
 COMMENT ON COLUMN device_archive_file.sort_order IS '类型内自定义排序（升序）';
 COMMENT ON COLUMN device_archive_file.rotate_angle IS '预览旋转角 0/90/180/270（CSS）';
 COMMENT ON COLUMN device_archive_file.source IS '来源 upload|eloam|copy';
+
+-- WX-BIND-01 / PLT-AUDIT-2026-10-26
+ALTER TABLE power_tag_bind_log ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+COMMENT ON COLUMN power_tag_bind_log.create_channel IS '绑定/解绑操作途径 web/app/mp（MOB-CHANNEL）';
+
+ALTER TABLE sys_entity_change_log ADD COLUMN IF NOT EXISTS operator_wx_openid VARCHAR(64);
+COMMENT ON COLUMN sys_entity_change_log.operator_wx_openid IS '操作时微信 openid（小程序审计，WX-BIND-01）';
+ALTER TABLE sys_doc_change_log ADD COLUMN IF NOT EXISTS operator_wx_openid VARCHAR(64);
+COMMENT ON COLUMN sys_doc_change_log.operator_wx_openid IS '操作时微信 openid（小程序审计，WX-BIND-01）';
+
+CREATE TABLE IF NOT EXISTS sys_user_wx_bind (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
+    wx_openid VARCHAR(64) NOT NULL,
+    wx_unionid VARCHAR(64),
+    mp_app_id VARCHAR(64),
+    effective_from TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    effective_to TIMESTAMPTZ,
+    bind_channel VARCHAR(20),
+    unbind_channel VARCHAR(20),
+    remark VARCHAR(500),
+    unbound_at TIMESTAMPTZ,
+    unbound_by UUID,
+    unbound_by_name VARCHAR(100),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by UUID,
+    updated_by_name VARCHAR(100),
+    is_deleted SMALLINT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMPTZ,
+    deleted_by UUID,
+    deleted_by_name VARCHAR(100)
+);
+COMMENT ON TABLE sys_user_wx_bind IS '系统用户与微信账号区间绑定（多对多历史，WX-BIND-01）';
+COMMENT ON COLUMN sys_user_wx_bind.effective_from IS '绑定生效起';
+COMMENT ON COLUMN sys_user_wx_bind.effective_to IS '绑定生效止（空=当前有效；解绑时闭合）';
+CREATE INDEX IF NOT EXISTS idx_sys_user_wx_bind_user ON sys_user_wx_bind(user_id, effective_from DESC);
+CREATE INDEX IF NOT EXISTS idx_sys_user_wx_bind_openid ON sys_user_wx_bind(wx_openid, effective_from DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_sys_user_wx_bind_openid_active
+    ON sys_user_wx_bind (wx_openid)
+    WHERE effective_to IS NULL AND COALESCE(is_deleted, 0) = 0 AND wx_openid <> '';

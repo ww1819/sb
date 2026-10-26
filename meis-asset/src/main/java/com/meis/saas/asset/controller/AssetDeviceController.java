@@ -30,8 +30,10 @@ import java.util.*;
 @RequiredArgsConstructor
 public class AssetDeviceController {
     private static final int BATCH_LIMIT = 5000;
-    private static final Set<String> BATCH_UUID_FIELDS = Set.of(
+    /** 科室/仓/院区/楼宇须走归属·位置区间（AST-UI-23），禁止批量静默改 */
+    private static final Set<String> BATCH_FORBIDDEN_INTERVAL_FIELDS = Set.of(
             "dept_id", "manage_dept_id", "campus_id", "building_id", "warehouse_id");
+    private static final Set<String> BATCH_UUID_FIELDS = Set.of();
     private static final Set<String> BATCH_STR_FIELDS = Set.of("device_status", "risk_level");
     private static final Set<String> BATCH_BOOL_FIELDS = Set.of(
             "is_life_support", "is_emergency", "is_metrology", "is_shared_device",
@@ -273,6 +275,12 @@ public class AssetDeviceController {
                 : Map.of();
         if (fields.isEmpty()) {
             throw new BizException(400, "请至少勾选一项要修改的字段");
+        }
+        for (String key : fields.keySet()) {
+            if (BATCH_FORBIDDEN_INTERVAL_FIELDS.contains(key)) {
+                throw new BizException(400,
+                        "科室/管理科室/院区/楼宇/仓库不可批量修改，请在台账详情使用「改科室」「改位置」（真变更/纠错）以保留区间历史");
+            }
         }
         Set<String> cols = TableColumnCache.columns(jdbc, "medical_device");
         List<String> sets = new ArrayList<>();

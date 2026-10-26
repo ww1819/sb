@@ -10,8 +10,24 @@
     {
       "path": "pages/home/index",
       "style": {
-        "navigationBarTitleText": "MEIS 设备助手",
+        "navigationBarTitleText": "工作台",
         "navigationBarBackgroundColor": "#e8f1ff",
+        "backgroundColor": "#f0f2f5"
+      }
+    },
+    {
+      "path": "pages/message/index",
+      "style": {
+        "navigationBarTitleText": "消息",
+        "navigationBarBackgroundColor": "#e8f1ff",
+        "backgroundColor": "#f0f2f5"
+      }
+    },
+    {
+      "path": "pages/mine/index",
+      "style": {
+        "navigationBarTitleText": "我的",
+        "navigationBarBackgroundColor": "#ffffff",
         "backgroundColor": "#f0f2f5"
       }
     },
@@ -159,5 +175,31 @@
     "navigationBarTitleText": "MEIS",
     "navigationBarBackgroundColor": "#ffffff",
     "backgroundColor": "#f0f2f5"
+  },
+  "tabBar": {
+    "color": "#8c8c8c",
+    "selectedColor": "#1677ff",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/message/index",
+        "text": "消息",
+        "iconPath": "static/tab/message.png",
+        "selectedIconPath": "static/tab/message-active.png"
+      },
+      {
+        "pagePath": "pages/home/index",
+        "text": "工作台",
+        "iconPath": "static/tab/work.png",
+        "selectedIconPath": "static/tab/work-active.png"
+      },
+      {
+        "pagePath": "pages/mine/index",
+        "text": "我的",
+        "iconPath": "static/tab/mine.png",
+        "selectedIconPath": "static/tab/mine-active.png"
+      }
+    ]
   }
 }

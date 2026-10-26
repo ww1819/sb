@@ -2,6 +2,7 @@ package com.meis.saas.common.rbac;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.meis.saas.common.ops.WxOperatorContext;
 import com.meis.saas.common.tenant.TenantConstants;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -38,11 +39,13 @@ public class PermissionInterceptor implements HandlerInterceptor {
             } catch (Exception ignored) {}
         }
         CTX.set(ctx);
+        WxOperatorContext.setOpenid(request.getHeader(WxOperatorContext.HEADER));
         return true;
     }
 
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
         CTX.remove();
+        WxOperatorContext.clear();
     }
 }

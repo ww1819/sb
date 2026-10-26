@@ -51,6 +51,10 @@
         v-show="activeTab === 'ownership_backfill'"
         :device-id="deviceId"
       />
+      <DeviceLocationBackfillPanel
+        v-show="activeTab === 'location_backfill'"
+        :device-id="deviceId"
+      />
       <DevicePartReplacementPanel
         v-show="activeTab === 'part_replace_edit'"
         :device-id="deviceId"
@@ -290,6 +294,7 @@ import DeviceImagePanel from '@/components/asset/tabs/DeviceImagePanel.vue'
 import DevicePowerMonitorPanel from '@/components/asset/tabs/DevicePowerMonitorPanel.vue'
 import DeviceWarrantyPanel from '@/components/asset/tabs/DeviceWarrantyPanel.vue'
 import DeviceOwnershipBackfillPanel from '@/components/asset/tabs/DeviceOwnershipBackfillPanel.vue'
+import DeviceLocationBackfillPanel from '@/components/asset/tabs/DeviceLocationBackfillPanel.vue'
 import DeviceLicensePanel from '@/components/asset/tabs/DeviceLicensePanel.vue'
 import DeviceTrainingAuthPanel from '@/components/asset/tabs/DeviceTrainingAuthPanel.vue'
 import DevicePartReplacementPanel from '@/components/asset/tabs/DevicePartReplacementPanel.vue'
@@ -334,6 +339,7 @@ const editTabs = [
   { key: 'license', label: '设备证照' },
   { key: 'training_auth', label: '培训授权' },
   { key: 'ownership_backfill', label: '补录归属历史' },
+  { key: 'location_backfill', label: '补录位置历史' },
   { key: 'part_replace_edit', label: '非维修配件更换' }
 ]
 

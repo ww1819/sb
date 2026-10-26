@@ -11,6 +11,9 @@
       <el-table-column label="途径" width="80">
         <template #default="{ row }">{{ channelLabel(row.client) }}</template>
       </el-table-column>
+      <el-table-column label="微信openid" width="120" show-overflow-tooltip>
+        <template #default="{ row }">{{ maskWx(row.operator_wx_openid) }}</template>
+      </el-table-column>
       <el-table-column prop="fieldLabel" label="变更字段" min-width="120" show-overflow-tooltip />
       <el-table-column prop="oldText" label="改动前" min-width="140" show-overflow-tooltip>
         <template #default="{ row }">
@@ -226,6 +229,13 @@ function channelLabel(v: unknown) {
   if (!k) return '—'
   const m: Record<string, string> = { web: 'Web', app: 'App', mp: '小程序' }
   return m[k] ?? String(v)
+}
+
+function maskWx(v: unknown) {
+  const s = v == null ? '' : String(v).trim()
+  if (!s) return '—'
+  if (s.length < 6) return s
+  return `${s.slice(0, 3)}***${s.slice(-3)}`
 }
 
 function fieldList(row: Record<string, unknown>): FieldChange[] {

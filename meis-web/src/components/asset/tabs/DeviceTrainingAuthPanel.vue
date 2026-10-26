@@ -20,10 +20,13 @@
         <el-table-column prop="trained_at" label="培训日期" width="120" />
         <el-table-column prop="expiry_date" label="有效期至" width="120" />
         <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
-        <el-table-column v-if="!readonly" label="操作" width="140" fixed="right">
+        <el-table-column label="操作" :width="readonly ? 100 : 200" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
-            <el-button link type="danger" @click="onDelete(row)">删除</el-button>
+            <el-button link type="primary" @click="openChangeLog(row)">变更记录</el-button>
+            <template v-if="!readonly">
+              <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
+              <el-button link type="danger" @click="onDelete(row)">删除</el-button>
+            </template>
           </template>
         </el-table-column>
         <template #empty>
@@ -31,6 +34,12 @@
         </template>
       </el-table>
     </template>
+
+    <EntityChangeHistoryDrawer
+      v-model="changeLogVisible"
+      entity-type="device_training_auth"
+      :entity-id="changeLogId"
+    />
 
     <AppModal v-model="visible" :title="form.id ? '编辑培训授权' : '新增培训授权'" size="md">
       <el-form label-width="100px">
@@ -76,11 +85,14 @@ import http from '@/api/http'
 import AppModal from '@/components/AppModal.vue'
 import RefSelect from '@/components/form/RefSelect.vue'
 import PageEmpty from '@/components/table/PageEmpty.vue'
+import EntityChangeHistoryDrawer from '@/components/EntityChangeHistoryDrawer.vue'
 
 const props = defineProps<{ deviceId?: string; readonly?: boolean }>()
 const loading = ref(false)
 const saving = ref(false)
 const visible = ref(false)
+const changeLogVisible = ref(false)
+const changeLogId = ref('')
 const rows = ref<Record<string, unknown>[]>([])
 const form = reactive({
   id: '',
@@ -115,6 +127,11 @@ function reset() {
     expiry_date: '',
     remark: ''
   })
+}
+
+function openChangeLog(row: Record<string, unknown>) {
+  changeLogId.value = String(row.id ?? '')
+  changeLogVisible.value = true
 }
 
 function openCreate() {

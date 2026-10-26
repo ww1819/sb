@@ -42,11 +42,25 @@ public class DeviceOwnershipPeriodController {
         return Result.ok(ownershipService.createBackfill(body));
     }
 
+    @PostMapping("/location/backfill")
+    @Transactional
+    @OperationLog(module = "asset", description = "补录位置历史")
+    public Result<Map<String, Object>> locationBackfill(@RequestBody Map<String, Object> body) {
+        return Result.ok(ownershipService.createLocationBackfill(body));
+    }
+
     @PutMapping("/{id}")
     @Transactional
     @OperationLog(module = "asset", description = "修改补录归属草稿")
     public Result<Map<String, Object>> update(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
         return Result.ok(ownershipService.updateDraft(id, body));
+    }
+
+    @PutMapping("/location/{id}")
+    @Transactional
+    @OperationLog(module = "asset", description = "修改补录位置草稿")
+    public Result<Map<String, Object>> updateLocation(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
+        return Result.ok(ownershipService.updateLocationDraft(id, body));
     }
 
     @DeleteMapping("/{id}")
@@ -57,11 +71,26 @@ public class DeviceOwnershipPeriodController {
         return Result.ok();
     }
 
+    @DeleteMapping("/location/{id}")
+    @Transactional
+    @OperationLog(module = "asset", description = "删除补录位置草稿")
+    public Result<Void> deleteLocation(@PathVariable UUID id) {
+        ownershipService.deleteLocationDraft(id);
+        return Result.ok();
+    }
+
     @PostMapping("/{id}/confirm")
     @Transactional
     @OperationLog(module = "asset", description = "确认归属补录生效")
     public Result<Map<String, Object>> confirm(@PathVariable UUID id) {
         return Result.ok(ownershipService.confirm(id));
+    }
+
+    @PostMapping("/location/{id}/confirm")
+    @Transactional
+    @OperationLog(module = "asset", description = "确认位置补录生效")
+    public Result<Map<String, Object>> confirmLocation(@PathVariable UUID id) {
+        return Result.ok(ownershipService.confirmLocation(id));
     }
 
     @PostMapping("/device/{deviceId}/change-dept")

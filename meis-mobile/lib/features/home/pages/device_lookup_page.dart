@@ -306,6 +306,11 @@ class _DeviceLookupDetailPageState extends ConsumerState<_DeviceLookupDetailPage
   Map<String, dynamic>? device;
   List<Map<String, dynamic>> licenses = [];
   List<Map<String, dynamic>> trainings = [];
+  List<Map<String, dynamic>> archives = [];
+  List<Map<String, dynamic>> udiHist = [];
+  List<Map<String, dynamic>> ownerships = [];
+  List<Map<String, dynamic>> locations = [];
+  List<Map<String, dynamic>> changes = [];
   var loading = true;
   String? error;
 
@@ -326,6 +331,16 @@ class _DeviceLookupDetailPageState extends ConsumerState<_DeviceLookupDetailPage
       final detail = await api.getData('/asset/device/$id/detail');
       final lic = await api.getData('/asset/device-license/by-device/$id');
       final tr = await api.getData('/asset/device-training-auth/by-device/$id');
+      final arch = await api.getData('/asset/device-archive/by-device/$id');
+      final udi = await api.getData('/asset/device-udi-history/by-device/$id');
+      final own = await api.getData('/asset/ownership-period/by-device/$id');
+      final loc = await api.getData('/asset/ownership-period/location/by-device/$id');
+      final ch = await api.getData('/system/entity-change-log', query: {
+        'entityType': 'medical_device',
+        'entityId': id,
+        'page': '1',
+        'size': '20',
+      });
       if (!mounted) return;
       setState(() {
         device = detail is Map ? Map<String, dynamic>.from(detail) : null;
@@ -335,6 +350,28 @@ class _DeviceLookupDetailPageState extends ConsumerState<_DeviceLookupDetailPage
         trainings = tr is List
             ? tr.map((e) => Map<String, dynamic>.from(e as Map)).toList()
             : <Map<String, dynamic>>[];
+        archives = arch is List
+            ? arch
+                .map((e) => Map<String, dynamic>.from(e as Map))
+                .where((e) => (e['row_kind']?.toString() ?? 'archive') != 'ref')
+                .toList()
+            : <Map<String, dynamic>>[];
+        udiHist = udi is List
+            ? udi.map((e) => Map<String, dynamic>.from(e as Map)).toList()
+            : <Map<String, dynamic>>[];
+        ownerships = own is List
+            ? own.map((e) => Map<String, dynamic>.from(e as Map)).toList()
+            : <Map<String, dynamic>>[];
+        locations = loc is List
+            ? loc.map((e) => Map<String, dynamic>.from(e as Map)).toList()
+            : <Map<String, dynamic>>[];
+        if (ch is Map && ch['records'] is List) {
+          changes = (ch['records'] as List)
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+        } else {
+          changes = <Map<String, dynamic>>[];
+        }
       });
     } on ApiException catch (e) {
       if (mounted) setState(() => error = e.message);
@@ -438,8 +475,104 @@ class _DeviceLookupDetailPageState extends ConsumerState<_DeviceLookupDetailPage
                               ),
                             ),
                           ),
+                        const SizedBox(height: AppSpacing.md),
+                        const MeisSectionLabel('设备档案（只读）'),
+                        if (archives.isEmpty)
+                          const Text('暂无档案附件', style: TextStyle(color: AppColors.textMuted))
+                        else
+                          ...archives.map(
+                            (r) => Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Text(
+                                '${_text(r['title'] ?? r['file_name'])}\n${resolveStatusLabel('device_archive_type', r['archive_type'])} · ${_text(r['created_at'])}',
+                                style: const TextStyle(fontSize: 13, height: 1.4),
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: AppSpacing.md),
+                        const MeisSectionLabel('UDI 变更史（只读）'),
+                        if (udiHist.isEmpty)
+                          const Text('暂无 UDI 变更', style: TextStyle(color: AppColors.textMuted))
+                        else
+                          ...udiHist.map(
+                            (r) => Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Text(
+                                'DI ${_text(r['udi_di'])} · PI ${_text(r['udi_pi'])}\n${_fmtRange(r['effective_from'], r['effective_to'])} · ${resolveStatusLabel('udi_change_reason', r['change_reason'])}',
+                                style: const TextStyle(fontSize: 13, height: 1.4),
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: AppSpacing.md),
+                        const MeisSectionLabel('归属历史（只读）'),
+                        if (ownerships.isEmpty)
+                          const Text('暂无归属区间', style: TextStyle(color: AppColors.textMuted))
+                        else
+                          ...ownerships.map(
+                            (r) => Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Text(
+                                '${_text(r['dept_name'] ?? r['warehouse_name'])}\n${_fmtRange(r['effective_from'], r['effective_to'])}',
+                                style: const TextStyle(fontSize: 13, height: 1.4),
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: AppSpacing.md),
+                        const MeisSectionLabel('位置历史（只读）'),
+                        if (locations.isEmpty)
+                          const Text('暂无位置区间', style: TextStyle(color: AppColors.textMuted))
+                        else
+                          ...locations.map(
+                            (r) => Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Text(
+                                '${_locLabel(r)}\n${_fmtRange(r['effective_from'], r['effective_to'])}',
+                                style: const TextStyle(fontSize: 13, height: 1.4),
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: AppSpacing.md),
+                        const MeisSectionLabel('变更记录（只读）'),
+                        if (changes.isEmpty)
+                          const Text('暂无变更记录', style: TextStyle(color: AppColors.textMuted))
+                        else
+                          ...changes.map(
+                            (r) => Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Text(
+                                '${_text(r['action'])} · ${_text(r['operator_name'])}\n${_text(r['created_at'])} · ${_channel(r['client'])}',
+                                style: const TextStyle(fontSize: 13, height: 1.4),
+                              ),
+                            ),
+                          ),
                       ],
                     ),
     );
+  }
+
+  String _fmtRange(Object? from, Object? to) {
+    final a = _text(from);
+    final b = (to == null || to.toString().trim().isEmpty || to.toString() == 'null') ? '至今' : _text(to);
+    return '$a ~ $b';
+  }
+
+  String _locLabel(Map<String, dynamic> r) {
+    final parts = [
+      r['building_name'],
+      r['location_floor'],
+      r['room_number'],
+      r['location_detail'],
+    ].map(_text).where((s) => s != '—').toList();
+    return parts.isEmpty ? '—' : parts.join(' / ');
+  }
+
+  String _channel(Object? v) {
+    final s = v?.toString() ?? '';
+    return switch (s) {
+      'web' => 'Web',
+      'app' => 'App',
+      'mp' => '小程序',
+      _ => s.isEmpty ? '—' : s,
+    };
   }
 }

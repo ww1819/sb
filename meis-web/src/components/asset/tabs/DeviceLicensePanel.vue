@@ -23,10 +23,13 @@
         <el-table-column prop="expiry_date" label="有效期至" width="120" />
         <el-table-column prop="issuer_name" label="发证机关" min-width="120" show-overflow-tooltip />
         <el-table-column prop="file_name" label="附件" min-width="120" show-overflow-tooltip />
-        <el-table-column v-if="!readonly" label="操作" width="140" fixed="right">
+        <el-table-column label="操作" :width="readonly ? 100 : 200" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
-            <el-button link type="danger" @click="onDelete(row)">删除</el-button>
+            <el-button link type="primary" @click="openChangeLog(row)">变更记录</el-button>
+            <template v-if="!readonly">
+              <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
+              <el-button link type="danger" @click="onDelete(row)">删除</el-button>
+            </template>
           </template>
         </el-table-column>
         <template #empty>
@@ -34,6 +37,12 @@
         </template>
       </el-table>
     </template>
+
+    <EntityChangeHistoryDrawer
+      v-model="changeLogVisible"
+      entity-type="device_license"
+      :entity-id="changeLogId"
+    />
 
     <AppModal v-model="visible" :title="form.id ? '编辑证照' : '新增证照'" size="md">
       <el-form label-width="100px">
@@ -80,6 +89,7 @@ import http from '@/api/http'
 import AppModal from '@/components/AppModal.vue'
 import PageEmpty from '@/components/table/PageEmpty.vue'
 import StatusTag from '@/components/table/StatusTag.vue'
+import EntityChangeHistoryDrawer from '@/components/EntityChangeHistoryDrawer.vue'
 import { useDict } from '@/composables/useDict'
 
 const props = defineProps<{ deviceId?: string; readonly?: boolean }>()
@@ -88,6 +98,8 @@ const loading = ref(false)
 const saving = ref(false)
 const uploading = ref(false)
 const visible = ref(false)
+const changeLogVisible = ref(false)
+const changeLogId = ref('')
 const rows = ref<Record<string, unknown>[]>([])
 const licenseTypes = ref<{ label: string; value: string }[]>([])
 const form = reactive({
@@ -127,6 +139,11 @@ function reset() {
     file_name: '',
     remark: ''
   })
+}
+
+function openChangeLog(row: Record<string, unknown>) {
+  changeLogId.value = String(row.id ?? '')
+  changeLogVisible.value = true
 }
 
 function openCreate() {

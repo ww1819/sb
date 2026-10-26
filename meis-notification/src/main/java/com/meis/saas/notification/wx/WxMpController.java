@@ -3,13 +3,16 @@ package com.meis.saas.notification.wx;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.meis.saas.common.exception.BizException;
-import com.meis.saas.common.persistence.SoftDeleteSupport;
+import com.meis.saas.common.ops.OpsClientChannel;
+import com.meis.saas.common.ops.WxOperatorContext;
 import com.meis.saas.common.persistence.TableColumnCache;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
+import com.meis.saas.common.wx.SysUserWxBindService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -20,18 +23,18 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
- * 微信小程序：code→openid 绑定（订阅消息前置）。
- * 未配置 app-id/secret 时返回 configured=false，不打断前端。
+ * 微信小程序：code→openid 绑定（WX-BIND-01 区间表 + 订阅消息主 openid 快照）。
  */
 @RestController
 @RequestMapping("/api/notification/wx")
 @RequiredArgsConstructor
 public class WxMpController {
     private final JdbcTemplate jdbc;
+    private final SysUserWxBindService bindService;
     private final ObjectMapper om = new ObjectMapper();
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build();
 
@@ -48,24 +51,29 @@ public class WxMpController {
         return Result.ok(data);
     }
 
-    /** 小程序 wx.login 得到的 code，换 openid 并写入当前用户。 */
+    /** 小程序 wx.login 得到的 code，换 openid 并写入区间绑定。 */
     @PostMapping("/bind")
+    @Transactional
     public Result<Map<String, Object>> bind(@RequestBody Map<String, Object> body) {
         String uid = TenantContext.getUserId();
         if (uid == null || uid.isBlank()) throw new BizException(401, "未登录");
         if (appId == null || appId.isBlank() || appSecret == null || appSecret.isBlank()) {
             return Result.ok(Map.of("bound", false, "configured", false, "message", "未配置微信小程序 appId/secret"));
         }
-        if (!TableColumnCache.hasColumn(jdbc, "sys_user", "wx_openid")) {
-            return Result.ok(Map.of("bound", false, "configured", true, "message", "库表缺 wx_openid，请重启 meis-tenant 迁库"));
-        }
         Object code = body.get("code");
         if (code == null || String.valueOf(code).isBlank()) {
             throw new BizException(400, "缺少 code");
         }
-        String openid = code2Session(String.valueOf(code).trim());
-        jdbc.update("UPDATE sys_user SET wx_openid = ?, updated_at = NOW() WHERE id = ?::uuid", openid, uid);
-        return Result.ok(Map.of("bound", true, "configured", true, "openidMasked", mask(openid)));
+        SessionIds session = code2Session(String.valueOf(code).trim());
+        Map<String, Object> result = bindService.bind(
+                UUID.fromString(uid), session.openid(), session.unionid(), appId,
+                OpsClientChannel.of(body), "mp-login-bind");
+        Map<String, Object> out = new LinkedHashMap<>(result);
+        out.put("configured", true);
+        // 供小程序本地缓存并带 X-Meis-Wx-Openid（审计用）
+        out.put("openid", session.openid());
+        WxOperatorContext.setOpenid(session.openid());
+        return Result.ok(out);
     }
 
     @GetMapping("/bind-status")
@@ -74,20 +82,20 @@ public class WxMpController {
         if (uid == null || uid.isBlank()) throw new BizException(401, "未登录");
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("configured", appId != null && !appId.isBlank());
-        if (!TableColumnCache.hasColumn(jdbc, "sys_user", "wx_openid")) {
-            data.put("bound", false);
-            return Result.ok(data);
+        String primary = bindService.resolvePrimaryOpenid(UUID.fromString(uid));
+        if (primary == null && TableColumnCache.hasColumn(jdbc, "sys_user", "wx_openid")) {
+            var rows = jdbc.queryForList("SELECT wx_openid FROM sys_user WHERE id = ?::uuid", uid);
+            if (!rows.isEmpty() && rows.get(0).get("wx_openid") != null) {
+                primary = String.valueOf(rows.get(0).get("wx_openid"));
+            }
         }
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT wx_openid FROM sys_user WHERE id = ?::uuid"
-                        + SoftDeleteSupport.notDeletedClause(jdbc, "sys_user", null), uid);
-        String openid = rows.isEmpty() ? null : (rows.get(0).get("wx_openid") != null ? rows.get(0).get("wx_openid").toString() : null);
-        data.put("bound", openid != null && !openid.isBlank());
-        data.put("openidMasked", mask(openid));
+        data.put("bound", primary != null && !primary.isBlank());
+        data.put("openidMasked", SysUserWxBindService.mask(primary));
+        data.put("activeCount", bindService.listByUser(UUID.fromString(uid), true).size());
         return Result.ok(data);
     }
 
-    private String code2Session(String code) {
+    private SessionIds code2Session(String code) {
         try {
             String url = "https://api.weixin.qq.com/sns/jscode2session?appid="
                     + URLEncoder.encode(appId, StandardCharsets.UTF_8)
@@ -104,7 +112,9 @@ public class WxMpController {
             if (openid == null || openid.isBlank()) {
                 throw new BizException(400, "微信未返回 openid");
             }
-            return openid;
+            String unionid = node.path("unionid").asText(null);
+            if (unionid != null && unionid.isBlank()) unionid = null;
+            return new SessionIds(openid, unionid);
         } catch (BizException e) {
             throw e;
         } catch (Exception e) {
@@ -112,8 +122,5 @@ public class WxMpController {
         }
     }
 
-    private static String mask(String openid) {
-        if (openid == null || openid.length() < 6) return "";
-        return openid.substring(0, 3) + "***" + openid.substring(openid.length() - 3);
-    }
+    private record SessionIds(String openid, String unionid) {}
 }

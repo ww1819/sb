@@ -48,15 +48,45 @@ public class DocChangeLogService {
         if ((name == null || name.isBlank()) && TenantContext.get() != null) {
             name = TenantContext.get().getUsername();
         }
-        jdbc.update("""
-                INSERT INTO sys_doc_change_log
-                (id, module, doc_type, doc_id, doc_no, event_type, entity_type, entity_id,
-                 field_name, old_value, new_value, client, operator_id, operator_name, remark)
-                VALUES (?::uuid,?,?,?::uuid,?,?,?,?,?,?,?,?,?::uuid,?,?)
-                """, UUID.randomUUID(), module, docType, docId, docNo, eventType, entityType, entityId,
-                field, oldValue, newValue,
-                com.meis.saas.common.ops.OpsClientChannel.normalize(client),
-                userId, name, remark);
+        String wxOpenid = com.meis.saas.common.ops.WxOperatorContext.getOpenid();
+        if ((wxOpenid == null || wxOpenid.isBlank()) && userId != null) {
+            try {
+                var cols = com.meis.saas.common.persistence.TableColumnCache.columns(jdbc, "sys_user_wx_bind");
+                if (cols.contains("wx_openid")) {
+                    List<Map<String, Object>> rows = jdbc.queryForList("""
+                            SELECT wx_openid FROM sys_user_wx_bind
+                            WHERE user_id = ?::uuid AND effective_to IS NULL
+                              AND COALESCE(is_deleted, 0) = 0
+                            ORDER BY effective_from DESC NULLS LAST LIMIT 1
+                            """, userId);
+                    if (!rows.isEmpty() && rows.get(0).get("wx_openid") != null) {
+                        wxOpenid = String.valueOf(rows.get(0).get("wx_openid"));
+                    }
+                }
+            } catch (Exception ignored) { /* optional */ }
+        }
+        var logCols = com.meis.saas.common.persistence.TableColumnCache.columns(jdbc, "sys_doc_change_log");
+        if (logCols.contains("operator_wx_openid")) {
+            jdbc.update("""
+                    INSERT INTO sys_doc_change_log
+                    (id, module, doc_type, doc_id, doc_no, event_type, entity_type, entity_id,
+                     field_name, old_value, new_value, client, operator_id, operator_name, remark, operator_wx_openid)
+                    VALUES (?::uuid,?,?,?::uuid,?,?,?,?,?,?,?,?,?::uuid,?,?,?)
+                    """, UUID.randomUUID(), module, docType, docId, docNo, eventType, entityType, entityId,
+                    field, oldValue, newValue,
+                    com.meis.saas.common.ops.OpsClientChannel.normalize(client),
+                    userId, name, remark, wxOpenid);
+        } else {
+            jdbc.update("""
+                    INSERT INTO sys_doc_change_log
+                    (id, module, doc_type, doc_id, doc_no, event_type, entity_type, entity_id,
+                     field_name, old_value, new_value, client, operator_id, operator_name, remark)
+                    VALUES (?::uuid,?,?,?::uuid,?,?,?,?,?,?,?,?,?::uuid,?,?)
+                    """, UUID.randomUUID(), module, docType, docId, docNo, eventType, entityType, entityId,
+                    field, oldValue, newValue,
+                    com.meis.saas.common.ops.OpsClientChannel.normalize(client),
+                    userId, name, remark);
+        }
     }
 
     private static String stringify(Object v) {

@@ -182,41 +182,59 @@ public class EntityChangeLogService {
                 if (!u.isEmpty()) operatorName = String.valueOf(u.get(0).get("name"));
             }
             String channel = com.meis.saas.common.ops.OpsClientChannel.normalize(client);
+            String wxOpenid = resolveOperatorWxOpenid(userId);
             var cols = com.meis.saas.common.persistence.TableColumnCache.columns(jdbc, "sys_entity_change_log");
+            List<String> colNames = new ArrayList<>(List.of(
+                    "id", "entity_type", "entity_id", "action", "changed_fields", "snapshot_json",
+                    "operator_id", "operator_name", "remark"));
+            List<Object> vals = new ArrayList<>();
+            vals.add(UUID.randomUUID());
+            vals.add(entityType);
+            vals.add(String.valueOf(entityId));
+            vals.add(action);
+            vals.add(mapper.writeValueAsString(changedFields != null ? changedFields : List.of()));
+            vals.add(snapshot == null ? null : mapper.writeValueAsString(snapshot));
+            vals.add(userId);
+            vals.add(operatorName);
+            vals.add(remark);
             if (cols.contains("client")) {
-                jdbc.update("""
-                        INSERT INTO sys_entity_change_log
-                        (id, entity_type, entity_id, action, changed_fields, snapshot_json, operator_id, operator_name, remark, client)
-                        VALUES (?::uuid, ?, ?::uuid, ?, ?::jsonb, ?::jsonb, ?::uuid, ?, ?, ?)
-                        """,
-                        UUID.randomUUID(),
-                        entityType,
-                        String.valueOf(entityId),
-                        action,
-                        mapper.writeValueAsString(changedFields != null ? changedFields : List.of()),
-                        snapshot == null ? null : mapper.writeValueAsString(snapshot),
-                        userId,
-                        operatorName,
-                        remark,
-                        channel);
-            } else {
-                jdbc.update("""
-                        INSERT INTO sys_entity_change_log
-                        (id, entity_type, entity_id, action, changed_fields, snapshot_json, operator_id, operator_name, remark)
-                        VALUES (?::uuid, ?, ?::uuid, ?, ?::jsonb, ?::jsonb, ?::uuid, ?, ?)
-                        """,
-                        UUID.randomUUID(),
-                        entityType,
-                        String.valueOf(entityId),
-                        action,
-                        mapper.writeValueAsString(changedFields != null ? changedFields : List.of()),
-                        snapshot == null ? null : mapper.writeValueAsString(snapshot),
-                        userId,
-                        operatorName,
-                        remark);
+                colNames.add("client");
+                vals.add(channel);
             }
+            if (cols.contains("operator_wx_openid") && wxOpenid != null && !wxOpenid.isBlank()) {
+                colNames.add("operator_wx_openid");
+                vals.add(wxOpenid);
+            }
+            String placeholders = colNames.stream().map(c -> switch (c) {
+                case "id", "entity_id", "operator_id" -> "?::uuid";
+                case "changed_fields", "snapshot_json" -> "?::jsonb";
+                default -> "?";
+            }).reduce((a, b) -> a + ", " + b).orElse("?");
+            jdbc.update("INSERT INTO sys_entity_change_log (" + String.join(", ", colNames)
+                    + ") VALUES (" + placeholders + ")", vals.toArray());
         } catch (Exception ignored) {
             // 审计失败不阻断主业务
+        }
+    }
+
+    /** 请求头优先，否则取用户当前有效微信绑定。 */
+    private String resolveOperatorWxOpenid(String userId) {
+        String fromHeader = com.meis.saas.common.ops.WxOperatorContext.getOpenid();
+        if (fromHeader != null && !fromHeader.isBlank()) return fromHeader.trim();
+        if (userId == null || userId.isBlank()) return null;
+        try {
+            var cols = com.meis.saas.common.persistence.TableColumnCache.columns(jdbc, "sys_user_wx_bind");
+            if (!cols.contains("wx_openid")) return null;
+            List<Map<String, Object>> rows = jdbc.queryForList("""
+                    SELECT wx_openid FROM sys_user_wx_bind
+                    WHERE user_id = ?::uuid AND effective_to IS NULL
+                      AND COALESCE(is_deleted, 0) = 0
+                    ORDER BY effective_from DESC NULLS LAST LIMIT 1
+                    """, userId);
+            if (rows.isEmpty() || rows.get(0).get("wx_openid") == null) return null;
+            return String.valueOf(rows.get(0).get("wx_openid"));
+        } catch (Exception e) {
+            return null;
         }
     }
 

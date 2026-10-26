@@ -360,10 +360,18 @@ public class PowerTagController {
 
     private void insertBindLog(UUID tagId, UUID deviceId, Map<String, Object> body, Object remark) {
         UUID safeDeviceId = resolveExistingDeviceId(deviceId);
-        jdbc.update("""
-                INSERT INTO power_tag_bind_log (tag_id, device_id, device_code, device_name, remark)
-                VALUES (?::uuid, ?::uuid, ?, ?, ?)
-                """, tagId, safeDeviceId, body.get("device_code"), body.get("device_name"), remark);
+        String channel = OpsClientChannel.of(body);
+        if (TableColumnCache.hasColumn(jdbc, "power_tag_bind_log", "create_channel")) {
+            jdbc.update("""
+                    INSERT INTO power_tag_bind_log (tag_id, device_id, device_code, device_name, remark, create_channel)
+                    VALUES (?::uuid, ?::uuid, ?, ?, ?, ?)
+                    """, tagId, safeDeviceId, body.get("device_code"), body.get("device_name"), remark, channel);
+        } else {
+            jdbc.update("""
+                    INSERT INTO power_tag_bind_log (tag_id, device_id, device_code, device_name, remark)
+                    VALUES (?::uuid, ?::uuid, ?, ?, ?)
+                    """, tagId, safeDeviceId, body.get("device_code"), body.get("device_name"), remark);
+        }
     }
 
     private UUID resolveExistingDeviceId(UUID deviceId) {

@@ -1,11 +1,14 @@
 ﻿# MEIS 设备管理系统 — 需求与问题跟踪
 
-> **用途**：梳理、编写、评审 MEIS 全系统业务需求，并跟踪已知问题与技术债。  
+> **用途**：梳理、编写、评审 MEIS 全系统业务需求，并跟踪已知问题与技术债。
 > 请在本文件中直接增删改；模块细节可拆分子文档后在此链接。
 
-**文档状态**：进行中（主需求 SSOT）  
-**最后更新**：2026-10-15  
-**负责人**：待填写  
+**文档状态**：进行中（主需求 SSOT）
+
+**最后更新**：2026-10-26
+
+**负责人**：待填写
+
 **系统定位**：医院医疗设备与固定资产全生命周期管理 SaaS（Schema 多租户）
 
 **关联文档**：
@@ -41,18 +44,37 @@
 **需求编号规则**（建议）：
 
 ```
+
 {模块缩写}-{类型}-{序号}
 
 模块缩写：SYS 系统 | PUR 采购 | AST 资产 | WH 库房 | REP 维修 | MT 保养
+
          | INS 巡检 | MET 计量 | QC 质控 | MC 维保合同 | SPC 特种
+
          | SHR 公用设备 | PM 预防性维护 | ANA 效益 | PWR 电流监测 | PLT 平台
 
 类型：F 功能 | B 业务规则 | U 界面 | I 接口 | D 数据 | N 非功能 | X 问题
+
 ```
 
 示例：`REP-F-01`（维修功能需求）、`PLT-X-03`（平台已知问题）
 
 ---
+
+## 文档格式约定（统一风格）
+
+> 自 2026-10-26 起，本文档统一按下列版式维护（历史空行膨胀已一次性清理）。
+
+| 项 | 约定 |
+|------|------|
+| 空行 | 块与块之间最多 **1** 个空行；禁止连续空行 |
+| 标题 | ATX（`#` / `##` / `###`）；标题上下各空一行；勿跳级 |
+| 表格 | 表头+分隔行+数据行连续书写，**表行之间不得插入空行** |
+| 列表 | 同一列表项之间不插空行；列表与前后段落空一行 |
+| 引用块 | 连续 `>` 行；落地说明可用引用块 |
+| 定稿条目 | 建议用「标题 + 表格/清单」；变更记入第 6 章版本记录 |
+| 待办分流 | 缺陷→第 4 章；待确认→第 5 章；暂缓→第 7 章 BACKLOG |
+| 行尾 | 去掉行尾空白；文件以单个换行结束 |
 
 ## 1. 系统概述
 
@@ -153,14 +175,15 @@
 
 ## 3. 分模块需求
 
-> 每节包含：业务目标、功能清单、关键业务规则、界面要点、接口/数据、验收用例（待填写）。  
+> 每节包含：业务目标、功能清单、关键业务规则、界面要点、接口/数据、验收用例（待填写）。
 > **状态**：未开始 | 草稿 | 评审中 | 已确认 | 开发中 | 已实现
 
 ---
 
 ### 3.1 平台与系统管理（SYS）
 
-**服务**：meis-system、meis-auth、meis-tenant  
+**服务**：meis-system、meis-auth、meis-tenant
+
 **状态**：草稿
 
 | 子模块 | 路径 | 核心表/实体 | 状态 |
@@ -322,9 +345,11 @@
 | **范围外** | 不引入 React/antd 运行时；不改 KPI 数据接口 |
 
 ---
+
 ### 3.2 基础字典（DICT）
 
-**服务**：meis-system  
+**服务**：meis-system
+
 **状态**：未开始
 
 | 子模块 | 路径 | 说明 |
@@ -358,7 +383,8 @@
 
 ### 3.3 采购管理（PUR）
 
-**服务**：meis-purchase  
+**服务**：meis-purchase
+
 **状态**：未开始
 
 | 子模块 | 路径 | 主从 | 说明 |
@@ -759,7 +785,8 @@
 
 ### 3.4 资产管理（AST）
 
-**服务**：meis-asset  
+**服务**：meis-asset
+
 **状态**：未开始
 
 | 子模块 | 路径 | 说明 |
@@ -826,7 +853,7 @@
 - [x] AST-BF-01 台账历史补录「保存→确认→生效后不可改删」（归属/非维修换件）
 - [x] AST-PART-01 编辑态「非维修配件更换」Sheet + 查看「配件更换记录」聚合（含确认生效）
 - [x] AST-SRC-01 混合来源查看 Sheet「生成方式」列（配件/归属/位置/处置）
-- [x] AST-LOC-01 楼层/房间位置区间 + 按钮真变更/纠错 + 「位置历史」Sheet（补录 Sheet 可选未做）
+- [x] AST-LOC-01 楼层/房间位置区间 + 按钮真变更/纠错 + 「位置历史」Sheet + 编辑「补录位置历史」
 - [x] AST-DISP-01 处置记录聚合 Sheet
 - [x] AST-UI-22 资产登记业务 Sheet 状态/字典列中文
 - [x] AST-UI-23 编辑态「变更所属科室」按钮（真变更 / 纠错）
@@ -834,7 +861,7 @@
 
 **AST-OWN-01 / AST-OWN-02 / AST-LOC-01 / AST-DISP-01 / AST-UI-22 / AST-UI-23 / PLT-DEV-SHEET-01 定稿（2026-08-01）**
 
-> **状态**：**P0–P2 主路径已实现**（2026-08-01）。迁库须重启 meis-tenant 应用 V1 新表 + R__ 字典。位置补录 Sheet、财务外部处置、Sheet 下钻路由仍可增强。
+> **状态**：**P0–P2 主路径已实现**（含 2026-10-26 位置补录 Sheet）。迁库须重启 meis-tenant 应用 V1 新表 + R__ 字典。财务外部处置、Sheet 下钻路由仍可增强。
 
 ##### 缺口摘要
 
@@ -943,8 +970,8 @@
 | **当前值 UI** | 基本信息中楼层/房间等：**只读或弱化**；入口按钮「变更安装/存放位置」→ 选择器/表单 → 确定后二次确认 |
 | **二次确认** | ① **生成位置历史**（真变更：闭合旧段+新开段并写台账，段直接已确认）；② **仅修正台账位置（不生成位置历史）**（纠错） |
 | **Sheet** | 查看态「**位置历史**」；列：楼层、房间（及约定快照字段）、起止、来源、原因、确认状态 |
-| **补录** | 可选：编辑态「补录位置历史」与 OWN-02 同构，且**必须**遵守 AST-BF-01；首版可不做 |
-| **分期** | **方案本期定稿**；实现排 **P2**（`BACKLOG-AST-LOC-01`）；不阻塞 P1 归属 |
+| **补录** | 编辑态「补录位置历史」与 OWN-02 同构，遵守 AST-BF-01（草稿→确认→不可改删；默认不改当前台账位置） |
+| **分期** | 主路径 + 补录 Sheet 已落地（`BACKLOG-AST-LOC-01` 已完成） |
 | **双写** | 真变更/纠错 + 补录确认 → 约定包 §5.17 |
 
 ##### AST-DISP-01 处置记录
@@ -1222,7 +1249,7 @@
 | **新增** | 基本信息 + 设备档案 + 设备图片 + **电流监测** + **维保信息**（AST-UI-17 / AST-WRN-02；无设备 id 时不可绑标签/维保） |
 | **编辑** | 基本信息 + 设备档案 + 设备图片 + **电流监测** + **维保信息**（**不含**资产卡片与其余业务 Sheet） |
 | **查看 Tab 顺序** | 基本信息 → 资产卡片 → 设备档案 → 设备图片 → **维保信息** → 资产标签 → 维修记录 → **配件更换记录** → 保养记录 → 保养计划 → 巡检记录 → 巡检计划 → 计量记录 → 计量计划 → PM维护记录 → PM维护计划 → 借调记录 → 借调费用 → 盘点记录 → 不良事件 → 电流读数 → 电流标签绑定记录；（规划）**归属历史**（AST-OWN-01）→ **位置历史**（AST-LOC-01）→ **处置记录**（AST-DISP-01）建议插在盘点与不良事件之间或借调之后，实现时定序 |
-| **编辑 Tab（规划）** | 「**补录归属历史**」（AST-OWN-02）；「**非维修配件更换**」（AST-PART-01）；位置真变更走基本信息按钮（AST-LOC-01） |
+| **编辑 Tab** | 「**补录归属历史**」（AST-OWN-02）；「**补录位置历史**」（AST-LOC-01）；「**非维修配件更换**」（AST-PART-01）；位置真变更走基本信息按钮 |
 | **数据** | 各业务 Sheet 按设备查询并展示；空壳 Tab 须接通 `loadUrl`/设备侧 API；单据/计划类遵守 **PLT-DEV-SHEET-01** |
 | **命名** | 保持「设备图片」；「电流度数」改为「电流读数」 |
 | **状态展示** | 业务 Sheet 状态/字典列须中文（AST-UI-22），禁止裸英文码 |
@@ -1371,7 +1398,8 @@
 
 ### 3.5 库房管理（WH）
 
-**服务**：meis-asset（与资产共用）  
+**服务**：meis-asset（与资产共用）
+
 **状态**：未开始
 
 | 子模块 | 路径 | 说明 |
@@ -1713,7 +1741,6 @@
 | **打印** | 对齐设备退货：页内隐藏 iframe 直接调起系统打印；标题「设备退库单」；头信息：仓库/科室/单据号、审核时间/退库原因；明细含资产名称、规格、SN、数量、单价、金额；签栏为制单人/审核人/打印日期 |
 
 - [x] WH-UI-27 退库列表打印
-
 - [ ] WH-B-02 入库来源：采购验收 / 调拨 / 其他
 - [ ] WH-F-01 退货流程与台账状态回滚
 - [ ] WH-D-01 租户 Schema 须含 `device_return*` 等表
@@ -1722,7 +1749,8 @@
 
 ### 3.6 维修管理（REP）
 
-**服务**：meis-repair  
+**服务**：meis-repair
+
 **状态**：部分已文档化 → [repair-workorder.md](repair-workorder.md)
 
 | 子模块 | 路径 | 说明 |
@@ -1755,7 +1783,8 @@
 
 ### 3.7 保养管理（MT）
 
-**服务**：meis-maintain  
+**服务**：meis-maintain
+
 **状态**：未开始
 
 | 子模块 | 路径 |
@@ -1785,7 +1814,8 @@
 
 ### 3.8 巡检管理（INS）
 
-**服务**：meis-inspect  
+**服务**：meis-inspect
+
 **状态**：未开始
 
 | 子模块 | 路径 |
@@ -1811,7 +1841,8 @@
 
 ### 3.9 计量管理（MET）
 
-**服务**：meis-metrology  
+**服务**：meis-metrology
+
 **状态**：未开始
 
 | 子模块 | 路径 |
@@ -1836,7 +1867,8 @@
 
 ### 3.10 质控管理（QC）
 
-**服务**：meis-qc  
+**服务**：meis-qc
+
 **状态**：未开始
 
 | 子模块 | 路径 | 说明 |
@@ -1878,7 +1910,8 @@
 
 ### 3.11 维保合同（MC）
 
-**服务**：meis-maintenance-contract  
+**服务**：meis-maintenance-contract
+
 **状态**：未开始
 
 | 子模块 | 路径 | 说明 |
@@ -1896,7 +1929,8 @@
 
 ### 3.12 特殊设备（SPC）
 
-**服务**：meis-special  
+**服务**：meis-special
+
 **状态**：未开始
 
 | 子模块 | 路径 |
@@ -1917,8 +1951,10 @@
 
 ### 3.13 公用设备 / 调配中心（SHR）
 
-**服务**：meis-special（`meis-shared` 路由别名）  
-**状态**：部分骨架已实现，业务待按附录 N 重构  
+**服务**：meis-special（`meis-shared` 路由别名）
+
+**状态**：部分骨架已实现，业务待按附录 N 重构
+
 **菜单模块名**：调配中心（`mod_shared`；原「公用设备借调」→「借调中心」SHR-UI-01 →「调配中心」SHR-UI-02）
 
 | 子模块 | 路径 |
@@ -1949,7 +1985,8 @@
 
 ### 3.14 预防性维护（PM）
 
-**服务**：meis-pm  
+**服务**：meis-pm
+
 **状态**：未开始
 
 | 子模块 | 路径 |
@@ -1969,7 +2006,8 @@
 
 ### 3.15 效益分析（ANA）
 
-**服务**：meis-analytics  
+**服务**：meis-analytics
+
 **状态**：未开始
 
 | 子模块 | 路径 | 说明 |
@@ -2186,7 +2224,8 @@
 
 ### 3.16 电流监测（PWR）
 
-**服务**：meis-analytics  
+**服务**：meis-analytics
+
 **状态**：评审中
 
 | 子模块 | 路径 |
@@ -2225,7 +2264,7 @@
 **已确认决策（2026-07-11）**
 
 1. **标签页维护待机电流上下限 → 回写设备台账**（Q-09 ✓）
-2. **上下限缺失时的判定规则**（Q-10 ✓），见下表  
+2. **上下限缺失时的判定规则**（Q-10 ✓），见下表
 3. **读数等于下限时归入待机**（边界规则 ✓）
 
 **判定逻辑**（`work_state`，读数单位 mA，上限 = `standby_current_max_ma`，下限 = `standby_current_min_ma`）：
@@ -2261,7 +2300,6 @@
 | 读数 **≥** 下限（**含等于下限**） | 待机 | `idle` |
 
 > 例：下限 50mA 时，读数 50mA → 待机；读数 30mA 或 0 → 关机。
-
 > 实现参考（伪代码）：
 >
 > ```
@@ -2283,7 +2321,6 @@
 >   return idle;  // v >= min，含等于下限
 > }
 > ```
-
 > 注：当前实现为 Mock 随机状态（`PowerMonitorService`），须按上表改写。
 
 **验收标准**：
@@ -2406,8 +2443,11 @@
 **A. 资产台账字段**（`medical_device`）
 
 ```sql
+
 standby_current_max_ma DECIMAL(10,2)  -- 待机电流上限(mA)
+
 standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
+
 ```
 
 **B. 原始读数表**（建议新建 `power_current_reading`）
@@ -2500,10 +2540,12 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 ### 3.17 运营大屏（SCR）
 
 **路径**：
+
 - `/screen/equipment` — 设备运营大屏（KPI / 图表 / 动态）
 - `/screen/warehouse-twin` — 数字孪生大屏（独立菜单）
 
 **菜单**：`mod_screen` 下
+
 - `screen_equipment` 设备运营大屏
 - `screen_warehouse_twin` 数字孪生大屏
 
@@ -2520,7 +2562,8 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 ### 3.18 外部集成（INT）
 
-**服务**：meis-integration  
+**服务**：meis-integration
+
 **状态**：占位
 
 **需求摘要（待补充）**：
@@ -2534,7 +2577,8 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 ### 3.19 移动端（MOB）
 
-**工程**：meis-mobile（Flutter）  
+**工程**：meis-mobile（Flutter）
+
 **状态**：骨架
 
 **需求摘要**：
@@ -2624,7 +2668,9 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 **新增问题模板**（复制到上表）：
 
 ```markdown
+
 | XXX-X-NN | 模块 | 问题描述 | 影响 | 处理建议 | 待处理 |
+
 ```
 
 ---
@@ -2644,6 +2690,9 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | Q-06 | 权限 | 科室用户数据权限：本科室 vs 本院 | 需院方确认 | 待确认 |
 | Q-07 | 移动端 | 一期移动端范围 | 报修 + 盘点（含扫码/补打标志） | **已确认**（2026-07-17，见 MOB / AST.INV） |
 | Q-08 | 部署 | 单院私有部署 vs 多租户 SaaS 优先级 | 影响认证与运维 | 待确认 |
+| Q-12 | 微信/审计 | 小程序操作是否记录当次微信 openid（可选 unionid）？多微信号与系统账号多对一/多对多如何绑定？ | 建议 C：A+B | **已确认**（2026-10-26）：选 C；区间绑定表+users 管理；解绑=闭合区间（不物理删）；一期不做启用/停用开关 |
+| Q-13 | 移动端 | 2026-10 审计后「一起补齐」范围 | 建议先做 P0/P1 | **已确认**（2026-10-26）：按建议执行 |
+| Q-14 | 变更/归属 | App/小程序台账详情是否补「归属历史/位置历史/变更记录」只读 | 建议做 | **已确认**（2026-10-26）：要；移动端**不能修改**位置/归属 |
 
 ---
 
@@ -2651,7 +2700,11 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
-
+| 2.227 | 2026-10-26 15:40:00 | — | AST-LOC-01 补录位置历史 Sheet；MOB-18 小程序 tabBar 三栏（消息/工作台/我的） |
+| 2.226 | 2026-10-26 15:25:00 | — | 无歧义 BACKLOG：证照/培训/档案变更记录；移动端档案+UDI 只读 |
+| 2.225 | 2026-10-26 15:20:00 | — | 统一文档格式：清除空行膨胀、表行连续、新增「文档格式约定」 |
+| 2.224 | 2026-10-26 15:10:00 | — | Q-12~14 已确认：WX-BIND-01 区间绑定（解绑=闭合）；P0/P1+移动只读归属 |
+| 2.223 | 2026-10-26 14:50:00 | — | 审计：变更历史/区间归属/多端缺口/途径/微信 openid；Q-12~14；BACKLOG-AST-CHANGE-01 等 |
 | 2.222 | 2026-10-15 11:20:00 | — | AST-SNJ-01 工程约束：冗余/幂等/禁假主键；档案合同聚合改 origin 元数据；约定包 §5.11.1 |
 | 2.221 | 2026-10-15 11:10:00 | — | 主文档收口：AST-SNJ-01；缺口稿降为附记；后续需求一律记主文档 |
 | 2.220 | 2026-10-15 11:00:00 | — | AST-ARCH-02 / PLT-CAM-04：档案 PDF/合同只读/批量改类/多设备复制/排序抽屉/预览缩放；高拍仪补光空格命名；神农架设备管理对照 BACKLOG |
@@ -2995,11 +3048,10 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 ---
 
-
 ## 7. 待开发功能池
 
-> 已认可、值得做，但因现场节奏/人力暂未开发或未测完的功能。  
-> **区别**：第 4 章 = 缺陷/技术债；第 5 章 = 产品决策未定；**本章 = 已确认方向、待排期**。  
+> 已认可、值得做，但因现场节奏/人力暂未开发或未测完的功能。
+> **区别**：第 4 章 = 缺陷/技术债；第 5 章 = 产品决策未定；**本章 = 已确认方向、待排期**。
 > 编号规则：`BACKLOG-{模块缩写}-{序号}`，模块缩写同文档开头（如 `REP` 维修、`AST` 资产、`SYS` 系统）。
 
 | 编号 | 模块 | 摘要 | 来源/背景 | 优先级 | 阻塞原因 | 状态 |
@@ -3031,7 +3083,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | BACKLOG-AST-PART-01 | 资产 | 非维修配件更换表 + 编辑 Sheet + 查看聚合/生成方式 | 已实现 | P1 | 不强制扣库存 | 已完成 |
 | BACKLOG-AST-DISP-01 | 资产 | 处置记录聚合 Sheet | 已实现 | P1 | — | 已完成 |
 | BACKLOG-AST-UI-22 | 资产 | 台账业务 Sheet 状态中文 | 已实现 | P0 | 缺字典时回退未知(码) | 已完成 |
-| BACKLOG-AST-LOC-01 | 资产 | 位置区间 + 按钮真变更/纠错 +「位置历史」 | 主路径已实现 | P2 | 补录位置历史 Sheet 可选未做 | 部分完成 |
+| BACKLOG-AST-LOC-01 | 资产 | 位置区间 + 按钮真变更/纠错 +「位置历史」+ 补录 Sheet | 已实现 | P2 | — | 已完成 |
 | BACKLOG-AST-DISP-FIN-01 | 资产/集成 | 财务/金蝶等外部资产处置同步 | 预留表+手工 API 已落地；金蝶双向另议 | P2 | 金蝶对接与冲突策略未定 | 部分完成 |
 | BACKLOG-AST-ENTRY-DID-01 | 资产 | 入库完成可靠回写 `device_entry_item.device_id` | 已随 OWN 实现 | P1 | — | 已完成 |
 | BACKLOG-AST-GAP-REVIEW-01 | 资产 | 三甲再审文档 + 非效益实施 | [复核专文](meis-requirements-tertiary-gap-review.md) | P2 | G1～G5 非效益已落地；效益排除 | 部分完成 |
@@ -3081,10 +3133,16 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | BACKLOG-MP-08 | 小程序 | OPS 体验微调：到期 meta、纳入计划 picker 信息、「可修改」提示 | MP.4 | P2 | 体验对齐 | 已完成 |
 | BACKLOG-MOB-14 | 移动端 | 移动端功能独立菜单权限码，与 Web 菜单码分离 | MOB-PWR-01 / 用户约定 | P1 | 全量移动功能统一改造 | 可排期 |
 | BACKLOG-MOB-15 | 移动端 | 电流标签：待机电流上下限 / 绑定历史（移动端） | MOB-PWR-01 范围外 | P2 | 监测记录已并入 MOB-PWR-01/02 | 可排期 |
-| BACKLOG-MP-09 | 小程序 | 台账详情档案附件 / UDI 变更史只读区 | MOB-GAP-01 | P2 | 本批证照/培训已做 | 可排期 |
+| BACKLOG-MP-09 | 小程序 | 台账详情档案附件 / UDI 变更史只读区 | MOB-GAP-01 | P2 | App 同批只读 | 已完成 |
 | BACKLOG-MOB-16 | 移动端 | 本地台账同步 G1 标量；报废进度只读；档案/UDI 史 | MOB-GAP-01 | P2 | 扫码查台账本批已做 | 可排期 |
 | BACKLOG-MOB-17 | 移动端 | 科室盘点申请/报表（执行已支持；申请归 Web） | G5/P-06 | P2 | 列表已标 check_type | 可排期 |
-| BACKLOG-MOB-18 | 移动端 | 小程序首页 tabBar 对齐 App 三栏（消息/功能/我的） | MOB-UI-02 | P2 | App 已落地 | 可排期 |
+| BACKLOG-MOB-18 | 移动端 | 小程序首页 tabBar 对齐 App 三栏（消息/工作台/我的） | MOB-UI-02 | P2 | — | 已完成 |
+| BACKLOG-AST-CHANGE-01 | 资产/审计 | 实体变更查询 API 回传 client（途径列） | 2026-10 审计 | P0 | 查询已回传 client/可选 openid | 已完成 |
+| BACKLOG-AST-OWN-BATCH | 资产 | 批量改台账科室/仓/楼宇禁止绕过归属·位置区间 | AST-UI-23 | P0 | Web+后端已禁 | 已完成 |
+| BACKLOG-AST-T-CHILD-UI | 资产 | 证照/培训/档案面板挂「变更记录」（后端已 TRACKED） | 附录 T | P1 | UI 对齐维保 | 已完成 |
+| BACKLOG-CH-BIND-01 | 电流/途径 | power_tag_bind_log 补 create_channel 并落库 | MOB-CHANNEL-03 | P1 | 列+落库已做 | 已完成 |
+| BACKLOG-MOB-OWN-RO | 移动端 | App/小程序台账：归属历史/位置历史/变更记录只读 | Q-14 | P1 | 移动端禁改 | 已完成 |
+| BACKLOG-WX-OP-01 | 微信 | 小程序写操作落库当次 wx_openid（及区间绑定表） | Q-12 | P1 | WX-BIND-01 | 已完成 |
 | BACKLOG-PWR-01 | 电流监测 | 标签↔基站绑定策略（临近基站多站识别） | MOB-PWR-02 F | P1 | 业务规则待定 | 可排期 |
 
 **状态取值**：`暂缓` / `可排期` / `开发中` / `已完成` / **`长期搁置`**。完成后可移入版本记录说明，或将状态改为已完成并保留一行备查。
@@ -3092,36 +3150,49 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 **新增条目模板**（复制到上表）：
 
 ```markdown
+
 | BACKLOG-XXX-01 | 模块 | 一句话摘要 | 谁提出/哪个现场 | P0/P1/P2 | 暂无时间测试 / 等客户验收窗口 等 | 暂缓 |
+
 ```
 
 ---
+
 ## 附录 A：需求条目模板
 
 ```markdown
+
 #### {编号} {标题}
 
-**用户故事**  
+**用户故事**
+
 作为 ___角色___，我希望 ___做什么___，以便 ___达成什么目标___。
 
 **业务规则**
-1. 
-2. 
+
+1.
+
+2.
 
 **界面要求**
-- 
+
+-
 
 **接口 / 数据**
+
 - 表：
 - API：
 
 **验收标准**
-- [ ] 
-- [ ] 
 
-**优先级**：P0 / P1 / P2  
-**状态**：草稿 / 评审中 / 已确认 / 开发中 / 已实现  
+- [ ]
+- [ ]
+
+**优先级**：P0 / P1 / P2
+
+**状态**：草稿 / 评审中 / 已确认 / 开发中 / 已实现
+
 **负责人**：
+
 ```
 
 ---
@@ -3214,7 +3285,8 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 
 ### D.4 老租户启动时的建表与补列（已落地）
 
-**问：老租户执行建表语句有无问题？**  
+**问：老租户执行建表语句有无问题？**
+
 **答：没有问题。** 使用 `CREATE TABLE IF NOT EXISTS` 时，已存在的表会被跳过，不会删表、不会改已有列，不影响存量数据。
 
 **`meis-tenant` 启动时**（`TenantSchemaMigrator`）对每个活跃租户 schema 自动执行：
@@ -3252,12 +3324,17 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 **提交前 / 环境修复检查**：
 
 ```powershell
+
 # 1) 扫描缺表（应为 0）
+
 cd scripts && javac -encoding UTF-8 -cp ../meis-common/target/deps/postgresql-42.7.3.jar V1TenantGapScan.java
+
 java -cp ".;../meis-common/target/deps/postgresql-42.7.3.jar" V1TenantGapScan
 
 # 2) 一键补表（可选，等同启动时 SchemaTableEnsuring）
+
 powershell -File scripts/ensure-tenant-tables.ps1
+
 ```
 
 **注意**：`public` 中误建的租户业务表（如 `power_tag_bind_log`）不会自动删除；修复后以租户 schema 内表为准。新环境勿向 public 写入租户业务 DDL。
@@ -3440,10 +3517,12 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 ### G.9 UPDATE SET 列重复（2026-07-12 修复）
 
-**现象**：供应商等通用 CRUD 恢复/更新时报  
+**现象**：供应商等通用 CRUD 恢复/更新时报
+
 `bad SQL grammar [... updated_by = ?, ..., updated_by = ?::uuid]`
 
 **原因**：
+
 1. `applyInsertAudit` / 前端整行回传把 `updated_by` 写入 body
 2. `executeUpdate` 把 body 全部拼进 SET
 3. `appendUpdateAuditSets` 再追加一次 `updated_by`
@@ -3574,6 +3653,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 ## 附录 J：开发面板整体 Clean 与打包（2026-07-12）
 
 工具栏构建区：
+
 - **整体 Clean**：`mvn -q clean`（需确认）
 - **打包后端**：`mvn -q package -DskipTests`（紧挨 Clean，全量生成 JAR）
 
@@ -3584,6 +3664,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 **JAR 路径检测正确**（`{name}/target/{name}-1.0.0-SNAPSHOT.jar`）。此前「JAR 缺失」多因只执行了 `compile` 而未 `package`。
 
 推荐流程：**整体 Clean**（可选）→ **打包后端** → 启动服务。
+
 ### J.2 标准七列约定（2026-07-12）
 
 已落定：业务表统一具备创建/更新/删除审计字段；老表由 R__ 补全，新表写 V1。详见 **附录 G.0**。
@@ -3906,11 +3987,11 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | 字典 | `shared_fee_mode`、`shared_fee_time_unit`；扩展借调状态展示文案 |
 | 文档 | §3.13 勾选 SHR 子项；MET 台账联动 |
 
-1. **AST-01/02**：台账字段（计量类型、公用标志）+ schema/表单  
-2. **SHR-F-01~03**：计费字典与台账计费配置字段  
-3. **SHR-01~05**：公用设备页改台账列表 + 状态派生 + 取消公用；**停用 `shared_device` 读写**  
-4. **SHR-F-04**：借调申请写入计费快照（来自 `medical_device`）  
-5. **SHR-F-05~06 + AST-04**：归还自动计费（N.8.2）+ 台账借调/费用 Tab  
+1. **AST-01/02**：台账字段（计量类型、公用标志）+ schema/表单
+2. **SHR-F-01~03**：计费字典与台账计费配置字段
+3. **SHR-01~05**：公用设备页改台账列表 + 状态派生 + 取消公用；**停用 `shared_device` 读写**
+4. **SHR-F-04**：借调申请写入计费快照（来自 `medical_device`）
+5. **SHR-F-05~06 + AST-04**：归还自动计费（N.8.2）+ 台账借调/费用 Tab
 6. **数据迁移**：`shared_device` → `medical_device` 一次性合并；代码清除 `shared_device_id` 引用
 
 ### N.8 已确认规则（2026-07-12）
@@ -3936,8 +4017,8 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 #### N.8.3 原待确认问题 — 答复归档
 
-1. ~~`shared_device` 去留~~ → **直接废弃**  
-2. ~~按次如何计数~~ → **一张借调单据算一次**  
+1. ~~`shared_device` 去留~~ → **直接废弃**
+2. ~~按次如何计数~~ → **一张借调单据算一次**
 3. ~~计时起止点~~ → **借调审核通过后开始，归还审核通过后结束**（不用 `lend` 操作时刻，不用申请单上的计划日期 `loan_start`/`loan_end` 计费）
 
 ---
@@ -4013,7 +4094,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 ### P.2 编辑 vs 查看 Tab
 
-> **修订（AST-UI-14，2026-07-28）**：纠正编辑态漂移（曾误露出全部业务 Sheet）；查看态补计划 / PM / 电流读数与标签绑定。  
+> **修订（AST-UI-14，2026-07-28）**：纠正编辑态漂移（曾误露出全部业务 Sheet）；查看态补计划 / PM / 电流读数与标签绑定。
 > **修订（AST-UI-17，2026-07-31）**：编辑/新增追加「电流监测」Tab（绑已有标签 / 待机上下限 / 监测记录）；查看态仍用原电流两 Tab。
 
 | 模式 | 可见 Tab |
@@ -4063,10 +4144,8 @@ powershell -File scripts/ensure-tenant-tables.ps1
    - 收到需求后，先判断是否合理、可落地。
    - 若存在**风险、歧义、漏洞、与现有架构冲突**，先提醒并与用户澄清；**不得直接开发**。
    - 与用户明确并完善后，将定稿需求写入 `docs/meis-requirements.md`（附录或对应章节），再进入开发。
-
 2. **按文档开发**
    - 以文档定稿为准实现/修改功能，避免口头需求与实现漂移。
-
 3. **交付前自检与修补**
    - 修改完成后，检查并补全/修正：
      - **后端 CRUD**：列表/详情、创建、更新、删除、校验、权限、软删、关联约束、错误返回等；
@@ -4274,7 +4353,6 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 **状态**：R.2 按 PLT-STATUS-CN-01 实施。
 
-
 ---
 
 ## 附录 S：设备报修草稿 / 提交 / 撤回
@@ -4335,7 +4413,6 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | Web | 报修申请表单可上传/删除/预览；草稿可改；非草稿只读 |
 | 移动端 | 同规则；相册/拍照上传 |
 
-
 #### 列表空白排查（2026-07-13）
 
 | 现象 | 原因 | 处理 |
@@ -4378,7 +4455,6 @@ powershell -File scripts/ensure-tenant-tables.ps1
 ## 附录 T：主数据查看与变更记录
 
 > 来源：用户需求（2026-07-12）；定稿：粒度 A+C（字段级 diff + 删/提交类附精简快照）；范围 P0+P1+P2 本轮。
-
 
 ### PLT-RUANZHU-01 软著源代码鉴定材料（定稿·2026-09-07）
 
@@ -4423,7 +4499,6 @@ powershell -File scripts/ensure-tenant-tables.ps1
 **待申请表补齐后**：回填页眉全称/版本；确认开发完成日期；按需重跑脚本。
 
 **状态**：材料已生成（60 页）；元数据占位待填。
-
 
 ### T.1 目标
 
@@ -5094,7 +5169,7 @@ API：`GET /repair/workorder/page` 增加 `statuses`（逗号分隔）、`urgenc
 
 ### U.15 进程段编辑删除、确认补全与配件档案（2026-07-15 20:42:27）
 
-> 来源：用户需求（文末草稿已并入本节与附录 W 后删除）。  
+> 来源：用户需求（文末草稿已并入本节与附录 W 后删除）。
 > 待确认已定稿：删段不重开上一段；工程师至少保留 1 人；进行中可改 `ended_at`；确认时空 `ended_at` 回填；开待验段时自动确认未确认段；冗余选方案 B 并推广（附录 W）。
 
 #### U.15.1 进程段编辑 / 删除 / 配件行
@@ -5175,7 +5250,6 @@ API：`GET /repair/workorder/page` 增加 `statuses`（逗号分隔）、`urgenc
 | 扫描结果 | `tenant_*` 仅缺：`device_label_print_log`、`sys_entity_change_log`（日志类亦补标志；读过滤仍按 I.4 例外） |
 | public | 平台/遗留副本不在本轮租户补齐范围 |
 
-
 ### G.10 物理删除盘点与结构补齐策略（2026-07-14）
 
 #### G.10.1 代码中 `DELETE FROM` 盘点
@@ -5216,7 +5290,7 @@ API：`GET /repair/workorder/page` 增加 `statuses`（逗号分隔）、`urgenc
 
 ## 附录 V：列表勾选跨页缓存与批量作用域（2026-07-15）
 
-> 来源：用户需求；通用原则双写 [约定包 §5.4](reusable-engineering-conventions.md)。  
+> 来源：用户需求；通用原则双写 [约定包 §5.4](reusable-engineering-conventions.md)。
 > **2026-07-16 修订**：按 PLT-UI-01 取消「已选 / 全选当页 / 取消全选」提示条 UI；其余约定不变。
 
 ### V.1 合理性结论
@@ -5251,7 +5325,7 @@ API：`GET /repair/workorder/page` 增加 `statuses`（逗号分隔）、`urgenc
 
 ## 附录 W：业务冗余字段约定（2026-07-15）
 
-> 来源：用户确认方案 B，并要求不限于 `device_id`、按经验推广关键字段冗余，便于台账追溯与直查。  
+> 来源：用户确认方案 B，并要求不限于 `device_id`、按经验推广关键字段冗余，便于台账追溯与直查。
 > 可复用原则双写 [约定包 §6.2](reusable-engineering-conventions.md)（当前 v1.14；含 **W.6** 单据头下沉）。
 
 ### W.1 原则
@@ -5312,15 +5386,15 @@ P1 记入第 7 章：`BACKLOG-AST-W01`（跨模块执行表/费用表冗余补�
 
 设备台账子页（维修/保养/巡检/计量/借调等）优先：
 
-1. 有冗余 `device_id` 的子表/流水 → `WHERE device_id = ?`  
-2. 否则 → 经主单 `device_id` 关联  
+1. 有冗余 `device_id` 的子表/流水 → `WHERE device_id = ?`
+2. 否则 → 经主单 `device_id` 关联
 
 **状态**：W.3.1 与 U.15 同轮实施；W.3.2 进待开发池后分批。
 
 ### W.5 工作人员姓名冗余（2026-07-15）**【强制约定】**
 
-> 来源：用户确认——审计列 + 业务责任人均冗余姓名；优先 `real_name`，空则 `username`；写入快照、不级联改名。  
-> **效力（Q.12）**：后续所有新功能 / 新表 / 新手写 SQL **一律遵守**；存量缺口分批修补（见 W.5.5 / `BACKLOG-PLT-W02`）。  
+> 来源：用户确认——审计列 + 业务责任人均冗余姓名；优先 `real_name`，空则 `username`；写入快照、不级联改名。
+> **效力（Q.12）**：后续所有新功能 / 新表 / 新手写 SQL **一律遵守**；存量缺口分批修补（见 W.5.5 / `BACKLOG-PLT-W02`）。
 > 可复用原则双写 [约定包 v1.6 §3 / §6.3](reusable-engineering-conventions.md)。
 
 #### W.5.1 原则
@@ -5380,7 +5454,7 @@ P1 记入第 7 章：`BACKLOG-AST-W01`（跨模块执行表/费用表冗余补�
 
 ### W.6 单据头与主数据冗余到明细/子表（2026-07-22）**【强制约定】**
 
-> 来源：用户新增约定（文末草稿已并入本节后删除）。扩展 W.1/W.2：不仅设备，**新业务单据**的明细/子表须冗余业务单号及常用头字段、关联主数据的编码/名称。  
+> 来源：用户新增约定（文末草稿已并入本节后删除）。扩展 W.1/W.2：不仅设备，**新业务单据**的明细/子表须冗余业务单号及常用头字段、关联主数据的编码/名称。
 > 可复用原则双写 [约定包 v1.14 §6.2](reusable-engineering-conventions.md)。
 
 #### W.6.1 合理性与边界
@@ -5679,43 +5753,56 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 ### OPS.3 目标单据结构（三模块同构）
 
 ```
+
 参数: 级别或类别 → template → template_item
+
 计划: plan（1）→ plan_item（N 设备；权威到期日在此）
+
 执行: execution（1，plan_id 可空）
+
         → execution_item（N 设备）
+
         → execution_result（N 检查项，挂 item）
+
 ```
 
 「记录查询」= **已审核执行单**的只读查询/视图；不强制再维护与执行完全重复的第三套 `*_record` 写模型（存量 `maintenance_record` 等可逐步收敛到执行单）。
 
 #### OPS.3.1 计划主表（业务字段摘要）
 
-`plan_no`，`plan_name`，级别或类别 id，`template_id`，`template_name`（快照），`cycle_type`，`cycle_value`/`cycle_days`，`reminder_days_before`，`status`（active/paused/closed），`approval_status`（draft/pending/approved/rejected），可选 `dept_id`/`campus_id`，`remark`  
-+ **审计七列**及 `created_by_name` / `updated_by_name` / `deleted_by_name`（W.5）  
+`plan_no`，`plan_name`，级别或类别 id，`template_id`，`template_name`（快照），`cycle_type`，`cycle_value`/`cycle_days`，`reminder_days_before`，`status`（active/paused/closed），`approval_status`（draft/pending/approved/rejected），可选 `dept_id`/`campus_id`，`remark`
+
++ **审计七列**及 `created_by_name` / `updated_by_name` / `deleted_by_name`（W.5）
 + 审核人：`approved_by` / `approved_by_name` / `approved_at`
 
 > 主表**不**再作为权威「上次/下次保养(巡检/PM)日」存贮；列表若需汇总，可派生或冗余缓存，以明细为准。
 
 #### OPS.3.2 计划明细（按设备，权威到期）
 
-`plan_id`，`plan_no`，`device_id`，`device_code`，`device_name`，`dept_id`，**`last_done_date`**，**`next_due_date`**，`assigned_user_id` / `assigned_user_name`，`item_status`，`remark`  
+`plan_id`，`plan_no`，`device_id`，`device_code`，`device_name`，`dept_id`，**`last_done_date`**，**`next_due_date`**，`assigned_user_id` / `assigned_user_name`，`item_status`，`remark`
+
 + 审计七列及姓名快照（若明细独立软删）
 
 #### OPS.3.3 执行主表
 
-`execution_no`，`plan_id`（**可空**），`plan_no`，`source_type`（`from_plan` / `ad_hoc`），`template_id`，`template_name`，级别或类别快照，`planned_date`，  
-`status`：`draft` → `in_progress` → `submitted` → `audited`（及 `cancelled`），  
-`submitter_id` / `submitter_name` / `submitted_at`，`auditor_id` / `auditor_name` / `audited_at` / `audit_comment`  
+`execution_no`，`plan_id`（**可空**），`plan_no`，`source_type`（`from_plan` / `ad_hoc`），`template_id`，`template_name`，级别或类别快照，`planned_date`，
+
+`status`：`draft` → `in_progress` → `submitted` → `audited`（及 `cancelled`），
+
+`submitter_id` / `submitter_name` / `submitted_at`，`auditor_id` / `auditor_name` / `audited_at` / `audit_comment`
+
 + 审计七列及姓名快照
 
 #### OPS.3.4 执行明细（设备行）
 
-`execution_id`，`execution_no`，`plan_id` / `plan_item_id`（可空），`device_id` + code/name，`executor_id` / `executor_name`，`start_time` / `end_time`，`item_status`，`overall_result`，`issues_found`，`photos`，`signature_url`，**`row_version`**（乐观锁）  
+`execution_id`，`execution_no`，`plan_id` / `plan_item_id`（可空），`device_id` + code/name，`executor_id` / `executor_name`，`start_time` / `end_time`，`item_status`，`overall_result`，`issues_found`，`photos`，`signature_url`，**`row_version`**（乐观锁）
+
 + 审计列 / 姓名快照（按需）
 
 #### OPS.3.5 执行内容（检查项结果，生成时快照模板）
 
-`execution_item_id`，`template_item_id`（可空），快照：`item_name` / `item_content` / `standard_value` / `check_method` / `sort_order` / `is_required`，  
+`execution_item_id`，`template_item_id`（可空），快照：`item_name` / `item_content` / `standard_value` / `check_method` / `sort_order` / `is_required`，
+
 `result_value`，`result_status`（pass/fail/na/pending），`remark`，`photos`，**`row_version`**
 
 模板事后变更**不得**改写历史执行内容。
@@ -6376,7 +6463,6 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 | **租户 V1** | 绝大多数业务表 `id UUID`；字符串主键：`import_profile_binding.business_type`（VARCHAR） |
 | **平台 public V1** | 业务表 UUID；字符串主键：`package_code`（套餐编码作 PK，合理） |
 | **非 UUID/非字符串** | 仅下表 3 个 `BIGSERIAL`（bigint 自增） |
-
 | 表 | 主键 | 说明 | 建议 |
 |----|------|------|------|
 | `sys_operation_log` | `id BIGSERIAL` | 操作日志，高写入 | 可保留自增；若强一致再迁 UUID |
@@ -6402,7 +6488,6 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 | **P2 连带** | 保养/PM 计划头责任人服务端补姓名；前端计划审核人/入库明细/合同明细/保养记录字段对齐 |
 | **Backlog** | OPS plan_code 收敛；标签绑定等零星责任人入口可后续 |
 
-
 #### PLT-AUDIT-01.1 公用借调审核姓名 + 巡检责任人姓名（2026-07-23）
 
 | 项 | 定稿 / 修补 |
@@ -6410,7 +6495,6 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 | **公用借调/归还** | 加 approved_by_name；手工 approve 与审批流副作用同写 |
 | **巡检计划** | 加 assigned_inspector_name；save 服务端按 ID 解析；前端选人 fillFromLink |
 | **前端** | 借调/归还列表审核人；收费明细补 device_code |
-
 
 #### PLT-AUDIT-01.2 BACKLOG-PLT-W02 非维修责任人姓名（2026-07-23）
 
@@ -6484,7 +6568,6 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 | 一期功能 | ① 扫码查询台账 ② 扫码报修（对齐 App）③ 保养执行 ④ 巡检执行 ⑤ PM 执行 |
 | 客户端标识 | 运维执行写操作 `client=mp`（与 App 的 `app` 区分，单据追溯可见） |
 | 排期 | App MT-F-02 → MOB.8 之后；见第 7 章 **BACKLOG-MP-01** |
-
 | 页面 | 路径 | API 摘要 |
 |------|------|----------|
 | 扫码查询 | `/pages/asset/scan` | `GET /asset/device/by-code/{code}` → 详情 |
@@ -6537,12 +6620,12 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 
 ### MOB.9.3 实施顺序（已确认 2026-07-21）
 
-1. ~~App+小程序：**我的报修进度** + **维修验收**~~ → **已完成**（MOB.10）  
-2. ~~App：**消息中心**~~ → **已完成**（增强）  
-3. ~~App：**工程师移动维修**~~ → **一期已完成**（MOB.11：抢单/接单/进程/配件/完工）  
-4. ~~小程序：**订阅消息** + **手写签名**~~ → **已完成**（MP.3）  
-5. ~~App：**报修本地草稿** / **计量执行** / **补打一期**；小程序：**不良事件**~~ → **已完成**（MOB.12）  
-6. 其余按院方痛点插队（如 BACKLOG-MOB-10）  
+1. ~~App+小程序：**我的报修进度** + **维修验收**~~ → **已完成**（MOB.10）
+2. ~~App：**消息中心**~~ → **已完成**（增强）
+3. ~~App：**工程师移动维修**~~ → **一期已完成**（MOB.11：抢单/接单/进程/配件/完工）
+4. ~~小程序：**订阅消息** + **手写签名**~~ → **已完成**（MP.3）
+5. ~~App：**报修本地草稿** / **计量执行** / **补打一期**；小程序：**不良事件**~~ → **已完成**（MOB.12）
+6. 其余按院方痛点插队（如 BACKLOG-MOB-10）
 
 **状态**：顺序 1–5 已落地；弱网运维草稿等待排期。
 
@@ -6578,6 +6661,7 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 **状态**：一期已落地（需重启 **meis-repair**）。
 
 ---
+
 ### MP.3 手写签名与订阅消息（2026-07-21）
 
 | 项 | 定稿 |
@@ -6780,8 +6864,8 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 
 ### AST-SNJ-01 神农架设备管理对照后续池（定稿·2026-10-15）
 
-> 来源：对照 `cestar_shenNongJia` 资产/设备管理（`erps/zcgl`、盘点/借用/报废/定位/特种/效益等）；**不含**已收口档案/高拍仪（AST-ARCH / PLT-CAM）。  
-> 分析附记可保留在 [缺口稿 §8](meis-requirements-asset-ledger-gap.md)；**排期与状态以本表 + 第 7 章 BACKLOG 为准**。  
+> 来源：对照 `cestar_shenNongJia` 资产/设备管理（`erps/zcgl`、盘点/借用/报废/定位/特种/效益等）；**不含**已收口档案/高拍仪（AST-ARCH / PLT-CAM）。
+> 分析附记可保留在 [缺口稿 §8](meis-requirements-asset-ledger-gap.md)；**排期与状态以本表 + 第 7 章 BACKLOG 为准**。
 > MEIS 已领先、勿重复当 gap：台账 Tab/Sheet、归属/位置、非维修配件、处置聚合、维保包、盘点扫码主路径、借调主流程、培训授权 Tab、电流标签运维。
 
 #### 工程约束（实施 BACKLOG 时强制 · 2026-10-15）
@@ -6821,7 +6905,6 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 
 **状态**：分析定稿；实施项进第 7 章（2026-10-15）。
 
-
 ### PLT-MENU-01 菜单唯一维护脚本（2026-07-24）
 
 > 来源：用户要求将菜单 SQL 整合到单一脚本，避免散落各迁移/临时脚本导致管理混乱。
@@ -6836,7 +6919,6 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 | **维护方式** | 增删改菜单只改 `R__menus.sql`；重启 meis-tenant 触发 Flyway；可选 `scripts/ExportMenus.java` 从现网导出对齐 |
 
 **状态**：已落地（2026-07-24）。
-
 
 ### PLT-OCR-01 铭牌图像识别回填台账（待开发·2026-07-24）
 
@@ -6888,20 +6970,20 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 
 | 项 | 定稿 |
 |----|------|
-| **端** | 本期 **Flutter App（`meis-mobile`）**；小程序 tabBar 对齐见 BACKLOG-MOB-16 |
+| **端** | Flutter App（`meis-mobile`）已落地；小程序 tabBar 对齐见 **BACKLOG-MOB-18**（已完成） |
 | **底栏** | 三栏固定：**消息** · **工作台** · **我的**；默认落在 **工作台** |
 | **消息** | 原消息中心列表（已读/跳转逻辑不变）；不再在功能列表重复入口 |
-| **工作台** | 业务入口列表（常用功能 / 运维执行等）；**不含**品牌问候头 |
-| **我的** | 微信式资料头（点击进 **个人资料**）；分组列表：修改密码 / 设置 IP / 关于 / 退出；无「你好」问候语 |
-| **个人资料** | 头像、账号、租户、名字、性别、地区、手机号、微信号；`GET /api/system/users/me/profile`；库表 `sys_user.gender/region/wechat_id` |
-| **实现** | `MainShellPage` + `ProfilePage`；改密 `POST .../me/change-password`；设置 IP 回填本地配置 |
-| **不做** | 本期不改小程序；不改消息后端契约 |
+| **工作台** | 业务入口列表（常用功能 / 运维执行等）；App **不含**品牌问候头；小程序保留轻量问候 |
+| **我的** | 微信式资料头；App：修改密码 / 设置 IP / 关于 / 退出；小程序：关于 / 退出 |
+| **个人资料** | App：头像、账号、租户、名字、性别、地区、手机号、微信号；`GET /api/system/users/me/profile` |
+| **实现** | App：`MainShellPage`；小程序：`pages.json` tabBar + `pages/message` / `pages/home` / `pages/mine` |
+| **不做** | 不改消息后端契约；小程序暂不设 IP / 完整个人资料页 |
 
-**状态**：已落地。
+**状态**：App + 小程序均已落地。
 
 ### PLT-DEP-01 Windows Server 生产部署文档（已完成·2026-07-27）
 
-> 来源：需补充 Windows 生产环境部署说明（原仅有 Linux 生产 + Windows 本地开发）。  
+> 来源：需补充 Windows 生产环境部署说明（原仅有 Linux 生产 + Windows 本地开发）。
 > **完整正文已独立成篇，勿在本需求文档内展开步骤**：[docs/windows-production-deploy.md](windows-production-deploy.md)
 
 | 项 | 定稿 |
@@ -6917,7 +6999,7 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 
 ### PLT-OPS-01 生产服务运行状态监测（已完成·2026-07-28）
 
-> 来源：如何监测生产环境各个服务运行状态。  
+> 来源：如何监测生产环境各个服务运行状态。
 > **完整正文已独立成篇**：[production-monitoring.md](production-monitoring.md)
 
 | 项 | 定稿 |
@@ -7419,7 +7501,7 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 
 ### MOB-SCAN-03 扫码页 CameraX NPE（定稿·2026-07-31）
 
-> 来源：已授权相机后仍黑屏感叹号，文案为  
+> 来源：已授权相机后仍黑屏感叹号，文案为
 > `Attempt to invoke virtual method 'java.lang.Class java.lang.Object.getClass()' on a null object reference`。
 
 #### 1. 根因
@@ -7603,15 +7685,15 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 
 #### 2. 后续升级路径（预留）
 
-1. Web：`vue-i18n`（或等价）挂载同一 key 空间；Element Plus locale 已有中文基础。  
-2. App：`flutter gen-l10n` / ARB，与字典 key 对齐。  
-3. 小程序：启用 uni-i18n，与 Web 共享 JSON。  
-4. 可选：`sys_dict` 增加 `locale` 或独立 `sys_dict_i18n` 表。  
+1. Web：`vue-i18n`（或等价）挂载同一 key 空间；Element Plus locale 已有中文基础。
+2. App：`flutter gen-l10n` / ARB，与字典 key 对齐。
+3. 小程序：启用 uni-i18n，与 Web 共享 JSON。
+4. 可选：`sys_dict` 增加 `locale` 或独立 `sys_dict_i18n` 表。
 5. **优先本仓库改造**；仅当框架冲突无法解决时再考虑从本套代码生成平行产品线。
 
 #### 3. 新增功能门禁
 
-- 新状态机 / 枚举：必须先落 `sys_dict` 种子，再挂 schema `dictType` / 三端解析。  
+- 新状态机 / 枚举：必须先落 `sys_dict` 种子，再挂 schema `dictType` / 三端解析。
 - Code Review：用户可见状态不得直接 `{{ row.status }}` / `'${status}'` 裸绑。
 
 **状态**：约定已落地；语言切换列为后续能力（无需 BACKLOG 编号，随产品排期）。
@@ -7652,18 +7734,14 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 
 **状态**：已完成（需重新打包 App / 小程序验证）。
 
-
 > 已定稿并实现：**AST-UI-16**、**AST-UI-17**（见上文资产登记清单）。
 
 **FAQ（AST-UI-17）**：编辑态应在「设备图片」后出现 Tab「电流监测」。若仍只见 3 个 Tab，多为浏览器/现场包仍加载旧前端：硬刷新（Ctrl+F5）或重启 `meis-web` 开发服务；若走 Nginx/`package/.../www` 静态包，需重新 `npm run build` 并覆盖 www。源码：`DeviceLedgerForm.vue` → `ledgerKeys` 含 `power_monitor`，面板 `DevicePowerMonitorPanel.vue`。
 
 > **PLT-STATUS-CN-01 修订（v2.178）**：标签维护等页编码/名称被打成「未知(…)」已修复——仅状态与 `dictType` 分类字段走中文/`未知(码)`；编码、规格、型号等属性原样显示。
-
-
 > 已定稿并实现：**AST-WRN-02**；**AST-UI-18～23**；**AST-GAP-01**；**AST-DEMO-01**；**PLT-DEV-LIST-01**；**PLT-DB-SYNC-01**；**PLT-DEV-SHEET-01**；**AST-OWN-01/02**；**AST-BF-01**；**AST-PART-01**；**AST-SRC-01**；**AST-LOC-01**（主路径）；**AST-DISP-01**。
 > **部署**：重启 **meis-tenant** 以建 `device_ownership_period` / `device_part_replacement` / `device_location_period` 并灌字典；再重启业务服务与前端。
 > **种子执行**：须 `SET search_path TO tenant_demo;`（Web 登录态不会自动带到 pgAdmin）。
-
 > **三甲再审文档**：[meis-requirements-tertiary-gap-review.md](meis-requirements-tertiary-gap-review.md)（标量 S-* / 对象 O-* / 流程 P-*；只分析不开发）。
 > **AST-GAP-REVIEW-01 后端（2026-08-01）**：已落地 G1 标量列 + 字典、O-02 证照、O-03 培训授权、O-04 档案附件、O-01 UDI 史（台账更新钩子）；**未做** O-09/O-11/P-08 效益与 G5 报废/盘点流程。部署：重启 **meis-tenant** 建表补列灌字典，再重启 meis-asset / meis-common。
 > **G5 已落地（2026-08-01，不含效益 P-08）**：
@@ -7671,65 +7749,70 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 > - **P-06**：科室盘点申请（check_type=dept）+ 设备盘点报表；完成时刷新相符/不符/盘亏计数（写回台账另议）
 > - **P-12**：external_asset_disposition 预留表 + /api/asset/external-disposition；纳入处置 Sheet；**金蝶双向同步仍 BACKLOG**
 > **部署**：重启 **meis-tenant**（报废补列、外部处置表、字典）→ 再重启 meis-asset / meis-common / 前端。
-
 > **AST-SHEET-DRILL-01（2026-08-01）**：台账 Sheet 点单号/「明细」→ 只读抽屉（头+明细+执行结果）。种子：data/seed/demo_asset_ledger.sql（含 *_execution_result）。部署后重跑种子并硬刷新前端。
-
 > **AST-STATUS-CN-GAP-01（2026-08-01）**：扫描代码 dictType 与 R__data_fix / statusCatalog.zh-CN.ts 对照后补齐：
 > - 审批：maintain_approval_status / inspect_approval_status / metrology_approval_status（及 withdrawn/rejected）
 > - 结果：inspect_result、pm_exec_result、pm_exec_status；计量补 qualified/unqualified/conditional
 > - 其它：disposition_biz_status、sync_status、udi_change_reason；处置 Sheet 的 biz_status、UDI 史 change_reason 改用正确 dictType
 > **部署**：重启 **meis-tenant** 灌字典 → 重启前端；已有库依赖可重复执行的 R__data_fix。
-
 > **PLT-DICT-SEED-01（2026-08-01）**：继续开发若产生新状态/枚举码，须同步 R__data_dict + 三端 catalog（约定包 §5.1 v1.43）。与 PLT-STATUS-CN-01 / AST-STATUS-CN-GAP-01 配套。
-
 > **MOB-GAP-01（2026-08-01）**：对照 Web G1～G5，移动端最小落地——
 > - **小程序**：台账详情补 G1 标量（UDI/责任人/类别等）+ 证照/培训授权只读
 > - **App**：工作台「台账查询」：顶部搜索条件 + 下方资产列表（`/asset/device/page`），点选进轻量详情（G1 标量 + 证照/培训只读）；盘点列表/详情展示 check_type（科室盘点）与科室名；双端 statusLabels 对齐
 > - **入池**：档案/UDI 史 BACKLOG-MP-09；本地 G1 同步/报废只读 BACKLOG-MOB-16；科室盘点申请 BACKLOG-MOB-17；报废全流程/外部处置仍归 Web
 > **验证**：重新编译 App / 小程序；打开扫码查台账与盘点任务页。
-
 > **AST-DEMO-01 修订（2026-08-01）**：演示种子覆盖列表前三页设备（默认每页 20 → `SD24080001`～`060`）各业务 Sheet，不再仅样板机一条。部署：`SET search_path TO tenant_demo;` 后重跑 `data/seed/demo_asset_ledger.sql`。
-
 > **AST-UI-24（2026-08-01）**：资产登记**查看态** Sheet 改为左侧纵向列表（可滚动）+ 右侧内容；顺序按现场操作习惯（台账核对→证照合规→运维闭环→流转处置→监测），**不是**按 Windows/Mac 操作系统。编辑态仍顶栏横向（Tab 较少）。
-
 > **MOB-CHANNEL-03（2026-08-01，v1.45）**：App/小程序增删改交付前须扫描途径；**缺 `*_channel` 列须先补列再写落库**（禁止无列跳过）。标签打印流水已补 `create_channel`。约定包 §5.10.4。
-
 > **AST-EXP-01（2026-08-01）使用到期推算**：
 > - **默认优先级（客户未指定前）**：启用日期 → 生产日期 → 验收日期 → 购置日期 → 录入日期（`created_at`）
 > - **算式**：锚点日期 + `service_life_years`；落库 `service_expiry_date` + `service_expiry_basis`；备注写入/更新 `[使用到期推算] …`
 > - **列表**：显示「使用到期推算方式」列（字典中文）
 > - **经验说明**：生产日期最严（制造商寿命）；启用日期更贴近医院在用管理与折旧起算。默认启用优先，预留生产优先模式待租户配置
 > - **部署**：重启 meis-tenant（补列+字典+存量回填）→ meis-common/asset → 前端；演示种子已带年限与推算备注
-
 > **MOB-CHANNEL-03 扫描修补（2026-08-01）**：对照 App/MP 写入口与后端落库——
 > - **已齐套（前端）**：报修制单提交、运维执行、借还、不良、电流、盘点在线等均已传 `client`
 > - **本批后端补写**：工程师 grab/accept/complete/segments/withdraw → `update_channel`；盘点 offline-sync 注入 client、patch 盘到写 `confirm_channel`；巡检/保养/PM start+complete 写 `update_channel`；借还 reject 写 `confirm_channel`；不良新建写 `submit_channel`
 > - **2.210 补齐**：`device_label_print_log.create_channel`（缺列→补列→落库→回填→Web 展示）；App 补打传 `client=app`
 > - **余量**：`repair_workorder.audit_channel` 语义未用（审核路径未走该列时保持空）
 > **部署**：重启 meis-tenant（补列+回填）→ meis-asset → Web / App
-
 > **MOB-CHANNEL-04（2026-08-01，v1.46）**：写业务表途径时同事务写变更/单据日志 `client`（create/update/delete/动作）。报修工程师动作进 EntityChangeLog；借还/不良/盘点/计量/电流进 DocChangeLog；历史日志 NULL→web。
 > **部署**：重启 meis-tenant（回填）→ meis-repair / meis-special / meis-qc / meis-asset / meis-analytics / meis-common
-
 > **PLT-REF-CODE-01（2026-08-01，v1.47）**：强业务主数据外键列表/详情/下拉显示「编码 名称」（厂家/供应商/科室/院区/仓库/楼宇/三类分类）；人员/单位只显名称；**采购计划**院区/科室继续只显名称。刷新前端即可。
-
 > **MOB-SYNC-01（2026-08-01，v1.48）**：Web 与移动端**已共有**的功能，若字段扩展或业务分支扩展，须同批改 App/小程序（已有入口的端），禁止只改 Web 回头再补；暂缓须入 BACKLOG 并点名。约定包 §5.18。
-
 > **AST-UI-25（2026-08-01，v1.49）查看态侧栏/内容滚动**：
 > - **问题**：顶栏 Tab 的全宽负 margin 误套到侧栏导航，内容区撑破盖住滚动条
 > - **规则**：顶栏专用样式只作用于 `--top`；侧栏与内容区各自 `min-width/min-height:0` + 独立 `overflow-y`；内容区 `scrollbar-gutter: stable` 并留足右内边距
 > - **范围**：资产登记查看态（`DeviceLedgerForm` 侧栏）；编辑态顶栏不变
 > - **双写**：约定包 §5.19
 > **部署**：刷新前端即可
-
 > **REP-PERF-01（2026-08-03）**：报修列表「查不到/超时」——enrichWorkorders 改本页一次 IN 查询，消除 N+1；**报修申请/处理/验收同一路径**；重启 meis-repair。
 > **扫描余量（入第 7 章）**：用户角色 enrich、台账/维保 SQL、执行单详情、采购补号副作用 → BACKLOG-*-PERF-*；约定包 §5.20。
 > **REP-STAT-01（2026-08-06）**：筛「已验收」含验收后结案（closed+子状态 verified）；列表展示对齐。重启 meis-repair。
-
 > **PLT-RUANZHU-01（2026-09-07）**：软著源代码鉴定材料约定已定稿；生成稿见 `docs/附件3-源代码鉴定材料.docx`（副本 `docs/ruanzhu-source-identification.docx`）；页眉全称/版本待申请表回填。重新生成：`python scripts/common/gen-ruanzhu-source-docx.py`。
-
 > **AST-ARCH-01/02 · PLT-CAM-03/04 · AST-SNJ-01（2026-10-15）**：
 > - **已落地**：设备档案物理复制/排序/旋转/字典对齐；PDF 预览、合同只读（`row_kind=ref`+FK，禁假主键）；批改/批删/排序幂等；多设备复制去重+跳过同源；高拍仪成片横纵向与补光/空格/命名
 > - **工程约束**：补强须遵守 [AST-SNJ-01 工程约束](#工程约束实施-backlog-时强制--2026-10-15)（冗余双写、幂等、正规关联）；约定包 **§5.11.1**
 > - **后续池**：第 7 章 `BACKLOG-AST-YK/KD/BEN/RFID/...`、`BACKLOG-AST-ARCH-02`
 > - **部署**：重启 meis-asset / meis-file；刷新前端
+> **PLT-PROMO-01（2026-10-26）宣传彩页（HTML，篇幅不设限）**：
+> - 路径：`docs/promo/meis-brochure-zh.html` / `meis-brochure-en.html`（说明见 `docs/promo/README.md`）
+> - 结构：品牌 → 区间归属差异 → **常规功能介绍（按域）** → **同类产品特色比对** → 收束
+> - 卖点：字段齐全、记录完整、历史归属清晰；归属/位置为**时间区间**；真变更/纠错；主从齐套；多端途径；变更可审计
+> - 约定：宣传暂不写 RFID 已落地（仅 BACKLOG）
+
+### WX-BIND-01 微信账号与系统用户多对多区间绑定（定稿·2026-10-26）
+
+| 项 | 定稿 |
+|------|------|
+| 模型 | **C**：独立表 `sys_user_wx_bind`（区间历史） + 写操作时落 `operator_wx_openid`（Entity/Doc 变更日志） |
+| 关联 | 用户管理：关联 / **解除绑定** / 查看历史（生效起止） |
+| 解绑 vs 停用 | **解绑 = 闭合当前有效区间**（写 effective_to，保留行）；**一期不做**独立「启用/停用」开关（有效=未闭合；再绑=新开区间） |
+| 同时有效 | 同一 openid **同时仅允许绑一个**系统用户；一个用户可同时多个活跃 openid |
+| sys_user.wx_openid | 保留为**订阅消息主 openid 快照**（取最近一条活跃绑定），不再作唯一真源 |
+| 小程序 | 登录后 bind 开/续区间；请求头 `X-Meis-Wx-Openid`；写日志同事记 operator_wx_openid |
+| 移动端归属 | Q-14：只读归属/位置/变更记录；**禁止**移动端改科室/位置 |
+
+> **PLT-AUDIT-2026-10-26 已落地**（Q-12~14 已确认）：变更日志回传 client、批量禁绕过区间、电流绑定流水途径、WX-BIND-01、MOB-OWN-RO。
+
+> **PLT-BACKLOG-BATCH-2026-10-26**：无歧义项继续落地——AST-T-CHILD-UI、MP-09/部分 MOB-16、**AST-LOC-01 补录位置历史**、**MOB-18 小程序 tabBar**。仍待产品决策/大体量：效益 ANA、金蝶 KD、RFID、盘点盈亏写回、移动独立权限码等。
