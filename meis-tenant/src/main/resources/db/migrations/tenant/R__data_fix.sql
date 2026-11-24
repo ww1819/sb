@@ -754,6 +754,28 @@ FROM medical_device d
 WHERE t.device_id = d.id
   AND (t.device_code IS NULL OR TRIM(t.device_code) = '' OR t.device_name IS NULL OR TRIM(t.device_name) = '');
 
+-- AST-W01 / W6：仓单明细设备编码/名称历史回填
+UPDATE device_outbound_item i
+SET device_code = COALESCE(NULLIF(TRIM(i.device_code), ''), d.device_code),
+    device_name = COALESCE(NULLIF(TRIM(i.device_name), ''), d.device_name)
+FROM medical_device d
+WHERE i.device_id = d.id
+  AND (i.device_code IS NULL OR TRIM(i.device_code) = '' OR i.device_name IS NULL OR TRIM(i.device_name) = '');
+
+UPDATE device_return_item i
+SET device_code = COALESCE(NULLIF(TRIM(i.device_code), ''), d.device_code),
+    device_name = COALESCE(NULLIF(TRIM(i.device_name), ''), d.device_name)
+FROM medical_device d
+WHERE i.device_id = d.id
+  AND (i.device_code IS NULL OR TRIM(i.device_code) = '' OR i.device_name IS NULL OR TRIM(i.device_name) = '');
+
+UPDATE device_goods_return_item i
+SET device_code = COALESCE(NULLIF(TRIM(i.device_code), ''), d.device_code),
+    device_name = COALESCE(NULLIF(TRIM(i.device_name), ''), d.device_name)
+FROM medical_device d
+WHERE i.device_id = d.id
+  AND (i.device_code IS NULL OR TRIM(i.device_code) = '' OR i.device_name IS NULL OR TRIM(i.device_name) = '');
+
 UPDATE asset_transfer t
 SET applicant_name = COALESCE(NULLIF(TRIM(t.applicant_name), ''), u.real_name)
 FROM sys_user u

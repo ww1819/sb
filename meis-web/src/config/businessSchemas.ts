@@ -485,7 +485,9 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'quality_check_report_url', label: '验收报告', type: 'file', group: 'basic', form: false },
     { prop: 'installation_completed', label: '安装完成', type: 'boolean', group: 'basic', form: false },
     { prop: 'installation_date', label: '安装日期', type: 'date', group: 'basic', form: false },
-    { prop: 'status', label: '入库业务状态', dictType: 'entry_status', group: 'basic', form: false }
+    { prop: 'status', label: '入库业务状态', dictType: 'entry_status', group: 'basic', form: false },
+    { prop: 'create_channel', label: '制单途径', dictType: 'execution_channel', list: true, readonly: true, form: true, width: 90 },
+    { prop: 'confirm_channel', label: '完成途径', dictType: 'execution_channel', list: true, readonly: true, form: true, width: 90 }
   ],
   device_entry_item: [
     { prop: 'entry_no', label: '入库单号', list: true, detail: true, readonly: true, form: false, width: 140 },
@@ -536,7 +538,11 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'dept_name', label: '科室', list: false, readonly: true, form: false, width: 120 },
     { prop: 'approval_status', label: '审批状态', dictType: 'acceptance_review_status', list: true, readonly: true, form: false, width: 100 },
     { prop: 'doc_status', label: '单据状态', dictType: 'approval_status', list: false, readonly: true, form: false },
-    { prop: 'status', label: '出库状态', dictType: 'outbound_status', list: false, form: false }
+    { prop: 'status', label: '出库状态', dictType: 'outbound_status', list: false, form: false },
+    { prop: 'create_channel', label: '制单途径', dictType: 'execution_channel', list: true, readonly: true, form: true, width: 90 },
+    { prop: 'update_channel', label: '修改途径', dictType: 'execution_channel', list: false, readonly: true, form: true, width: 90 },
+    { prop: 'submit_channel', label: '提交途径', dictType: 'execution_channel', list: false, readonly: true, form: true, width: 90 },
+    { prop: 'audit_channel', label: '审核途径', dictType: 'execution_channel', list: true, readonly: true, form: true, width: 90 }
   ],
   device_outbound_item: [
     { prop: 'device_code', label: '资产编码', list: true, detail: true, width: 140 },
@@ -580,7 +586,10 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'applicant_name', label: '申请人', list: true, readonly: true, form: false },
     { prop: 'created_by_name', label: '制单人', list: true, readonly: true, form: false },
     { prop: 'status', label: '状态', dictType: 'transfer_status', list: true },
-    { prop: 'remark', label: '备注', type: 'textarea' }
+    { prop: 'remark', label: '备注', type: 'textarea' },
+    { prop: 'create_channel', label: '制单途径', dictType: 'execution_channel', list: true, readonly: true, form: true, width: 90 },
+    { prop: 'submit_channel', label: '提交途径', dictType: 'execution_channel', list: false, readonly: true, form: true, width: 90 },
+    { prop: 'audit_channel', label: '审核途径', dictType: 'execution_channel', list: true, readonly: true, form: true, width: 90 }
   ],
   inventory_check: [
     { prop: 'check_no', label: '盘点单号', list: true, readonly: true },
@@ -663,7 +672,10 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'warehouse_name', label: '仓库', list: true, readonly: true, form: false, width: 120 },
     { prop: 'return_type', label: '退库类型', dictType: 'return_type', list: false, form: false },
     { prop: 'approval_status', label: '审批状态', dictType: 'acceptance_review_status', list: true, readonly: true, form: false, width: 100 },
-    { prop: 'status', label: '退库状态', dictType: 'return_status', list: false, form: false, width: 100 }
+    { prop: 'status', label: '退库状态', dictType: 'return_status', list: false, form: false, width: 100 },
+    { prop: 'create_channel', label: '制单途径', dictType: 'execution_channel', list: true, readonly: true, form: true, width: 90 },
+    { prop: 'submit_channel', label: '提交途径', dictType: 'execution_channel', list: false, readonly: true, form: true, width: 90 },
+    { prop: 'confirm_channel', label: '完成途径', dictType: 'execution_channel', list: true, readonly: true, form: true, width: 90 }
   ],
   device_return_item: [
     { prop: 'device_code', label: '资产编码', list: true, detail: true, width: 140 },
@@ -703,7 +715,10 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'approved_by_name', label: '审核人', list: true, readonly: true, form: false, width: 100 },
     { prop: 'approved_at', label: '审核日期', type: 'date', list: true, readonly: true, form: false, width: 120 },
     { prop: 'doc_status', label: '单据状态', dictType: 'approval_status', form: false },
-    { prop: 'status', label: '退货状态', dictType: 'goods_return_status', form: false }
+    { prop: 'status', label: '退货状态', dictType: 'goods_return_status', form: false },
+    { prop: 'create_channel', label: '制单途径', dictType: 'execution_channel', list: true, readonly: true, form: true, width: 90 },
+    { prop: 'submit_channel', label: '提交途径', dictType: 'execution_channel', list: false, readonly: true, form: true, width: 90 },
+    { prop: 'confirm_channel', label: '完成途径', dictType: 'execution_channel', list: true, readonly: true, form: true, width: 90 }
   ],
   device_goods_return_item: [
     { prop: 'device_code', label: '资产编码', list: true, detail: true, width: 140 },
@@ -789,7 +804,10 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'approved_at', label: '审批时间', type: 'datetime', readonly: true },
     { prop: 'status', label: '状态', dictType: 'scrap_status', list: true },
     { prop: 'approval_status', label: '审批状态', dictType: 'approval_status', list: true, readonly: true },
-    { prop: 'remark', label: '备注', type: 'textarea' }
+    { prop: 'remark', label: '备注', type: 'textarea' },
+    { prop: 'create_channel', label: '制单途径', dictType: 'execution_channel', list: true, readonly: true, form: true, width: 90 },
+    { prop: 'submit_channel', label: '提交途径', dictType: 'execution_channel', list: false, readonly: true, form: true, width: 90 },
+    { prop: 'audit_channel', label: '审核途径', dictType: 'execution_channel', list: true, readonly: true, form: true, width: 90 }
   ],
   inspection_type: [
     { prop: 'type_code', label: '类型编码', list: true, required: true },

@@ -22,6 +22,15 @@ public class ApprovalInstanceService {
     @Transactional
     public Map<String, Object> submit(String businessType, UUID businessId, String businessNo,
                                        String title, UUID applicantId, double amount) {
+        var pending = jdbc.queryForList("""
+                SELECT id FROM sys_approval_instance
+                WHERE business_type = ? AND business_id = ?::uuid AND status = 'pending'
+                ORDER BY created_at DESC NULLS LAST LIMIT 1
+                """, businessType, businessId);
+        if (!pending.isEmpty()) {
+            updateBusinessStatus(businessType, businessId, "pending");
+            return getInstance(UUID.fromString(String.valueOf(pending.get(0).get("id"))));
+        }
         Map<String, Object> flow = flowService.getFlowByBusinessType(businessType);
         if (flow == null) throw new BizException(400, "no approval flow for " + businessType);
         UUID flowId = UUID.fromString(flow.get("id").toString());
@@ -321,6 +330,16 @@ public class ApprovalInstanceService {
                 if ("approved".equals(status)) autoCompleteSharedReturn(businessId);
             }
             default -> {}
+        }
+        // AST-CH-01：审批终态写审核/确认途径（缺列则跳过）
+        if ("approved".equals(status) || "rejected".equals(status)) {
+            switch (businessType) {
+                case "device_scrap", "asset_transfer", "device_outbound" ->
+                        SoftDeleteSupport.applyChannels(jdbc, businessType, businessId, null, "audit_channel");
+                case "device_return", "device_goods_return" ->
+                        SoftDeleteSupport.applyChannels(jdbc, businessType, businessId, null, "confirm_channel");
+                default -> {}
+            }
         }
     }
 

@@ -1,12 +1,15 @@
 package com.meis.saas.asset.controller;
 
 import com.meis.saas.asset.service.DeviceOwnershipPeriodService;
+import com.meis.saas.common.asset.DeviceSnapshotSupport;
 import com.meis.saas.common.audit.OperationLog;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.DetailLineUpsertSupport;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
+import com.meis.saas.common.persistence.TableColumnCache;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.workflow.ApprovalInstanceService;
 import lombok.RequiredArgsConstructor;
@@ -160,6 +163,7 @@ public class DeviceOutboundController {
                     toDateParam(body.get("outbound_date")), blankToNull(body.get("purpose")), blankToNull(body.get("remark")),
                     actorId, actorName,
                     actorId, actorName, actorId, actorName);
+            SoftDeleteSupport.applyChannels(jdbc, "device_outbound", id, body, "create_channel", "update_channel");
         } else {
             var nos = jdbc.queryForList("SELECT outbound_no FROM device_outbound WHERE id = ?", id);
             outboundNo = nos.isEmpty() ? null : blankToNull(nos.get(0).get("outbound_no"));
@@ -174,39 +178,102 @@ public class DeviceOutboundController {
                     deptId, receiverId, receiverName, warehouseId,
                     toDateParam(body.get("outbound_date")), blankToNull(body.get("purpose")), blankToNull(body.get("remark")),
                     actorId, actorName, actorId, actorName, id);
+            SoftDeleteSupport.applyChannels(jdbc, "device_outbound", id, body, "update_channel");
         }
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> items = (List<Map<String, Object>>) body.getOrDefault("items", List.of());
-        jdbc.update("""
-                UPDATE device_outbound_item
-                SET is_deleted = 1, deleted_at = NOW(), deleted_by = ?, deleted_by_name = ?,
-                    updated_at = NOW(), updated_by = ?, updated_by_name = ?
-                WHERE outbound_id = ? AND COALESCE(is_deleted, 0) = 0
-                """, actorId, actorName, actorId, actorName, id);
-        for (Map<String, Object> item : items) {
-            jdbc.update("""
-                INSERT INTO device_outbound_item (
-                    id, outbound_id, outbound_no, device_id, device_code, device_name, specification, unit,
-                    quantity, unit_price, total_price, manufacturer_id, supplier_id, serial_number,
-                    brand, category_id, category_name, asset_category_id, asset_category_name,
-                    finance_category_id, finance_category_name,
-                    created_at, updated_at, created_by, created_by_name, updated_by, updated_by_name, is_deleted
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?, ?, ?, ?, 0)
-                """,
-                    UUID.randomUUID(), id, outboundNo, parseUuid(item.get("device_id")),
-                    blankToNull(item.get("device_code")), blankToNull(item.get("device_name")),
-                    blankToNull(item.get("specification")), blankToNull(item.get("unit")),
-                    item.getOrDefault("quantity", 1),
-                    item.get("unit_price"), item.get("total_price"),
-                    parseUuid(item.get("manufacturer_id")), parseUuid(item.get("supplier_id")),
-                    blankToNull(item.get("serial_number")),
-                    blankToNull(item.get("brand")),
-                    parseUuid(item.get("category_id")), blankToNull(item.get("category_name")),
-                    parseUuid(item.get("asset_category_id")), blankToNull(item.get("asset_category_name")),
-                    parseUuid(item.get("finance_category_id")), blankToNull(item.get("finance_category_name")),
-                    actorId, actorName, actorId, actorName);
-        }
+        upsertItems(id, outboundNo, items, actorId, actorName);
         return get(id);
+    }
+
+    private void upsertItems(UUID outboundId, String outboundNo, List<Map<String, Object>> items,
+                             UUID actorId, String actorName) {
+        try {
+            Set<UUID> keep = new LinkedHashSet<>();
+            for (Map<String, Object> item : items) {
+                UUID itemId = DetailLineUpsertSupport.resolveLineId(
+                        jdbc, "device_outbound_item", "outbound_id", outboundId, item.get("id"), item.get("device_id"));
+                keep.add(itemId);
+                boolean exists = DetailLineUpsertSupport.existsUnderParent(
+                        jdbc, "device_outbound_item", "outbound_id", outboundId, itemId);
+                Object deviceIdObj = item.get("device_id");
+                Map<String, Object> deviceSnap = DeviceSnapshotSupport.resolve(
+                        jdbc, deviceIdObj, item.get("device_code"), item.get("device_name"));
+                if (exists) {
+                    List<String> sets = new ArrayList<>();
+                    List<Object> args = new ArrayList<>();
+                    sets.add("outbound_no = COALESCE(?, outbound_no)");
+                    args.add(outboundNo);
+                    sets.add("device_id = ?");
+                    args.add(parseUuid(deviceIdObj));
+                    sets.add("device_code = ?");
+                    args.add(deviceSnap.get("device_code"));
+                    sets.add("device_name = ?");
+                    args.add(deviceSnap.get("device_name"));
+                    sets.add("specification = ?");
+                    args.add(blankToNull(item.get("specification")));
+                    sets.add("unit = ?");
+                    args.add(blankToNull(item.get("unit")));
+                    sets.add("quantity = ?");
+                    args.add(item.getOrDefault("quantity", 1));
+                    sets.add("unit_price = ?");
+                    args.add(item.get("unit_price"));
+                    sets.add("total_price = ?");
+                    args.add(item.get("total_price"));
+                    sets.add("manufacturer_id = ?");
+                    args.add(parseUuid(item.get("manufacturer_id")));
+                    sets.add("supplier_id = ?");
+                    args.add(parseUuid(item.get("supplier_id")));
+                    sets.add("serial_number = ?");
+                    args.add(blankToNull(item.get("serial_number")));
+                    sets.add("brand = ?");
+                    args.add(blankToNull(item.get("brand")));
+                    sets.add("category_id = ?");
+                    args.add(parseUuid(item.get("category_id")));
+                    sets.add("category_name = ?");
+                    args.add(blankToNull(item.get("category_name")));
+                    sets.add("asset_category_id = ?");
+                    args.add(parseUuid(item.get("asset_category_id")));
+                    sets.add("asset_category_name = ?");
+                    args.add(blankToNull(item.get("asset_category_name")));
+                    sets.add("finance_category_id = ?");
+                    args.add(parseUuid(item.get("finance_category_id")));
+                    sets.add("finance_category_name = ?");
+                    args.add(blankToNull(item.get("finance_category_name")));
+                    DetailLineUpsertSupport.appendRestoreIfNeeded(jdbc, "device_outbound_item", itemId, sets);
+                    SoftDeleteSupport.appendUpdateAuditSets(jdbc, TableColumnCache.columns(jdbc, "device_outbound_item"), sets, args);
+                    DetailLineUpsertSupport.appendRowVersionBump(jdbc, "device_outbound_item", sets);
+                    DetailLineUpsertSupport.updateWithOptionalLock(
+                            jdbc, "UPDATE device_outbound_item SET " + String.join(", ", sets),
+                            args, itemId, DetailLineUpsertSupport.parseRowVersion(item.get("row_version")));
+                } else {
+                    jdbc.update("""
+                        INSERT INTO device_outbound_item (
+                            id, outbound_id, outbound_no, device_id, device_code, device_name, specification, unit,
+                            quantity, unit_price, total_price, manufacturer_id, supplier_id, serial_number,
+                            brand, category_id, category_name, asset_category_id, asset_category_name,
+                            finance_category_id, finance_category_name,
+                            created_at, updated_at, created_by, created_by_name, updated_by, updated_by_name, is_deleted
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?, ?, ?, ?, 0)
+                        """,
+                            itemId, outboundId, outboundNo, parseUuid(deviceIdObj),
+                            deviceSnap.get("device_code"), deviceSnap.get("device_name"),
+                            blankToNull(item.get("specification")), blankToNull(item.get("unit")),
+                            item.getOrDefault("quantity", 1),
+                            item.get("unit_price"), item.get("total_price"),
+                            parseUuid(item.get("manufacturer_id")), parseUuid(item.get("supplier_id")),
+                            blankToNull(item.get("serial_number")),
+                            blankToNull(item.get("brand")),
+                            parseUuid(item.get("category_id")), blankToNull(item.get("category_name")),
+                            parseUuid(item.get("asset_category_id")), blankToNull(item.get("asset_category_name")),
+                            parseUuid(item.get("finance_category_id")), blankToNull(item.get("finance_category_name")),
+                            actorId, actorName, actorId, actorName);
+                }
+            }
+            DetailLineUpsertSupport.softDeleteNotIn(jdbc, "device_outbound_item", "outbound_id", outboundId, keep);
+        } catch (RuntimeException e) {
+            DetailLineUpsertSupport.rethrowDeviceUniqueConflict(e);
+        }
     }
 
     @PostMapping("/{id}/submit")
@@ -215,6 +282,7 @@ public class DeviceOutboundController {
         Map<String, Object> o = get(id).getData();
         approvalService.submit("device_outbound", id, o.get("outbound_no").toString(), "设备出库 " + o.get("outbound_no"),
                 UUID.fromString(body.get("applicantId").toString()), 0);
+        SoftDeleteSupport.applyChannels(jdbc, "device_outbound", id, body, "submit_channel", "update_channel");
         return get(id);
     }
 
@@ -223,9 +291,33 @@ public class DeviceOutboundController {
     @OperationLog(module = "asset", description = "出库发放")
     public Result<Map<String, Object>> issue(@PathVariable UUID id) {
         var outs = jdbc.queryForList(
-                "SELECT dept_id, outbound_no FROM device_outbound WHERE id = ?"
+                "SELECT dept_id, outbound_no, status FROM device_outbound WHERE id = ?"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "device_outbound", null), id);
         if (outs.isEmpty()) throw new BizException(404, "not found");
+        if ("issued".equals(String.valueOf(outs.get(0).get("status")))) {
+            return get(id);
+        }
+        var ctx = com.meis.saas.common.rbac.PermissionInterceptor.CTX.get();
+        UUID actorId = null;
+        String actorName = null;
+        if (ctx != null && ctx.getUserId() != null && !ctx.getUserId().isBlank()) {
+            actorId = UUID.fromString(ctx.getUserId());
+            actorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, actorId);
+        }
+        int claimed = jdbc.update("""
+                UPDATE device_outbound
+                SET doc_status = 'issued', status = 'issued', approval_status = 'approved',
+                    approved_by = COALESCE(approved_by, ?),
+                    approved_by_name = COALESCE(approved_by_name, ?),
+                    approved_at = COALESCE(approved_at, CURRENT_DATE),
+                    updated_at = NOW()
+                WHERE id = ? AND COALESCE(status, '') <> 'issued'
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "device_outbound", null),
+                actorId, actorName, id);
+        if (claimed == 0) {
+            return get(id);
+        }
+        SoftDeleteSupport.applyChannels(jdbc, "device_outbound", id, null, "audit_channel", "update_channel");
         UUID deptId = parseUuid(outs.get(0).get("dept_id"));
         String outboundNo = outs.get(0).get("outbound_no") != null
                 ? String.valueOf(outs.get(0).get("outbound_no")) : null;
@@ -247,22 +339,6 @@ public class DeviceOutboundController {
                 }
             }
         }
-        var ctx = com.meis.saas.common.rbac.PermissionInterceptor.CTX.get();
-        UUID actorId = null;
-        String actorName = null;
-        if (ctx != null && ctx.getUserId() != null && !ctx.getUserId().isBlank()) {
-            actorId = UUID.fromString(ctx.getUserId());
-            actorName = SoftDeleteSupport.resolveUserDisplayName(jdbc, actorId);
-        }
-        jdbc.update("""
-                UPDATE device_outbound
-                SET doc_status = 'issued', status = 'issued', approval_status = 'approved',
-                    approved_by = COALESCE(approved_by, ?),
-                    approved_by_name = COALESCE(approved_by_name, ?),
-                    approved_at = COALESCE(approved_at, CURRENT_DATE),
-                    updated_at = NOW()
-                WHERE id = ?
-                """, actorId, actorName, id);
         return get(id);
     }
 

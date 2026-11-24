@@ -1492,3 +1492,117 @@ ALTER TABLE device_scrap ADD COLUMN IF NOT EXISTS deleted_by_name VARCHAR(100);
 COMMENT ON COLUMN device_scrap.created_by_name IS '制单人姓名快照（W.5）';
 COMMENT ON COLUMN device_scrap.updated_by_name IS '最后修改人姓名快照（W.5）';
 COMMENT ON COLUMN device_scrap.deleted_by_name IS '删除人姓名快照（W.5）';
+
+-- AST-DUP-03：仓单/盘点活跃明细业务键唯一 + 乐观锁列
+ALTER TABLE device_outbound_item ADD COLUMN IF NOT EXISTS row_version INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE device_return_item ADD COLUMN IF NOT EXISTS row_version INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE device_goods_return_item ADD COLUMN IF NOT EXISTS row_version INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE device_entry_item ADD COLUMN IF NOT EXISTS row_version INTEGER NOT NULL DEFAULT 1;
+
+-- 建唯一索引前软删重复活跃行（保留最早创建）
+UPDATE device_outbound_item t SET is_deleted = 1, deleted_at = COALESCE(t.deleted_at, NOW()), updated_at = NOW()
+WHERE COALESCE(t.is_deleted, 0) = 0 AND t.device_id IS NOT NULL
+  AND t.ctid NOT IN (
+    SELECT DISTINCT ON (outbound_id, device_id) ctid FROM device_outbound_item
+    WHERE COALESCE(is_deleted, 0) = 0 AND device_id IS NOT NULL
+    ORDER BY outbound_id, device_id, created_at ASC NULLS LAST, id ASC);
+UPDATE device_return_item t SET is_deleted = 1, deleted_at = COALESCE(t.deleted_at, NOW()), updated_at = NOW()
+WHERE COALESCE(t.is_deleted, 0) = 0 AND t.device_id IS NOT NULL
+  AND t.ctid NOT IN (
+    SELECT DISTINCT ON (return_id, device_id) ctid FROM device_return_item
+    WHERE COALESCE(is_deleted, 0) = 0 AND device_id IS NOT NULL
+    ORDER BY return_id, device_id, created_at ASC NULLS LAST, id ASC);
+UPDATE device_goods_return_item t SET is_deleted = 1, deleted_at = COALESCE(t.deleted_at, NOW()), updated_at = NOW()
+WHERE COALESCE(t.is_deleted, 0) = 0 AND t.device_id IS NOT NULL
+  AND t.ctid NOT IN (
+    SELECT DISTINCT ON (return_id, device_id) ctid FROM device_goods_return_item
+    WHERE COALESCE(is_deleted, 0) = 0 AND device_id IS NOT NULL
+    ORDER BY return_id, device_id, created_at ASC NULLS LAST, id ASC);
+UPDATE inventory_check_item t SET is_deleted = 1, deleted_at = COALESCE(t.deleted_at, NOW()), updated_at = NOW()
+WHERE COALESCE(t.is_deleted, 0) = 0 AND t.device_id IS NOT NULL
+  AND t.ctid NOT IN (
+    SELECT DISTINCT ON (check_id, device_id) ctid FROM inventory_check_item
+    WHERE COALESCE(is_deleted, 0) = 0 AND device_id IS NOT NULL
+    ORDER BY check_id, device_id, created_at ASC NULLS LAST, id ASC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_outbound_item_device_alive
+    ON device_outbound_item (outbound_id, device_id)
+    WHERE COALESCE(is_deleted, 0) = 0 AND device_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_return_item_device_alive
+    ON device_return_item (return_id, device_id)
+    WHERE COALESCE(is_deleted, 0) = 0 AND device_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_goods_return_item_device_alive
+    ON device_goods_return_item (return_id, device_id)
+    WHERE COALESCE(is_deleted, 0) = 0 AND device_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_inventory_item_device_alive
+    ON inventory_check_item (check_id, device_id)
+    WHERE COALESCE(is_deleted, 0) = 0 AND device_id IS NOT NULL;
+COMMENT ON INDEX uk_outbound_item_device_alive IS '唯一：出库明细未删行(outbound_id,device_id)';
+COMMENT ON INDEX uk_return_item_device_alive IS '唯一：退库明细未删行(return_id,device_id)';
+COMMENT ON INDEX uk_goods_return_item_device_alive IS '唯一：退货明细未删行(return_id,device_id)';
+COMMENT ON INDEX uk_inventory_item_device_alive IS '唯一：盘点明细未删行(check_id,device_id)';
+
+-- AST-CH-01：仓单/调拨/报废途径列（盘点已有；通用回填见 R__data_fix MOB-CHANNEL-02）
+ALTER TABLE device_outbound ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE device_outbound ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE device_outbound ADD COLUMN IF NOT EXISTS submit_channel VARCHAR(20);
+ALTER TABLE device_outbound ADD COLUMN IF NOT EXISTS audit_channel VARCHAR(20);
+ALTER TABLE device_outbound ADD COLUMN IF NOT EXISTS delete_channel VARCHAR(20);
+COMMENT ON COLUMN device_outbound.create_channel IS '制单途径 web/app/mp';
+COMMENT ON COLUMN device_outbound.update_channel IS '修改途径 web/app/mp';
+COMMENT ON COLUMN device_outbound.submit_channel IS '提交途径 web/app/mp';
+COMMENT ON COLUMN device_outbound.audit_channel IS '审核/发放途径 web/app/mp';
+COMMENT ON COLUMN device_outbound.delete_channel IS '删除途径 web/app/mp';
+
+ALTER TABLE device_return ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE device_return ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE device_return ADD COLUMN IF NOT EXISTS submit_channel VARCHAR(20);
+ALTER TABLE device_return ADD COLUMN IF NOT EXISTS confirm_channel VARCHAR(20);
+ALTER TABLE device_return ADD COLUMN IF NOT EXISTS delete_channel VARCHAR(20);
+COMMENT ON COLUMN device_return.create_channel IS '制单途径 web/app/mp';
+COMMENT ON COLUMN device_return.update_channel IS '修改途径 web/app/mp';
+COMMENT ON COLUMN device_return.submit_channel IS '提交途径 web/app/mp';
+COMMENT ON COLUMN device_return.confirm_channel IS '完成/审核途径 web/app/mp';
+COMMENT ON COLUMN device_return.delete_channel IS '删除途径 web/app/mp';
+
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS submit_channel VARCHAR(20);
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS confirm_channel VARCHAR(20);
+ALTER TABLE device_goods_return ADD COLUMN IF NOT EXISTS delete_channel VARCHAR(20);
+COMMENT ON COLUMN device_goods_return.create_channel IS '制单途径 web/app/mp';
+COMMENT ON COLUMN device_goods_return.update_channel IS '修改途径 web/app/mp';
+COMMENT ON COLUMN device_goods_return.submit_channel IS '提交途径 web/app/mp';
+COMMENT ON COLUMN device_goods_return.confirm_channel IS '完成/审核途径 web/app/mp';
+COMMENT ON COLUMN device_goods_return.delete_channel IS '删除途径 web/app/mp';
+
+ALTER TABLE device_entry ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE device_entry ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE device_entry ADD COLUMN IF NOT EXISTS confirm_channel VARCHAR(20);
+ALTER TABLE device_entry ADD COLUMN IF NOT EXISTS delete_channel VARCHAR(20);
+COMMENT ON COLUMN device_entry.create_channel IS '制单途径 web/app/mp';
+COMMENT ON COLUMN device_entry.update_channel IS '修改途径 web/app/mp';
+COMMENT ON COLUMN device_entry.confirm_channel IS '完成入库途径 web/app/mp';
+COMMENT ON COLUMN device_entry.delete_channel IS '删除途径 web/app/mp';
+
+ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS submit_channel VARCHAR(20);
+ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS audit_channel VARCHAR(20);
+ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS delete_channel VARCHAR(20);
+COMMENT ON COLUMN asset_transfer.create_channel IS '制单途径 web/app/mp';
+COMMENT ON COLUMN asset_transfer.update_channel IS '修改途径 web/app/mp';
+COMMENT ON COLUMN asset_transfer.submit_channel IS '提交途径 web/app/mp';
+COMMENT ON COLUMN asset_transfer.audit_channel IS '审核途径 web/app/mp';
+COMMENT ON COLUMN asset_transfer.delete_channel IS '删除途径 web/app/mp';
+
+ALTER TABLE device_scrap ADD COLUMN IF NOT EXISTS create_channel VARCHAR(20);
+ALTER TABLE device_scrap ADD COLUMN IF NOT EXISTS update_channel VARCHAR(20);
+ALTER TABLE device_scrap ADD COLUMN IF NOT EXISTS submit_channel VARCHAR(20);
+ALTER TABLE device_scrap ADD COLUMN IF NOT EXISTS audit_channel VARCHAR(20);
+ALTER TABLE device_scrap ADD COLUMN IF NOT EXISTS delete_channel VARCHAR(20);
+COMMENT ON COLUMN device_scrap.create_channel IS '制单途径 web/app/mp';
+COMMENT ON COLUMN device_scrap.update_channel IS '修改途径 web/app/mp';
+COMMENT ON COLUMN device_scrap.submit_channel IS '提交途径 web/app/mp';
+COMMENT ON COLUMN device_scrap.audit_channel IS '审核途径 web/app/mp';
+COMMENT ON COLUMN device_scrap.delete_channel IS '删除途径 web/app/mp';

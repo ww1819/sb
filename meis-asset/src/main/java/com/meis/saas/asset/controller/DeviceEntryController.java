@@ -7,7 +7,9 @@ import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
+import com.meis.saas.common.persistence.DetailLineUpsertSupport;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
+import com.meis.saas.common.persistence.TableColumnCache;
 import com.meis.saas.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -149,6 +151,7 @@ public class DeviceEntryController {
                     toDouble(body.get("invoice_amount")), blankToNull(body.get("invoice_no")),
                     body.getOrDefault("approval_status", "draft"),
                     createdBy, createdByName);
+            SoftDeleteSupport.applyChannels(jdbc, "device_entry", id, body, "create_channel", "update_channel");
         } else {
             var nos = jdbc.queryForList("SELECT entry_no FROM device_entry WHERE id = ?", id);
             entryNo = nos.isEmpty() ? null : blankToNull(nos.get(0).get("entry_no"));
@@ -185,13 +188,22 @@ public class DeviceEntryController {
                     body.getOrDefault("status", "draft"), blankToNull(body.get("remark")),
                     toDouble(body.get("invoice_amount")), blankToNull(body.get("invoice_no")),
                     updatedBy, updatedByName, id);
+            SoftDeleteSupport.applyChannels(jdbc, "device_entry", id, body, "update_channel");
         }
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> items = (List<Map<String, Object>>) body.getOrDefault("items", List.of());
-        jdbc.update("DELETE FROM device_entry_item WHERE entry_id = ?", id);
+        upsertItems(id, entryNo, items);
+        return get(id);
+    }
+
+    private void upsertItems(UUID entryId, String entryNo, List<Map<String, Object>> items) {
+        Set<UUID> keep = new LinkedHashSet<>();
         for (Map<String, Object> item : items) {
             String deviceName = blankToNull(item.get("device_name"));
             if (deviceName == null) continue;
+            UUID itemId = DetailLineUpsertSupport.resolveLineId(
+                    jdbc, "device_entry_item", "entry_id", entryId, item.get("id"), item.get("device_id"));
+            keep.add(itemId);
             UUID manufacturerId = parseUuid(item.get("manufacturer_id"));
             String manufacturerName = blankToNull(item.get("manufacturer_name"));
             if (manufacturerId != null) {
@@ -217,32 +229,94 @@ public class DeviceEntryController {
             if (specification == null) specification = blankToNull(item.get("model"));
             String deviceCode = blankToNull(item.get("device_code"));
             if (deviceCode == null) deviceCode = blankToNull(item.get("factory_code"));
-            jdbc.update("""
-                INSERT INTO device_entry_item (
-                    id, entry_id, entry_no, device_code, device_name, brand, model, specification, unit, serial_number,
-                    quantity, unit_price, total_price, dept_id, manufacturer_id, manufacturer_name,
-                    factory_code, financial_code, depreciation_years, production_date, warranty_period,
-                    purchase_method, storage_location, category_id, finance_category_id, asset_category_id,
-                    created_at
-                ) VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?,
-                    NOW()
-                )
-                """,
-                    UUID.randomUUID(), id, entryNo, deviceCode, deviceName, blankToNull(item.get("brand")),
-                    specification, specification, blankToNull(item.get("unit")),
-                    blankToNull(item.get("serial_number")),
-                    qty, price, amount, parseUuid(item.get("dept_id")), manufacturerId, manufacturerName,
-                    blankToNull(item.get("factory_code")), blankToNull(item.get("financial_code")),
-                    toIntOrNull(item.get("depreciation_years")), toDateOrNull(item.get("production_date")),
-                    blankToNull(item.get("warranty_period")), blankToNull(item.get("purchase_method")),
-                    blankToNull(item.get("storage_location")), parseUuid(item.get("category_id")),
-                    parseUuid(item.get("finance_category_id")), parseUuid(item.get("asset_category_id")));
+            boolean exists = DetailLineUpsertSupport.existsUnderParent(
+                    jdbc, "device_entry_item", "entry_id", entryId, itemId);
+            if (exists) {
+                List<String> sets = new ArrayList<>();
+                List<Object> args = new ArrayList<>();
+                sets.add("entry_no = COALESCE(?, entry_no)");
+                args.add(entryNo);
+                sets.add("device_code = ?");
+                args.add(deviceCode);
+                sets.add("device_name = ?");
+                args.add(deviceName);
+                sets.add("brand = ?");
+                args.add(blankToNull(item.get("brand")));
+                sets.add("model = ?");
+                args.add(specification);
+                sets.add("specification = ?");
+                args.add(specification);
+                sets.add("unit = ?");
+                args.add(blankToNull(item.get("unit")));
+                sets.add("serial_number = ?");
+                args.add(blankToNull(item.get("serial_number")));
+                sets.add("quantity = ?");
+                args.add(qty);
+                sets.add("unit_price = ?");
+                args.add(price);
+                sets.add("total_price = ?");
+                args.add(amount);
+                sets.add("dept_id = ?");
+                args.add(parseUuid(item.get("dept_id")));
+                sets.add("manufacturer_id = ?");
+                args.add(manufacturerId);
+                sets.add("manufacturer_name = ?");
+                args.add(manufacturerName);
+                sets.add("factory_code = ?");
+                args.add(blankToNull(item.get("factory_code")));
+                sets.add("financial_code = ?");
+                args.add(blankToNull(item.get("financial_code")));
+                sets.add("depreciation_years = ?");
+                args.add(toIntOrNull(item.get("depreciation_years")));
+                sets.add("production_date = ?");
+                args.add(toDateOrNull(item.get("production_date")));
+                sets.add("warranty_period = ?");
+                args.add(blankToNull(item.get("warranty_period")));
+                sets.add("purchase_method = ?");
+                args.add(blankToNull(item.get("purchase_method")));
+                sets.add("storage_location = ?");
+                args.add(blankToNull(item.get("storage_location")));
+                sets.add("category_id = ?");
+                args.add(parseUuid(item.get("category_id")));
+                sets.add("finance_category_id = ?");
+                args.add(parseUuid(item.get("finance_category_id")));
+                sets.add("asset_category_id = ?");
+                args.add(parseUuid(item.get("asset_category_id")));
+                DetailLineUpsertSupport.appendRestoreIfNeeded(jdbc, "device_entry_item", itemId, sets);
+                SoftDeleteSupport.appendUpdateAuditSets(jdbc, TableColumnCache.columns(jdbc, "device_entry_item"), sets, args);
+                args.add(itemId);
+                jdbc.update("UPDATE device_entry_item SET " + String.join(", ", sets) + " WHERE id = ?", args.toArray());
+            } else {
+                Map<String, Object> audit = new HashMap<>();
+                SoftDeleteSupport.applyInsertAudit(jdbc, "device_entry_item", audit);
+                jdbc.update("""
+                    INSERT INTO device_entry_item (
+                        id, entry_id, entry_no, device_code, device_name, brand, model, specification, unit, serial_number,
+                        quantity, unit_price, total_price, dept_id, manufacturer_id, manufacturer_name,
+                        factory_code, financial_code, depreciation_years, production_date, warranty_period,
+                        purchase_method, storage_location, category_id, finance_category_id, asset_category_id,
+                        created_at, created_by, created_by_name, is_deleted
+                    ) VALUES (
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?,
+                        NOW(), ?, ?, 0
+                    )
+                    """,
+                        itemId, entryId, entryNo, deviceCode, deviceName, blankToNull(item.get("brand")),
+                        specification, specification, blankToNull(item.get("unit")),
+                        blankToNull(item.get("serial_number")),
+                        qty, price, amount, parseUuid(item.get("dept_id")), manufacturerId, manufacturerName,
+                        blankToNull(item.get("factory_code")), blankToNull(item.get("financial_code")),
+                        toIntOrNull(item.get("depreciation_years")), toDateOrNull(item.get("production_date")),
+                        blankToNull(item.get("warranty_period")), blankToNull(item.get("purchase_method")),
+                        blankToNull(item.get("storage_location")), parseUuid(item.get("category_id")),
+                        parseUuid(item.get("finance_category_id")), parseUuid(item.get("asset_category_id")),
+                        audit.get("created_by"), audit.get("created_by_name"));
+            }
         }
-        return get(id);
+        DetailLineUpsertSupport.softDeleteNotIn(jdbc, "device_entry_item", "entry_id", entryId, keep);
     }
 
     @PostMapping("/{id}/complete")
@@ -255,10 +329,21 @@ public class DeviceEntryController {
                         + SoftDeleteSupport.notDeletedClause(jdbc, "device_entry", null), id);
         if (entryRows.isEmpty()) throw new BizException(404, "not found");
         Map<String, Object> entry = entryRows.get(0);
-        if ("completed".equals(String.valueOf(entry.get("status")))) throw new BizException(400, "入库单已完成");
+        if ("completed".equals(String.valueOf(entry.get("status")))) {
+            return get(id);
+        }
         if (entry.get("warehouse_id") == null && body.get("warehouse_id") == null) {
             throw new BizException(400, "请先选择仓库后再完成入库");
         }
+        // 无副作用更新以占用行锁，避免并发完成重复生成台账
+        int claimed = jdbc.update("""
+                UPDATE device_entry SET updated_at = NOW()
+                WHERE id = ? AND COALESCE(status, '') <> 'completed'
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "device_entry", null), id);
+        if (claimed == 0) {
+            return get(id);
+        }
+        SoftDeleteSupport.applyChannels(jdbc, "device_entry", id, body, "confirm_channel", "update_channel");
 
         Object deptId = body.get("dept_id");
         if (deptId == null && entry.get("plan_id") != null) {
@@ -343,11 +428,11 @@ public class DeviceEntryController {
             UPDATE device_entry SET
                 status = 'completed',
                 approval_status = 'approved',
-                approved_by = ?,
-                approved_by_name = ?,
+                approved_by = COALESCE(approved_by, ?),
+                approved_by_name = COALESCE(approved_by_name, ?),
                 approved_at = COALESCE(approved_at, CURRENT_DATE),
                 updated_at = NOW()
-            WHERE id = ?
+            WHERE id = ? AND COALESCE(status, '') <> 'completed'
             """, actorId, actorName, id);
         Map<String, Object> result = get(id).getData();
         result.put("device_ids", deviceIds);

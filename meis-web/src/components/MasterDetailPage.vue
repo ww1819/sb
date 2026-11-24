@@ -10,8 +10,8 @@
       @add="openCreate"
     >
       <template #actions-after>
-        <el-button v-if="showApproval" type="primary" @click="submitApproval">提交</el-button>
-        <el-button v-if="showApproval" @click="withdrawApproval">撤回审批</el-button>
+        <el-button v-if="showApproval" type="primary" :loading="submitting" :disabled="saving" @click="submitApproval">提交</el-button>
+        <el-button v-if="showApproval" :loading="withdrawing" :disabled="saving || submitting" @click="withdrawApproval">撤回审批</el-button>
         <slot
           name="actions-after"
           :master="master"
@@ -136,11 +136,11 @@
         />
       </template>
       <template #footer>
-        <el-button type="primary" plain @click="addItem">添加明细</el-button>
-        <el-button @click="detailVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveMaster">保存</el-button>
-        <el-button v-if="canApprove" type="success" @click="approvePlan">通过</el-button>
-        <el-button v-if="canApprove" type="danger" @click="rejectPlan">驳回</el-button>
+        <el-button type="primary" plain :disabled="saving" @click="addItem">添加明细</el-button>
+        <el-button :disabled="saving" @click="detailVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="saveMaster">保存</el-button>
+        <el-button v-if="canApprove" type="success" :loading="approving" :disabled="saving" @click="approvePlan">通过</el-button>
+        <el-button v-if="canApprove" type="danger" :loading="rejecting" :disabled="saving" @click="rejectPlan">驳回</el-button>
       </template>
     </AppModal>
   </div>
@@ -177,6 +177,11 @@ const master = ref<Record<string, unknown> | null>(null)
 const items = ref<Record<string, unknown>[]>([])
 const selectedId = ref('')
 const approvalInstanceId = ref('')
+const saving = ref(false)
+const submitting = ref(false)
+const withdrawing = ref(false)
+const approving = ref(false)
+const rejecting = ref(false)
 const progressVisible = ref(false)
 const progressBusinessId = ref('')
 const progressTitle = ref('审批进度')
@@ -421,9 +426,14 @@ function onDetailFieldChange(row: Record<string, unknown>, prop: string) {
   }
 }
 
+function newClientId() {
+  return globalThis.crypto?.randomUUID?.() ?? `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
 function defaultItem() {
-  const item: Record<string, unknown> = {}
+  const item: Record<string, unknown> = { id: newClientId() }
   for (const f of detailFields.value) {
+    if (f.prop === 'id') continue
     if (f.prop === 'quantity') {
       item.quantity = 1
     } else if (f.prop === 'total_price') {
@@ -495,7 +505,11 @@ async function loadDetail(row: Record<string, unknown>) {
 async function openCreate() {
   selectedId.value = ''
   approvalInstanceId.value = ''
-  const defaults: Record<string, unknown> = { approval_status: 'draft', is_active: true }
+  const defaults: Record<string, unknown> = {
+    id: newClientId(),
+    approval_status: 'draft',
+    is_active: true
+  }
   for (const f of masterFormFields.value) {
     if (defaults[f.prop] !== undefined) continue
     defaults[f.prop] = f.type === 'number' ? undefined : f.type === 'boolean' ? false : ''
@@ -642,7 +656,7 @@ function openProgress(row: Record<string, unknown>) {
 }
 
 async function saveMaster() {
-  if (!master.value) return
+  if (!master.value || saving.value) return
   applyCurrentUserDefaults(master.value)
   const missing = basicFormFields.value.filter((f) => {
     if (!f.required) return false
@@ -723,17 +737,26 @@ async function saveMaster() {
     }
     payload.plan_year = yearNum
   }
+  saving.value = true
   try {
-    await http.post(props.saveUrl, payload)
+    const { data } = await http.post(props.saveUrl, payload)
+    const saved = (data?.data ?? null) as Record<string, unknown> | null
+    if (saved?.id != null) {
+      master.value.id = String(saved.id)
+      selectedId.value = String(saved.id)
+    }
     ElMessage.success('保存成功')
     detailVisible.value = false
     crudRef.value?.load()
   } catch {
     // 错误提示由 http 拦截器统一处理
+  } finally {
+    saving.value = false
   }
 }
 
 async function submitApproval() {
+  if (submitting.value || saving.value) return
   const row = resolveTargetRow()
   if (!row?.id) {
     ElMessage.warning('请先勾选一条单据')
@@ -745,14 +768,20 @@ async function submitApproval() {
     return
   }
   const id = String(row.id)
-  await http.post(`${props.saveUrl}/${id}/submit`, { applicantId: auth.user?.userId })
-  ElMessage.success('已提交审批')
-  selectedId.value = id
-  await reloadMaster()
-  crudRef.value?.load()
+  submitting.value = true
+  try {
+    await http.post(`${props.saveUrl}/${id}/submit`, { applicantId: auth.user?.userId })
+    ElMessage.success('已提交审批')
+    selectedId.value = id
+    await reloadMaster()
+    crudRef.value?.load()
+  } finally {
+    submitting.value = false
+  }
 }
 
 async function withdrawApproval() {
+  if (withdrawing.value || saving.value || submitting.value) return
   const row = resolveTargetRow()
   if (!row?.id) {
     ElMessage.warning('请先勾选一条单据')
@@ -763,33 +792,48 @@ async function withdrawApproval() {
     return
   }
   const id = String(row.id)
-  await http.post(`${props.saveUrl}/${id}/withdraw`, { applicantId: auth.user?.userId })
-  ElMessage.success('已撤回审批')
-  selectedId.value = id
-  await reloadMaster()
-  crudRef.value?.load()
+  withdrawing.value = true
+  try {
+    await http.post(`${props.saveUrl}/${id}/withdraw`, { applicantId: auth.user?.userId })
+    ElMessage.success('已撤回审批')
+    selectedId.value = id
+    await reloadMaster()
+    crudRef.value?.load()
+  } finally {
+    withdrawing.value = false
+  }
 }
 
 async function approvePlan() {
-  if (!approvalInstanceId.value) return
-  await http.post(`/system/approval/${approvalInstanceId.value}/approve`, {
-    approverId: auth.user?.userId,
-    comment: '同意'
-  })
-  ElMessage.success('已通过')
+  if (!approvalInstanceId.value || approving.value) return
+  approving.value = true
+  try {
+    await http.post(`/system/approval/${approvalInstanceId.value}/approve`, {
+      approverId: auth.user?.userId,
+      comment: '同意'
+    })
+    ElMessage.success('已通过')
+  } finally {
+    approving.value = false
+  }
   await reloadMaster()
   crudRef.value?.load()
 }
 
 async function rejectPlan() {
-  if (!approvalInstanceId.value) return
-  await http.post(`/system/approval/${approvalInstanceId.value}/reject`, {
-    approverId: auth.user?.userId,
-    comment: '驳回'
-  })
-  ElMessage.success('已驳回')
-  await reloadMaster()
-  crudRef.value?.load()
+  if (!approvalInstanceId.value || rejecting.value) return
+  rejecting.value = true
+  try {
+    await http.post(`/system/approval/${approvalInstanceId.value}/reject`, {
+      approverId: auth.user?.userId,
+      comment: '驳回'
+    })
+    ElMessage.success('已驳回')
+    await reloadMaster()
+    crudRef.value?.load()
+  } finally {
+    rejecting.value = false
+  }
 }
 
 async function reloadMaster() {

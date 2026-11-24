@@ -272,3 +272,21 @@ CREATE INDEX IF NOT EXISTS idx_ext_asset_disp_device ON external_asset_dispositi
 COMMENT ON INDEX idx_ext_asset_disp_device IS '索引：外部处置.设备';
 CREATE INDEX IF NOT EXISTS idx_ext_asset_disp_sync ON external_asset_disposition(sync_status);
 COMMENT ON INDEX idx_ext_asset_disp_sync IS '索引：外部处置.同步状态';
+
+-- AST-DUP-03：仓单/盘点活跃明细业务键唯一
+CREATE UNIQUE INDEX IF NOT EXISTS uk_outbound_item_device_alive
+    ON device_outbound_item (outbound_id, device_id)
+    WHERE COALESCE(is_deleted, 0) = 0 AND device_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_return_item_device_alive
+    ON device_return_item (return_id, device_id)
+    WHERE COALESCE(is_deleted, 0) = 0 AND device_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_goods_return_item_device_alive
+    ON device_goods_return_item (return_id, device_id)
+    WHERE COALESCE(is_deleted, 0) = 0 AND device_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_inventory_item_device_alive
+    ON inventory_check_item (check_id, device_id)
+    WHERE COALESCE(is_deleted, 0) = 0 AND device_id IS NOT NULL;
+COMMENT ON INDEX uk_outbound_item_device_alive IS '唯一：出库明细未删行(outbound_id,device_id)';
+COMMENT ON INDEX uk_return_item_device_alive IS '唯一：退库明细未删行(return_id,device_id)';
+COMMENT ON INDEX uk_goods_return_item_device_alive IS '唯一：退货明细未删行(return_id,device_id)';
+COMMENT ON INDEX uk_inventory_item_device_alive IS '唯一：盘点明细未删行(check_id,device_id)';

@@ -1,6 +1,7 @@
 package com.meis.saas.asset.service;
 
 import com.meis.saas.common.asset.DeviceOwnershipWriteback;
+import com.meis.saas.common.audit.EntityChangeLogService;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.persistence.TableColumnCache;
@@ -25,6 +26,7 @@ public class DeviceOwnershipPeriodService implements DeviceOwnershipWriteback {
     private static final String LOC_TABLE = "device_location_period";
 
     private final JdbcTemplate jdbc;
+    private final EntityChangeLogService changeLog;
 
     public List<Map<String, Object>> listByDevice(UUID deviceId, boolean includeDraft) {
         ensureInitialPeriodIfMissing(deviceId);
@@ -322,10 +324,13 @@ public class DeviceOwnershipPeriodService implements DeviceOwnershipWriteback {
         putSet(sets, args, "remark", body, existing, false);
         SoftDeleteSupport.appendUpdateAuditSets(jdbc, TableColumnCache.columns(jdbc, OWN_TABLE), sets, args);
         args.add(periodId);
+        Map<String, Object> before = changeLog.loadRow(OWN_TABLE, periodId);
         jdbc.update("UPDATE device_ownership_period SET " + String.join(", ", sets)
                 + " WHERE id = ?::uuid"
                 + SoftDeleteSupport.notDeletedClause(jdbc, OWN_TABLE, null), args.toArray());
-        return loadOwnership(periodId);
+        Map<String, Object> after = loadOwnership(periodId);
+        changeLog.recordUpdate(OWN_TABLE, periodId, before, after);
+        return after;
     }
 
     @Transactional
@@ -334,7 +339,9 @@ public class DeviceOwnershipPeriodService implements DeviceOwnershipWriteback {
         if (!"draft".equals(String.valueOf(existing.get("confirm_status")))) {
             throw new BizException(400, "仅待确认草稿可删除");
         }
+        Map<String, Object> before = changeLog.loadRow(OWN_TABLE, periodId);
         SoftDeleteSupport.softDelete(jdbc, OWN_TABLE, periodId.toString());
+        changeLog.recordDelete(OWN_TABLE, periodId, before);
     }
 
     @Transactional
@@ -363,10 +370,13 @@ public class DeviceOwnershipPeriodService implements DeviceOwnershipWriteback {
         args.add(userName);
         SoftDeleteSupport.appendUpdateAuditSets(jdbc, TableColumnCache.columns(jdbc, OWN_TABLE), sets, args);
         args.add(periodId);
+        Map<String, Object> before = changeLog.loadRow(OWN_TABLE, periodId);
         jdbc.update("UPDATE device_ownership_period SET " + String.join(", ", sets)
                 + " WHERE id = ?::uuid"
                 + SoftDeleteSupport.notDeletedClause(jdbc, OWN_TABLE, null), args.toArray());
-        return loadOwnership(periodId);
+        Map<String, Object> after = loadOwnership(periodId);
+        changeLog.recordAction(OWN_TABLE, periodId, "confirm", before, after, null);
+        return after;
     }
 
     @Transactional
@@ -451,10 +461,13 @@ public class DeviceOwnershipPeriodService implements DeviceOwnershipWriteback {
         putSet(sets, args, "remark", body, existing, false);
         SoftDeleteSupport.appendUpdateAuditSets(jdbc, TableColumnCache.columns(jdbc, LOC_TABLE), sets, args);
         args.add(periodId);
+        Map<String, Object> before = changeLog.loadRow(LOC_TABLE, periodId);
         jdbc.update("UPDATE device_location_period SET " + String.join(", ", sets)
                 + " WHERE id = ?::uuid"
                 + SoftDeleteSupport.notDeletedClause(jdbc, LOC_TABLE, null), args.toArray());
-        return loadLocation(periodId);
+        Map<String, Object> after = loadLocation(periodId);
+        changeLog.recordUpdate(LOC_TABLE, periodId, before, after);
+        return after;
     }
 
     @Transactional
@@ -463,7 +476,9 @@ public class DeviceOwnershipPeriodService implements DeviceOwnershipWriteback {
         if (!"draft".equals(String.valueOf(existing.get("confirm_status")))) {
             throw new BizException(400, "仅待确认草稿可删除");
         }
+        Map<String, Object> before = changeLog.loadRow(LOC_TABLE, periodId);
         SoftDeleteSupport.softDelete(jdbc, LOC_TABLE, periodId.toString());
+        changeLog.recordDelete(LOC_TABLE, periodId, before);
     }
 
     @Transactional
@@ -492,10 +507,13 @@ public class DeviceOwnershipPeriodService implements DeviceOwnershipWriteback {
         args.add(userName);
         SoftDeleteSupport.appendUpdateAuditSets(jdbc, TableColumnCache.columns(jdbc, LOC_TABLE), sets, args);
         args.add(periodId);
+        Map<String, Object> before = changeLog.loadRow(LOC_TABLE, periodId);
         jdbc.update("UPDATE device_location_period SET " + String.join(", ", sets)
                 + " WHERE id = ?::uuid"
                 + SoftDeleteSupport.notDeletedClause(jdbc, LOC_TABLE, null), args.toArray());
-        return loadLocation(periodId);
+        Map<String, Object> after = loadLocation(periodId);
+        changeLog.recordAction(LOC_TABLE, periodId, "confirm", before, after, null);
+        return after;
     }
 
     @Transactional
@@ -563,6 +581,7 @@ public class DeviceOwnershipPeriodService implements DeviceOwnershipWriteback {
     // ---------- helpers ----------
 
     private void patchOpenOwnershipSnapshot(UUID periodId, Map<String, Object> device, String changeReason) {
+        Map<String, Object> before = changeLog.loadRow(OWN_TABLE, periodId);
         List<String> sets = new ArrayList<>();
         List<Object> args = new ArrayList<>();
         sets.add("device_code = ?");
@@ -591,9 +610,18 @@ public class DeviceOwnershipPeriodService implements DeviceOwnershipWriteback {
         jdbc.update("UPDATE device_ownership_period SET " + String.join(", ", sets)
                 + " WHERE id = ?::uuid"
                 + SoftDeleteSupport.notDeletedClause(jdbc, OWN_TABLE, null), args.toArray());
+        changeLog.recordUpdate(OWN_TABLE, periodId, before, changeLog.loadRow(OWN_TABLE, periodId));
     }
 
     private void closeOpenOwnershipPeriod(UUID deviceId, Instant at) {
+        var opens = jdbc.queryForList("""
+                SELECT id FROM device_ownership_period
+                WHERE device_id = ?::uuid AND effective_to IS NULL AND confirm_status = 'confirmed'
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, OWN_TABLE, null), deviceId);
+        List<Map<String, Object>> befores = new ArrayList<>();
+        for (Map<String, Object> o : opens) {
+            befores.add(changeLog.loadRow(OWN_TABLE, o.get("id")));
+        }
         List<String> sets = new ArrayList<>();
         List<Object> args = new ArrayList<>();
         sets.add("effective_to = ?::timestamptz");
@@ -607,9 +635,22 @@ public class DeviceOwnershipPeriodService implements DeviceOwnershipWriteback {
                   AND effective_to IS NULL
                   AND confirm_status = 'confirmed'
                 """ + SoftDeleteSupport.notDeletedClause(jdbc, OWN_TABLE, null), args.toArray());
+        for (Map<String, Object> before : befores) {
+            if (before == null || before.get("id") == null) continue;
+            Object id = before.get("id");
+            changeLog.recordUpdate(OWN_TABLE, id, before, changeLog.loadRow(OWN_TABLE, id));
+        }
     }
 
     private void closeOpenLocationPeriod(UUID deviceId, Instant at) {
+        var opens = jdbc.queryForList("""
+                SELECT id FROM device_location_period
+                WHERE device_id = ?::uuid AND effective_to IS NULL AND confirm_status = 'confirmed'
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, LOC_TABLE, null), deviceId);
+        List<Map<String, Object>> befores = new ArrayList<>();
+        for (Map<String, Object> o : opens) {
+            befores.add(changeLog.loadRow(LOC_TABLE, o.get("id")));
+        }
         List<String> sets = new ArrayList<>();
         List<Object> args = new ArrayList<>();
         sets.add("effective_to = ?::timestamptz");
@@ -623,6 +664,11 @@ public class DeviceOwnershipPeriodService implements DeviceOwnershipWriteback {
                   AND effective_to IS NULL
                   AND confirm_status = 'confirmed'
                 """ + SoftDeleteSupport.notDeletedClause(jdbc, LOC_TABLE, null), args.toArray());
+        for (Map<String, Object> before : befores) {
+            if (before == null || before.get("id") == null) continue;
+            Object id = before.get("id");
+            changeLog.recordUpdate(LOC_TABLE, id, before, changeLog.loadRow(LOC_TABLE, id));
+        }
     }
 
     private List<Map<String, Object>> findOpenOwnershipPeriod(UUID deviceId) {
@@ -819,6 +865,7 @@ public class DeviceOwnershipPeriodService implements DeviceOwnershipWriteback {
                 body.get("created_by"), body.get("updated_by"),
                 body.get("created_by_name"), body.get("updated_by_name"),
                 body.get("is_deleted") != null ? body.get("is_deleted") : 0);
+        changeLog.recordCreate(OWN_TABLE, body.get("id"), changeLog.loadRow(OWN_TABLE, body.get("id")));
     }
 
     private void insertLocation(Map<String, Object> body) {
@@ -853,6 +900,7 @@ public class DeviceOwnershipPeriodService implements DeviceOwnershipWriteback {
                 body.get("created_by"), body.get("updated_by"),
                 body.get("created_by_name"), body.get("updated_by_name"),
                 body.get("is_deleted") != null ? body.get("is_deleted") : 0);
+        changeLog.recordCreate(LOC_TABLE, body.get("id"), changeLog.loadRow(LOC_TABLE, body.get("id")));
     }
 
     private Map<String, Object> loadOwnership(UUID id) {

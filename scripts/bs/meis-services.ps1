@@ -337,12 +337,35 @@ function Get-MeisServicesStartList {
     return @($script:MeisServices)
 }
 
+function Invoke-MeisTenantSchemaEnsure {
+    param([switch]$Quiet)
+    $scriptPath = Join-Path $script:MeisScriptsBs 'ensure-tenant-tables.ps1'
+    if (-not (Test-Path -LiteralPath $scriptPath)) {
+        Write-Host "  Warn: missing ensure-tenant-tables.ps1 — skip schema ensure" -ForegroundColor Yellow
+        return
+    }
+    try {
+        if ($Quiet) {
+            & $scriptPath -Quiet
+        } else {
+            & $scriptPath
+        }
+        if ($LASTEXITCODE -ne 0) {
+            throw "ensure-tenant-tables.ps1 exit $LASTEXITCODE"
+        }
+    } catch {
+        Write-Host "  WARN schema ensure failed: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "  Continue starting services; meis-tenant Flyway may still repair." -ForegroundColor Yellow
+    }
+}
+
 function Start-MeisServices {
     param(
         [string]$Profile = "dev",
         [switch]$FollowLogs,
         [switch]$CoreOnly,
         [switch]$EnableJdwp,
+        [switch]$SkipSchemaEnsure,
         [string[]]$ServiceNames = $null
     )
 
@@ -354,6 +377,13 @@ function Start-MeisServices {
     $root = $script:MeisRoot
     $logDir = Join-Path $root "logs"
     if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
+
+    # PLT-SCHEMA-ENSURE-01：启动前结构补全（V1/V2 + R__columns_*），避免 meis-tenant 已在跑时漏补列、也不必单独执行 R 脚本
+    if (-not $SkipSchemaEnsure) {
+        Invoke-MeisTenantSchemaEnsure
+    } else {
+        Write-Host "Skip tenant schema ensure (-SkipSchemaEnsure)." -ForegroundColor DarkGray
+    }
 
     $targets = Get-MeisServicesStartList -CoreOnly:$CoreOnly -ServiceNames $ServiceNames
     $scopeLabel = if ($CoreOnly) { 'core backend' } else { 'all backend' }

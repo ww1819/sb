@@ -3073,15 +3073,15 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | BACKLOG-AST-PERF-01 | 资产 | 设备台账/维保列表相关子查询与大 JOIN 性能评估优化 | REP-PERF-01 扫描 | P1 | 最像再撞 30s 的 Crud 列表 | 可排期 |
 | BACKLOG-PUR-PERF-01 | 采购 | 计划明细列表侧 `allocateMissingApproved` 移出热路径 | REP-PERF-01 扫描 | P2 | 缺号多时首次打开可能写库久等 | 可排期 |
 | BACKLOG-PLT-DB-SYNC-01 | 平台 | 将 R__ 中仍未回写 V1 的扩展列分批同步进 `V1__tables.sql`（约 200 列：台账扩展、途径列等） | PLT-DB-SYNC-01 / 附录 D.1 | P2 | 本期已修关键业务路径；全量回填工作量大 | 可排期 |
-| BACKLOG-AST-W01 | 跨模块 | 保养/计量/巡检/PM 执行表与公用设备费用表等补齐 device_id/code/name 冗余 | 附录 W.3.2 | P1 | 维修 P0 先落地；其余分批 | 可排期 |
+| BACKLOG-AST-W01 | 跨模块 | 保养/计量/巡检/PM 执行表与公用设备费用表等补齐 device_id/code/name 冗余 | 附录 W.3.2 | P1 | 执行明细/费用表已齐；仓单明细服务端快照+回填已齐；头表多设备不加 device_id | 已完成 |
 | BACKLOG-AST-SD-01 | 资产 | 设备域软删补强：盘点明细物理删→软删；exists/update 过滤已删；出库/调拨/报废删入口统一 SoftDeleteSupport | [AST-AUDIT-CONV-01](#ast-audit-conv-01-设备域审计冗余软删缺口扫描2026-11-24) A | P0 | 盘点明细、transfer/scrap 写路径 | 已完成 |
 | BACKLOG-AST-W5-01 | 资产 | 姓名快照补强：台账 clinical/asset_manager fillFromLink+后端双写；调拨/报废 created_by_name；盘点/盘点项人员姓名列 | AST-AUDIT-CONV-01 B | P0 | 与 W.5 / SoftDeleteSupport 对齐 | 已完成 |
-| BACKLOG-AST-W6-01 | 资产 | 单据冗余补强：asset_transfer 写 device_code/name+申请人姓名；出库明细 device/warehouse 名称；执行表/费用表并入 W01 | AST-AUDIT-CONV-01 C | P1 | 调拨已落地；出库等并 W01 | 部分完成 |
-| BACKLOG-AST-T-OWN-01 | 资产 | 归属/位置区间、非维修换件、处置记录等纳入 EntityChangeLog TRACKED+T.5 快照 | AST-AUDIT-CONV-01 D | P1 | 先 ownership/location/part | 可排期 |
-| BACKLOG-AST-CH-01 | 资产 | 仓单/调拨/报废/盘点写入口补 `*_channel`（Web 回填 web；App 写库同事务） | AST-AUDIT-CONV-01 E / MOB-CHANNEL | P2 | App 写路径排期时同批 | 可排期 |
-| BACKLOG-AST-DUP-01 | 资产 | 主从仓单保存改 upsert 保留明细 id；禁「全删再插新 UUID」；新建客户端预生成主单 id | [AST-DUP-IDEMP-01](#ast-dup-idemp-01-设备域重复明细与幂等并发审查2026-11-24) | P0 | 出库/退库/退货/入库 | 可排期 |
-| BACKLOG-AST-DUP-02 | 资产/平台 | 主从页与审批动作防连点；提交/发放/完成状态条件幂等；审批实例禁重复 pending | AST-DUP-IDEMP-01 | P0 | MasterDetailPage + ApprovalInstanceService | 可排期 |
-| BACKLOG-AST-DUP-03 | 资产 | 仓单/盘点并发：业务键唯一（如 check_id+device_id 未删）+ 状态锁；row_version 冲突明示 | AST-DUP-IDEMP-01 / 约定包 §6.7 | P1 | 与 DUP-01 可同批或紧随 | 可排期 |
+| BACKLOG-AST-W6-01 | 资产 | 单据冗余补强：asset_transfer 写 device_code/name+申请人姓名；出库明细 device/warehouse 名称；执行表/费用表并入 W01 | AST-AUDIT-CONV-01 C | P1 | 调拨+出库/退库/退货明细服务端快照已齐 | 已完成 |
+| BACKLOG-AST-T-OWN-01 | 资产 | 归属/位置区间、非维修换件、处置记录等纳入 EntityChangeLog TRACKED+T.5 快照 | AST-AUDIT-CONV-01 D | P1 | ownership/location/part 已落地；处置记录另议 | 已完成 |
+| BACKLOG-AST-CH-01 | 资产 | 仓单/调拨/报废/盘点写入口补 `*_channel`（Web 回填 web；App 写库同事务） | AST-AUDIT-CONV-01 E / MOB-CHANNEL | P2 | 列+Web 写+通用回填已齐；App 仓单写入口仍无，待有写时同事务传 client | 已完成 |
+| BACKLOG-AST-DUP-01 | 资产 | 主从仓单保存改 upsert 保留明细 id；禁「全删再插新 UUID」；新建客户端预生成主单 id | [AST-DUP-IDEMP-01](#ast-dup-idemp-01-设备域重复明细与幂等并发审查2026-11-24) | P0 | 出库/退库/退货/入库 | 已完成 |
+| BACKLOG-AST-DUP-02 | 资产/平台 | 主从页与审批动作防连点；提交/发放/完成状态条件幂等；审批实例禁重复 pending | AST-DUP-IDEMP-01 | P0 | MasterDetailPage + ApprovalInstanceService | 已完成 |
+| BACKLOG-AST-DUP-03 | 资产 | 仓单/盘点并发：业务键唯一（如 check_id+device_id 未删）+ 状态锁；row_version 冲突明示 | AST-DUP-IDEMP-01 / 约定包 §6.7 | P1 | 出库/退库/退货/盘点唯一+row_version | 已完成 |
 | BACKLOG-AST-07 | 资产 | 科室盘点申请 / 设备盘点报表完整业务（表结构、流程、报表） | 主路径已实现（G5） | P1 | 盘亏写回台账另议 | 部分完成 |
 | BACKLOG-AST-08 | 资产 | 资产动态统计完整业务（指标、图表、导出） | AST-UI-08 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-AST-10 | 资产 | 报废审核 / 报废查询完整业务（状态流转、列表筛选） | 已实现（G5） | P1 | — | 已完成 |
@@ -3328,7 +3328,7 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 |------|------|
 | `ensureDatabaseExtensions()` | 建表前确保 `uuid-ossp` / `pgcrypto` |
 | `TenantSchemaShadowGuard` | 启动后对照 V1 表清单；缺表重跑 ensure；仍缺则抛错阻断启动 |
-| `scripts/ensure-tenant-tables.ps1` | 离线对全部活跃租户补 V1/V2 表（不重启服务） |
+| `scripts/bs/ensure-tenant-tables.ps1` | 离线结构补全：V1/V2 + `R__columns_audit/biz`；**已挂入** `start.ps1`（`-SkipSchemaEnsure` 可跳过） |
 | `scripts/V1TenantGapScan.java` | 对比 V1 与租户实际表，标 `[PUBLIC SHADOW]` |
 
 **提交前 / 环境修复检查**：
@@ -3343,7 +3343,7 @@ java -cp ".;../meis-common/target/deps/postgresql-42.7.3.jar" V1TenantGapScan
 
 # 2) 一键补表（可选，等同启动时 SchemaTableEnsuring）
 
-powershell -File scripts/ensure-tenant-tables.ps1
+powershell -File scripts/bs/ensure-tenant-tables.ps1
 
 ```
 
@@ -3402,7 +3402,7 @@ powershell -File scripts/ensure-tenant-tables.ps1
 
 - [ ] 改 `V1` + `R__` 双轨（见附录 D）
 - [ ] 重启 **meis-tenant** 触发迁库（含 ShadowGuard 缺表校验）
-- [ ] 或执行 `scripts/ensure-tenant-tables.ps1` 离线补表
+- [ ] 或执行 `scripts/bs/ensure-tenant-tables.ps1` 离线结构补全（V1/V2 + R__columns；`start.ps1` 已自动调用）
 - [ ] 运行 `V1TenantGapScan` 确认各租户 **missing = 0**
 - [ ] 再重启相关业务服务（如 meis-analytics）
 
@@ -4647,6 +4647,76 @@ powershell -File scripts/ensure-tenant-tables.ps1
 | `change_reason` | `VARCHAR(40)` | 变更原因 |
 | `remark` | `TEXT` | 备注 |
 
+#### `device_ownership_period`（归属区间，AST-T-OWN-01）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `device_id` | `UUID` | 设备 |
+| `device_code` | `VARCHAR(50)` | 设备编码冗余 |
+| `device_name` | `VARCHAR(200)` | 设备名称冗余 |
+| `campus_id` | `UUID` | 院区 |
+| `campus_name` | `VARCHAR(200)` | 院区名称快照 |
+| `owner_type` | `VARCHAR(20)` | 归属类型 warehouse|dept |
+| `warehouse_id` | `UUID` | 仓库 |
+| `warehouse_name` | `VARCHAR(200)` | 仓库名称快照 |
+| `dept_id` | `UUID` | 科室 |
+| `dept_name` | `VARCHAR(200)` | 科室名称快照 |
+| `effective_from` | `TIMESTAMPTZ` | 生效起 |
+| `effective_to` | `TIMESTAMPTZ` | 生效止 |
+| `change_reason` | `VARCHAR(40)` | 变更原因 |
+| `source_mode` | `VARCHAR(40)` | 生成方式 |
+| `source_biz_type` | `VARCHAR(40)` | 来源业务类型 |
+| `source_biz_id` | `UUID` | 来源业务 id |
+| `source_biz_no` | `VARCHAR(50)` | 来源业务单号 |
+| `confirm_status` | `VARCHAR(20)` | 确认状态 draft|confirmed |
+| `remark` | `TEXT` | 备注 |
+
+#### `device_location_period`（位置区间，AST-T-OWN-01）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `device_id` | `UUID` | 设备 |
+| `device_code` | `VARCHAR(50)` | 设备编码冗余 |
+| `device_name` | `VARCHAR(200)` | 设备名称冗余 |
+| `location_floor` | `VARCHAR(50)` | 楼层 |
+| `room_number` | `VARCHAR(50)` | 房间号 |
+| `location_detail` | `VARCHAR(200)` | 位置详述 |
+| `building_id` | `UUID` | 楼宇 |
+| `building_name` | `VARCHAR(200)` | 楼宇名称快照 |
+| `campus_id` | `UUID` | 院区 |
+| `campus_name` | `VARCHAR(200)` | 院区名称快照 |
+| `effective_from` | `TIMESTAMPTZ` | 生效起 |
+| `effective_to` | `TIMESTAMPTZ` | 生效止 |
+| `change_reason` | `VARCHAR(40)` | 变更原因 |
+| `source_mode` | `VARCHAR(40)` | 生成方式 |
+| `source_biz_type` | `VARCHAR(40)` | 来源业务类型 |
+| `source_biz_id` | `UUID` | 来源业务 id |
+| `source_biz_no` | `VARCHAR(50)` | 来源业务单号 |
+| `confirm_status` | `VARCHAR(20)` | 确认状态 draft|confirmed |
+| `remark` | `TEXT` | 备注 |
+
+#### `device_part_replacement`（非维修换件，AST-T-OWN-01）
+
+| 字段名 | 类型 | 中文注释 |
+|---|---|---|
+| `device_id` | `UUID` | 设备 |
+| `device_code` | `VARCHAR(50)` | 设备编码冗余 |
+| `device_name` | `VARCHAR(200)` | 设备名称冗余 |
+| `spare_part_id` | `UUID` | 配件 |
+| `part_code` | `VARCHAR(50)` | 配件编码快照 |
+| `part_name` | `VARCHAR(200)` | 配件名称快照 |
+| `part_specification` | `VARCHAR(200)` | 规格快照 |
+| `part_model` | `VARCHAR(100)` | 型号快照 |
+| `quantity` | `DECIMAL` | 数量 |
+| `unit_price` | `DECIMAL` | 单价 |
+| `total_price` | `DECIMAL` | 金额 |
+| `supplier_id` | `UUID` | 供应商 |
+| `supplier_name` | `VARCHAR(200)` | 供应商名称快照 |
+| `replaced_at` | `TIMESTAMPTZ` | 更换时间 |
+| `source_mode` | `VARCHAR(40)` | 生成方式 |
+| `confirm_status` | `VARCHAR(20)` | 确认状态 draft|confirmed |
+| `remark` | `TEXT` | 备注 |
+
 #### `manufacturer`（生产厂家）
 
 | 字段名 | 类型 | 中文注释 |
@@ -5399,7 +5469,7 @@ P1 记入第 7 章：`BACKLOG-AST-W01`（跨模块执行表/费用表冗余补�
 1. 有冗余 `device_id` 的子表/流水 → `WHERE device_id = ?`
 2. 否则 → 经主单 `device_id` 关联
 
-**状态**：W.3.1 与 U.15 同轮实施；W.3.2 进待开发池后分批。
+**状态**：W.3.1 与 U.15 同轮实施；W.3.2 / `BACKLOG-AST-W01` 已完成（执行明细与费用表 + 仓单明细快照；执行头表不铺单设备 id）。
 
 ### W.5 工作人员姓名冗余（2026-07-15）**【强制约定】**
 
@@ -7886,13 +7956,13 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 
 > **衍生提醒（未单独立项）**：盘点盈亏写回台账仍见 `BACKLOG-AST-YK-01`；与软删/审计补强解耦，勿混批。
 
-> **确认并落地（2026-11-24）**：用户确认后已实施 P0——`BACKLOG-AST-SD-01` / `BACKLOG-AST-W5-01` / `BACKLOG-AST-W6-01`（调拨部分）。迁库：`R__columns_biz` + `R__data_fix` + `V1`。P1 区间审计 `AST-T-OWN-01`、P2 途径 `AST-CH-01`、W01 其余冗余仍待排期。
+> **确认并落地（2026-11-24）**：用户确认后已实施 P0——`BACKLOG-AST-SD-01` / `BACKLOG-AST-W5-01` / `BACKLOG-AST-W6-01`（调拨部分）。迁库：`R__columns_biz` + `R__data_fix` + `V1`。P1 区间审计 `AST-T-OWN-01` 与 `AST-DUP-03`、W01/W6 仓单快照、P2 途径 `AST-CH-01`（Web+列）均已落地。
 
 ### AST-DUP-IDEMP-01 设备域重复明细与幂等/并发审查（2026-11-24）
 
 > **问题**：多次保存/提交、网络抖动连点、并发编辑，是否会生成重复明细或重复副作用。  
 > **结论**：**会**。仓单主从与审批动作存在明确缺口；盘点相对较好但仍缺防连点与业务键唯一。  
-> **本审查不改代码**；确认后按 BACKLOG 分批改。对照约定包 §6.1 / §6.6（保留明细 id）/ §6.7（乐观锁）。
+> **状态**：建议已确认；`DUP-01`/`DUP-02`/`DUP-03` 均已落地。对照约定包 §6.1 / §6.6 / §6.7。
 
 #### 1. 会重复明细的路径（P0）
 
@@ -7930,10 +8000,10 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 
 | 项 | 现状 |
 |----|------|
-| 明细 `row_version` | 盘点明细有列，仓单保存路径 **未**做冲突检测 |
-| 业务键唯一 | 未见 `(outbound_id, device_id) WHERE is_deleted=0` 一类唯一约束 |
-| 双人同单编辑 | 后写覆盖/软删对方行；无冲突提示 |
-| 多端 | 约定包 §6.7 要求事件流水+乐观锁；设备仓单未落地 |
+| 明细 `row_version` | **已落地（DUP-03）**：出库/退库/退货/入库/盘点明细有列；请求带版本时冲突 409 |
+| 业务键唯一 | **已落地（DUP-03）**：出库/退库/退货/盘点 `(父单,device_id) WHERE is_deleted=0` 部分唯一 |
+| 双人同单编辑 | 唯一键 + 可选乐观锁拦截；无版本时后写仍可覆盖非键字段 |
+| 多端 | 仓单侧唯一+乐观锁已齐；完整事件流水仍按约定包 §6.7 / OPS 执行单另议 |
 
 #### 5. 建议定稿（待确认后开发）
 
@@ -7945,5 +8015,10 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 
 > **BACKLOG**：`BACKLOG-AST-DUP-01`（upsert） / `02`（防连点+审批/发放幂等） / `03`（唯一+乐观锁）。
 
+> **确认并落地（2026-11-24）**：按建议实施 DUP-01+DUP-02（upsert 保留明细 id、新建预生成 id、MasterDetail 防连点、submit/issue/complete 幂等）。
 
-AST-T-OWN-01（P1）、AST-CH-01（P2）、AST-W01 其余执行表冗余。
+> **继续落地（2026-11-24）**：`BACKLOG-AST-T-OWN-01`——`device_ownership_period` / `device_location_period` / `device_part_replacement` 进 TRACKED+SNAPSHOT+T.5，写点挂 EntityChangeLog；`BACKLOG-AST-DUP-03`——出库/退库/退货/盘点活跃 `(父单,device_id)` 部分唯一索引 + 明细 `row_version` 乐观锁（请求带版本时冲突 409）。
+
+> **继续落地（2026-11-24·二）**：`BACKLOG-AST-W01`/`W6-01`——出库/退库/退货明细 `DeviceSnapshotSupport` 服务端快照 + `R__data_fix` 回填；执行明细/费用表确认已齐。`BACKLOG-AST-CH-01`——仓单/调拨/报废加 `*_channel` 列并挂 Web 写点与审批终态；历史 NULL 由 MOB-CHANNEL-02 通用回填；盘点原本已齐。App 仓单写入口仍无，日后同事务传 `client`。
+
+> **PLT-SCHEMA-ENSURE-01（2026-11-24）**：本地 `start.ps1` / `Start-MeisServices` 启动前自动跑 `scripts/bs/ensure-tenant-tables.ps1`——V1/V2 建表索引 + `R__columns_audit` + `R__columns_biz` 结构补全；即使 `meis-tenant` 已在监听被 skip，也能补列，无需再单独执行 `apply-tenant-patches.ps1`。`R__data_fix`（字典/回填）仍由重启 `meis-tenant` 的 Flyway 执行。跳过：`start.ps1 -SkipSchemaEnsure`。

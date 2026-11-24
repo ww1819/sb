@@ -20,7 +20,8 @@ public class EntityChangeLogService {
             "campus", "building", "warehouse", "asset_category", "medical_device_category",
             "engineer", "fault_type_dict", "repair_process_type", "finance_category", "unit_dict", "sys_role",
             "device_warranty", "device_warranty_device",
-            "device_license", "device_training_auth", "device_archive_file", "device_udi_history"
+            "device_license", "device_training_auth", "device_archive_file", "device_udi_history",
+            "device_ownership_period", "device_location_period", "device_part_replacement"
     );
 
     /** 附录 T.5：delete/submit/withdraw 精简快照字段（按实体） */
@@ -93,7 +94,25 @@ public class EntityChangeLogService {
                     "sort_order", "rotate_angle", "source", "remark")),
             Map.entry("device_udi_history", List.of(
                     "device_id", "device_code", "device_name", "udi_di", "udi_pi",
-                    "effective_from", "effective_to", "change_reason", "remark"))
+                    "effective_from", "effective_to", "change_reason", "remark")),
+            Map.entry("device_ownership_period", List.of(
+                    "device_id", "device_code", "device_name", "campus_id", "campus_name",
+                    "owner_type", "warehouse_id", "warehouse_name", "dept_id", "dept_name",
+                    "effective_from", "effective_to", "change_reason", "source_mode",
+                    "source_biz_type", "source_biz_id", "source_biz_no",
+                    "confirm_status", "remark")),
+            Map.entry("device_location_period", List.of(
+                    "device_id", "device_code", "device_name",
+                    "location_floor", "room_number", "location_detail",
+                    "building_id", "building_name", "campus_id", "campus_name",
+                    "effective_from", "effective_to", "change_reason", "source_mode",
+                    "source_biz_type", "source_biz_id", "source_biz_no",
+                    "confirm_status", "remark")),
+            Map.entry("device_part_replacement", List.of(
+                    "device_id", "device_code", "device_name",
+                    "spare_part_id", "part_code", "part_name", "part_specification", "part_model",
+                    "quantity", "unit_price", "total_price", "supplier_id", "supplier_name",
+                    "replaced_at", "source_mode", "confirm_status", "remark"))
     );
 
     private static final Set<String> SENSITIVE = Set.of(

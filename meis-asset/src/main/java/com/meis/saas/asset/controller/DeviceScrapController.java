@@ -197,6 +197,7 @@ public class DeviceScrapController {
         jdbc.update("UPDATE device_scrap SET applicant_id=?::uuid, applicant_name=?, updated_at=NOW() WHERE id=?::uuid"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "device_scrap", null),
                 applicantId, applicantName, id);
+        SoftDeleteSupport.applyChannels(jdbc, "device_scrap", id, body, "submit_channel", "update_channel");
         approvalService.submit("device_scrap", id, row.get("scrap_no").toString(),
                 "设备报废 " + row.get("scrap_no"), applicantId, 0);
         return get(id);

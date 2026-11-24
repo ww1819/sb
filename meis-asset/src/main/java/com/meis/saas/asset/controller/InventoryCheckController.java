@@ -7,6 +7,7 @@ import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.ops.OpsClientChannel;
+import com.meis.saas.common.persistence.DetailLineUpsertSupport;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.persistence.TableColumnCache;
 import com.meis.saas.common.result.Result;
@@ -619,9 +620,11 @@ public class InventoryCheckController {
     }
 
     private void upsertItems(UUID checkId, String checkNo, List<Map<String, Object>> items) {
+        try {
         Set<UUID> keep = new LinkedHashSet<>();
         for (Map<String, Object> item : items) {
-            UUID itemId = parseUuid(item.get("id")).orElse(UUID.randomUUID());
+            UUID itemId = DetailLineUpsertSupport.resolveLineId(
+                    jdbc, "inventory_check_item", "check_id", checkId, item.get("id"), item.get("device_id"));
             keep.add(itemId);
             boolean exists = !jdbc.queryForList(
                     "SELECT 1 FROM inventory_check_item WHERE id = ?::uuid AND check_id = ?::uuid"
@@ -669,10 +672,19 @@ public class InventoryCheckController {
                     SoftDeleteSupport.appendRestoreSets(TableColumnCache.columns(jdbc, "inventory_check_item"), sets);
                 }
                 SoftDeleteSupport.appendUpdateAuditSets(jdbc, TableColumnCache.columns(jdbc, "inventory_check_item"), sets, args);
+                DetailLineUpsertSupport.appendRowVersionBump(jdbc, "inventory_check_item", sets);
+                Integer expectedRv = DetailLineUpsertSupport.parseRowVersion(item.get("row_version"));
+                String where = " WHERE id = ?::uuid AND check_id = ?::uuid";
                 args.add(itemId);
                 args.add(checkId);
-                jdbc.update("UPDATE inventory_check_item SET " + String.join(", ", sets)
-                        + " WHERE id = ?::uuid AND check_id = ?::uuid", args.toArray());
+                if (expectedRv != null) {
+                    where += " AND COALESCE(row_version,1) = ?";
+                    args.add(expectedRv);
+                }
+                int n = jdbc.update("UPDATE inventory_check_item SET " + String.join(", ", sets) + where, args.toArray());
+                if (expectedRv != null && n == 0) {
+                    throw new BizException(409, "明细已被他人修改，请刷新后重试");
+                }
             } else {
                 Map<String, Object> audit = new LinkedHashMap<>();
                 SoftDeleteSupport.applyInsertAudit(jdbc, "inventory_check_item", audit);
@@ -693,6 +705,9 @@ public class InventoryCheckController {
             }
         }
         softDeleteItemsNotIn(checkId, keep);
+        } catch (RuntimeException e) {
+            DetailLineUpsertSupport.rethrowDeviceUniqueConflict(e);
+        }
     }
 
     private void softDeleteItemsNotIn(UUID checkId, Set<UUID> keep) {

@@ -1,5 +1,6 @@
 package com.meis.saas.asset.service;
 
+import com.meis.saas.common.audit.EntityChangeLogService;
 import com.meis.saas.common.exception.BizException;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
 import com.meis.saas.common.persistence.TableColumnCache;
@@ -24,6 +25,7 @@ public class DevicePartReplacementService {
     private static final String TABLE = "device_part_replacement";
 
     private final JdbcTemplate jdbc;
+    private final EntityChangeLogService changeLog;
 
     public List<Map<String, Object>> listByDevice(UUID deviceId, boolean includeDraft) {
         requireDevice(deviceId);
@@ -72,7 +74,9 @@ public class DevicePartReplacementService {
         if (body.get("created_by_name") != null) row.put("created_by_name", body.get("created_by_name"));
         SoftDeleteSupport.applyInsertAudit(jdbc, TABLE, row);
         insert(row);
-        return load(id);
+        Map<String, Object> created = load(id);
+        changeLog.recordCreate(TABLE, id, created);
+        return created;
     }
 
     @Transactional
@@ -81,6 +85,7 @@ public class DevicePartReplacementService {
         if (!"draft".equals(String.valueOf(existing.get("confirm_status")))) {
             throw new BizException(400, "仅待确认草稿可修改");
         }
+        Map<String, Object> before = changeLog.loadRow(TABLE, id);
         List<String> sets = new ArrayList<>();
         List<Object> args = new ArrayList<>();
         if (body.containsKey("spare_part_id") || body.containsKey("part_code") || body.containsKey("part_name")) {
@@ -146,7 +151,9 @@ public class DevicePartReplacementService {
         jdbc.update("UPDATE device_part_replacement SET " + String.join(", ", sets)
                 + " WHERE id = ?::uuid"
                 + SoftDeleteSupport.notDeletedClause(jdbc, TABLE, null), args.toArray());
-        return load(id);
+        Map<String, Object> after = load(id);
+        changeLog.recordUpdate(TABLE, id, before, after);
+        return after;
     }
 
     @Transactional
@@ -155,7 +162,9 @@ public class DevicePartReplacementService {
         if (!"draft".equals(String.valueOf(existing.get("confirm_status")))) {
             throw new BizException(400, "仅待确认草稿可删除");
         }
+        Map<String, Object> before = changeLog.loadRow(TABLE, id);
         SoftDeleteSupport.softDelete(jdbc, TABLE, id.toString());
+        changeLog.recordDelete(TABLE, id, before);
     }
 
     @Transactional
@@ -164,6 +173,7 @@ public class DevicePartReplacementService {
         if (!"draft".equals(String.valueOf(existing.get("confirm_status")))) {
             throw new BizException(400, "仅待确认草稿可确认生效");
         }
+        Map<String, Object> before = changeLog.loadRow(TABLE, id);
         List<String> sets = new ArrayList<>();
         List<Object> args = new ArrayList<>();
         sets.add("confirm_status = 'confirmed'");
@@ -178,7 +188,9 @@ public class DevicePartReplacementService {
         jdbc.update("UPDATE device_part_replacement SET " + String.join(", ", sets)
                 + " WHERE id = ?::uuid"
                 + SoftDeleteSupport.notDeletedClause(jdbc, TABLE, null), args.toArray());
-        return load(id);
+        Map<String, Object> after = load(id);
+        changeLog.recordAction(TABLE, id, "confirm", before, after, null);
+        return after;
     }
 
     private void fillPartSnapshot(Map<String, Object> row, Map<String, Object> body) {

@@ -123,6 +123,7 @@ public class AssetTransferController {
                 "SELECT * FROM asset_transfer WHERE id = ?::uuid"
                         + SoftDeleteSupport.notDeletedClause(jdbc, "asset_transfer", null), id);
         if (row.isEmpty()) throw new BizException(404, "not found");
+        SoftDeleteSupport.applyChannels(jdbc, "asset_transfer", id, body, "submit_channel", "update_channel");
         approvalService.submit("asset_transfer", id, row.get(0).get("transfer_no").toString(),
                 "资产流转 " + row.get(0).get("transfer_no"), UUID.fromString(body.get("applicantId").toString()), 0);
         return get(id);

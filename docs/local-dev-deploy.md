@@ -118,7 +118,9 @@ powershell -File scripts\setup-postgres.ps1 -PostgresPassword aspt -DbName meis
 
 启动 `meis-tenant` 即可（`start.ps1` 或开发面板），无需额外迁移脚本。失败时服务 fail-fast 退出。
 
-结构变更：修改 `db/migrations` 后重新编译并重启 `meis-tenant`。
+**本地启动结构补全（PLT-SCHEMA-ENSURE-01）**：`scripts/bs/start.ps1` 在拉起服务前会自动执行 `ensure-tenant-tables.ps1`（V1/V2 建表索引 + `R__columns_audit` / `R__columns_biz`）。即使 `meis-tenant` 已在运行被 skip，也能补列，不必再单独跑 `apply-tenant-patches.ps1`。跳过：`start.ps1 -SkipSchemaEnsure`。字典/回填（`R__data_fix`）仍需重启 `meis-tenant` 走 Flyway。
+
+结构变更：修改 `db/migrations` 后重新编译并重启 `meis-tenant`（或至少再执行一次 `start.ps1` 以跑结构补全）。
 
 ---
 

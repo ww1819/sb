@@ -1,41 +1,27 @@
-# Apply tenant business column patches to a schema (idempotent).
-# Prefer restarting meis-tenant (Flyway R__). This applies R__columns_biz offline only.
+﻿# 兼容入口：结构补全已并入 ensure-tenant-tables.ps1（V1/V2 + R__columns_audit/biz）。
+# 推荐：start.ps1 会自动调用；也可手动：
+#   powershell -File scripts\bs\ensure-tenant-tables.ps1 [-Schema tenant_demo]
+# 字典/回填仍依赖重启 meis-tenant 跑 R__data_fix。
 param(
-    [Parameter(Mandatory = $true)]
-    [string]$Schema,
-    [string]$DbHost = "localhost",
-    [int]$Port = 5432,
-    [string]$DbName = "meis",
-    [string]$AppUser = "med",
-    [string]$AppPassword = "med123456"
+    [string]$Schema = "",
+    [string]$DbHost = "",
+    [int]$Port = 0,
+    [string]$DbName = "",
+    [string]$AppUser = "",
+    [string]$AppPassword = ""
 )
 
 $ErrorActionPreference = "Stop"
 . (Join-Path (Split-Path $PSScriptRoot -Parent) 'common\meis-root.ps1')
-$repoRoot = $script:MeisRoot
-$patchFile = Join-Path $repoRoot "meis-tenant\src\main\resources\db\migrations\tenant\R__columns_biz.sql"
 
-if (-not (Test-Path $patchFile)) { throw "Patch file not found: $patchFile" }
+if ($DbHost) { $env:POSTGRES_HOST = $DbHost }
+if ($Port -gt 0) { $env:POSTGRES_PORT = "$Port" }
+if ($DbName) { $env:POSTGRES_DB = $DbName }
+if ($AppUser) { $env:POSTGRES_USER = $AppUser }
+if ($AppPassword) { $env:POSTGRES_PASSWORD = $AppPassword }
 
-function Invoke-WithJdbc {
-    param([string]$Sql)
-    $jar = Join-Path $env:USERPROFILE ".m2\repository\org\postgresql\postgresql\42.7.3\postgresql-42.7.3.jar"
-    $runner = Join-Path $PSScriptRoot "ApplySql.java"
-    if (-not (Test-Path $jar)) { throw "PostgreSQL JDBC jar not found: $jar" }
-    if (-not (Test-Path $runner)) { throw "ApplySql.java not found" }
-    $tmp = [System.IO.Path]::GetTempFileName() + ".sql"
-    Set-Content -Path $tmp -Value $Sql -Encoding UTF8
-    Push-Location $PSScriptRoot
-    try {
-        javac -cp $jar ApplySql.java
-        java -cp ".;$jar" ApplySql $DbHost $Port $DbName $AppUser $AppPassword $Schema $tmp
-    } finally {
-        Pop-Location
-        Remove-Item $tmp -ErrorAction SilentlyContinue
-    }
-}
-
-$sql = Get-Content $patchFile -Raw -Encoding UTF8
-Write-Host "Applying R__columns_biz to schema [$Schema] ..."
-Invoke-WithJdbc -Sql $sql
-Write-Host "Done. For R__columns_audit / R__data_fix, restart meis-tenant."
+Write-Host "Delegating to ensure-tenant-tables.ps1 (includes R__columns_audit + R__columns_biz) ..." -ForegroundColor Cyan
+$argsList = @()
+if ($Schema) { $argsList += @('-Schema', $Schema) }
+& (Join-Path $PSScriptRoot 'ensure-tenant-tables.ps1') @argsList
+exit $LASTEXITCODE
