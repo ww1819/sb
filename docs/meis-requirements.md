@@ -3074,6 +3074,14 @@ standby_current_min_ma DECIMAL(10,2)  -- 待机电流下限(mA)
 | BACKLOG-PUR-PERF-01 | 采购 | 计划明细列表侧 `allocateMissingApproved` 移出热路径 | REP-PERF-01 扫描 | P2 | 缺号多时首次打开可能写库久等 | 可排期 |
 | BACKLOG-PLT-DB-SYNC-01 | 平台 | 将 R__ 中仍未回写 V1 的扩展列分批同步进 `V1__tables.sql`（约 200 列：台账扩展、途径列等） | PLT-DB-SYNC-01 / 附录 D.1 | P2 | 本期已修关键业务路径；全量回填工作量大 | 可排期 |
 | BACKLOG-AST-W01 | 跨模块 | 保养/计量/巡检/PM 执行表与公用设备费用表等补齐 device_id/code/name 冗余 | 附录 W.3.2 | P1 | 维修 P0 先落地；其余分批 | 可排期 |
+| BACKLOG-AST-SD-01 | 资产 | 设备域软删补强：盘点明细物理删→软删；exists/update 过滤已删；出库/调拨/报废删入口统一 SoftDeleteSupport | [AST-AUDIT-CONV-01](#ast-audit-conv-01-设备域审计冗余软删缺口扫描2026-11-24) A | P0 | 盘点明细、transfer/scrap 写路径 | 已完成 |
+| BACKLOG-AST-W5-01 | 资产 | 姓名快照补强：台账 clinical/asset_manager fillFromLink+后端双写；调拨/报废 created_by_name；盘点/盘点项人员姓名列 | AST-AUDIT-CONV-01 B | P0 | 与 W.5 / SoftDeleteSupport 对齐 | 已完成 |
+| BACKLOG-AST-W6-01 | 资产 | 单据冗余补强：asset_transfer 写 device_code/name+申请人姓名；出库明细 device/warehouse 名称；执行表/费用表并入 W01 | AST-AUDIT-CONV-01 C | P1 | 调拨已落地；出库等并 W01 | 部分完成 |
+| BACKLOG-AST-T-OWN-01 | 资产 | 归属/位置区间、非维修换件、处置记录等纳入 EntityChangeLog TRACKED+T.5 快照 | AST-AUDIT-CONV-01 D | P1 | 先 ownership/location/part | 可排期 |
+| BACKLOG-AST-CH-01 | 资产 | 仓单/调拨/报废/盘点写入口补 `*_channel`（Web 回填 web；App 写库同事务） | AST-AUDIT-CONV-01 E / MOB-CHANNEL | P2 | App 写路径排期时同批 | 可排期 |
+| BACKLOG-AST-DUP-01 | 资产 | 主从仓单保存改 upsert 保留明细 id；禁「全删再插新 UUID」；新建客户端预生成主单 id | [AST-DUP-IDEMP-01](#ast-dup-idemp-01-设备域重复明细与幂等并发审查2026-11-24) | P0 | 出库/退库/退货/入库 | 可排期 |
+| BACKLOG-AST-DUP-02 | 资产/平台 | 主从页与审批动作防连点；提交/发放/完成状态条件幂等；审批实例禁重复 pending | AST-DUP-IDEMP-01 | P0 | MasterDetailPage + ApprovalInstanceService | 可排期 |
+| BACKLOG-AST-DUP-03 | 资产 | 仓单/盘点并发：业务键唯一（如 check_id+device_id 未删）+ 状态锁；row_version 冲突明示 | AST-DUP-IDEMP-01 / 约定包 §6.7 | P1 | 与 DUP-01 可同批或紧随 | 可排期 |
 | BACKLOG-AST-07 | 资产 | 科室盘点申请 / 设备盘点报表完整业务（表结构、流程、报表） | 主路径已实现（G5） | P1 | 盘亏写回台账另议 | 部分完成 |
 | BACKLOG-AST-08 | 资产 | 资产动态统计完整业务（指标、图表、导出） | AST-UI-08 菜单已挂 | P1 | 先菜单入口；业务待排期 | 可排期 |
 | BACKLOG-AST-10 | 资产 | 报废审核 / 报废查询完整业务（状态流转、列表筛选） | 已实现（G5） | P1 | — | 已完成 |
@@ -7820,3 +7828,122 @@ Web 报修申请保存成功后同样询问是否立即提交（是/否）。
 > **PLT-AUDIT-2026-10-26 已落地**（Q-12~14 已确认）：变更日志回传 client、批量禁绕过区间、电流绑定流水途径、WX-BIND-01、MOB-OWN-RO。
 
 > **PLT-BACKLOG-BATCH-2026-10-26**：无歧义项继续落地——AST-T-CHILD-UI、MP-09/部分 MOB-16、**AST-LOC-01 补录位置历史**、**MOB-18 小程序 tabBar**。仍待产品决策/大体量：效益 ANA、金蝶 KD、RFID、盘点盈亏写回、移动独立权限码等。
+
+### AST-AUDIT-CONV-01 设备域审计/冗余/软删缺口扫描（2026-11-24）
+
+> **背景**：对照约定包 §3 / §5.10 / §5.17 / §6.2 / §6.3、附录 T / W.5 / W.6，对 `meis-asset` 写入口与表字段做存量扫描。  
+> **已较好**：台账主表 EntityChangeLog + SoftDeleteSupport；证照/培训/档案/UDI 已进 TRACKED+T.5；报废读路径已滤软删且申请人姓名有双写；归属/位置区间业务（OWN/LOC）已落地。  
+> **本扫描不实现代码**；按优先级入第 7 章 BACKLOG，确认后分批改。
+
+#### A. 软删（P0）→ `BACKLOG-AST-SD-01`
+
+| # | 缺口 | 证据/影响 |
+|---|------|-----------|
+| A1 | 盘点明细 `inventory_check_item` 保存/删除仍 `DELETE FROM` 物理删 | `InventoryCheckController` 约 284/652/658 行；主单软删后明细不可追溯 |
+| A2 | 调拨/报废 `exists` 与部分 UPDATE 未带 `notDeletedClause` | `AssetTransferController.save`、`DeviceScrapController.save` 可对已软删行再写 |
+| A3 | 出库/入库等仓单若缺统一删入口或未走 SoftDeleteSupport | 与主从软删约定不一致时列表可「复活」脏数据 |
+| A4 | 读列表多数已滤软删；需通检子表/关联 JOIN 是否漏 `is_deleted` | 约定：读接口须过滤已软删 |
+
+#### B. 姓名冗余 W.5（P0）→ `BACKLOG-AST-W5-01`
+
+| # | 缺口 | 证据/影响 |
+|---|------|-----------|
+| B1 | 台账 `clinical_owner_user_id` / `asset_manager_user_id` 无 `fillFromLink` | `businessSchemas.ts` 仅 linkTable；前端不自动带姓名；后端若未强制双写则姓名空 |
+| B2 | 调拨 INSERT 未写 `created_by`/`created_by_name`，申请人姓名未落库 | `AssetTransferController.save` |
+| B3 | 报废虽有 `applicant_name`，创建路径宜统一走 `SoftDeleteSupport.applyInsertAudit` | 避免只写业务人、漏审计列姓名 |
+| B4 | 盘点单/明细责任人、盘点人等若仅 UUID 无 `*_name` | 历史列表无法展示中文姓名 |
+
+#### C. 单据冗余 W.6（P0/P1）→ `BACKLOG-AST-W6-01` + 既有 `BACKLOG-AST-W01`
+
+| # | 缺口 | 证据/影响 |
+|---|------|-----------|
+| C1 | `asset_transfer` 有 `device_id`，保存未冗余 `device_code`/`device_name` | 列表/历史依赖实时 JOIN，删设备后单据裸 UUID |
+| C2 | 出库/入库明细设备、仓库名称快照不完整 | 与 W.6「有 id 须冗余编码/名称」不符 |
+| C3 | 保养/计量/巡检/PM 执行表与公用费用表 device 冗余 | **已有** `BACKLOG-AST-W01`，本扫描确认仍待做 |
+
+#### D. 变更审计附录 T（P1）→ `BACKLOG-AST-T-OWN-01`
+
+| # | 缺口 | 证据/影响 |
+|---|------|-----------|
+| D1 | `device_ownership_period` / `device_location_period` **未**进 `TRACKED_TABLES` | 区间开闭/纠错无 EntityChangeLog；仅靠业务表自身 |
+| D2 | `device_part_replacement`（非维修换件）未进 TRACKED + T.5 | 确认生效后不可改删，更需审计轨迹 |
+| D3 | 处置记录等主数据从表若有独立 CRUD，核对是否漏挂 | 与 T.5 同步扩展 |
+
+当前 TRACKED 已含：`medical_device`、证照/培训/档案/UDI、维保等；**不含**归属/位置区间与非维修换件。
+
+#### E. 多端途径（P2）→ `BACKLOG-AST-CH-01`
+
+| # | 缺口 | 说明 |
+|---|------|------|
+| E1 | 调拨/报废/盘点/仓单缺 `*_channel` 或 Web 历史未回填 `web` | App/小程序一旦做写，须同批加列+落库+日志 client（§5.10） |
+| E2 | 归属/位置只读约定已定（WX-BIND / MOB-OWN-RO）；写途径待移动端写入口排期时补 | 勿提前盲填未发生动作的行 |
+
+#### F. 建议实施顺序
+
+1. **P0**：`BACKLOG-AST-SD-01`（盘点明细软删 + exists 过滤）→ `BACKLOG-AST-W5-01`（台账责任人姓名 + 调拨审计姓名）→ `BACKLOG-AST-W6-01` 中调拨 device 冗余  
+2. **P1**：区间/换件进 EntityChangeLog（`BACKLOG-AST-T-OWN-01`）；其余 W.6 并 `BACKLOG-AST-W01`  
+3. **P2**：途径列 `BACKLOG-AST-CH-01`（与移动端写入口同批）
+
+> **衍生提醒（未单独立项）**：盘点盈亏写回台账仍见 `BACKLOG-AST-YK-01`；与软删/审计补强解耦，勿混批。
+
+> **确认并落地（2026-11-24）**：用户确认后已实施 P0——`BACKLOG-AST-SD-01` / `BACKLOG-AST-W5-01` / `BACKLOG-AST-W6-01`（调拨部分）。迁库：`R__columns_biz` + `R__data_fix` + `V1`。P1 区间审计 `AST-T-OWN-01`、P2 途径 `AST-CH-01`、W01 其余冗余仍待排期。
+
+### AST-DUP-IDEMP-01 设备域重复明细与幂等/并发审查（2026-11-24）
+
+> **问题**：多次保存/提交、网络抖动连点、并发编辑，是否会生成重复明细或重复副作用。  
+> **结论**：**会**。仓单主从与审批动作存在明确缺口；盘点相对较好但仍缺防连点与业务键唯一。  
+> **本审查不改代码**；确认后按 BACKLOG 分批改。对照约定包 §6.1 / §6.6（保留明细 id）/ §6.7（乐观锁）。
+
+#### 1. 会重复明细的路径（P0）
+
+| 单据 | 保存策略 | 风险 |
+|------|----------|------|
+| 出库 `device_outbound` | 先软删该单全部明细，再 **每行 `UUID.randomUUID()` INSERT** | 同单连点/并发双请求 → 可见明细翻倍；违反「重写须保留明细 id」 |
+| 退库 `device_return` | 同上 | 同上 |
+| 退货 `device_goods_return` | 同上 | 同上 |
+| 入库 `device_entry` | **物理 DELETE** 全部明细再 INSERT 新 UUID | 同上，且丢失软删追溯；与刚落地的盘点明细软删不一致 |
+| 盘点 `inventory_check` | 按明细 id upsert + 软删未保留行 | **同请求带 id 再保存不重复**；前端丢 id / 新建无 id 仍可能插新行 |
+
+新建主单：`MasterDetailPage.openCreate` **不预生成** `id`，后端无 id 时 `UUID.randomUUID()` → **连点保存可生成两张主单 + 两套明细**。
+
+#### 2. 提交 / 审核 / 发放副作用（P0）
+
+| 动作 | 现状 | 风险 |
+|------|------|------|
+| `ApprovalInstanceService.submit` | 每次直接 INSERT 新 `sys_approval_instance`，不查是否已有 pending | 连点提交 → 多条审批实例 |
+| 前端 `submitApproval` | 仅看列表态；无按钮 loading / 请求锁 | 网络慢时易连点 |
+| 出库 `issue` | **无**「已发放则跳过」状态条件；每次 `openPeriodFromLedger` | 连点发放 → 重复开归属区间 |
+| 退库/退货 `complete` | 有「已完成/已审核」校验 | 相对安全；仍缺前端锁 |
+| 盘点 approve/complete | 有审核态校验 | 相对安全；前端盘点页亦需统一防连点 |
+
+「修改再保存」本身（单次成功请求内）出库类不会因「改字段」静默翻倍；**危险点是并发/连点两次写**，以及审批/发放副作用。
+
+#### 3. 前端防连点（P0）
+
+| 位置 | 现状 |
+|------|------|
+| `MasterDetailPage` 保存按钮 | **无** `:loading` / `saving` 互斥；`saveMaster` 可并行触发 |
+| 提交/撤回/通过/驳回 | **无**请求中锁 |
+| 台账 Sheet 局部面板 | 部分已有 `saving`（档案/证照等），主从页未对齐 |
+
+#### 4. 并发（P1）
+
+| 项 | 现状 |
+|----|------|
+| 明细 `row_version` | 盘点明细有列，仓单保存路径 **未**做冲突检测 |
+| 业务键唯一 | 未见 `(outbound_id, device_id) WHERE is_deleted=0` 一类唯一约束 |
+| 双人同单编辑 | 后写覆盖/软删对方行；无冲突提示 |
+| 多端 | 约定包 §6.7 要求事件流水+乐观锁；设备仓单未落地 |
+
+#### 5. 建议定稿（待确认后开发）
+
+1. **保存模型**：主从一律 **upsert 保留明细 id**；未带回的已有行才软删；禁止全量删再插新 UUID（入库改齐）。  
+2. **新建**：打开表单即生成主单 UUID（或首保存响应回写 id 且按钮锁定至返回）。  
+3. **防连点**：`MasterDetailPage`（及同类）保存/提交/审核按钮 `loading` + 进行中短路。  
+4. **状态幂等**：`submit` 若已有 pending 实例则返回原实例；`issue`/`complete` 用 `WHERE status IN (...)` 条件更新，影响行=0 则视为已处理。  
+5. **并发（可 P1）**：活跃明细业务键唯一 + `row_version` 冲突 409；与 OPS 执行单模式对齐。
+
+> **BACKLOG**：`BACKLOG-AST-DUP-01`（upsert） / `02`（防连点+审批/发放幂等） / `03`（唯一+乐观锁）。
+
+
+AST-T-OWN-01（P1）、AST-CH-01（P2）、AST-W01 其余执行表冗余。

@@ -1456,3 +1456,39 @@ CREATE INDEX IF NOT EXISTS idx_sys_user_wx_bind_openid ON sys_user_wx_bind(wx_op
 CREATE UNIQUE INDEX IF NOT EXISTS uk_sys_user_wx_bind_openid_active
     ON sys_user_wx_bind (wx_openid)
     WHERE effective_to IS NULL AND COALESCE(is_deleted, 0) = 0 AND wx_openid <> '';
+
+-- AST-AUDIT-CONV-01 / BACKLOG-AST-W5/W6：调拨设备冗余 + 姓名快照；盘点人员姓名；报废审计姓名
+ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS device_code VARCHAR(20);
+ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS device_name VARCHAR(200);
+ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS applicant_name VARCHAR(100);
+ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
+ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(100);
+ALTER TABLE asset_transfer ADD COLUMN IF NOT EXISTS deleted_by_name VARCHAR(100);
+COMMENT ON COLUMN asset_transfer.device_code IS '设备编码快照（W.6）';
+COMMENT ON COLUMN asset_transfer.device_name IS '设备名称快照（W.6）';
+COMMENT ON COLUMN asset_transfer.applicant_name IS '申请人姓名快照（W.5）';
+COMMENT ON COLUMN asset_transfer.created_by_name IS '制单人姓名快照（W.5）';
+COMMENT ON COLUMN asset_transfer.updated_by_name IS '最后修改人姓名快照（W.5）';
+COMMENT ON COLUMN asset_transfer.deleted_by_name IS '删除人姓名快照（W.5）';
+
+ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS checker_name VARCHAR(100);
+ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS supervisor_name VARCHAR(100);
+ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
+ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(100);
+ALTER TABLE inventory_check ADD COLUMN IF NOT EXISTS deleted_by_name VARCHAR(100);
+COMMENT ON COLUMN inventory_check.checker_name IS '盘点人姓名快照（W.5）';
+COMMENT ON COLUMN inventory_check.supervisor_name IS '监盘人姓名快照（W.5）';
+COMMENT ON COLUMN inventory_check.created_by_name IS '制单人姓名快照（W.5）';
+
+ALTER TABLE inventory_check_item ADD COLUMN IF NOT EXISTS checker_name VARCHAR(100);
+ALTER TABLE inventory_check_item ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
+ALTER TABLE inventory_check_item ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(100);
+ALTER TABLE inventory_check_item ADD COLUMN IF NOT EXISTS deleted_by_name VARCHAR(100);
+COMMENT ON COLUMN inventory_check_item.checker_name IS '盘点人姓名快照（W.5）';
+
+ALTER TABLE device_scrap ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(100);
+ALTER TABLE device_scrap ADD COLUMN IF NOT EXISTS updated_by_name VARCHAR(100);
+ALTER TABLE device_scrap ADD COLUMN IF NOT EXISTS deleted_by_name VARCHAR(100);
+COMMENT ON COLUMN device_scrap.created_by_name IS '制单人姓名快照（W.5）';
+COMMENT ON COLUMN device_scrap.updated_by_name IS '最后修改人姓名快照（W.5）';
+COMMENT ON COLUMN device_scrap.deleted_by_name IS '删除人姓名快照（W.5）';

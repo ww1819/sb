@@ -296,6 +296,7 @@ public abstract class GenericTableController {
         denyRepairWorkorderBypass(table);
         if ("medical_device".equals(table)) {
             MedicalDeviceFieldHelper.applyDerivedFields(body, null);
+            fillMedicalDeviceUserNames(body);
         }
         prepareInsertDefaults(table, body);
         applyOpsSystemDocNosOnCreate(table, body);
@@ -348,6 +349,7 @@ public abstract class GenericTableController {
                             + SoftDeleteSupport.notDeletedClause(jdbc(), "medical_device", null),
                     id).stream().findFirst().orElse(null);
             MedicalDeviceFieldHelper.applyDerivedFields(body, existingDevice);
+            fillMedicalDeviceUserNames(body);
             // 附录 P：设备编码创建后禁止修改
             body.remove("device_code");
         }
@@ -719,5 +721,24 @@ public abstract class GenericTableController {
             case "medical_device_category" -> ImportFieldRegistry.DEVICE_CATEGORY;
             default -> null;
         };
+    }
+
+    /** W.5：台账责任人 UUID 变更时同事务写姓名快照（前端 fillFromLink 兜底） */
+    private void fillMedicalDeviceUserNames(Map<String, Object> body) {
+        if (body == null) return;
+        fillUserNameSnapshot(body, "clinical_owner_user_id", "clinical_owner_name");
+        fillUserNameSnapshot(body, "asset_manager_user_id", "asset_manager_name");
+    }
+
+    private void fillUserNameSnapshot(Map<String, Object> body, String idKey, String nameKey) {
+        if (!body.containsKey(idKey)) return;
+        Object id = body.get(idKey);
+        if (id == null || String.valueOf(id).isBlank()) {
+            body.put(nameKey, null);
+            return;
+        }
+        Object existing = body.get(nameKey);
+        if (existing != null && !String.valueOf(existing).isBlank()) return;
+        body.put(nameKey, SoftDeleteSupport.resolveUserDisplayName(jdbc(), id));
     }
 }

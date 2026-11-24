@@ -6,6 +6,7 @@ import com.meis.saas.common.page.FilterCsvSupport;
 import com.meis.saas.common.page.PageQuery;
 import com.meis.saas.common.page.PageResult;
 import com.meis.saas.common.persistence.SoftDeleteSupport;
+import com.meis.saas.common.persistence.TableColumnCache;
 import com.meis.saas.common.result.Result;
 import com.meis.saas.common.tenant.TenantContext;
 import com.meis.saas.common.workflow.ApprovalInstanceService;
@@ -80,34 +81,82 @@ public class DeviceScrapController {
     @OperationLog(module = "asset", description = "保存报废单")
     public Result<Map<String, Object>> save(@RequestBody Map<String, Object> body) {
         UUID id = body.containsKey("id") ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
-        boolean exists = !jdbc.queryForList("SELECT 1 FROM device_scrap WHERE id = ?::uuid", id).isEmpty();
+        boolean exists = !jdbc.queryForList(
+                "SELECT 1 FROM device_scrap WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "device_scrap", null), id).isEmpty();
+        Map<String, Object> deviceSnap = resolveDeviceSnap(body.get("device_id"), body.get("device_code"), body.get("device_name"));
         if (exists) {
             assertMutable(id);
             String applicantName = resolveName(body.get("applicant_id"));
             String evaluatorName = resolveName(body.get("evaluator_id"));
-            jdbc.update("""
-                UPDATE device_scrap SET device_id=?::uuid, device_code=?, device_name=?, scrap_reason=?, scrap_type=?,
-                application_date=?, evaluator_id=?::uuid, evaluator_name=COALESCE(?, evaluator_name),
-                evaluation_result=?, residual_value=?, disposal_method=?, disposal_destination=?, disposal_proof_url=?,
-                disposal_date=?, remark=?, applicant_name=COALESCE(?, applicant_name), updated_at=NOW()
-                WHERE id=?::uuid
-                """, body.get("device_id"), body.get("device_code"), body.get("device_name"), body.get("scrap_reason"),
-                    body.get("scrap_type"), body.get("application_date"), body.get("evaluator_id"), evaluatorName,
-                    body.get("evaluation_result"), body.get("residual_value"), body.get("disposal_method"),
-                    body.get("disposal_destination"), body.get("disposal_proof_url"),
-                    body.get("disposal_date"), body.get("remark"), applicantName, id);
+            List<String> sets = new ArrayList<>();
+            List<Object> args = new ArrayList<>();
+            sets.add("device_id=?::uuid");
+            args.add(body.get("device_id"));
+            sets.add("device_code=?");
+            args.add(deviceSnap.get("device_code"));
+            sets.add("device_name=?");
+            args.add(deviceSnap.get("device_name"));
+            sets.add("scrap_reason=?");
+            args.add(body.get("scrap_reason"));
+            sets.add("scrap_type=?");
+            args.add(body.get("scrap_type"));
+            sets.add("application_date=?");
+            args.add(body.get("application_date"));
+            sets.add("evaluator_id=?::uuid");
+            args.add(body.get("evaluator_id"));
+            sets.add("evaluator_name=COALESCE(?, evaluator_name)");
+            args.add(evaluatorName);
+            sets.add("evaluation_result=?");
+            args.add(body.get("evaluation_result"));
+            sets.add("residual_value=?");
+            args.add(body.get("residual_value"));
+            sets.add("disposal_method=?");
+            args.add(body.get("disposal_method"));
+            sets.add("disposal_destination=?");
+            args.add(body.get("disposal_destination"));
+            sets.add("disposal_proof_url=?");
+            args.add(body.get("disposal_proof_url"));
+            sets.add("disposal_date=?");
+            args.add(body.get("disposal_date"));
+            sets.add("remark=?");
+            args.add(body.get("remark"));
+            sets.add("applicant_name=COALESCE(?, applicant_name)");
+            args.add(applicantName);
+            SoftDeleteSupport.appendUpdateAuditSets(jdbc, TableColumnCache.columns(jdbc, "device_scrap"), sets, args);
+            SoftDeleteSupport.appendUpdateChannelFromBody(jdbc, "device_scrap", sets, args, body);
+            args.add(id);
+            jdbc.update("UPDATE device_scrap SET " + String.join(", ", sets)
+                    + " WHERE id=?::uuid"
+                    + SoftDeleteSupport.notDeletedClause(jdbc, "device_scrap", null), args.toArray());
         } else {
             String userId = TenantContext.getUserId();
             Object applicantId = body.get("applicant_id") != null ? body.get("applicant_id") : userId;
             String applicantName = resolveName(applicantId);
+            Map<String, Object> audit = new LinkedHashMap<>(body);
+            SoftDeleteSupport.applyInsertAudit(jdbc, "device_scrap", audit);
             jdbc.update("""
                 INSERT INTO device_scrap (id, scrap_no, device_id, device_code, device_name, scrap_reason, scrap_type,
-                applicant_id, applicant_name, application_date, status, approval_status) VALUES (?::uuid,?,?::uuid,?,?,?,?,?::uuid,?,?,?,?)
+                applicant_id, applicant_name, application_date, status, approval_status,
+                created_by, created_by_name, is_deleted)
+                VALUES (?::uuid,?,?::uuid,?,?,?,?,?::uuid,?,?,?,?,?::uuid,?,0)
                 """, id, body.getOrDefault("scrap_no", "SC" + System.currentTimeMillis()), body.get("device_id"),
-                    body.get("device_code"), body.get("device_name"), body.get("scrap_reason"), body.get("scrap_type"),
-                    applicantId, applicantName, body.get("application_date"), "draft", "draft");
+                    deviceSnap.get("device_code"), deviceSnap.get("device_name"), body.get("scrap_reason"), body.get("scrap_type"),
+                    applicantId, applicantName, body.get("application_date"), "draft", "draft",
+                    audit.get("created_by"), audit.get("created_by_name"));
+            SoftDeleteSupport.applyChannels(jdbc, "device_scrap", id, body, "create_channel", "update_channel");
         }
         return get(id);
+    }
+
+    @DeleteMapping("/{id}")
+    @Transactional
+    @OperationLog(module = "asset", description = "删除报废单")
+    public Result<Void> delete(@PathVariable UUID id, @RequestParam(required = false) String client) {
+        assertMutable(id);
+        int n = SoftDeleteSupport.softDelete(jdbc, "device_scrap", id.toString(), client);
+        if (n == 0) throw new BizException(404, "not found");
+        return Result.ok();
     }
 
     @PostMapping("/{id}/evaluate")
@@ -123,7 +172,8 @@ public class DeviceScrapController {
         jdbc.update("""
                 UPDATE device_scrap SET evaluator_id=?::uuid, evaluator_name=?, evaluation_result=?, residual_value=?,
                 updated_at=NOW() WHERE id=?::uuid
-                """, evaluatorId, evaluatorName, body.get("evaluation_result"), body.get("residual_value"), id);
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "device_scrap", null),
+                evaluatorId, evaluatorName, body.get("evaluation_result"), body.get("residual_value"), id);
         return get(id);
     }
 
@@ -144,7 +194,8 @@ public class DeviceScrapController {
                 : (TenantContext.getUserId() != null ? UUID.fromString(TenantContext.getUserId()) : null);
         if (applicantId == null) throw new BizException(400, "缺少申请人");
         String applicantName = SoftDeleteSupport.resolveUserDisplayName(jdbc, applicantId);
-        jdbc.update("UPDATE device_scrap SET applicant_id=?::uuid, applicant_name=?, updated_at=NOW() WHERE id=?::uuid",
+        jdbc.update("UPDATE device_scrap SET applicant_id=?::uuid, applicant_name=?, updated_at=NOW() WHERE id=?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "device_scrap", null),
                 applicantId, applicantName, id);
         approvalService.submit("device_scrap", id, row.get("scrap_no").toString(),
                 "设备报废 " + row.get("scrap_no"), applicantId, 0);
@@ -171,7 +222,8 @@ public class DeviceScrapController {
         jdbc.update("""
                 UPDATE device_scrap SET disposal_method=?, disposal_destination=?, disposal_proof_url=?,
                 disposal_date=?, status='disposed', updated_at=NOW() WHERE id=?::uuid
-                """, method, body.get("disposal_destination"), body.get("disposal_proof_url"),
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "device_scrap", null),
+                method, body.get("disposal_destination"), body.get("disposal_proof_url"),
                 body.get("disposal_date"), id);
         return get(id);
     }
@@ -192,6 +244,25 @@ public class DeviceScrapController {
         }
     }
 
+    private Map<String, Object> resolveDeviceSnap(Object deviceId, Object codeHint, Object nameHint) {
+        Map<String, Object> snap = new LinkedHashMap<>();
+        String code = blankToNull(codeHint);
+        String name = blankToNull(nameHint);
+        if (deviceId != null && !String.valueOf(deviceId).isBlank()) {
+            var rows = jdbc.queryForList(
+                    "SELECT device_code, device_name FROM medical_device WHERE id = ?::uuid"
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "medical_device", null),
+                    deviceId);
+            if (!rows.isEmpty()) {
+                if (code == null) code = blankToNull(rows.get(0).get("device_code"));
+                if (name == null) name = blankToNull(rows.get(0).get("device_name"));
+            }
+        }
+        snap.put("device_code", code);
+        snap.put("device_name", name);
+        return snap;
+    }
+
     private String resolveName(Object userId) {
         if (userId == null || userId.toString().isBlank()) return null;
         try {
@@ -199,5 +270,11 @@ public class DeviceScrapController {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private static String blankToNull(Object v) {
+        if (v == null) return null;
+        String s = String.valueOf(v).trim();
+        return s.isEmpty() || "null".equalsIgnoreCase(s) ? null : s;
     }
 }

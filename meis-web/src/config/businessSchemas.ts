@@ -292,7 +292,8 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
       prop: 'clinical_owner_user_id',
       label: '临床责任人',
       linkTable: 'sys_user',
-      group: 'basic'
+      group: 'basic',
+      fillFromLink: { clinical_owner_name: 'real_name' }
     },
     { prop: 'clinical_owner_name', label: '临床责任人姓名', group: 'basic', readonly: true, form: false },
     { prop: 'dept_id', label: '科室', linkTable: 'department', group: 'basic' },
@@ -304,7 +305,8 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
       prop: 'asset_manager_user_id',
       label: '资产管理员',
       linkTable: 'sys_user',
-      group: 'basic'
+      group: 'basic',
+      fillFromLink: { asset_manager_name: 'real_name' }
     },
     { prop: 'asset_manager_name', label: '资产管理员姓名', group: 'basic', readonly: true, form: false },
     { prop: 'manage_dept_id', label: '管理科室', linkTable: 'department', group: 'basic' },
@@ -558,7 +560,15 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   asset_transfer: [
     { prop: 'transfer_no', label: '流转单号', list: true, readonly: true },
     { prop: 'transfer_type', label: '流转类型', dictType: 'transfer_type', list: true },
-    { prop: 'device_id', label: '设备', linkTable: 'medical_device', list: true },
+    {
+      prop: 'device_id',
+      label: '设备',
+      linkTable: 'medical_device',
+      list: true,
+      fillFromLink: { device_code: 'device_code', device_name: 'device_name' }
+    },
+    { prop: 'device_code', label: '设备编码', list: true, readonly: true, form: false },
+    { prop: 'device_name', label: '设备名称', list: true, readonly: true, form: false },
     { prop: 'from_dept_id', label: '转出科室', linkTable: 'department', list: true },
     { prop: 'to_dept_id', label: '转入科室', linkTable: 'department', list: true },
     { prop: 'from_campus_id', label: '转出院区', linkTable: 'campus' },
@@ -567,6 +577,8 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'to_warehouse_id', label: '转入库房', linkTable: 'warehouse', list: true },
     { prop: 'transfer_date', label: '流转日期', type: 'date', list: true },
     { prop: 'reason', label: '流转原因', type: 'textarea' },
+    { prop: 'applicant_name', label: '申请人', list: true, readonly: true, form: false },
+    { prop: 'created_by_name', label: '制单人', list: true, readonly: true, form: false },
     { prop: 'status', label: '状态', dictType: 'transfer_status', list: true },
     { prop: 'remark', label: '备注', type: 'textarea' }
   ],
@@ -580,9 +592,22 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
     { prop: 'warehouse_id', label: '盘点库房', linkTable: 'warehouse', list: true },
     { prop: 'start_date', label: '计划开始', type: 'date', list: true },
     { prop: 'end_date', label: '计划结束', type: 'date' },
-    { prop: 'checker_id', label: '盘点人', linkTable: 'sys_user' },
-    { prop: 'supervisor_id', label: '监盘人', linkTable: 'sys_user' },
+    {
+      prop: 'checker_id',
+      label: '盘点人',
+      linkTable: 'sys_user',
+      fillFromLink: { checker_name: 'real_name' }
+    },
+    { prop: 'checker_name', label: '盘点人', list: true, readonly: true, form: false },
+    {
+      prop: 'supervisor_id',
+      label: '监盘人',
+      linkTable: 'sys_user',
+      fillFromLink: { supervisor_name: 'real_name' }
+    },
+    { prop: 'supervisor_name', label: '监盘人', list: false, readonly: true, form: false },
     { prop: 'created_by', label: '制单人', linkTable: 'sys_user', list: true, readonly: true },
+    { prop: 'created_by_name', label: '制单人', list: true, readonly: true, form: false },
     { prop: 'created_at', label: '制单时间', type: 'datetime', list: true, readonly: true },
     { prop: 'approved_by_name', label: '审核人', list: true, readonly: true, form: false },
     { prop: 'approved_at', label: '审核时间', type: 'datetime', list: true, readonly: true },
@@ -734,14 +759,25 @@ export const businessSchemas: Record<string, FieldSchema[]> = {
   ],
   device_scrap: [
     { prop: 'scrap_no', label: '报废单号', list: true, readonly: true },
-    { prop: 'device_id', label: '设备', linkTable: 'medical_device', list: true },
+    {
+      prop: 'device_id',
+      label: '设备',
+      linkTable: 'medical_device',
+      list: true,
+      fillFromLink: { device_code: 'device_code', device_name: 'device_name' }
+    },
     { prop: 'device_code', label: '设备编码', list: true, readonly: true },
     { prop: 'device_name', label: '设备名称', list: true, readonly: true },
     { prop: 'scrap_reason', label: '报废原因', type: 'textarea', list: true, required: true },
     { prop: 'scrap_type', label: '报废类型', dictType: 'scrap_type', list: true },
     { prop: 'application_date', label: '申请日期', type: 'date', list: true },
     { prop: 'applicant_name', label: '申请人', list: true, readonly: true },
-    { prop: 'evaluator_id', label: '评估人', linkTable: 'sys_user' },
+    {
+      prop: 'evaluator_id',
+      label: '评估人',
+      linkTable: 'sys_user',
+      fillFromLink: { evaluator_name: 'real_name' }
+    },
     { prop: 'evaluator_name', label: '评估人姓名', readonly: true },
     { prop: 'evaluation_result', label: '评估结论', type: 'textarea' },
     { prop: 'residual_value', label: '残值', type: 'number' },

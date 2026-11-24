@@ -1269,6 +1269,8 @@ CREATE TABLE asset_transfer (
     transfer_no VARCHAR(30) UNIQUE NOT NULL,
     transfer_type VARCHAR(20) NOT NULL,
     device_id UUID REFERENCES medical_device(id),
+    device_code VARCHAR(20),
+    device_name VARCHAR(200),
     from_dept_id UUID REFERENCES department(id),
     to_dept_id UUID REFERENCES department(id),
     from_campus_id UUID REFERENCES campus(id),
@@ -1276,6 +1278,7 @@ CREATE TABLE asset_transfer (
     from_warehouse_id UUID REFERENCES warehouse(id),
     to_warehouse_id UUID REFERENCES warehouse(id),
     applicant_id UUID REFERENCES sys_user(id),
+    applicant_name VARCHAR(100),
     approver_id UUID REFERENCES sys_user(id),
     approved_at TIMESTAMP WITH TIME ZONE,
     transfer_date DATE,
@@ -1284,6 +1287,11 @@ CREATE TABLE asset_transfer (
     remark TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    deleted_by_name VARCHAR(100),
     approval_status VARCHAR(20)
 );
 COMMENT ON TABLE asset_transfer IS '资产流转记录表';
@@ -1291,11 +1299,14 @@ COMMENT ON COLUMN asset_transfer.id IS '主键';
 COMMENT ON COLUMN asset_transfer.transfer_no IS '流转编号';
 COMMENT ON COLUMN asset_transfer.transfer_type IS 'transfer type';
 COMMENT ON COLUMN asset_transfer.device_id IS '关联设备';
+COMMENT ON COLUMN asset_transfer.device_code IS '设备编码快照（W.6）';
+COMMENT ON COLUMN asset_transfer.device_name IS '设备名称快照（W.6）';
 COMMENT ON COLUMN asset_transfer.from_dept_id IS '关联fromdept';
 COMMENT ON COLUMN asset_transfer.to_dept_id IS '关联todept';
 COMMENT ON COLUMN asset_transfer.from_campus_id IS '关联fromcampus';
 COMMENT ON COLUMN asset_transfer.to_campus_id IS '关联tocampus';
 COMMENT ON COLUMN asset_transfer.applicant_id IS '关联申请人';
+COMMENT ON COLUMN asset_transfer.applicant_name IS '申请人姓名快照（W.5）';
 COMMENT ON COLUMN asset_transfer.approver_id IS '关联审批人';
 COMMENT ON COLUMN asset_transfer.approved_at IS '审核时间';
 COMMENT ON COLUMN asset_transfer.transfer_date IS 'transfer日期';
@@ -1304,6 +1315,7 @@ COMMENT ON COLUMN asset_transfer.status IS '状态';
 COMMENT ON COLUMN asset_transfer.remark IS '备注';
 COMMENT ON COLUMN asset_transfer.created_at IS '创建时间';
 COMMENT ON COLUMN asset_transfer.updated_at IS '更新时间';
+COMMENT ON COLUMN asset_transfer.created_by_name IS '制单人姓名快照（W.5）';
 COMMENT ON COLUMN asset_transfer.approval_status IS '审批状态';
 
 -- 4.6 资产盘点表
@@ -1321,7 +1333,9 @@ CREATE TABLE inventory_check (
     actual_start_at TIMESTAMP WITH TIME ZONE,
     actual_end_at TIMESTAMP WITH TIME ZONE,
     checker_id UUID REFERENCES sys_user(id),
+    checker_name VARCHAR(100),
     supervisor_id UUID REFERENCES sys_user(id),
+    supervisor_name VARCHAR(100),
     total_count INTEGER,
     checked_count INTEGER DEFAULT 0,
     matched_count INTEGER DEFAULT 0,
@@ -1334,6 +1348,9 @@ CREATE TABLE inventory_check (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by UUID REFERENCES sys_user(id),
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    deleted_by_name VARCHAR(100),
     approved_by UUID REFERENCES sys_user(id),
     approved_by_name VARCHAR(100),
     approved_at TIMESTAMP WITH TIME ZONE
@@ -1351,7 +1368,9 @@ COMMENT ON COLUMN inventory_check.end_date IS '结束日期';
 COMMENT ON COLUMN inventory_check.actual_start_at IS '实际开始时间';
 COMMENT ON COLUMN inventory_check.actual_end_at IS '实际结束时间';
 COMMENT ON COLUMN inventory_check.checker_id IS '盘点人';
+COMMENT ON COLUMN inventory_check.checker_name IS '盘点人姓名快照（W.5）';
 COMMENT ON COLUMN inventory_check.supervisor_id IS '监盘人';
+COMMENT ON COLUMN inventory_check.supervisor_name IS '监盘人姓名快照（W.5）';
 COMMENT ON COLUMN inventory_check.total_count IS '应盘数量';
 COMMENT ON COLUMN inventory_check.checked_count IS '已盘数量';
 COMMENT ON COLUMN inventory_check.matched_count IS '盘实相符数量';
@@ -1364,6 +1383,7 @@ COMMENT ON COLUMN inventory_check.remark IS '备注';
 COMMENT ON COLUMN inventory_check.created_at IS '创建时间';
 COMMENT ON COLUMN inventory_check.updated_at IS '更新时间';
 COMMENT ON COLUMN inventory_check.created_by IS '制单人';
+COMMENT ON COLUMN inventory_check.created_by_name IS '制单人姓名快照（W.5）';
 COMMENT ON COLUMN inventory_check.approved_by IS '审核人';
 COMMENT ON COLUMN inventory_check.approved_at IS '审核时间';
 COMMENT ON COLUMN inventory_check.approved_by_name IS '审核人姓名快照（W.5）';
@@ -1386,9 +1406,13 @@ CREATE TABLE inventory_check_item (
     condition_status VARCHAR(20),
     check_date TIMESTAMP WITH TIME ZONE,
     checker_id UUID REFERENCES sys_user(id),
+    checker_name VARCHAR(100),
     photos JSONB,
     remark TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    deleted_by_name VARCHAR(100)
 );
 COMMENT ON TABLE inventory_check_item IS '资产盘点明细表';
 COMMENT ON COLUMN inventory_check_item.id IS '主键';
@@ -1406,6 +1430,7 @@ COMMENT ON COLUMN inventory_check_item.label_print_count IS '本明细标签打�
 COMMENT ON COLUMN inventory_check_item.condition_status IS '设备状况';
 COMMENT ON COLUMN inventory_check_item.check_date IS '盘点/巡检日期';
 COMMENT ON COLUMN inventory_check_item.checker_id IS '盘点人';
+COMMENT ON COLUMN inventory_check_item.checker_name IS '盘点人姓名快照（W.5）';
 COMMENT ON COLUMN inventory_check_item.photos IS '现场照片JSON';
 COMMENT ON COLUMN inventory_check_item.remark IS '备注';
 COMMENT ON COLUMN inventory_check_item.created_at IS '创建时间';
@@ -1438,7 +1463,10 @@ CREATE TABLE device_scrap (
     approval_status VARCHAR(20),
     applicant_name VARCHAR(100),
     evaluator_name VARCHAR(100),
-    approver_name VARCHAR(100)
+    approver_name VARCHAR(100),
+    created_by_name VARCHAR(100),
+    updated_by_name VARCHAR(100),
+    deleted_by_name VARCHAR(100)
 );
 COMMENT ON TABLE device_scrap IS '设备报废表';
 COMMENT ON COLUMN device_scrap.id IS '主键';
@@ -1468,6 +1496,9 @@ COMMENT ON COLUMN device_scrap.approval_status IS '审批状态';
 COMMENT ON COLUMN device_scrap.applicant_name IS '申请人姓名快照（W.5）';
 COMMENT ON COLUMN device_scrap.evaluator_name IS '评估人姓名快照（W.5）';
 COMMENT ON COLUMN device_scrap.approver_name IS '审批人姓名快照（W.5）';
+COMMENT ON COLUMN device_scrap.created_by_name IS '制单人姓名快照（W.5）';
+COMMENT ON COLUMN device_scrap.updated_by_name IS '最后修改人姓名快照（W.5）';
+COMMENT ON COLUMN device_scrap.deleted_by_name IS '删除人姓名快照（W.5）';
 
 -- 4.x 资产标签打印记录（附录 P）
 CREATE TABLE device_label_print_log (

@@ -229,31 +229,44 @@ public class InventoryCheckController {
     public Result<Map<String, Object>> save(@RequestBody Map<String, Object> body) {
         UUID id = body.containsKey("id") && body.get("id") != null && !body.get("id").toString().isBlank()
                 ? UUID.fromString(body.get("id").toString()) : UUID.randomUUID();
-        boolean exists = !jdbc.queryForList("SELECT 1 FROM inventory_check WHERE id = ?::uuid", id).isEmpty();
+        boolean exists = !jdbc.queryForList(
+                "SELECT 1 FROM inventory_check WHERE id = ?::uuid"
+                        + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check", null), id).isEmpty();
         String userId = TenantContext.getUserId();
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> items = (List<Map<String, Object>>) body.getOrDefault("items", List.of());
+        String checkerName = firstNonBlank(body.get("checker_name"), resolveUserName(asIdString(body.get("checker_id"))));
+        String supervisorName = firstNonBlank(body.get("supervisor_name"), resolveUserName(asIdString(body.get("supervisor_id"))));
 
         if (exists) {
             assertMutable(id);
             jdbc.update("""
                 UPDATE inventory_check SET check_name=?, check_year=?, check_type=?, campus_id=?::uuid, dept_id=?::uuid,
-                warehouse_id=?::uuid, start_date=?, end_date=?, checker_id=?::uuid, supervisor_id=?::uuid, remark=?, total_count=?, updated_at=NOW()
+                warehouse_id=?::uuid, start_date=?, end_date=?, checker_id=?::uuid, checker_name=COALESCE(?, checker_name),
+                supervisor_id=?::uuid, supervisor_name=COALESCE(?, supervisor_name), remark=?, total_count=?, updated_at=NOW()
                 WHERE id=?::uuid
-                """, body.get("check_name"), body.get("check_year"), body.get("check_type"), body.get("campus_id"),
-                    body.get("dept_id"), body.get("warehouse_id"), body.get("start_date"), body.get("end_date"), body.get("checker_id"),
-                    body.get("supervisor_id"), body.get("remark"), items.size(), id);
+                """ + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check", null),
+                    body.get("check_name"), body.get("check_year"), body.get("check_type"), body.get("campus_id"),
+                    body.get("dept_id"), body.get("warehouse_id"), body.get("start_date"), body.get("end_date"),
+                    body.get("checker_id"), checkerName, body.get("supervisor_id"), supervisorName,
+                    body.get("remark"), items.size(), id);
         } else {
+            Map<String, Object> audit = new LinkedHashMap<>(body);
+            SoftDeleteSupport.applyInsertAudit(jdbc, "inventory_check", audit);
             jdbc.update("""
                 INSERT INTO inventory_check (id, check_no, check_name, check_year, check_type, campus_id, dept_id,
-                warehouse_id, start_date, end_date, checker_id, supervisor_id, status, audit_status, total_count, created_by)
-                VALUES (?::uuid,?,?,?,?,?::uuid,?::uuid,?::uuid,?,?,?::uuid,?::uuid,?,?,?,?::uuid)
+                warehouse_id, start_date, end_date, checker_id, checker_name, supervisor_id, supervisor_name,
+                status, audit_status, total_count, created_by, created_by_name, is_deleted)
+                VALUES (?::uuid,?,?,?,?,?::uuid,?::uuid,?::uuid,?,?,?::uuid,?,?::uuid,?,?,?,?,?::uuid,?,0)
                 """, id, body.getOrDefault("check_no", "IC" + System.currentTimeMillis()), body.get("check_name"),
                     body.get("check_year"), body.getOrDefault("check_type", "annual"), body.get("campus_id"),
-                    body.get("dept_id"), body.get("warehouse_id"), body.get("start_date"), body.get("end_date"), body.get("checker_id"),
-                    body.get("supervisor_id"), body.getOrDefault("status", "planning"),
+                    body.get("dept_id"), body.get("warehouse_id"), body.get("start_date"), body.get("end_date"),
+                    body.get("checker_id"), checkerName, body.get("supervisor_id"), supervisorName,
+                    body.getOrDefault("status", "planning"),
                     body.getOrDefault("audit_status", "pending"), items.size(),
-                    userId != null ? UUID.fromString(userId) : null);
+                    audit.get("created_by") != null ? audit.get("created_by")
+                            : (userId != null ? UUID.fromString(userId) : null),
+                    audit.get("created_by_name"));
         }
 
         String checkNo = jdbc.queryForList("SELECT check_no FROM inventory_check WHERE id = ?::uuid", id)
@@ -281,7 +294,7 @@ public class InventoryCheckController {
                                @RequestParam(required = false) String client) {
         assertMutable(id);
         String checkNo = resolveCheckNo(id);
-        jdbc.update("DELETE FROM inventory_check_item WHERE check_id = ?::uuid", id);
+        softDeleteItemsNotIn(id, Set.of());
         int n = SoftDeleteSupport.softDelete(jdbc, "inventory_check", id.toString(), client);
         if (n == 0) throw new BizException(404, "not found");
         docLog.event("asset", "inventory", id, checkNo, "delete",
@@ -611,52 +624,89 @@ public class InventoryCheckController {
             UUID itemId = parseUuid(item.get("id")).orElse(UUID.randomUUID());
             keep.add(itemId);
             boolean exists = !jdbc.queryForList(
-                    "SELECT 1 FROM inventory_check_item WHERE id = ?::uuid AND check_id = ?::uuid",
+                    "SELECT 1 FROM inventory_check_item WHERE id = ?::uuid AND check_id = ?::uuid"
+                            + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check_item", null),
+                    itemId, checkId).isEmpty();
+            boolean softDeleted = !exists && !jdbc.queryForList(
+                    "SELECT 1 FROM inventory_check_item WHERE id = ?::uuid AND check_id = ?::uuid AND is_deleted = 1",
                     itemId, checkId).isEmpty();
             Boolean needReprint = item.containsKey("need_reprint_label")
                     ? asBool(item.get("need_reprint_label")) : null;
-            if (exists) {
-                jdbc.update("""
-                        UPDATE inventory_check_item SET
-                          check_no = COALESCE(?, check_no),
-                          device_id = ?::uuid, device_code = ?, device_name = ?,
-                          expected_location = ?, actual_location = ?,
-                          is_found = ?, is_matched = ?, condition_status = ?, remark = ?,
-                          need_reprint_label = COALESCE(?, need_reprint_label),
-                          check_date = COALESCE(?, check_date),
-                          checker_id = COALESCE(?::uuid, checker_id)
-                        WHERE id = ?::uuid AND check_id = ?::uuid
-                        """, checkNo, blankToNull(item.get("device_id")), item.get("device_code"), item.get("device_name"),
-                        item.get("expected_location"), item.get("actual_location"),
-                        asBool(item.getOrDefault("is_found", false)),
-                        asBool(item.getOrDefault("is_matched", false)),
-                        item.get("condition_status"), item.get("remark"),
-                        needReprint, item.get("check_date"), blankToNull(item.get("checker_id")),
-                        itemId, checkId);
+            String checkerId = asIdString(item.get("checker_id"));
+            String checkerName = firstNonBlank(item.get("checker_name"), resolveUserName(checkerId));
+            if (exists || softDeleted) {
+                List<String> sets = new ArrayList<>();
+                List<Object> args = new ArrayList<>();
+                sets.add("check_no = COALESCE(?, check_no)");
+                args.add(checkNo);
+                sets.add("device_id = ?::uuid");
+                args.add(blankToNull(item.get("device_id")));
+                sets.add("device_code = ?");
+                args.add(item.get("device_code"));
+                sets.add("device_name = ?");
+                args.add(item.get("device_name"));
+                sets.add("expected_location = ?");
+                args.add(item.get("expected_location"));
+                sets.add("actual_location = ?");
+                args.add(item.get("actual_location"));
+                sets.add("is_found = ?");
+                args.add(asBool(item.getOrDefault("is_found", false)));
+                sets.add("is_matched = ?");
+                args.add(asBool(item.getOrDefault("is_matched", false)));
+                sets.add("condition_status = ?");
+                args.add(item.get("condition_status"));
+                sets.add("remark = ?");
+                args.add(item.get("remark"));
+                sets.add("need_reprint_label = COALESCE(?, need_reprint_label)");
+                args.add(needReprint);
+                sets.add("check_date = COALESCE(?, check_date)");
+                args.add(item.get("check_date"));
+                sets.add("checker_id = COALESCE(?::uuid, checker_id)");
+                args.add(checkerId);
+                sets.add("checker_name = COALESCE(?, checker_name)");
+                args.add(checkerName);
+                if (softDeleted) {
+                    SoftDeleteSupport.appendRestoreSets(TableColumnCache.columns(jdbc, "inventory_check_item"), sets);
+                }
+                SoftDeleteSupport.appendUpdateAuditSets(jdbc, TableColumnCache.columns(jdbc, "inventory_check_item"), sets, args);
+                args.add(itemId);
+                args.add(checkId);
+                jdbc.update("UPDATE inventory_check_item SET " + String.join(", ", sets)
+                        + " WHERE id = ?::uuid AND check_id = ?::uuid", args.toArray());
             } else {
+                Map<String, Object> audit = new LinkedHashMap<>();
+                SoftDeleteSupport.applyInsertAudit(jdbc, "inventory_check_item", audit);
                 jdbc.update("""
                         INSERT INTO inventory_check_item (id, check_id, check_no, device_id, device_code, device_name,
                         expected_location, actual_location, is_found, is_matched, need_reprint_label,
-                        label_printed, label_print_count, condition_status, check_date, checker_id, remark)
-                        VALUES (?::uuid,?::uuid,?,?::uuid,?,?,?,?,?,?,?,FALSE,0,?,?,?::uuid,?)
+                        label_printed, label_print_count, condition_status, check_date, checker_id, checker_name,
+                        remark, created_by, created_by_name, is_deleted)
+                        VALUES (?::uuid,?::uuid,?,?::uuid,?,?,?,?,?,?,?,FALSE,0,?,?,?::uuid,?,?,?::uuid,?,0)
                         """, itemId, checkId, checkNo, blankToNull(item.get("device_id")), item.get("device_code"),
                         item.get("device_name"), item.get("expected_location"), item.get("actual_location"),
                         asBool(item.getOrDefault("is_found", false)),
                         asBool(item.getOrDefault("is_matched", false)),
                         needReprint != null ? needReprint : false,
                         item.get("condition_status"), item.get("check_date"),
-                        blankToNull(item.get("checker_id")), item.get("remark"));
+                        checkerId, checkerName, item.get("remark"),
+                        audit.get("created_by"), audit.get("created_by_name"));
             }
         }
-        if (keep.isEmpty()) {
-            jdbc.update("DELETE FROM inventory_check_item WHERE check_id = ?::uuid", checkId);
-        } else {
+        softDeleteItemsNotIn(checkId, keep);
+    }
+
+    private void softDeleteItemsNotIn(UUID checkId, Set<UUID> keep) {
+        String sql = "SELECT id FROM inventory_check_item WHERE check_id = ?::uuid"
+                + SoftDeleteSupport.notDeletedClause(jdbc, "inventory_check_item", null);
+        List<Object> args = new ArrayList<>();
+        args.add(checkId);
+        if (!keep.isEmpty()) {
             String placeholders = String.join(",", Collections.nCopies(keep.size(), "?::uuid"));
-            List<Object> args = new ArrayList<>();
-            args.add(checkId);
+            sql += " AND id NOT IN (" + placeholders + ")";
             args.addAll(keep);
-            jdbc.update("DELETE FROM inventory_check_item WHERE check_id = ?::uuid AND id NOT IN ("
-                    + placeholders + ")", args.toArray());
+        }
+        for (Map<String, Object> row : jdbc.queryForList(sql, args.toArray())) {
+            SoftDeleteSupport.softDelete(jdbc, "inventory_check_item", String.valueOf(row.get("id")));
         }
     }
 
@@ -733,5 +783,20 @@ public class InventoryCheckController {
         if (value == null) return null;
         if (value instanceof String s && s.isBlank()) return null;
         return value;
+    }
+
+    private static String asIdString(Object value) {
+        Object v = blankToNull(value);
+        return v == null ? null : String.valueOf(v).trim();
+    }
+
+    private static String firstNonBlank(Object... values) {
+        if (values == null) return null;
+        for (Object v : values) {
+            if (v == null) continue;
+            String s = String.valueOf(v).trim();
+            if (!s.isEmpty() && !"null".equalsIgnoreCase(s)) return s;
+        }
+        return null;
     }
 }

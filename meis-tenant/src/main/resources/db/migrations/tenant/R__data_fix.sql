@@ -746,6 +746,38 @@ FROM device_goods_return r WHERE i.return_id = r.id AND (i.return_no IS NULL OR 
 UPDATE inventory_check_item i SET check_no = c.check_no
 FROM inventory_check c WHERE i.check_id = c.id AND (i.check_no IS NULL OR TRIM(i.check_no) = '');
 
+-- AST-AUDIT-CONV-01：调拨设备编码/名称与申请人姓名历史回填
+UPDATE asset_transfer t
+SET device_code = COALESCE(NULLIF(TRIM(t.device_code), ''), d.device_code),
+    device_name = COALESCE(NULLIF(TRIM(t.device_name), ''), d.device_name)
+FROM medical_device d
+WHERE t.device_id = d.id
+  AND (t.device_code IS NULL OR TRIM(t.device_code) = '' OR t.device_name IS NULL OR TRIM(t.device_name) = '');
+
+UPDATE asset_transfer t
+SET applicant_name = COALESCE(NULLIF(TRIM(t.applicant_name), ''), u.real_name)
+FROM sys_user u
+WHERE t.applicant_id = u.id
+  AND (t.applicant_name IS NULL OR TRIM(t.applicant_name) = '');
+
+UPDATE inventory_check c
+SET checker_name = COALESCE(NULLIF(TRIM(c.checker_name), ''), u.real_name)
+FROM sys_user u
+WHERE c.checker_id = u.id
+  AND (c.checker_name IS NULL OR TRIM(c.checker_name) = '');
+
+UPDATE inventory_check c
+SET supervisor_name = COALESCE(NULLIF(TRIM(c.supervisor_name), ''), u.real_name)
+FROM sys_user u
+WHERE c.supervisor_id = u.id
+  AND (c.supervisor_name IS NULL OR TRIM(c.supervisor_name) = '');
+
+UPDATE inventory_check_item i
+SET checker_name = COALESCE(NULLIF(TRIM(i.checker_name), ''), u.real_name)
+FROM sys_user u
+WHERE i.checker_id = u.id
+  AND (i.checker_name IS NULL OR TRIM(i.checker_name) = '');
+
 UPDATE repair_workorder_event e SET wo_no = w.wo_no
 FROM repair_workorder w WHERE e.workorder_id = w.id AND (e.wo_no IS NULL OR TRIM(e.wo_no) = '');
 
